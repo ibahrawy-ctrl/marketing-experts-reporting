@@ -1,0 +1,45 @@
+/* ==========================================================================
+   خبراء التسويق · Marketing Experts — Brand Design Tokens
+   المصدر المعتمد: "دليل الهوية البصرية - خبراء التسويق v2.html" (V2.0, 2026)
+   هذه هي الهوية المعتمدة لمشروع نظام تقارير الأداء والتشغيل الداخلي.
+   ========================================================================== */
+:root {
+  /* ---- Primary: Navy (اللون الأساسي) ---- */
+  --navy:      #243763;  /* الأساسي */
+  --navy-900:  #141F3A;
+  --navy-800:  #1B2A4E;
+  --navy-600:  #2F4880;
+  --navy-100:  #E4E8F1;
+  --navy-50:   #F1F4F9;
+
+  /* ---- Accent: Orange (لون الإجراء / CTA) ---- */
+  --orange:     #FF6E31;
+  --orange-600: #ED5A1C;
+  --orange-100: #FFE5D7;
+  --orange-50:  #FFF3EC;
+
+  /* ---- Ink / Text (النصوص) ---- */
+  --ink:    #1A2030;  /* العنوان الأساسي */
+  --ink-2:  #52596B;  /* نص ثانوي */
+  --ink-3:  #8A91A3;  /* نص باهت / hint */
+
+  /* ---- Surfaces (الأسطح) ---- */
+  --paper:    #FFFFFF;
+  --offwhite: #F6F7FA;
+  --line:     #E6E9F0;
+  --line-2:   #D4D9E4;
+
+  /* ---- Status (الحالات) ---- */
+  --success: #1E9E6A;
+  --alert:   #E04141;
+  --gold:    #E0A82E;
+
+  /* ---- Typography (الخطوط) ---- */
+  --ar: "IBM Plex Sans Arabic", system-ui, sans-serif;  /* العربية / الواجهة */
+  --en: "Inter", system-ui, sans-serif;                  /* اللاتينية / الأرقام */
+}
+
+/* أساسيات: RTL + خط عربي + ارتفاع سطر مريح للقراءة */
+html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+body { font-family: var(--ar); color: var(--ink); line-height: 1.6; direction: rtl; }
+.en  { font-family: var(--en); direction: ltr; unicode-bidi: isolate; }

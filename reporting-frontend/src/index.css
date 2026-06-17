@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  font-family: '"Tajawal"', system-ui, sans-serif;
+  background: #f6f7fa;
+  color: #1a2030;
+  line-height: 1.6;
+  direction: rtl;
+}
+
+.en {
+  font-family: '"Inter"', system-ui, sans-serif;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
