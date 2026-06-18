@@ -25,6 +25,8 @@ interface AuthContextValue {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  // تغيير كلمة المرور للحساب الحالي (تُبطِل كل جلسات التجديد النشطة بالخادم).
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   hasAnyRole: (...roles: Role[]) => boolean;
   // صلاحية اعتماد التقارير (تظهر تبويب «بانتظار اعتمادي» وأزرار الاعتماد).
   canApprove: boolean;
@@ -110,6 +112,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
+  const changePassword = useCallback(async (currentPassword: string, newPassword: string) => {
+    await api.post('/auth/change-password', { currentPassword, newPassword });
+  }, []);
+
   const hasAnyRole = useCallback(
     (...roles: Role[]) => !!user && user.roles.some((r) => roles.includes(r)),
     [user],
@@ -137,8 +143,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, loading, login, logout, hasAnyRole, canApprove, canViewGovernance, canManageTeams, canManageTemplates, canManageClients }),
-    [user, loading, login, logout, hasAnyRole, canApprove, canViewGovernance, canManageTeams, canManageTemplates, canManageClients],
+    () => ({ user, loading, login, logout, changePassword, hasAnyRole, canApprove, canViewGovernance, canManageTeams, canManageTemplates, canManageClients }),
+    [user, loading, login, logout, changePassword, hasAnyRole, canApprove, canViewGovernance, canManageTeams, canManageTemplates, canManageClients],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

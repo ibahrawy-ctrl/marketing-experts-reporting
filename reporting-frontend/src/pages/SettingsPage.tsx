@@ -1,10 +1,12 @@
 // الإعدادات — معلومات الحساب الحالي، الهوية، ودلائل النظام.
+import { useState, type FormEvent } from 'react';
 import { useAuth } from '../lib/auth';
 import { useDirectoryUsers, useTeams, useDepartments } from '../lib/useDirectory';
-import { Card, Badge } from '../components/ui';
+import { Card, Badge, Field, Input, Button, Alert } from '../components/ui';
 import { CardsSkeleton } from '../components/states';
 import { SectionTitle } from '../components/dashboard';
 import { roleLabel } from '../lib/format';
+import { apiErrorMessage } from '../lib/api';
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -41,6 +43,8 @@ export default function SettingsPage() {
         </dl>
       </Card>
 
+      <ChangePasswordCard />
+
       <Card>
         <SectionTitle title="ملخص النظام" />
         {users.isLoading || teams.isLoading || departments.isLoading ? (
@@ -67,6 +71,90 @@ export default function SettingsPage() {
         </div>
       </Card>
     </div>
+  );
+}
+
+// بطاقة تغيير كلمة المرور للحساب الحالي، مع عرض سياسة كلمة المرور وإظهار رسالة الخادم (لمعرفة الشرط الناقص).
+function ChangePasswordCard() {
+  const { changePassword } = useAuth();
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [status, setStatus] = useState<'idle' | 'saving'>('idle');
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSuccess(false);
+
+    if (newPassword !== confirmPassword) {
+      setError('كلمة المرور الجديدة وتأكيدها غير متطابقين.');
+      return;
+    }
+
+    setStatus('saving');
+    try {
+      await changePassword(currentPassword, newPassword);
+      setSuccess(true);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err) {
+      setError(apiErrorMessage(err, 'تعذّر تغيير كلمة المرور.'));
+    } finally {
+      setStatus('idle');
+    }
+  }
+
+  return (
+    <Card>
+      <SectionTitle title="تغيير كلمة المرور" />
+      <form onSubmit={onSubmit} className="space-y-4">
+        <Alert tone="navy">
+          سياسة كلمة المرور: 8 أحرف على الأقل، وتشمل حرفًا كبيرًا (A-Z) وحرفًا صغيرًا (a-z) ورقمًا (0-9).
+        </Alert>
+
+        <Field label="كلمة المرور الحالية">
+          <Input
+            type="password"
+            autoComplete="current-password"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+            required
+          />
+        </Field>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="كلمة المرور الجديدة">
+            <Input
+              type="password"
+              autoComplete="new-password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              required
+            />
+          </Field>
+          <Field label="تأكيد كلمة المرور الجديدة">
+            <Input
+              type="password"
+              autoComplete="new-password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+            />
+          </Field>
+        </div>
+
+        {error && <Alert tone="alert">{error}</Alert>}
+        {success && <Alert tone="success">تم تغيير كلمة المرور بنجاح. ستُنهى الجلسات الأخرى.</Alert>}
+
+        <Button type="submit" disabled={status === 'saving'}>
+          {status === 'saving' ? 'جارٍ الحفظ…' : 'تغيير كلمة المرور'}
+        </Button>
+      </form>
+    </Card>
   );
 }
 

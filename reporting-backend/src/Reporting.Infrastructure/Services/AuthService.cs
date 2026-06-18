@@ -83,6 +83,36 @@ public class AuthService : IAuthService
             user.Id, user.FullName, user.Email ?? string.Empty, user.IsActive, roles.ToArray(), cadence));
     }
 
+    public async Task<Result> ChangePasswordAsync(Guid userId, ChangePasswordRequest request, CancellationToken ct = default)
+    {
+        var user = await _users.FindByIdAsync(userId.ToString());
+        if (user is null)
+            return Result.Failure("المستخدم غير موجود.", "auth.not_found");
+
+        var result = await _users.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword);
+        if (!result.Succeeded)
+        {
+            // كلمة المرور الحالية خاطئة.
+            if (result.Errors.Any(e => e.Code == "PasswordMismatch"))
+                return Result.Failure("كلمة المرور الحالية غير صحيحة.", "auth.invalid_credentials");
+
+            // كلمة المرور الجديدة لا تستوفي الشروط.
+            return Result.Failure(
+                "كلمة المرور الجديدة لا تستوفي الشروط (8 أحرف على الأقل، وتشمل حرفًا كبيرًا وصغيرًا ورقمًا).",
+                "auth.password_invalid");
+        }
+
+        // إبطال كل جلسات التجديد النشطة بعد تغيير كلمة المرور (إنهاء أي جلسات أخرى).
+        var activeTokens = await _db.RefreshTokens
+            .Where(t => t.UserId == userId && t.RevokedAtUtc == null)
+            .ToListAsync(ct);
+        foreach (var token in activeTokens)
+            token.RevokedAtUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync(ct);
+
+        return Result.Success();
+    }
+
     private async Task<AuthResponse> IssueAsync(ApplicationUser user, CancellationToken ct)
     {
         var roles = await _users.GetRolesAsync(user);
