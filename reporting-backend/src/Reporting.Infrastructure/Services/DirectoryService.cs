@@ -223,6 +223,10 @@ public class DirectoryService : IDirectoryService
         if (string.IsNullOrWhiteSpace(fullName))
             return Result<DirectoryUserDto>.Failure("الاسم الكامل مطلوب.", "user.name.required");
 
+        var email = (req.Email ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(email))
+            return Result<DirectoryUserDto>.Failure("البريد الإلكتروني مطلوب.", "user.email.required");
+
         var user = await _users.FindByIdAsync(userId.ToString());
         if (user is null)
             return Result<DirectoryUserDto>.Failure("المستخدم غير موجود.", "user.not_found");
@@ -245,6 +249,21 @@ public class DirectoryService : IDirectoryService
         var orgErr = await ValidateOrgAsync(req.TeamId, req.DepartmentId, req.ManagerId, ct);
         if (orgErr is not null)
             return Result<DirectoryUserDto>.Failure(orgErr.Value.Error, orgErr.Value.Code);
+
+        // تغيير البريد (هوية الدخول): يُمنع التكرار. البريد = UserName أيضًا.
+        if (!string.Equals(user.Email, email, StringComparison.OrdinalIgnoreCase))
+        {
+            var existing = await _users.FindByEmailAsync(email);
+            if (existing is not null && existing.Id != user.Id)
+                return Result<DirectoryUserDto>.Failure("هذا البريد الإلكتروني مستخدم بالفعل.", "user.email.duplicate.conflict");
+
+            var setEmail = await _users.SetEmailAsync(user, email);
+            if (!setEmail.Succeeded)
+                return Result<DirectoryUserDto>.Failure(string.Join("; ", setEmail.Errors.Select(e => e.Description)), "user.email.invalid.conflict");
+            var setName = await _users.SetUserNameAsync(user, email);
+            if (!setName.Succeeded)
+                return Result<DirectoryUserDto>.Failure(string.Join("; ", setName.Errors.Select(e => e.Description)), "user.email.invalid.conflict");
+        }
 
         user.FullName = fullName;
         user.IsActive = req.IsActive;

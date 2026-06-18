@@ -113,6 +113,38 @@ public class AuthService : IAuthService
         return Result.Success();
     }
 
+    public async Task<Result> ChangeEmailAsync(Guid userId, ChangeEmailRequest request, CancellationToken ct = default)
+    {
+        var newEmail = (request.NewEmail ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(newEmail))
+            return Result.Failure("البريد الإلكتروني مطلوب.", "auth.email_required");
+
+        var user = await _users.FindByIdAsync(userId.ToString());
+        if (user is null)
+            return Result.Failure("المستخدم غير موجود.", "auth.not_found");
+
+        // تأكيد الهوية بكلمة المرور الحالية قبل تغيير بريد الدخول.
+        if (!await _users.CheckPasswordAsync(user, request.CurrentPassword))
+            return Result.Failure("كلمة المرور الحالية غير صحيحة.", "auth.invalid_credentials");
+
+        if (string.Equals(user.Email, newEmail, StringComparison.OrdinalIgnoreCase))
+            return Result.Success();
+
+        var existing = await _users.FindByEmailAsync(newEmail);
+        if (existing is not null && existing.Id != user.Id)
+            return Result.Failure("هذا البريد الإلكتروني مستخدم بالفعل.", "auth.email_duplicate.conflict");
+
+        // البريد = UserName أيضًا.
+        var setEmail = await _users.SetEmailAsync(user, newEmail);
+        if (!setEmail.Succeeded)
+            return Result.Failure("البريد الإلكتروني غير صالح.", "auth.email_invalid");
+        var setName = await _users.SetUserNameAsync(user, newEmail);
+        if (!setName.Succeeded)
+            return Result.Failure("البريد الإلكتروني غير صالح.", "auth.email_invalid");
+
+        return Result.Success();
+    }
+
     private async Task<AuthResponse> IssueAsync(ApplicationUser user, CancellationToken ct)
     {
         var roles = await _users.GetRolesAsync(user);

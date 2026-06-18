@@ -43,6 +43,8 @@ export default function SettingsPage() {
         </dl>
       </Card>
 
+      <ChangeEmailCard />
+
       <ChangePasswordCard />
 
       <Card>
@@ -71,6 +73,76 @@ export default function SettingsPage() {
         </div>
       </Card>
     </div>
+  );
+}
+
+// بطاقة تغيير بريد الدخول للحساب الحالي، مع تأكيد بكلمة المرور الحالية.
+function ChangeEmailCard() {
+  const { user, changeEmail } = useAuth();
+  const [newEmail, setNewEmail] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [status, setStatus] = useState<'idle' | 'saving'>('idle');
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSuccess(false);
+    setStatus('saving');
+    try {
+      await changeEmail(newEmail, currentPassword);
+      setSuccess(true);
+      setNewEmail('');
+      setCurrentPassword('');
+    } catch (err) {
+      setError(apiErrorMessage(err, 'تعذّر تغيير البريد الإلكتروني.'));
+    } finally {
+      setStatus('idle');
+    }
+  }
+
+  return (
+    <Card>
+      <SectionTitle title="تغيير البريد الإلكتروني" />
+      <form onSubmit={onSubmit} className="space-y-4">
+        <Alert tone="navy">
+          البريد الإلكتروني هو هوية تسجيل الدخول. سجّل الدخول بالبريد الجديد بعد التغيير.
+        </Alert>
+
+        <Field label="البريد الإلكتروني الحالي">
+          <Input type="email" value={user?.email ?? ''} disabled />
+        </Field>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="البريد الإلكتروني الجديد">
+            <Input
+              type="email"
+              autoComplete="email"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              required
+            />
+          </Field>
+          <Field label="كلمة المرور الحالية (للتأكيد)">
+            <Input
+              type="password"
+              autoComplete="current-password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              required
+            />
+          </Field>
+        </div>
+
+        {error && <Alert tone="alert">{error}</Alert>}
+        {success && <Alert tone="success">تم تغيير البريد الإلكتروني بنجاح.</Alert>}
+
+        <Button type="submit" disabled={status === 'saving'}>
+          {status === 'saving' ? 'جارٍ الحفظ…' : 'تغيير البريد الإلكتروني'}
+        </Button>
+      </form>
+    </Card>
   );
 }
 

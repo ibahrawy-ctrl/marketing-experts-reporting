@@ -572,6 +572,7 @@ export interface CreateUserRequest {
 }
 export interface UpdateUserRequest {
   fullName: string;
+  email: string;
   isActive: boolean;
   departmentId: string | null;
   teamId: string | null;

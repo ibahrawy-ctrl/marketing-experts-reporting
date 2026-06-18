@@ -464,6 +464,7 @@ function UserDataEditor({
 }) {
   const update = useUpdateUser();
   const [fullName, setFullName] = useState(target.fullName);
+  const [email, setEmail] = useState(target.email);
   const [isActive, setIsActive] = useState(target.isActive);
   const [teamId, setTeamId] = useState(target.teamId ?? '');
   const [departmentId, setDepartmentId] = useState(target.departmentId ?? '');
@@ -477,6 +478,7 @@ function UserDataEditor({
         userId: target.id,
         req: {
           fullName: fullName.trim(),
+          email: email.trim(),
           isActive,
           teamId: teamId || null,
           departmentId: departmentId || null,
@@ -496,6 +498,9 @@ function UserDataEditor({
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="الاسم الكامل">
           <Input value={fullName} onChange={(e) => setFullName(e.target.value)} />
+        </Field>
+        <Field label="البريد الإلكتروني" help="هو هوية تسجيل الدخول">
+          <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         </Field>
         <Field label="المدير المباشر">
           <Select value={managerId} onChange={(e) => setManagerId(e.target.value)}>

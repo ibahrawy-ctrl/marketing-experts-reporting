@@ -37,4 +37,9 @@ public class AuthController : ApiControllerBase
     [Authorize]
     public async Task<IActionResult> ChangePassword(ChangePasswordRequest request, CancellationToken ct)
         => FromResult(await _auth.ChangePasswordAsync(CurrentUserId, request, ct));
+
+    [HttpPost("change-email")]
+    [Authorize]
+    public async Task<IActionResult> ChangeEmail(ChangeEmailRequest request, CancellationToken ct)
+        => FromResult(await _auth.ChangeEmailAsync(CurrentUserId, request, ct));
 }

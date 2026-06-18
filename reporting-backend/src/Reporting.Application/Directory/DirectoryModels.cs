@@ -55,9 +55,10 @@ public record CreateUserRequest(
     Guid? TeamId,
     Guid? ManagerId);
 
-/// <summary>تعديل بيانات مستخدم قائم (الاسم/التفعيل/الانتماء التنظيمي) — للأدمن فقط.</summary>
+/// <summary>تعديل بيانات مستخدم قائم (الاسم/البريد/التفعيل/الانتماء التنظيمي) — للأدمن فقط.</summary>
 public record UpdateUserRequest(
     string FullName,
+    string Email,
     bool IsActive,
     Guid? DepartmentId,
     Guid? TeamId,

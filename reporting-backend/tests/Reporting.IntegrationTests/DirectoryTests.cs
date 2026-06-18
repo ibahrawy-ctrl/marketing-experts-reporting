@@ -168,13 +168,15 @@ public class DirectoryTests
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var (_, targetId) = await TestAuth.CreateUserAsync(_factory, "Employee");
 
+        var newEmail = $"updated-{Guid.NewGuid():N}@test.local";
         var res = await admin.PutAsJsonAsync($"/api/directory/users/{targetId}",
-            new UpdateUserRequest("اسم معدّل", false, null, null, null));
+            new UpdateUserRequest("اسم معدّل", newEmail, false, null, null, null));
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
 
         var users = await (await admin.GetAsync("/api/directory/users?includeInactive=true")).ReadAsync<List<DirectoryUserDto>>();
         var updated = users!.Single(u => u.Id == targetId);
         Assert.Equal("اسم معدّل", updated.FullName);
+        Assert.Equal(newEmail, updated.Email);
         Assert.False(updated.IsActive);
     }
 
@@ -571,7 +573,7 @@ public class DirectoryTests
         var deptId = await CreateDepartmentAsync();
         var (_, userId) = await TestAuth.CreateUserAsync(_factory, "Employee");
         await admin.PutAsJsonAsync($"/api/directory/users/{userId}",
-            new UpdateUserRequest("موظف", true, deptId, null, null));
+            new UpdateUserRequest("موظف", $"emp-{Guid.NewGuid():N}@test.local", true, deptId, null, null));
 
         var res = await admin.DeleteAsync($"/api/directory/departments/{deptId}");
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
