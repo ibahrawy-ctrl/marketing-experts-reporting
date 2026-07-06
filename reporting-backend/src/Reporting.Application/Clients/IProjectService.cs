@@ -9,6 +9,8 @@ public interface IProjectService
     Task<Result<ProjectDto>> CreateAsync(CreateProjectRequest request, CancellationToken ct = default);
     Task<Result<ProjectDto>> UpdateAsync(Guid id, UpdateProjectRequest request, CancellationToken ct = default);
     Task<Result<ProjectDto>> ArchiveAsync(Guid id, CancellationToken ct = default);
+    Task<Result<ProjectDto>> ReactivateAsync(Guid id, CancellationToken ct = default);
+    Task<Result> DeleteAsync(Guid id, CancellationToken ct = default);
 
     Task<Result<IReadOnlyList<LinkedReportRow>>> GetReportsAsync(Guid id, CancellationToken ct = default);
     Task<Result<ProjectSummaryDto>> GetSummaryAsync(Guid id, CancellationToken ct = default);

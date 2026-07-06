@@ -9,6 +9,8 @@ public interface IClientService
     Task<Result<ClientDto>> CreateAsync(CreateClientRequest request, CancellationToken ct = default);
     Task<Result<ClientDto>> UpdateAsync(Guid id, UpdateClientRequest request, CancellationToken ct = default);
     Task<Result<ClientDto>> ArchiveAsync(Guid id, CancellationToken ct = default);
+    Task<Result<ClientDto>> ReactivateAsync(Guid id, CancellationToken ct = default);
+    Task<Result> DeleteAsync(Guid id, CancellationToken ct = default);
 
     Task<Result<IReadOnlyList<LinkedReportRow>>> GetReportsAsync(Guid id, CancellationToken ct = default);
     Task<Result<ClientHealthReport>> GetHealthAsync(CancellationToken ct = default);

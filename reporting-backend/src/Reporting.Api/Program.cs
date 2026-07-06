@@ -74,6 +74,47 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy(Policies.LeaveFinalApproval, p => p.RequireRole(Roles.LeaveFinalApprovers));
     // رؤية طابور مراجعة الإجازات — الإدارة + الموارد البشرية (الفرض الدقيق للنطاق والخطوة في الخدمة).
     options.AddPolicy(Policies.LeaveReview, p => p.RequireRole(Roles.LeaveReviewers));
+    // إعادة تعيين كلمة مرور المستخدم — Admin + CEO + CeoSupport (GOV-R1). الحماية الإضافية لحسابات Admin في الخدمة (فاعل Admin فقط).
+    options.AddPolicy(Policies.UserPasswordReset, p => p.RequireRole(Roles.Admin, Roles.Ceo, Roles.CeoSupport));
+    // إدارة المستخدمين الكاملة (إنشاء/تعديل/تعطيل/حذف + الأدوار) — Admin + CEO فقط (GOV-R1). منفصلة عن AdminOnly العامة.
+    options.AddPolicy(Policies.UserManagement, p => p.RequireRole(Roles.UserManagers));
+    // تعديل المسمّى الوظيفي للموظف فقط (سطح مخصّص) — Admin/CeoSupport/HR/GM/CEO. مستقلة عن باقي إدارة المستخدم.
+    options.AddPolicy(Policies.UserJobRoleManagement, p => p.RequireRole(Roles.UserJobRoleManagers));
+    // رؤية/إدارة أرصدة الإجازات والأذونات (V1.1 — خدمات الموظف) — Admin/CEO/GM/CeoSupport/HR.
+    options.AddPolicy(Policies.BalanceManagement, p => p.RequireRole(Roles.BalanceManagers));
+    // معالجة طلبات الموارد البشرية العامة (V1.1 — خدمات الموظف) — HR/Admin/CEO/GM/CeoSupport.
+    options.AddPolicy(Policies.HrRequestManagement, p => p.RequireRole(Roles.HrRequestManagers));
+    // إدارة المناصب المرنة (Phase 1A — رؤية فقط) — Admin فقط (عمدًا لا CEO/GM).
+    options.AddPolicy(Policies.PositionManagement, p => p.RequireRole(Roles.Admin));
+    // تعديل البيانات الأساسية غير الحسّاسة للموظف (الاسم فقط) — Admin/CeoSupport/HR.
+    options.AddPolicy(Policies.UserBasicManagement, p => p.RequireRole(Roles.UserBasicManagers));
+    // تعديل الانتماء التنظيمي للموظف (الإدارة/الفريق/المدير) — Admin/CeoSupport/HR/GM/CEO. القيود في طبقة الخدمة.
+    options.AddPolicy(Policies.UserOrgAssignment, p => p.RequireRole(Roles.UserOrgAssigners));
+    // رؤية شاشة متابعة التزام التسليم (per-person، عرض فقط بلا محتوى تقرير) — Roles.CompletionMonitors (+HR).
+    options.AddPolicy(Policies.ReportCompletionView, p => p.RequireRole(Roles.CompletionMonitors));
+    // قراءة دليل الموارد البشرية المخصّص (قوائم الاختيار لحزمة HR) — Admin/CeoSupport/HR/GM/CEO. قراءة فقط، منفصلة عن الدليل العام.
+    options.AddPolicy(Policies.HrDirectoryRead, p => p.RequireRole(Roles.HrDirectoryReaders));
+    // قراءة عرض التأثير على الرواتب (FIN-L1) — Admin/CEO/GM/HR/CeoSupport. عرض على مستوى الشركة، إعلامي بحت بلا تعديل على الطلب.
+    options.AddPolicy(Policies.PayrollImpactRead, p => p.RequireRole(Roles.PayrollImpactReaders));
+    // تحديث حالة المراجعة المالية لطلب مؤثّر على الراتب (FIN-L1) — Admin/HR فقط. لا يمسّ الطلب الأصلي ولا الراتب.
+    options.AddPolicy(Policies.PayrollImpactManage, p => p.RequireRole(Roles.PayrollImpactManagers));
+    // تصدير تقييمات KPI المعتمدة للمالية (KPI-FIN1) — Admin/CEO/GM/HR/CeoSupport. قراءة فقط على مستوى الشركة، لا يحسب/يصرف مستحقات.
+    options.AddPolicy(Policies.KpiFinanceExport, p => p.RequireRole(Roles.KpiFinanceExporters));
+    // محفظة مدير الحساب (مشاريعي/عملائي — عرض فقط) — AccountPortfolioReader (+Admin تشغيليًّا). الرؤية مقصورة خادمًا على مشاريع المستخدم نفسه.
+    options.AddPolicy(Policies.AccountPortfolioRead, p => p.RequireRole(Roles.AccountPortfolioReaders));
+    // ورشة الحوكمة العامة (GOV-GOVERNANCE-UX1) — Admin/CEO/GM/CeoSupport/Manager/TeamLeader/HR. Employee/Viewer ممنوعون.
+    // الفرز التفصيلي للرؤية (واسع/نطاق/HR محدود) وقيود تغيير الحالة/الإغلاق تُفرَض في طبقة الخدمة.
+    options.AddPolicy(Policies.GovernanceWorkspaceAccess, p => p.RequireRole(Roles.GovernanceWorkspaceUsers));
+    // التصعيد الفردي (GOV-INDIVIDUAL-ESCALATION1 — كيان مستقلّ) — Admin/CEO/GM/CeoSupport/Manager/TeamLeader/HR/Employee. Viewer ممنوع.
+    // الفرز التفصيلي للرؤية (واسع/نطاق/HR/موظف) وقيود الإسناد/الإغلاق/إعادة الفتح تُفرَض في طبقة الخدمة.
+    options.AddPolicy(Policies.GovernanceEscalationAccess, p => p.RequireRole(Roles.GovernanceEscalationUsers));
+    // إجراءات الحوكمة والمتابعة (GOV-ACTION-ITEMS-R1 — كيان مستقلّ) — Admin/CEO/GM/CeoSupport/Manager/TeamLeader/HR/Employee. Viewer ممنوع.
+    // الفرز التفصيلي للرؤية وقيود الإنشاء/الإسناد/تغيير الحالة تُفرَض في طبقة الخدمة.
+    options.AddPolicy(Policies.GovernanceActionItemAccess, p => p.RequireRole(Roles.GovernanceActionItemUsers));
+    // سجلّ إشعارات البريد (EMAIL-NOTIFICATIONS-R1) — عرض إداريّ قراءة-فقط: Admin/CEO/GM/CeoSupport.
+    options.AddPolicy(Policies.EmailNotificationLog, p => p.RequireRole(Roles.EmailNotificationLogViewers));
+    // مركز التحكم بالبريد (EMAIL-CONTROL-CENTER-R1) — كتابة قوالب/قواعد + تذكير يدويّ DryRun: Admin حصرًا.
+    options.AddPolicy(Policies.EmailControlManage, p => p.RequireRole(Roles.EmailControlManagers));
 });
 
 // ===== Rate limiting لمنع التخمين على المصادقة =====
@@ -103,7 +144,7 @@ string[] corsOrigins;
 if (builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Testing"))
 {
     // التطوير/الاختبار: منافذ الواجهة المحلية + أي أصول مُعرّفة في الإعدادات.
-    corsOrigins = new[] { "http://localhost:5174", "http://localhost:4173" }
+    corsOrigins = new[] { "http://localhost:5173", "http://localhost:5174", "http://localhost:4173" }
         .Concat(configuredOrigins)
         .Distinct()
         .ToArray();
@@ -144,6 +185,10 @@ using (var scope = app.Services.CreateScope())
     await db.Database.MigrateAsync();
     await IdentitySeeder.SeedAsync(scope.ServiceProvider);
     await TemplateSeeder.SeedAsync(scope.ServiceProvider);
+    // مركز التحكم بالبريد (EMAIL-CONTROL-CENTER-R1) — بذر قوالب/قواعد أساسية (idempotent، DryRun، إضافيّ بحت).
+    await EmailControlSeeder.SeedAsync(scope.ServiceProvider);
+    // كتالوج الدورات (مصدر أسماء دورات مبيعات B2C) — بذر أولي قابل للتعديل (idempotent، إضافيّ بحت).
+    await CourseSeeder.SeedAsync(scope.ServiceProvider);
 
     // هيكل تنظيمي تمثيلي لاختبار نطاق الرؤية — بيئة التطوير فقط (لا يُزرع في الإنتاج).
     if (app.Environment.IsDevelopment())

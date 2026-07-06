@@ -51,7 +51,7 @@ public class DevelopmentService : IDevelopmentService
         await _db.SaveChangesAsync(ct);
 
         await _notifications.NotifyAsync(request.SubjectUserId, "training_need.raised",
-            "تم رصد احتياج تدريبي لك", null, $"/training-needs/{need.Id}", ct);
+            "تم رصد احتياج تدريبي لك", null, "/app/development", ct);
         await _audit.LogAsync(uid, "training_need.created", nameof(TrainingNeed), need.Id, ct: ct);
 
         return Result<TrainingNeedDto>.Success(await BuildNeedAsync(need.Id, ct));
@@ -126,7 +126,7 @@ public class DevelopmentService : IDevelopmentService
         await _db.SaveChangesAsync(ct);
 
         await _notifications.NotifyAsync(request.SubjectUserId, "improvement_plan.created",
-            "أُنشئت لك خطة تحسين", null, $"/improvement-plans/{plan.Id}", ct);
+            "أُنشئت لك خطة تحسين", null, "/app/development", ct);
         await _audit.LogAsync(uid, "improvement_plan.created", nameof(ImprovementPlan), plan.Id, ct: ct);
 
         return Result<ImprovementPlanDto>.Success(await BuildPlanAsync(plan.Id, ct));

@@ -53,6 +53,13 @@ public class SubmissionsController : ApiControllerBase
     public async Task<IActionResult> Submit(Guid id, CancellationToken ct)
         => FromResult(await _service.SubmitAsync(id, ct));
 
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> DeleteDraft(Guid id, CancellationToken ct)
+    {
+        var result = await _service.DeleteDraftAsync(id, ct);
+        return result.Succeeded ? NoContent() : ToProblem(result);
+    }
+
     [HttpPost("{id:guid}/approve")]
     public async Task<IActionResult> Approve(Guid id, ApprovalActionRequest request, CancellationToken ct)
         => FromResult(await _service.ApproveAsync(id, request, ct));

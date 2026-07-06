@@ -28,6 +28,7 @@ export interface ProjectsFilter {
   ownerTeamId?: string;
   accountManagerId?: string;
   includeClosed?: boolean;
+  selectableOnly?: boolean;
 }
 
 // ===== العملاء =====
@@ -89,6 +90,22 @@ export function useArchiveClient() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => (await api.post(`/clients/${id}/archive`)).data,
+    onSuccess: () => invalidateClients(qc),
+  });
+}
+
+export function useReactivateClient() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => (await api.post<ClientDto>(`/clients/${id}/reactivate`)).data,
+    onSuccess: () => invalidateClients(qc),
+  });
+}
+
+export function useDeleteClient() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => (await api.delete(`/clients/${id}`)).data,
     onSuccess: () => invalidateClients(qc),
   });
 }
@@ -156,6 +173,22 @@ export function useArchiveProject() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => (await api.post(`/projects/${id}/archive`)).data,
+    onSuccess: () => invalidateProjects(qc),
+  });
+}
+
+export function useReactivateProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => (await api.post<ProjectDto>(`/projects/${id}/reactivate`)).data,
+    onSuccess: () => invalidateProjects(qc),
+  });
+}
+
+export function useDeleteProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => (await api.delete(`/projects/${id}`)).data,
     onSuccess: () => invalidateProjects(qc),
   });
 }

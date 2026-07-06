@@ -46,4 +46,14 @@ public class ClientsController : ApiControllerBase
     [Authorize(Policy = Policies.ManagementOnly)]
     public async Task<IActionResult> Archive(Guid id, CancellationToken ct)
         => FromResult(await _service.ArchiveAsync(id, ct));
+
+    [HttpPost("{id:guid}/reactivate")]
+    [Authorize(Policy = Policies.ManagementOnly)]
+    public async Task<IActionResult> Reactivate(Guid id, CancellationToken ct)
+        => FromResult(await _service.ReactivateAsync(id, ct));
+
+    [HttpDelete("{id:guid}")]
+    [Authorize(Policy = Policies.ManagementOnly)]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
+        => FromResult(await _service.DeleteAsync(id, ct));
 }

@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Reporting.Application.Common;
+using Reporting.Application.EmployeeServices;
 using Reporting.Application.Leave;
 using Reporting.Domain.Enums;
 using Xunit;
@@ -41,6 +42,16 @@ public class LeaveRequestsTests
         var otherTl = await TestAuth.CreateUserAsync(_factory, Roles.TeamLeader, gm.UserId);
         var otherEmp = await TestAuth.CreateUserAsync(_factory, Roles.Employee, otherTl.UserId);
 
+        // ربط فرق فعليّة بقادتها (T-WF2): الموظّف يتبع فريقًا قائده الفعلي هو tl/otherTl
+        // كي تمرّ خطوة قائد الفريق إلى القائد الفعلي حصرًا (لا يعتمدها المدير/المدير العام لمجرد اتساع نطاقه).
+        await TestAuth.CreateTeamWithLeaderAsync(_factory, tl.UserId, emp.UserId);
+        await TestAuth.CreateTeamWithLeaderAsync(_factory, otherTl.UserId, otherEmp.UserId);
+
+        // رصيد إجازات سنوي كافٍ لكل من ينشئ طلبًا — هذه الاختبارات تخصّ المسار/النطاق لا حارس الرصيد.
+        var admin = await TestAuth.LoginAsAdminAsync(_factory);
+        foreach (var id in new[] { emp.UserId, otherEmp.UserId, tl.UserId, manager.UserId, gm.UserId, otherTl.UserId })
+            await SeedAnnualLeaveAsync(admin, id);
+
         return new Org
         {
             Gm = (gm.Client, gm.UserId),
@@ -51,6 +62,11 @@ public class LeaveRequestsTests
             OtherEmp = (otherEmp.Client, otherEmp.UserId),
         };
     }
+
+    // رصيد افتتاحي وفير (سنة 2026) — كل تواريخ الإجازات في هذه الاختبارات ضمن 2026.
+    private static Task SeedAnnualLeaveAsync(HttpClient admin, Guid userId)
+        => admin.PostAsJsonAsync($"/api/balances/employees/{userId}/opening",
+            new OpeningBalanceRequest(BalanceType.AnnualLeave, 365, 2026, "رصيد اختبار"), TestJson.Options);
 
     // ===== مساعدات =====
 
@@ -154,6 +170,25 @@ public class LeaveRequestsTests
         Assert.Equal("leave_request.end_time_before_start", await ErrorCodeAsync(res));
     }
 
+    // ===== 6ب) استئذان: المدّة تتجاوز ساعتين تُرفَض خادميًّا =====
+    [Fact]
+    public async Task Permission_DurationOverTwoHours_Rejected()
+    {
+        var org = await BuildOrgAsync();
+        var res = await CreatePermissionAsync(org.Emp.C, D1, new TimeOnly(9, 0), new TimeOnly(12, 0));
+        Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode);
+        Assert.Equal("leave_request.permission_duration_exceeded", await ErrorCodeAsync(res));
+    }
+
+    // ===== 6ج) استئذان: ساعتان بالضبط مقبول =====
+    [Fact]
+    public async Task Permission_ExactlyTwoHours_Allowed()
+    {
+        var org = await BuildOrgAsync();
+        var res = await CreatePermissionAsync(org.Emp.C, D1, new TimeOnly(9, 0), new TimeOnly(11, 0));
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+    }
+
     // ===== 7) تداخل الفترات =====
     [Fact]
     public async Task Overlapping_Period_Conflicts()
@@ -200,13 +235,13 @@ public class LeaveRequestsTests
         var org = await BuildOrgAsync();
         var req = await CreateLeaveOkAsync(org.Emp.C, D1, D2);
 
-        // المدير العام (نطاق واسع) يعتمد خطوة قائد الفريق...
-        var step1 = await org.Gm.C.PostAsJsonAsync(
+        // قائد الفريق الفعلي يعتمد خطوة قائد الفريق (T-WF2: لا يعتمدها المدير العام لمجرد اتساع نطاقه)...
+        var step1 = await org.Tl.C.PostAsJsonAsync(
             $"/api/leave-requests/{req.Id}/team-leader/approve", new LeaveApproveRequest(null), TestJson.Options);
         Assert.Equal(HttpStatusCode.OK, step1.StatusCode);
 
-        // ...ثم يحاول اعتماد خطوة المدير على الطلب نفسه — ممنوع.
-        var step2 = await org.Gm.C.PostAsJsonAsync(
+        // ...ثم يحاول اعتماد خطوة المدير على الطلب نفسه — ممنوع (لا خطوتين لنفس المراجِع).
+        var step2 = await org.Tl.C.PostAsJsonAsync(
             $"/api/leave-requests/{req.Id}/manager/approve", new LeaveApproveRequest(null), TestJson.Options);
         Assert.Equal(HttpStatusCode.Forbidden, step2.StatusCode);
         Assert.Equal("auth.forbidden", await ErrorCodeAsync(step2));

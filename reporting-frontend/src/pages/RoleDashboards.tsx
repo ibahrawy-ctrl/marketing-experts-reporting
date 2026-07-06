@@ -6,6 +6,7 @@ import { api } from '../lib/api';
 import { Card, Badge, Button } from '../components/ui';
 import { LoadingState } from '../components/states';
 import { LineTrend, Donut } from '../components/Charts';
+import { ReportInsightsSection } from './RoleHomeDashboards';
 import {
   SectionTitle,
   MetricTile,
@@ -281,10 +282,10 @@ function GovernanceTiles({ g }: { g?: GovernanceSummaryReport }) {
   if (!g) return null;
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      <MetricTile label="مخاطر مفتوحة" value={g.openRisks} tone={g.openRisks > 0 ? 'alert' : 'success'} to="/app/governance" />
-      <MetricTile label="تصعيدات مفتوحة" value={g.openEscalations} tone={g.openEscalations > 0 ? 'gold' : 'success'} to="/app/governance" />
-      <MetricTile label="قرارات مفتوحة" value={g.openDecisions} tone="navy" to="/app/governance" />
-      <MetricTile label="خطط تدريب مفتوحة" value={g.openTrainingNeeds} tone="navy" to="/app/development" />
+      <MetricTile label="مخاطر مفتوحة" value={g.openRisks} tone={g.openRisks > 0 ? 'alert' : 'success'} to="/app/governance" icon="governance" />
+      <MetricTile label="تصعيدات مفتوحة" value={g.openEscalations} tone={g.openEscalations > 0 ? 'gold' : 'success'} to="/app/governance" icon="workflow" />
+      <MetricTile label="قرارات مفتوحة" value={g.openDecisions} tone="navy" to="/app/governance" icon="governance" />
+      <MetricTile label="خطط تدريب مفتوحة" value={g.openTrainingNeeds} tone="navy" to="/app/development" icon="kpi" />
     </div>
   );
 }
@@ -1533,6 +1534,9 @@ export function TeamLeaderDashboard({ dash }: { dash: DashboardDto }) {
         cta={<Link to="/app/submissions?tab=pending"><Button variant="inverted">مراجعة الاعتمادات</Button></Link>}
       />
 
+      {/* الفلتر الزمني + التزام التقارير + اختناقات سير الاعتماد — RPT-ROLE-HOME-REPORT-CARDS-R1 */}
+      <ReportInsightsSection />
+
       <NeedsActionPanel
         items={actions}
         emptyText="لا اعتمادات معلّقة ولا تصعيدات ولا أعضاء يحتاجون دعمًا — فريقك منضبط."
@@ -1540,10 +1544,10 @@ export function TeamLeaderDashboard({ dash }: { dash: DashboardDto }) {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricTile label="بانتظار اعتمادي" value={needApproval} tone={needApproval > 0 ? 'gold' : 'success'} />
-        <MetricTile label="متوسط KPI للفريق" value={card(dash.summaryCards, 'kpiAverage')?.value ?? '—'} tone={tone[card(dash.summaryCards, 'kpiAverage')?.status ?? 'neutral']} />
-        <MetricTile label="تقارير متأخرة" value={pending?.length ?? 0} tone={(pending?.length ?? 0) > 0 ? 'alert' : 'success'} />
-        <MetricTile label="أعضاء دون المستهدف" value={members?.filter(belowTarget).length ?? 0} tone={(members?.filter(belowTarget).length ?? 0) > 0 ? 'alert' : 'success'} hint="قد يحتاجون إلى دعم أو خطة تحسين" />
+        <MetricTile label="بانتظار اعتمادي" value={needApproval} tone={needApproval > 0 ? 'gold' : 'success'} icon="workflow" />
+        <MetricTile label="متوسط KPI للفريق" value={card(dash.summaryCards, 'kpiAverage')?.value ?? '—'} tone={tone[card(dash.summaryCards, 'kpiAverage')?.status ?? 'neutral']} icon="kpi" />
+        <MetricTile label="تقارير متأخرة" value={pending?.length ?? 0} tone={(pending?.length ?? 0) > 0 ? 'alert' : 'success'} icon="reports" />
+        <MetricTile label="أعضاء دون المستهدف" value={members?.filter(belowTarget).length ?? 0} tone={(members?.filter(belowTarget).length ?? 0) > 0 ? 'alert' : 'success'} hint="قد يحتاجون إلى دعم أو خطة تحسين" icon="teams" />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -1602,6 +1606,9 @@ export function ManagerDashboard({ dash }: { dash: DashboardDto }) {
         cta={<Link to="/app/reports"><Button variant="inverted">تقارير القسم</Button></Link>}
       />
 
+      {/* الفلتر الزمني + التزام التقارير + اختناقات سير الاعتماد — RPT-ROLE-HOME-REPORT-CARDS-R1 */}
+      <ReportInsightsSection />
+
       <NeedsActionPanel
         items={actions}
         emptyText="لا اعتمادات معلّقة ولا مخاطر ولا تقارير متأخرة في قسمك."
@@ -1609,10 +1616,10 @@ export function ManagerDashboard({ dash }: { dash: DashboardDto }) {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricTile label="متوسط KPI للقسم" value={card(dash.summaryCards, 'kpiAverage')?.value ?? '—'} tone={tone[card(dash.summaryCards, 'kpiAverage')?.status ?? 'neutral']} />
-        <MetricTile label="اعتمادات معلّقة" value={approvals?.length ?? 0} tone={(approvals?.length ?? 0) > 0 ? 'gold' : 'success'} />
-        <MetricTile label="تقارير متأخرة" value={pending?.length ?? 0} tone={(pending?.length ?? 0) > 0 ? 'alert' : 'success'} />
-        <MetricTile label="موظفون دون المستهدف" value={kpi?.belowTarget ?? 0} tone={(kpi?.belowTarget ?? 0) > 0 ? 'alert' : 'success'} hint="قد يحتاجون إلى دعم أو خطة تحسين" />
+        <MetricTile label="متوسط KPI للقسم" value={card(dash.summaryCards, 'kpiAverage')?.value ?? '—'} tone={tone[card(dash.summaryCards, 'kpiAverage')?.status ?? 'neutral']} icon="kpi" />
+        <MetricTile label="اعتمادات معلّقة" value={approvals?.length ?? 0} tone={(approvals?.length ?? 0) > 0 ? 'gold' : 'success'} icon="workflow" />
+        <MetricTile label="تقارير متأخرة" value={pending?.length ?? 0} tone={(pending?.length ?? 0) > 0 ? 'alert' : 'success'} icon="reports" />
+        <MetricTile label="موظفون دون المستهدف" value={kpi?.belowTarget ?? 0} tone={(kpi?.belowTarget ?? 0) > 0 ? 'alert' : 'success'} hint="قد يحتاجون إلى دعم أو خطة تحسين" icon="teams" />
       </div>
 
       <GovernanceTiles g={gov} />
@@ -1666,6 +1673,9 @@ export function GMDashboard({ dash }: { dash: DashboardDto }) {
         cta={<Link to="/app/reports"><Button variant="inverted">إرسال ملخص للرئيس التنفيذي</Button></Link>}
       />
 
+      {/* الفلتر الزمني + التزام التقارير + اختناقات سير الاعتماد — RPT-ROLE-HOME-REPORT-CARDS-R1 */}
+      <ReportInsightsSection />
+
       <NeedsActionPanel
         items={actions}
         emptyText="كل الأقسام مكتملة ولا مخاطر أو اعتمادات معلّقة — الشركة منضبطة."
@@ -1673,10 +1683,10 @@ export function GMDashboard({ dash }: { dash: DashboardDto }) {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricTile label="اكتمال تقارير الشركة" value={`${comp?.completionRate ?? 0}٪`} tone={(comp?.completionRate ?? 0) >= 90 ? 'success' : 'gold'} />
-        <MetricTile label="أقسام متأخرة" value={lateDepts} tone={lateDepts > 0 ? 'alert' : 'success'} />
-        <MetricTile label="متوسط KPI" value={kpi?.averageScore ?? '—'} tone={(kpi?.averageScore ?? 0) >= 85 ? 'success' : (kpi?.averageScore ?? 0) >= 70 ? 'gold' : 'alert'} />
-        <MetricTile label="اعتمادات معلّقة" value={approvals?.length ?? 0} tone={(approvals?.length ?? 0) > 0 ? 'gold' : 'success'} />
+        <MetricTile label="اكتمال تقارير الشركة" value={`${comp?.completionRate ?? 0}٪`} tone={(comp?.completionRate ?? 0) >= 90 ? 'success' : 'gold'} icon="reports" />
+        <MetricTile label="أقسام متأخرة" value={lateDepts} tone={lateDepts > 0 ? 'alert' : 'success'} icon="departments" />
+        <MetricTile label="متوسط KPI" value={kpi?.averageScore ?? '—'} tone={(kpi?.averageScore ?? 0) >= 85 ? 'success' : (kpi?.averageScore ?? 0) >= 70 ? 'gold' : 'alert'} icon="kpi" />
+        <MetricTile label="اعتمادات معلّقة" value={approvals?.length ?? 0} tone={(approvals?.length ?? 0) > 0 ? 'gold' : 'success'} icon="workflow" />
       </div>
 
       <GovernanceTiles g={gov} />
@@ -1742,6 +1752,9 @@ export function CeoDashboard({ dash, kpiDelta }: { dash: DashboardDto; kpiDelta:
         tone="navy"
       />
 
+      {/* الفلتر الزمني + التزام التقارير + اختناقات سير الاعتماد — RPT-ROLE-HOME-REPORT-CARDS-R1 */}
+      <ReportInsightsSection />
+
       <NeedsActionPanel
         items={actions}
         emptyText="لا قرارات معلّقة ولا مخاطر عالية ولا نقص في الاكتمال — الشركة منضبطة."
@@ -1749,10 +1762,10 @@ export function CeoDashboard({ dash, kpiDelta }: { dash: DashboardDto; kpiDelta:
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricTile label="متوسط KPI للشركة" value={kpi?.averageScore ?? '—'} tone={(kpi?.averageScore ?? 0) >= 85 ? 'success' : (kpi?.averageScore ?? 0) >= 70 ? 'gold' : 'alert'} delta={kpiDelta} />
-        <MetricTile label="اكتمال الأسبوع" value={`${comp?.completionRate ?? 0}٪`} tone={(comp?.completionRate ?? 0) >= 90 ? 'success' : 'gold'} />
-        <MetricTile label="مخاطر عالية/حرجة" value={highRisks.length} tone={highRisks.length > 0 ? 'alert' : 'success'} to="/app/governance" />
-        <MetricTile label="قرارات تحتاج قراري" value={openDecisions.length} tone={openDecisions.length > 0 ? 'gold' : 'success'} to="/app/governance" />
+        <MetricTile label="متوسط KPI للشركة" value={kpi?.averageScore ?? '—'} tone={(kpi?.averageScore ?? 0) >= 85 ? 'success' : (kpi?.averageScore ?? 0) >= 70 ? 'gold' : 'alert'} delta={kpiDelta} icon="kpi" />
+        <MetricTile label="اكتمال الأسبوع" value={`${comp?.completionRate ?? 0}٪`} tone={(comp?.completionRate ?? 0) >= 90 ? 'success' : 'gold'} icon="reports" />
+        <MetricTile label="مخاطر عالية/حرجة" value={highRisks.length} tone={highRisks.length > 0 ? 'alert' : 'success'} to="/app/governance" icon="governance" />
+        <MetricTile label="قرارات تحتاج قراري" value={openDecisions.length} tone={openDecisions.length > 0 ? 'gold' : 'success'} to="/app/governance" icon="governance" />
       </div>
 
       <B2cRollupPanel periodKey={dash.period.periodKey} variant="ceo" />
@@ -1829,6 +1842,9 @@ export function CeoSupportDashboard({ dash }: { dash: DashboardDto }) {
         cta={<Link to="/app/reports"><Button variant="inverted">تجهيز ملخّص الرئيس التنفيذي</Button></Link>}
       />
 
+      {/* الفلتر الزمني + التزام التقارير + اختناقات سير الاعتماد — RPT-ROLE-HOME-REPORT-CARDS-R1 */}
+      <ReportInsightsSection />
+
       <NeedsActionPanel
         items={actions}
         emptyText="كل التقارير مُرسَلة وصورة الأسبوع مكتملة — لا متابعة مطلوبة الآن."
@@ -1836,10 +1852,10 @@ export function CeoSupportDashboard({ dash }: { dash: DashboardDto }) {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricTile label="اكتمال الأسبوع" value={`${rate}٪`} tone={rate >= 95 ? 'success' : 'gold'} />
-        <MetricTile label="تقارير مكتملة" value={comp?.closed ?? 0} tone="success" />
-        <MetricTile label="متأخرة / لم تُرسل" value={pending?.length ?? 0} tone={(pending?.length ?? 0) > 0 ? 'alert' : 'success'} />
-        <MetricTile label="اعتمادات معلّقة" value={awaiting.length} tone={awaiting.length > 0 ? 'gold' : 'success'} />
+        <MetricTile label="اكتمال الأسبوع" value={`${rate}٪`} tone={rate >= 95 ? 'success' : 'gold'} icon="reports" />
+        <MetricTile label="تقارير مكتملة" value={comp?.closed ?? 0} tone="success" icon="reports" />
+        <MetricTile label="متأخرة / لم تُرسل" value={pending?.length ?? 0} tone={(pending?.length ?? 0) > 0 ? 'alert' : 'success'} icon="workflow" />
+        <MetricTile label="اعتمادات معلّقة" value={awaiting.length} tone={awaiting.length > 0 ? 'gold' : 'success'} icon="workflow" />
       </div>
 
       <Card>

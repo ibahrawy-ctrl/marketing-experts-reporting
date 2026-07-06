@@ -18,7 +18,9 @@ public record ProjectDto(
     string? AccountManagerName,
     string? Notes,
     DateTime CreatedAtUtc,
-    DateTime? UpdatedAtUtc);
+    DateTime? UpdatedAtUtc,
+    bool CanHardDelete = false,
+    string? DeleteBlockReason = null);
 
 public record CreateProjectRequest(
     Guid ClientId,
@@ -47,7 +49,9 @@ public record ProjectFilter(
     ServiceType? ServiceType = null,
     Guid? OwnerTeamId = null,
     Guid? AccountManagerId = null,
-    bool IncludeClosed = false);
+    bool IncludeClosed = false,
+    // قائمة الاختيار (Multi-Project وغيره): مشاريع نشطة فقط تابعة لعميل غير مؤرشف ضمن النطاق.
+    bool SelectableOnly = false);
 
 // ملخّص المشروع (drill-down) — إحصاءات التقارير المرتبطة دون إعادة حساب KPI.
 public record ProjectSummaryDto(

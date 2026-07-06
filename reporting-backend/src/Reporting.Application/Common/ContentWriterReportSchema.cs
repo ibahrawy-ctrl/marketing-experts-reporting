@@ -21,4 +21,16 @@ public static class ContentWriterReportSchema
     // ===== حقول نصية (سياق فقط، لا تُجمَّع رقميًا) =====
     public const string DelayReasons = "أسباب التأخير";  // أسباب التأخير المتكررة
     public const string Challenges = "التحديات";          // مخاطر / قرارات مطلوبة
+
+    // ===== مفاتيح الحقول الفرعية داخل قسم المشاريع (PRS) لنسخة v5 (KPI مضمَّن داخل كل مشروع) =====
+    public static class Prs
+    {
+        public const string RequiredPieces = "required_pieces";
+        public const string DeliveredPieces = "delivered_pieces";
+        public const string ApprovedFirstTime = "approved_first_time";
+        public const string LatePieces = "late_pieces";
+        public const string OutputAchievement = "output_achievement";
+        public const string DelayReasons = "delay_reasons";
+        public const string Challenges = "challenges";
+    }
 }

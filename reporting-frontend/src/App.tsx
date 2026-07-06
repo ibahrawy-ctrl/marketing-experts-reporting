@@ -14,26 +14,71 @@ import AuditPage from './pages/AuditPage';
 import TeamsPage from './pages/TeamsPage';
 import TeamDetailsPage from './pages/TeamDetailsPage';
 import ComparisonsPage from './pages/ComparisonsPage';
+import SalesAggregationPage from './pages/SalesAggregationPage';
 import ReportTemplatesPage from './pages/ReportTemplatesPage';
 import KpiTemplatesPage from './pages/KpiTemplatesPage';
 import ApprovalWorkflowsPage from './pages/ApprovalWorkflowsPage';
 import UsersPage from './pages/UsersPage';
+import CompliancePage from './pages/CompliancePage';
+import HrEmployeesPage from './pages/HrEmployeesPage';
+import JobRolesAssignmentPage from './pages/JobRolesAssignmentPage';
+import JobRoleManagementPage from './pages/JobRoleManagementPage';
+import PositionsPage from './pages/PositionsPage';
+import ReportViewGrantsPage from './pages/ReportViewGrantsPage';
+import EmailNotificationsPage from './pages/EmailNotificationsPage';
+import EmailControlCenterPage from './pages/EmailControlCenterPage';
 import EmployeeProfilePage from './pages/EmployeeProfilePage';
+import { MyKpiPage, EmployeeKpiPage } from './pages/IndividualKpiPage';
 import LeaveRequestsPage from './pages/LeaveRequestsPage';
+import MyBalancesPage from './pages/MyBalancesPage';
+import BalanceManagementPage from './pages/BalanceManagementPage';
+import HrRequestsPage from './pages/HrRequestsPage';
+import PayrollLeaveImpactsPage from './pages/PayrollLeaveImpactsPage';
+import KpiFinanceExportPage from './pages/KpiFinanceExportPage';
 import { DepartmentsPage } from './pages/DepartmentsPage';
 import SettingsPage from './pages/SettingsPage';
+import CourseManagementPage from './pages/CourseManagementPage';
 import ClientsPage from './pages/ClientsPage';
 import ClientDetailPage from './pages/ClientDetailPage';
 import ProjectsPage from './pages/ProjectsPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
+import AccountPortfolioPage from './pages/AccountPortfolioPage';
+import AccountPortfolioProjectPage from './pages/AccountPortfolioProjectPage';
+import AccountPortfolioClientPage from './pages/AccountPortfolioClientPage';
+import GovernanceWorkspacePage from './pages/GovernanceWorkspacePage';
+import GovernanceEscalationsPage from './pages/GovernanceEscalationsPage';
+import GovernanceActionItemsPage from './pages/GovernanceActionItemsPage';
 import type { Role } from './types/api';
 
 const EXEC_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'Manager', 'TeamLeader', 'CeoSupport', 'Viewer'];
 const ADMIN: Role[] = ['Admin'];
+// صفحة إدارة فريق العمل (GOV-R1): Admin + CEO يديران المستخدمين بالكامل؛ CeoSupport عرض + إعادة تعيين كلمات المرور فقط.
+// إنشاء/تعديل/أدوار/حذف المستخدمين = Admin + CEO (مفروضة بسياسة UserManagement بالخادم وفي الواجهة).
+const USERS_PAGE_ROLES: Role[] = ['Admin', 'CEO', 'CeoSupport'];
 // الحوكمة مقصورة على من يملك ViewGovernance بالخادم (تطابق RoleAccess.CanViewGovernance).
 const GOVERNANCE_ROLES: Role[] = ['Admin', 'CeoSupport', 'CEO', 'GeneralManager'];
 // حوكمة القوالب وKPI — المستوى الإداري الأعلى (Admin/CEO/GM)، تطابق سياسة TemplateGovernance بالخادم.
 const TEMPLATE_GOVERNANCE_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager'];
+// إدارة المسمّيات الوظيفية للموظفين (سطح مخصّص للقراءة + تعديل JobRole فقط) — تطابق سياسة UserJobRoleManagement بالخادم.
+const JOB_ROLE_MANAGEMENT_ROLES: Role[] = ['Admin', 'CeoSupport', 'HR', 'GeneralManager', 'CEO'];
+// إدارة الأرصدة (خدمات الموظف V1.1) — تطابق سياسة BalanceManagement بالخادم.
+const BALANCE_MANAGEMENT_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'CeoSupport', 'HR'];
+// متابعة الالتزام بالتقارير (per-person) — تطابق سياسة ReportCompletionView بالخادم.
+const COMPLETION_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'Manager', 'TeamLeader', 'CeoSupport', 'Viewer', 'HR'];
+// إدارة بيانات الموظفين (حزمة HR A) — اتحاد سياستَي UserBasicManagement و UserOrgAssignment بالخادم.
+const HR_EMPLOYEE_ROLES: Role[] = ['Admin', 'CeoSupport', 'HR', 'GeneralManager', 'CEO'];
+// عرض التأثير على الرواتب (FIN-L1) — تطابق سياسة PayrollImpactRead بالخادم (قراءة؛ التعديل Admin/HR فقط داخل الصفحة).
+const PAYROLL_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'HR', 'CeoSupport', 'FinanceManager', 'Accountant'];
+// تصدير KPI للمالية (KPI-FIN1) — تطابق سياسة KpiFinanceExport بالخادم (قراءة/تصدير فقط على مستوى الشركة).
+const KPI_FINANCE_EXPORT_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'HR', 'CeoSupport', 'FinanceManager', 'Accountant'];
+// محفظة مدير الحساب (ACCOUNT-MANAGER-PORTFOLIO) — عرض فقط، تطابق سياسة AccountPortfolioRead بالخادم.
+const ACCOUNT_PORTFOLIO_ROLES: Role[] = ['AccountPortfolioReader', 'Admin'];
+// ورشة الحوكمة العامة (GOV-GOVERNANCE-UX1) — تطابق سياسة GovernanceWorkspaceAccess بالخادم؛ الرؤية مقيّدة داخليًّا حسب الدور.
+const GOVERNANCE_WORKSPACE_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'CeoSupport', 'Manager', 'TeamLeader', 'HR'];
+// التصعيد الفردي (GOV-INDIVIDUAL-ESCALATION1) — تطابق سياسة GovernanceEscalationAccess بالخادم؛ الفرز (واسع/نطاق/HR/موظف) مفروض داخليًّا.
+const GOVERNANCE_ESCALATION_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'CeoSupport', 'Manager', 'TeamLeader', 'HR', 'Employee'];
+// إجراءات الحوكمة والمتابعة (GOV-ACTION-ITEMS-R1) — تطابق سياسة GovernanceActionItemAccess بالخادم؛ الفرز (واسع/نطاق/HR/موظف) مفروض داخليًّا.
+const GOVERNANCE_ACTION_ITEM_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'CeoSupport', 'Manager', 'TeamLeader', 'HR', 'Employee'];
 
 function Landing() {
   return (
@@ -92,11 +137,27 @@ const APP_ROUTES: { path: string; element: ReactNode; roles?: Role[] }[] = [
   { path: '/app/clients/:clientId', element: <ClientDetailPage />, roles: EXEC_ROLES },
   { path: '/app/projects', element: <ProjectsPage />, roles: EXEC_ROLES },
   { path: '/app/projects/:projectId', element: <ProjectDetailPage />, roles: EXEC_ROLES },
+  // محفظة مدير الحساب (مشاريعي) — عرض فقط، النطاق مفروض خادمًا (Project.AccountManagerId == المستخدم).
+  { path: '/app/account-portfolio', element: <AccountPortfolioPage />, roles: ACCOUNT_PORTFOLIO_ROLES },
+  { path: '/app/account-portfolio/projects/:id', element: <AccountPortfolioProjectPage />, roles: ACCOUNT_PORTFOLIO_ROLES },
+  { path: '/app/account-portfolio/clients/:id', element: <AccountPortfolioClientPage />, roles: ACCOUNT_PORTFOLIO_ROLES },
   // ملف أداء الموظف: متاح لكل مصادَق عليه — النطاق مفروض خادمًا (الموظف يرى نفسه فقط).
   { path: '/app/employee/:userId', element: <EmployeeProfilePage /> },
+  // مؤشرات أداء فردية (KPI-INDIVIDUAL-DASHBOARD-R1): «مؤشرات أدائي» للموظّف الحالي،
+  // و«مؤشرات أداء الموظف» لموظّف بعينه — النطاق مفروض خادمًا (self-or-scope ⇒ 403/404 خارج النطاق).
+  { path: '/app/my-kpi', element: <MyKpiPage /> },
+  { path: '/app/employees/:userId/kpi', element: <EmployeeKpiPage /> },
   { path: '/app/submissions', element: <SubmissionsPage /> },
   // الإجازات والاستئذانات (V1.0.1): متاح لكل مصادَق عليه — النطاق والدور مفروضان خادمًا.
   { path: '/app/leave-requests', element: <LeaveRequestsPage /> },
+  // خدمات الموظف (V1.1): الأرصدة وطلبات الموارد البشرية — متاح لكل مصادَق عليه (النطاق مفروض خادمًا).
+  { path: '/app/balances', element: <MyBalancesPage /> },
+  { path: '/app/hr-requests', element: <HrRequestsPage /> },
+  { path: '/app/balance-management', element: <BalanceManagementPage />, roles: BALANCE_MANAGEMENT_ROLES },
+  // المالية والرواتب (FIN-L1): عرض الطلبات المؤثّرة على الراتب — قراءة للأدوار المالية، التعديل Admin/HR فقط.
+  { path: '/app/payroll/leave-impacts', element: <PayrollLeaveImpactsPage />, roles: PAYROLL_ROLES },
+  // تصدير KPI للمالية (KPI-FIN1): معاينة/تصدير CSV قراءة فقط — تطابق سياسة KpiFinanceExport بالخادم.
+  { path: '/app/kpi-finance-export', element: <KpiFinanceExportPage />, roles: KPI_FINANCE_EXPORT_ROLES },
   { path: '/app/report-templates', element: <ReportTemplatesPage />, roles: TEMPLATE_GOVERNANCE_ROLES },
   { path: '/app/kpi', element: <KpiPage /> },
   // تقويم التقارير والتجميع الدوري: متاح لكل مصادَق عليه — النطاق مفروض خادمًا.
@@ -104,9 +165,31 @@ const APP_ROUTES: { path: string; element: ReactNode; roles?: Role[] }[] = [
   { path: '/app/kpi-templates', element: <KpiTemplatesPage />, roles: TEMPLATE_GOVERNANCE_ROLES },
   { path: '/app/workflows', element: <ApprovalWorkflowsPage />, roles: EXEC_ROLES },
   { path: '/app/governance', element: <GovernancePage />, roles: GOVERNANCE_ROLES },
+  { path: '/app/governance-workspace', element: <GovernanceWorkspacePage />, roles: GOVERNANCE_WORKSPACE_ROLES },
+  // التصعيد الفردي (GOV-INDIVIDUAL-ESCALATION1) — الرؤية والإجراءات مقيّدة داخليًّا حسب الدور والنطاق.
+  { path: '/app/governance/escalations', element: <GovernanceEscalationsPage />, roles: GOVERNANCE_ESCALATION_ROLES },
+  { path: '/app/governance/action-items', element: <GovernanceActionItemsPage />, roles: GOVERNANCE_ACTION_ITEM_ROLES },
   { path: '/app/analytics', element: <ComparisonsPage />, roles: EXEC_ROLES },
-  { path: '/app/users', element: <UsersPage />, roles: ADMIN },
+  // تجميع المبيعات (B2C-UAT-FIXPACK الجزء 4) — عرض تجميعي للمدير؛ النطاق مفروض خادميًّا عبر IScopeResolver.
+  { path: '/app/sales-aggregation', element: <SalesAggregationPage />, roles: EXEC_ROLES },
+  // متابعة الالتزام بالتقارير (per-person) — شاشة متابعة فقط، الصلاحية مفروضة خادمًا.
+  { path: '/app/compliance', element: <CompliancePage />, roles: COMPLETION_ROLES },
+  // إدارة بيانات الموظفين (حزمة HR A) — تعديل الاسم + التنظيم الوظيفي فقط.
+  { path: '/app/hr-employees', element: <HrEmployeesPage />, roles: HR_EMPLOYEE_ROLES },
+  { path: '/app/users', element: <UsersPage />, roles: USERS_PAGE_ROLES },
+  { path: '/app/job-roles', element: <JobRolesAssignmentPage />, roles: JOB_ROLE_MANAGEMENT_ROLES },
+  { path: '/app/job-roles/manage', element: <JobRoleManagementPage />, roles: JOB_ROLE_MANAGEMENT_ROLES },
+  // المناصب المرنة (Phase 1A — رؤية فقط) — Admin فقط (تطابق سياسة PositionManagement بالخادم).
+  { path: '/app/positions', element: <PositionsPage />, roles: ADMIN },
+  // منح رؤية التقارير المخفيّ (REPORT-VIEW-GRANTS-R1) — Admin فقط (تطابق سياسة AdminOnly بالخادم).
+  { path: '/app/report-view-grants', element: <ReportViewGrantsPage />, roles: ADMIN },
+  // سجلّ إشعارات البريد (EMAIL-NOTIFICATIONS-UI-R1) — قراءة فقط، Admin/CEO/GM/CeoSupport (تطابق سياسة EmailNotificationLog بالخادم).
+  { path: '/app/email-notifications', element: <EmailNotificationsPage />, roles: GOVERNANCE_ROLES },
+  // مركز التحكم بالبريد (EMAIL-CONTROL-CENTER-R1) — قوالب/قواعد/تذكير يدويّ DryRun — Admin فقط (سياسة EmailControlManage بالخادم).
+  { path: '/app/email-control', element: <EmailControlCenterPage />, roles: ADMIN },
   { path: '/app/departments', element: <DepartmentsPage />, roles: ADMIN },
+  // إدارة كتالوج الدورات (B2C) — تطابق سياسة TemplateGovernance بالخادم (Admin/CEO/GM).
+  { path: '/app/courses', element: <CourseManagementPage />, roles: TEMPLATE_GOVERNANCE_ROLES },
   { path: '/app/settings', element: <SettingsPage />, roles: ADMIN },
   { path: '/app/audit', element: <AuditPage />, roles: ['Admin', 'CEO', 'GeneralManager'] },
   { path: '/app/development', element: <DevelopmentPage /> },

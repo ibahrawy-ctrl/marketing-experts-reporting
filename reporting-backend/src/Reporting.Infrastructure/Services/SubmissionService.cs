@@ -1,9 +1,11 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Reporting.Application.Audit;
 using Reporting.Application.Clients;
 using Reporting.Application.Common;
 using Reporting.Application.Notifications;
 using Reporting.Application.Submissions;
+using Reporting.Application.Templates;
 using Reporting.Domain.Entities.Submissions;
 using Reporting.Domain.Enums;
 using Reporting.Infrastructure.Persistence;
@@ -18,9 +20,24 @@ public class SubmissionService : ISubmissionService
     private readonly IAuditService _audit;
     private readonly IScopeResolver _scope;
     private readonly IClientProjectAccess _access;
+    private readonly IReportTemplateService _templates;
+    private readonly IReportViewGrantService _grants;
+
+    // الحالات التي يجوز لمستفيد منح الرؤية رؤيتها فقط (REPORT-VIEW-GRANTS-R1):
+    // تقارير مُرسَلة رسميًّا بحالة معتمدة — تُستبعد المسودّة (Draft) والمُعادة للتعديل (Returned).
+    private static readonly SubmissionStatus[] GrantViewableStatuses =
+    {
+        SubmissionStatus.Submitted,
+        SubmissionStatus.ApprovedByDirectManager,
+        SubmissionStatus.ApprovedByNextLevel,
+        SubmissionStatus.Escalated,
+        SubmissionStatus.Closed,
+        SubmissionStatus.Visible
+    };
 
     public SubmissionService(AppDbContext db, ICurrentUser currentUser,
-        INotificationService notifications, IAuditService audit, IScopeResolver scope, IClientProjectAccess access)
+        INotificationService notifications, IAuditService audit, IScopeResolver scope, IClientProjectAccess access,
+        IReportTemplateService templates, IReportViewGrantService grants)
     {
         _db = db;
         _currentUser = currentUser;
@@ -28,6 +45,8 @@ public class SubmissionService : ISubmissionService
         _audit = audit;
         _scope = scope;
         _access = access;
+        _templates = templates;
+        _grants = grants;
     }
 
     public async Task<Result<SubmissionDto>> CreateOrGetDraftAsync(CreateSubmissionRequest request, CancellationToken ct = default)
@@ -43,6 +62,12 @@ public class SubmissionService : ISubmissionService
             .FirstOrDefaultAsync(ct);
         if (version is null)
             return Result<SubmissionDto>.Failure("لا يوجد إصدار منشور لهذا القالب.", "template.no_published_version.conflict");
+
+        // حارس الإسناد المركزي (TEMPLATE-ROLE-GUARD): يُمنع إنشاء/فتح مسودة لقالب غير مُسنَد للمستخدم،
+        // بنفس منطق assignedOnly المصدر الوحيد للحقيقة. لا إعفاء ضمني لأي دور (لا انتحال بالنيابة هنا).
+        if (!await _templates.IsTemplateAssignedToUserAsync(userId, request.ReportTemplateId, ct))
+            return Result<SubmissionDto>.Failure(
+                "هذا القالب غير مُسنَد إليك ولا يمكنك إنشاء تقرير به.", "report.template_not_assigned");
 
         var periodKey = request.PeriodKey.Trim();
         var existing = await _db.ReportSubmissions.FirstOrDefaultAsync(
@@ -141,6 +166,14 @@ public class SubmissionService : ISubmissionService
         if (submission.Status is not (SubmissionStatus.Draft or SubmissionStatus.Returned))
             return Result<SubmissionDto>.Failure("لا يمكن تعديل تسليم بعد إرساله.", "submission.locked.conflict");
 
+        // حارس الإسناد المركزي (يمنع استغلال أي مسودة قائمة لقالب غير مُسنَد): يجب أن يكون القالب مُسنَدًا لصاحب التسليم.
+        var saveTemplateId = await _db.ReportTemplateVersions
+            .Where(v => v.Id == submission.ReportTemplateVersionId)
+            .Select(v => v.ReportTemplateId).FirstAsync(ct);
+        if (!await _templates.IsTemplateAssignedToUserAsync(submission.SubmitterId, saveTemplateId, ct))
+            return Result<SubmissionDto>.Failure(
+                "هذا القالب غير مُسنَد إليك ولا يمكنك تعديل تقرير به.", "report.template_not_assigned");
+
         var fieldIds = await _db.TemplateFields
             .Where(f => f.ReportTemplateVersionId == submission.ReportTemplateVersionId)
             .Select(f => f.Id).ToListAsync(ct);
@@ -183,9 +216,19 @@ public class SubmissionService : ISubmissionService
         if (submission.Status is not (SubmissionStatus.Draft or SubmissionStatus.Returned))
             return Result<SubmissionDto>.Failure("التسليم في حالة لا تسمح بالإرسال.", "submission.not_submittable.conflict");
 
+        // حارس الإسناد المركزي (دفاع متعمّق قبل الإرسال النهائي): يجب أن يكون القالب مُسنَدًا لصاحب التسليم.
+        var submitTemplateId = await _db.ReportTemplateVersions
+            .Where(v => v.Id == submission.ReportTemplateVersionId)
+            .Select(v => v.ReportTemplateId).FirstAsync(ct);
+        if (!await _templates.IsTemplateAssignedToUserAsync(submission.SubmitterId, submitTemplateId, ct))
+            return Result<SubmissionDto>.Failure(
+                "هذا القالب غير مُسنَد إليك ولا يمكنك إرسال تقرير به.", "report.template_not_assigned");
+
+        // الحقول العادية المطلوبة — يُستثنى منها أقسام المشاريع المتكررة لأن لها تحققًا خاصًّا أدناه.
         var requiredFields = await _db.TemplateFields
             .Where(f => f.ReportTemplateVersionId == submission.ReportTemplateVersionId
-                        && f.IsRequired && f.FieldType != FieldType.SectionHeader)
+                        && f.IsRequired && f.FieldType != FieldType.SectionHeader
+                        && f.FieldType != FieldType.ProjectRepeatableSection)
             .Select(f => new { f.Id, f.Label }).ToListAsync(ct);
 
         var missing = requiredFields
@@ -194,14 +237,32 @@ public class SubmissionService : ISubmissionService
         if (missing.Count > 0)
             return Result<SubmissionDto>.Failure($"حقول مطلوبة غير مكتملة: {string.Join("، ", missing)}", "submission.required_fields_missing");
 
+        // تحقق أقسام المشاريع المتكررة (ProjectRepeatableSection): الحد الأدنى/الأقصى، صلاحية المشروع ضمن النطاق، الحقول الفرعية المطلوبة.
+        var sectionErrors = await ValidateRepeatableSectionsAsync(submission, ct);
+        if (sectionErrors.Count > 0)
+            return Result<SubmissionDto>.Failure(string.Join("، ", sectionErrors), "submission.repeatable_section_invalid");
+
+        // ERDS Phase 2A: تحقّق رقمي/منطقي آمن لخلايا جدول «مبيعات B2C حسب الدورة» فقط (مطابقة الأعمدة)، لا يمسّ أي TableGrid آخر.
+        var versionGrids = await GetVersionTableGridsAsync(submission.ReportTemplateVersionId, ct);
+        var gridErrors = ValidateB2cByCourseGrids(submission, versionGrids);
+        // Phase 7: تحقّق مماثل لجدولَي قالب «B2C — بيانات جديدة/قديمة» (New Leads + Old CRM)، مطابقة الأعمدة فقط.
+        gridErrors.AddRange(ValidateB2cNewOldGrids(submission, versionGrids));
+        if (gridErrors.Count > 0)
+            return Result<SubmissionDto>.Failure(string.Join("، ", gridErrors), "submission.grid_invalid");
+
         var me = await _db.Users.FirstOrDefaultAsync(u => u.Id == submission.SubmitterId, ct);
-        var managerId = me?.ManagerId;
+        // APPROVAL-FALLBACK-R1: تحديد أول معتمِد عبر سلسلة احتياطية بدل الاعتماد على المدير المباشر وحده.
+        // الترتيب: قائد فريق المقدّم ← المدير المباشر (ManagerId) ← أول مدير عام نشط ← أول Admin/CEO نشط.
+        // لا يُغلق التقرير لمجرد غياب قائد الفريق أو المدير طالما وُجد بديل أعلى، مع تفادي اعتماد المقدّم لنفسه.
+        var firstApproverId = me is null
+            ? (Guid?)null
+            : await ResolveFirstApproverAsync(me.Id, me.TeamId, me.ManagerId, ct);
 
         submission.Status = SubmissionStatus.Submitted;
         submission.SubmittedAtUtc = DateTime.UtcNow;
         submission.UpdatedAtUtc = DateTime.UtcNow;
 
-        if (managerId is Guid approverId && approverId != Guid.Empty)
+        if (firstApproverId is Guid approverId && approverId != Guid.Empty)
         {
             submission.CurrentApproverId = approverId;
             var nextLevel = (submission.ApprovalSteps.Count == 0 ? 0 : submission.ApprovalSteps.Max(a => a.Level)) + 1;
@@ -215,7 +276,7 @@ public class SubmissionService : ISubmissionService
         }
         else
         {
-            // لا يوجد مدير مباشر — يُغلق التسليم مباشرة.
+            // لا يوجد أي معتمِد بديل إطلاقًا (مثلاً مقدّم من الطبقة العليا بلا مدير) — يُغلق التسليم مباشرة.
             submission.Status = SubmissionStatus.Closed;
             submission.ClosedAtUtc = DateTime.UtcNow;
             submission.CurrentApproverId = null;
@@ -225,10 +286,175 @@ public class SubmissionService : ISubmissionService
 
         if (submission.CurrentApproverId is Guid approver)
             await _notifications.NotifyAsync(approver, "submission.submitted",
-                "تقرير بانتظار اعتمادك", null, $"/submissions/{submission.Id}", ct);
+                "تقرير بانتظار اعتمادك", null, $"/app/submissions?open={submission.Id}", ct);
         await _audit.LogAsync(_currentUser.UserId, "submission.submitted", nameof(ReportSubmission), submission.Id, ct: ct);
 
         return Result<SubmissionDto>.Success(await BuildDtoAsync(submissionId, ct));
+    }
+
+    // ===== APPROVAL-FALLBACK-R1: سلسلة اعتماد احتياطية لتقارير التسليم فقط =====
+    // لا تمسّ مسار الإجازات/الأذونات ولا طلبات الموارد البشرية (تلك لها Endpoints ومسارات منفصلة تمامًا).
+    //
+    // الطبقة العليا (Senior tier) = { GeneralManager, Admin, CEO }. عند وصول الاعتماد لهذه الطبقة
+    // وغياب مدير مباشر صالح للمعتمِد ⇒ يُعدّ الاعتماد نهائيًّا فيُغلق التقرير (لا تصعيد عام أعلى منها).
+    // أما المعتمِد الأدنى (موظّف/قائد فريق/مدير) بلا مدير ⇒ يُصعَّد لأول مدير عام نشط ثم أول Admin/CEO نشط.
+    // هذا يحافظ على السلوك القائم (سلاسل ManagerId الصحيحة، ومقدّم الطبقة العليا يُغلق مباشرة)
+    // ويمنع في الوقت ذاته إغلاق/تعليق تقرير موظّف لمجرد غياب قائد الفريق أو المدير.
+    private static readonly string[] SeniorRoles = { Roles.GeneralManager, Roles.Admin, Roles.Ceo };
+    private static readonly string[] GeneralManagerRoles = { Roles.GeneralManager };
+    private static readonly string[] FinalFallbackRoles = { Roles.Admin, Roles.Ceo };
+
+    /// <summary>هل المستخدم مفعَّل (IsActive)؟</summary>
+    private Task<bool> IsActiveUserAsync(Guid userId, CancellationToken ct)
+        => _db.Users.AnyAsync(u => u.Id == userId && u.IsActive, ct);
+
+    /// <summary>هل يحمل المستخدم أيًّا من الأدوار المحدّدة؟ (عبر ربط UserRoles↔Roles)</summary>
+    private Task<bool> UserHasAnyRoleAsync(Guid userId, string[] roleNames, CancellationToken ct)
+        => (from ur in _db.UserRoles
+            join r in _db.Roles on ur.RoleId equals r.Id
+            where ur.UserId == userId && r.Name != null && roleNames.Contains(r.Name)
+            select ur.UserId).AnyAsync(ct);
+
+    /// <summary>
+    /// أول مستخدم نشط يحمل أحد الأدوار المطلوبة مع استبعاد مجموعة معيّنة (المقدّم/المُزارين)،
+    /// بترتيب حتميّ (OrderBy على المعرّف) لضمان ثبات الاختيار.
+    /// </summary>
+    private async Task<Guid?> FirstActiveUserInRoleAsync(string[] roleNames, HashSet<Guid> exclude, CancellationToken ct)
+    {
+        var candidates = await (from ur in _db.UserRoles
+                                join r in _db.Roles on ur.RoleId equals r.Id
+                                join u in _db.Users on ur.UserId equals u.Id
+                                where u.IsActive && r.Name != null && roleNames.Contains(r.Name)
+                                select u.Id).Distinct().ToListAsync(ct);
+        foreach (var id in candidates.OrderBy(x => x))
+            if (!exclude.Contains(id)) return id;
+        return null;
+    }
+
+    /// <summary>
+    /// تحديد أول معتمِد لتسليم جديد: قائد فريق المقدّم ← المدير المباشر ← أول مدير عام نشط ← أول Admin/CEO نشط.
+    /// يُستبعَد المقدّم نفسه في كل خطوة (منع اعتماد الذات). يُرجِع null فقط عند انعدام أي بديل صالح
+    /// (كمقدّم من الطبقة العليا بلا مدير) ⇒ عندها يُغلق التسليم مباشرة.
+    /// </summary>
+    private async Task<Guid?> ResolveFirstApproverAsync(Guid submitterId, Guid? submitterTeamId, Guid? submitterManagerId, CancellationToken ct)
+    {
+        // 1) قائد فريق المقدّم (الفريق نشط، القائد نشط، وليس المقدّم نفسه).
+        if (submitterTeamId is Guid teamId)
+        {
+            var tlId = await _db.Teams
+                .Where(t => t.Id == teamId && t.IsActive)
+                .Select(t => t.TeamLeaderId)
+                .FirstOrDefaultAsync(ct);
+            if (tlId is Guid tl && tl != submitterId && await IsActiveUserAsync(tl, ct))
+                return tl;
+        }
+
+        // 2) المدير المباشر (ManagerId نشط وليس المقدّم نفسه).
+        if (submitterManagerId is Guid mgr && mgr != submitterId && await IsActiveUserAsync(mgr, ct))
+            return mgr;
+
+        // 3) إن لم يكن المقدّم ضمن الطبقة العليا: تصعيد عام لأول مدير عام ثم أول Admin/CEO.
+        var submitterIsSenior = await UserHasAnyRoleAsync(submitterId, SeniorRoles, ct);
+        if (!submitterIsSenior)
+        {
+            var exclude = new HashSet<Guid> { submitterId };
+            var gm = await FirstActiveUserInRoleAsync(GeneralManagerRoles, exclude, ct);
+            if (gm is Guid g) return g;
+            var top = await FirstActiveUserInRoleAsync(FinalFallbackRoles, exclude, ct);
+            if (top is Guid t) return t;
+        }
+
+        // 4) لا بديل إطلاقًا ⇒ إغلاق مباشر.
+        return null;
+    }
+
+    /// <summary>
+    /// قائد الفريق الفعليّ لمقدّم التقرير: TeamId للمقدّم ← Team.TeamLeaderId (الفريق نشط، القائد نشط، وليس المقدّم نفسه).
+    /// يُرجِع null إن لم يوجد قائد فريق صالح — عندها يبقى المسار الاحتياطيّ (تصعيد للمدير ثم GM/CEO) بلا تغيير.
+    /// </summary>
+    private async Task<Guid?> ResolveSubmitterTeamLeaderIdAsync(Guid submitterId, CancellationToken ct)
+    {
+        var teamId = await _db.Users
+            .Where(u => u.Id == submitterId)
+            .Select(u => u.TeamId)
+            .FirstOrDefaultAsync(ct);
+        if (teamId is not Guid tid) return null;
+
+        var tlId = await _db.Teams
+            .Where(t => t.Id == tid && t.IsActive)
+            .Select(t => t.TeamLeaderId)
+            .FirstOrDefaultAsync(ct);
+        if (tlId is Guid tl && tl != submitterId && await IsActiveUserAsync(tl, ct))
+            return tl;
+        return null;
+    }
+
+    /// <summary>
+    /// تحديد المعتمِد التالي بعد قرار المعتمِد الحالي: المدير المباشر للمعتمِد الحالي ←
+    /// (إن كان المعتمِد الحالي من الطبقة العليا بلا مدير ⇒ اعتماد نهائي/إغلاق) ← وإلا تصعيد عام
+    /// لأول مدير عام ثم أول Admin/CEO. تُستبعَد كل المعرّفات المُزارة سابقًا (منع الحلقات) والمقدّم (منع اعتماد الذات).
+    /// يُرجِع null عندما يجب أن يُغلق التسليم نهائيًّا.
+    /// </summary>
+    private async Task<Guid?> ResolveNextApproverAsync(Guid currentApproverId, Guid submitterId, HashSet<Guid> visited, CancellationToken ct)
+    {
+        // 0) B2C-UAT-FIXPACK — إيقاف صعود التقرير بعد قائد الفريق:
+        // إذا كان المعتمِد الحالي هو قائد الفريق الفعليّ لمقدّم التقرير ⇒ اعتماده نهائيّ فيُغلق التقرير،
+        // ولا تُنشأ خطوة اعتماد للمدير. الاحتياطيّ محفوظ: عند غياب قائد فريق فعليّ لن يبدأ المسار عنده
+        // (ResolveFirstApproverAsync يعيد المدير/GM/CEO)، فلن يساوي المعتمِد الحالي قائد الفريق،
+        // فيمرّ للمنطق الأصلي (تصعيد للمدير ثم المدير العام ثم Admin/CEO) بلا كسر لأي تقرير بلا قائد فريق.
+        var teamLeaderId = await ResolveSubmitterTeamLeaderIdAsync(submitterId, ct);
+        if (teamLeaderId is Guid tlId && tlId == currentApproverId)
+            return null;
+
+        // 1) المدير المباشر للمعتمِد الحالي (نشط، غير مُزار، وليس المقدّم).
+        var currentManagerId = await _db.Users
+            .Where(u => u.Id == currentApproverId)
+            .Select(u => u.ManagerId)
+            .FirstOrDefaultAsync(ct);
+        if (currentManagerId is Guid mgr && mgr != submitterId && !visited.Contains(mgr) && await IsActiveUserAsync(mgr, ct))
+            return mgr;
+
+        // 2) المعتمِد الحالي من الطبقة العليا (GM/Admin/CEO) بلا مدير صالح ⇒ الاعتماد نهائي (إغلاق).
+        var currentIsSenior = await UserHasAnyRoleAsync(currentApproverId, SeniorRoles, ct);
+        if (currentIsSenior)
+            return null;
+
+        // 3) معتمِد أدنى بلا مدير ⇒ تصعيد عام لأول مدير عام ثم أول Admin/CEO (مع منع الحلقات واعتماد الذات).
+        var exclude = new HashSet<Guid>(visited) { submitterId };
+        var gm = await FirstActiveUserInRoleAsync(GeneralManagerRoles, exclude, ct);
+        if (gm is Guid g) return g;
+        var top = await FirstActiveUserInRoleAsync(FinalFallbackRoles, exclude, ct);
+        if (top is Guid t) return t;
+
+        // 4) لا بديل ⇒ إغلاق نهائي.
+        return null;
+    }
+
+    /// <summary>
+    /// حذف مسودة تقرير. صاحب المسودة فقط (لا يُسمح للأدمن/القائد/المدير بحذف مسودة موظّف آخر)،
+    /// وحالة Draft حصرًا. الحذف يزيل القيم المرتبطة وخطوات الاعتماد عبر Cascade، ولا يمسّ القالب/النسخة/المشروع.
+    /// </summary>
+    public async Task<Result> DeleteDraftAsync(Guid submissionId, CancellationToken ct = default)
+    {
+        var submission = await _db.ReportSubmissions
+            .FirstOrDefaultAsync(s => s.Id == submissionId, ct);
+        if (submission is null) return Result.Failure("التسليم غير موجود.", "submission.not_found");
+
+        // صاحب المسودة فقط — منع IDOR وعدم السماح بأي تصعيد (حتى الأدمن لا يحذف مسودة غيره).
+        if (_currentUser.UserId != submission.SubmitterId)
+            return Result.Failure("لا يمكنك حذف مسودة لا تخصّك.", "auth.forbidden");
+
+        // الحذف مسموح فقط عندما تكون الحالة Draft — أي حالة أخرى (مُرسَل/مُراجَع/معتمد/مُغلق/مُعاد) ممنوعة.
+        if (submission.Status != SubmissionStatus.Draft)
+            return Result.Failure("لا يمكن حذف تقرير بعد إرساله؛ الحذف متاح للمسودات فقط.", "submission.delete_forbidden.conflict");
+
+        // Cascade يحذف submission_field_values + approval_steps المرتبطة بالمسودة. لا يمسّ القالب/النسخة/المشروع.
+        _db.ReportSubmissions.Remove(submission);
+        await _db.SaveChangesAsync(ct);
+
+        await _audit.LogAsync(_currentUser.UserId, "submission.draft_deleted", nameof(ReportSubmission), submission.Id, ct: ct);
+
+        return Result.Success();
     }
 
     public Task<Result<SubmissionDto>> ApproveAsync(Guid submissionId, ApprovalActionRequest request, CancellationToken ct = default)
@@ -269,8 +495,10 @@ public class SubmissionService : ISubmissionService
         step.DecidedAtUtc = DateTime.UtcNow;
         submission.UpdatedAtUtc = DateTime.UtcNow;
 
-        var approver = await _db.Users.FirstOrDefaultAsync(u => u.Id == step.ApproverId, ct);
-        var nextApproverId = approver?.ManagerId;
+        // APPROVAL-FALLBACK-R1: تحديد المعتمِد التالي عبر السلسلة الاحتياطية بدل ManagerId وحده،
+        // مع منع الحلقات عبر مجموعة المعتمِدين السابقين (visited) وتفادي اعتماد المقدّم لنفسه.
+        var visited = submission.ApprovalSteps.Select(a => a.ApproverId).ToHashSet();
+        var nextApproverId = await ResolveNextApproverAsync(step.ApproverId, submission.SubmitterId, visited, ct);
 
         switch (decision)
         {
@@ -326,20 +554,20 @@ public class SubmissionService : ISubmissionService
         {
             case ApprovalStatus.Returned:
                 await _notifications.NotifyAsync(submission.SubmitterId, "submission.returned",
-                    "أُعيد تقريرك للتعديل", comment, $"/submissions/{submission.Id}", ct);
+                    "أُعيد تقريرك للتعديل", comment, $"/app/submissions?open={submission.Id}", ct);
                 break;
             case ApprovalStatus.Escalated:
                 if (submission.CurrentApproverId is Guid esc)
                     await _notifications.NotifyAsync(esc, "submission.escalated",
-                        "تصعيد بانتظار اعتمادك", comment, $"/submissions/{submission.Id}", ct);
+                        "تصعيد بانتظار اعتمادك", comment, $"/app/submissions?open={submission.Id}", ct);
                 break;
             case ApprovalStatus.Approved:
                 if (submission.CurrentApproverId is Guid next)
                     await _notifications.NotifyAsync(next, "submission.submitted",
-                        "تقرير بانتظار اعتمادك", null, $"/submissions/{submission.Id}", ct);
+                        "تقرير بانتظار اعتمادك", null, $"/app/submissions?open={submission.Id}", ct);
                 else
                     await _notifications.NotifyAsync(submission.SubmitterId, "submission.approved",
-                        "تم اعتماد تقريرك", comment, $"/submissions/{submission.Id}", ct);
+                        "تم اعتماد تقريرك", comment, $"/app/submissions?open={submission.Id}", ct);
                 break;
         }
         await _audit.LogAsync(_currentUser.UserId, $"submission.{decision.ToString().ToLowerInvariant()}",
@@ -358,7 +586,14 @@ public class SubmissionService : ISubmissionService
         if (!scope.SeesAll)
         {
             var ids = scope.UserIds;
-            q = q.Where(s => ids.Contains(s.SubmitterId));
+            // إضافة تقارير مُرسِلين أُتيحوا عبر منح الرؤية المخفيّ (عرض فقط، حالات معتمدة فقط) —
+            // معزول تمامًا عن ScopeResolver؛ لا يوسّع نطاق الدور بل يضيف اتحادًا محدودًا للقراءة.
+            var grantIds = await _grants.ResolveGrantedSubmitterIdsAsync(userId, ct);
+            if (grantIds.Count == 0)
+                q = q.Where(s => ids.Contains(s.SubmitterId));
+            else
+                q = q.Where(s => ids.Contains(s.SubmitterId)
+                                 || (grantIds.Contains(s.SubmitterId) && GrantViewableStatuses.Contains(s.Status)));
         }
 
         q = ApplyFilter(q, filter);
@@ -391,7 +626,12 @@ public class SubmissionService : ISubmissionService
         if (!scope.SeesAll)
         {
             var ids = scope.UserIds;
-            q = q.Where(s => ids.Contains(s.SubmitterId));
+            var grantIds = await _grants.ResolveGrantedSubmitterIdsAsync(userId, ct);
+            if (grantIds.Count == 0)
+                q = q.Where(s => ids.Contains(s.SubmitterId));
+            else
+                q = q.Where(s => ids.Contains(s.SubmitterId)
+                                 || (grantIds.Contains(s.SubmitterId) && GrantViewableStatuses.Contains(s.Status)));
         }
         q = ApplyFilter(q, filter);
 
@@ -499,7 +739,15 @@ public class SubmissionService : ISubmissionService
         if (userId == s.SubmitterId) return true;
         if (s.CurrentApproverId == userId) return true;
         var scope = await _scope.ResolveAsync(ct);
-        return scope.Contains(s.SubmitterId);
+        if (scope.Contains(s.SubmitterId)) return true;
+        // منح الرؤية المخفيّ (عرض فقط): يُسمح بقراءة تقرير مُرسِل مُتاح فقط بحالة معتمدة (لا مسودّة/مُعادة).
+        // canEdit يبقى false (المستفيد ليس صاحب التقرير ولا الموافِق) فلا يكتسب أيّ قدرة قرار/تعديل.
+        if (GrantViewableStatuses.Contains(s.Status))
+        {
+            var grantIds = await _grants.ResolveGrantedSubmitterIdsAsync(userId, ct);
+            if (grantIds.Contains(s.SubmitterId)) return true;
+        }
+        return false;
     }
 
     private static bool HasValue(SubmissionFieldValue? v)
@@ -510,5 +758,368 @@ public class SubmissionService : ISubmissionService
             || v.ValueDate is not null
             || v.ValueBool is not null
             || !string.IsNullOrWhiteSpace(v.ValueJson);
+    }
+
+    // ===== أقسام المشاريع المتكررة (Multi-Project MVP) =====
+    // الإعداد في ConfigJson للحقل، والقيمة في ValueJson للتسليم كقائمة {projectId, answers}.
+    private static readonly JsonSerializerOptions RepeatableJson = new() { PropertyNameCaseInsensitive = true };
+
+    private sealed class RepeatableConfig
+    {
+        public bool ProjectRequired { get; set; } = true;
+        public int MinProjects { get; set; }
+        public int MaxProjects { get; set; }
+        public List<RepeatableField> Fields { get; set; } = new();
+    }
+
+    private sealed class RepeatableField
+    {
+        public string Key { get; set; } = string.Empty;
+        public string Label { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
+        public bool Required { get; set; }
+    }
+
+    private sealed class RepeatableEntry
+    {
+        public Guid? ProjectId { get; set; }
+        public Dictionary<string, JsonElement> Answers { get; set; } = new();
+    }
+
+    private static RepeatableConfig ParseSectionConfig(string? configJson)
+    {
+        if (string.IsNullOrWhiteSpace(configJson)) return new RepeatableConfig();
+        try { return JsonSerializer.Deserialize<RepeatableConfig>(configJson, RepeatableJson) ?? new RepeatableConfig(); }
+        catch { return new RepeatableConfig(); }
+    }
+
+    private static List<RepeatableEntry> ParseSectionEntries(string? valueJson)
+    {
+        if (string.IsNullOrWhiteSpace(valueJson)) return new List<RepeatableEntry>();
+        try { return JsonSerializer.Deserialize<List<RepeatableEntry>>(valueJson, RepeatableJson) ?? new List<RepeatableEntry>(); }
+        catch { return new List<RepeatableEntry>(); }
+    }
+
+    private static bool AnswerHasValue(JsonElement e) => e.ValueKind switch
+    {
+        JsonValueKind.String => !string.IsNullOrWhiteSpace(e.GetString()),
+        JsonValueKind.Number => true,
+        JsonValueKind.True or JsonValueKind.False => true,
+        _ => false
+    };
+
+    private async Task<List<string>> ValidateRepeatableSectionsAsync(ReportSubmission submission, CancellationToken ct)
+    {
+        var errors = new List<string>();
+        var sections = await _db.TemplateFields
+            .Where(f => f.ReportTemplateVersionId == submission.ReportTemplateVersionId
+                        && f.FieldType == FieldType.ProjectRepeatableSection)
+            .Select(f => new { f.Id, f.Label, f.IsRequired, f.ConfigJson })
+            .ToListAsync(ct);
+        if (sections.Count == 0) return errors;
+
+        var vis = await _access.ResolveAsync(ct);
+
+        foreach (var sec in sections)
+        {
+            var config = ParseSectionConfig(sec.ConfigJson);
+            var value = submission.FieldValues.FirstOrDefault(v => v.TemplateFieldId == sec.Id);
+            var entries = ParseSectionEntries(value?.ValueJson);
+
+            var min = sec.IsRequired ? Math.Max(config.MinProjects, 1) : Math.Max(config.MinProjects, 0);
+            if (entries.Count < min)
+            {
+                errors.Add($"قسم «{sec.Label}» يتطلب {min} مشروعًا على الأقل.");
+                continue;
+            }
+            if (config.MaxProjects > 0 && entries.Count > config.MaxProjects)
+            {
+                errors.Add($"قسم «{sec.Label}» يسمح بحد أقصى {config.MaxProjects} مشروعًا.");
+                continue;
+            }
+
+            foreach (var entry in entries)
+            {
+                if (config.ProjectRequired || entry.ProjectId is not null)
+                {
+                    if (entry.ProjectId is not Guid pid || pid == Guid.Empty)
+                    {
+                        errors.Add($"قسم «{sec.Label}»: يجب اختيار المشروع لكل عنصر.");
+                        continue;
+                    }
+                    if (!vis.CanViewProject(pid))
+                    {
+                        errors.Add($"قسم «{sec.Label}»: مشروع خارج نطاق صلاحيتك.");
+                        continue;
+                    }
+                }
+
+                foreach (var sf in config.Fields.Where(x => x.Required))
+                {
+                    var has = entry.Answers.TryGetValue(sf.Key, out var av) && AnswerHasValue(av);
+                    if (!has)
+                        errors.Add($"قسم «{sec.Label}»: الحقل «{sf.Label}» مطلوب لكل مشروع.");
+                }
+            }
+        }
+        return errors;
+    }
+
+    // ===== تحقّق خلايا جدول «مبيعات B2C حسب الدورة» (ERDS Phase 2A) =====
+    // نطاق آمن مقصور: يُطبَّق حصرًا على الجداول (TableGrid) التي تطابق أعمدتها شيما B2cByCourseReportSchema بالترتيب،
+    // فلا يمسّ أيّ TableGrid آخر في النظام (كلها ذات أعمدة مختلفة). القيم مخزَّنة string[][] في ValueJson.
+    // يُفرَض خادميًّا عند الإرسال (SubmitAsync) — نفس بوابة تحقّق الحقول المطلوبة — فيمنع البيانات غير المنطقية حتى لو أُرسِلت من API مباشرة.
+    private sealed record GridFieldInfo(Guid Id, string Label, string[] Columns);
+
+    private async Task<List<GridFieldInfo>> GetVersionTableGridsAsync(Guid versionId, CancellationToken ct)
+    {
+        var raw = await _db.TemplateFields
+            .Where(f => f.ReportTemplateVersionId == versionId && f.FieldType == FieldType.TableGrid)
+            .Select(f => new { f.Id, f.Label, f.ConfigJson })
+            .ToListAsync(ct);
+        return raw.Select(f => new GridFieldInfo(f.Id, f.Label, ParseGridColumns(f.ConfigJson))).ToList();
+    }
+
+    private static List<string> ValidateB2cByCourseGrids(ReportSubmission submission, List<GridFieldInfo> grids)
+    {
+        var errors = new List<string>();
+        foreach (var grid in grids)
+        {
+            // مطابقة الأعمدة الكاملة بالترتيب هي شرط التفعيل — يضمن عدم تأثّر أيّ جدول آخر.
+            if (!grid.Columns.SequenceEqual(B2cByCourseReportSchema.Columns)) continue;
+
+            var value = submission.FieldValues.FirstOrDefault(v => v.TemplateFieldId == grid.Id);
+            var rows = ParseGridRows(value?.ValueJson);
+
+            int Col(string name) => Array.IndexOf(B2cByCourseReportSchema.Columns, name);
+            var cWorkHours = Col(B2cByCourseReportSchema.ColWorkHours);
+            var cLeads = Col(B2cByCourseReportSchema.ColLeads);
+            var cContacted = Col(B2cByCourseReportSchema.ColContacted);
+            var cQualified = Col(B2cByCourseReportSchema.ColQualified);
+            var cFollowUps = Col(B2cByCourseReportSchema.ColFollowUps);
+            var cSales = Col(B2cByCourseReportSchema.ColSales);
+            var cRevenue = Col(B2cByCourseReportSchema.ColRevenue);
+            var cLost = Col(B2cByCourseReportSchema.ColLost);
+
+            var numericColumns = new[]
+            {
+                (Index: cWorkHours, Name: B2cByCourseReportSchema.ColWorkHours),
+                (Index: cLeads, Name: B2cByCourseReportSchema.ColLeads),
+                (Index: cContacted, Name: B2cByCourseReportSchema.ColContacted),
+                (Index: cQualified, Name: B2cByCourseReportSchema.ColQualified),
+                (Index: cFollowUps, Name: B2cByCourseReportSchema.ColFollowUps),
+                (Index: cSales, Name: B2cByCourseReportSchema.ColSales),
+                (Index: cRevenue, Name: B2cByCourseReportSchema.ColRevenue),
+                (Index: cLost, Name: B2cByCourseReportSchema.ColLost),
+            };
+
+            // قاعدة عامة: الجدول المطلوب لا يكون فارغًا، ولا تُقبَل صفوف فارغة بالكامل كبيانات (لا بدّ من صفّ واحد ببيانات فعلية).
+            if (!rows.Any(RowHasAnyValue))
+            {
+                errors.Add($"جدول «{grid.Label}» يجب أن يحتوي على صفّ واحد على الأقل ببيانات فعلية.");
+                continue;
+            }
+
+            for (var i = 0; i < rows.Count; i++)
+            {
+                var row = rows[i];
+                if (!RowHasAnyValue(row)) continue; // صفّ فارغ بالكامل = غير مُدخَل، يُتجاهَل.
+                var rowNum = i + 1;
+
+                // (1) الأعمدة الرقمية: رقم صحيح/عشري صالح وغير سالب.
+                var parsed = new Dictionary<int, decimal>();
+                var rowValid = true;
+                foreach (var (idx, name) in numericColumns)
+                {
+                    var raw = Cell(row, idx);
+                    if (string.IsNullOrWhiteSpace(raw)) continue; // خليّة فارغة = غير مُدخَلة.
+                    if (!TryParseNumber(raw, out var num))
+                    {
+                        errors.Add($"الصف {rowNum} في جدول «{grid.Label}»: قيمة «{name}» يجب أن تكون رقمًا.");
+                        rowValid = false;
+                        continue;
+                    }
+                    if (num < 0)
+                    {
+                        errors.Add($"الصف {rowNum} في جدول «{grid.Label}»: «{name}» لا يمكن أن يكون سالبًا.");
+                        rowValid = false;
+                        continue;
+                    }
+                    parsed[idx] = num;
+                }
+                if (!rowValid) continue; // لا تُطبَّق القواعد المنطقية على صفّ به خطأ رقمي.
+
+                decimal? Val(int idx) => parsed.TryGetValue(idx, out var v) ? v : (decimal?)null;
+
+                // (2) ساعات العمل: إن كان الصفّ يحوي نشاطًا (أيّ مقياس > 0) فيجب أن تكون ساعات العمل > 0.
+                var hasActivity = new[] { cLeads, cContacted, cQualified, cFollowUps, cSales, cRevenue, cLost }
+                    .Any(idx => Val(idx) is decimal dv && dv > 0);
+                if (hasActivity && !(Val(cWorkHours) is decimal wh && wh > 0))
+                    errors.Add($"الصف {rowNum} في جدول «{grid.Label}»: يجب إدخال ساعات عمل أكبر من صفر لصفّ يحتوي على نشاط.");
+
+                // (3) قواعد منطقية (تُطبَّق فقط حين تتوفّر القيمتان رقميًّا).
+                void LeMax(int lo, string loName, int hi, string hiName)
+                {
+                    if (Val(lo) is decimal a && Val(hi) is decimal b && a > b)
+                        errors.Add($"الصف {rowNum} في جدول «{grid.Label}»: «{loName}» لا يمكن أن يكون أكبر من «{hiName}».");
+                }
+                LeMax(cContacted, B2cByCourseReportSchema.ColContacted, cLeads, B2cByCourseReportSchema.ColLeads);
+                LeMax(cQualified, B2cByCourseReportSchema.ColQualified, cContacted, B2cByCourseReportSchema.ColContacted);
+                LeMax(cSales, B2cByCourseReportSchema.ColSales, cQualified, B2cByCourseReportSchema.ColQualified);
+                LeMax(cLost, B2cByCourseReportSchema.ColLost, cLeads, B2cByCourseReportSchema.ColLeads);
+            }
+        }
+        return errors;
+    }
+
+    // ===== تحقّق جدولَي قالب «مبيعات B2C — بيانات جديدة/قديمة» (Phase 7) =====
+    // نفس منطق جدول B2C القديم لكن على جدولين: New Leads (عمود Leads = New Leads، التأهيل = Qualified)،
+    // و Old CRM (عمود Leads = Old Leads Worked، التأهيل = Requalified). مطابقة الأعمدة بالترتيب شرط التفعيل
+    // فلا يمسّ أيّ TableGrid آخر (ومن ضمنه قالب B2C القديم ذو الأعمدة المختلفة).
+    private static List<string> ValidateB2cNewOldGrids(ReportSubmission submission, List<GridFieldInfo> grids)
+    {
+        var errors = new List<string>();
+        foreach (var grid in grids)
+        {
+            string[] cols;
+            string leadsName, qualifiedName;
+            if (grid.Columns.SequenceEqual(B2cNewOldReportSchema.NewLeadsColumns))
+            {
+                cols = B2cNewOldReportSchema.NewLeadsColumns;
+                leadsName = B2cNewOldReportSchema.ColNewLeads;
+                qualifiedName = B2cNewOldReportSchema.ColQualified;
+            }
+            else if (grid.Columns.SequenceEqual(B2cNewOldReportSchema.OldCrmColumns))
+            {
+                cols = B2cNewOldReportSchema.OldCrmColumns;
+                leadsName = B2cNewOldReportSchema.ColOldLeadsWorked;
+                qualifiedName = B2cNewOldReportSchema.ColRequalified;
+            }
+            else continue;
+
+            var value = submission.FieldValues.FirstOrDefault(v => v.TemplateFieldId == grid.Id);
+            var rows = ParseGridRows(value?.ValueJson);
+
+            int Col(string name) => Array.IndexOf(cols, name);
+            var cWorkHours = Col(B2cNewOldReportSchema.ColWorkHours);
+            var cLeads = Col(leadsName);
+            var cContacted = Col(B2cNewOldReportSchema.ColContacted);
+            var cQualified = Col(qualifiedName);
+            var cFollowUps = Col(B2cNewOldReportSchema.ColFollowUps);
+            var cSales = Col(B2cNewOldReportSchema.ColSales);
+            var cRevenue = Col(B2cNewOldReportSchema.ColRevenue);
+            var cLost = Col(B2cNewOldReportSchema.ColLost);
+
+            var numericColumns = new[]
+            {
+                (Index: cWorkHours, Name: B2cNewOldReportSchema.ColWorkHours),
+                (Index: cLeads, Name: leadsName),
+                (Index: cContacted, Name: B2cNewOldReportSchema.ColContacted),
+                (Index: cQualified, Name: qualifiedName),
+                (Index: cFollowUps, Name: B2cNewOldReportSchema.ColFollowUps),
+                (Index: cSales, Name: B2cNewOldReportSchema.ColSales),
+                (Index: cRevenue, Name: B2cNewOldReportSchema.ColRevenue),
+                (Index: cLost, Name: B2cNewOldReportSchema.ColLost),
+            };
+
+            if (!rows.Any(RowHasAnyValue))
+            {
+                errors.Add($"جدول «{grid.Label}» يجب أن يحتوي على صفّ واحد على الأقل ببيانات فعلية.");
+                continue;
+            }
+
+            for (var i = 0; i < rows.Count; i++)
+            {
+                var row = rows[i];
+                if (!RowHasAnyValue(row)) continue;
+                var rowNum = i + 1;
+
+                var parsed = new Dictionary<int, decimal>();
+                var rowValid = true;
+                foreach (var (idx, name) in numericColumns)
+                {
+                    var raw = Cell(row, idx);
+                    if (string.IsNullOrWhiteSpace(raw)) continue;
+                    if (!TryParseNumber(raw, out var num))
+                    {
+                        errors.Add($"الصف {rowNum} في جدول «{grid.Label}»: قيمة «{name}» يجب أن تكون رقمًا.");
+                        rowValid = false;
+                        continue;
+                    }
+                    if (num < 0)
+                    {
+                        errors.Add($"الصف {rowNum} في جدول «{grid.Label}»: «{name}» لا يمكن أن يكون سالبًا.");
+                        rowValid = false;
+                        continue;
+                    }
+                    parsed[idx] = num;
+                }
+                if (!rowValid) continue;
+
+                decimal? Val(int idx) => parsed.TryGetValue(idx, out var v) ? v : (decimal?)null;
+
+                var hasActivity = new[] { cLeads, cContacted, cQualified, cFollowUps, cSales, cRevenue, cLost }
+                    .Any(idx => Val(idx) is decimal dv && dv > 0);
+                if (hasActivity && !(Val(cWorkHours) is decimal wh && wh > 0))
+                    errors.Add($"الصف {rowNum} في جدول «{grid.Label}»: يجب إدخال ساعات عمل أكبر من صفر لصفّ يحتوي على نشاط.");
+
+                void LeMax(int lo, string loName, int hi, string hiName)
+                {
+                    if (Val(lo) is decimal a && Val(hi) is decimal b && a > b)
+                        errors.Add($"الصف {rowNum} في جدول «{grid.Label}»: «{loName}» لا يمكن أن يكون أكبر من «{hiName}».");
+                }
+                LeMax(cContacted, B2cNewOldReportSchema.ColContacted, cLeads, leadsName);
+                LeMax(cQualified, qualifiedName, cContacted, B2cNewOldReportSchema.ColContacted);
+                LeMax(cSales, B2cNewOldReportSchema.ColSales, cQualified, qualifiedName);
+                LeMax(cLost, B2cNewOldReportSchema.ColLost, cLeads, leadsName);
+            }
+        }
+        return errors;
+    }
+
+    private static string Cell(IReadOnlyList<string> row, int idx)
+        => idx >= 0 && idx < row.Count ? (row[idx] ?? string.Empty) : string.Empty;
+
+    private static bool RowHasAnyValue(IReadOnlyList<string> row)
+        => row.Any(c => !string.IsNullOrWhiteSpace(c));
+
+    private static string[] ParseGridColumns(string? configJson)
+    {
+        if (string.IsNullOrWhiteSpace(configJson)) return Array.Empty<string>();
+        try
+        {
+            using var doc = JsonDocument.Parse(configJson);
+            if (doc.RootElement.TryGetProperty("columns", out var cols) && cols.ValueKind == JsonValueKind.Array)
+                return cols.EnumerateArray().Select(e => e.GetString() ?? string.Empty).ToArray();
+        }
+        catch { /* ConfigJson غير صالح ⇒ لا أعمدة ⇒ لا تفعيل للتحقّق. */ }
+        return Array.Empty<string>();
+    }
+
+    private static List<string[]> ParseGridRows(string? valueJson)
+    {
+        if (string.IsNullOrWhiteSpace(valueJson)) return new List<string[]>();
+        try { return JsonSerializer.Deserialize<List<string[]>>(valueJson, RepeatableJson) ?? new List<string[]>(); }
+        catch { return new List<string[]>(); }
+    }
+
+    private static bool TryParseNumber(string raw, out decimal value)
+    {
+        var normalized = NormalizeDigits(raw).Trim();
+        return decimal.TryParse(normalized, System.Globalization.NumberStyles.Number,
+            System.Globalization.CultureInfo.InvariantCulture, out value);
+    }
+
+    // تحويل الأرقام العربية-الهندية (٠-٩ و ۰-۹) إلى ASCII لأغراض التحقّق فقط — القيمة المخزَّنة لا تتغيّر.
+    private static string NormalizeDigits(string s)
+    {
+        var chars = s.ToCharArray();
+        for (var i = 0; i < chars.Length; i++)
+        {
+            var c = chars[i];
+            if (c >= '\u0660' && c <= '\u0669') chars[i] = (char)('0' + (c - '\u0660'));
+            else if (c >= '\u06F0' && c <= '\u06F9') chars[i] = (char)('0' + (c - '\u06F0'));
+        }
+        return new string(chars);
     }
 }

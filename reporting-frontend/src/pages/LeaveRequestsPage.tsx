@@ -9,6 +9,7 @@ import {
   leaveTypeLabel,
   leaveStatusLabelFor,
   leaveStatusTone,
+  permissionShortfallResolutionLabel,
   formatDate,
   formatDateTime,
 } from '../lib/format';
@@ -17,6 +18,8 @@ import type {
   LeaveRequestListItemDto,
   LeaveRequestType,
   CreateLeaveRequestRequest,
+  MyBalancesDto,
+  PermissionShortfallResolution,
 } from '../types/api';
 
 // أدوار المراجعة (تطابق Policies.LeaveReview بالخادم) — يظهر لها تبويب «بانتظار قراري».
@@ -106,6 +109,24 @@ function MineTab({ onOpen }: { onOpen: (id: string) => void }) {
   );
 }
 
+// عدد أيام الإجازة شاملةً الطرفين (يطابق حساب الخادم) من تاريخين بصيغة YYYY-MM-DD.
+function inclusiveDays(start: string, end: string): number {
+  if (!start || !end) return 0;
+  const ms = Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`);
+  if (Number.isNaN(ms) || ms < 0) return 0;
+  return Math.round(ms / 86400000) + 1;
+}
+
+// مدّة الاستئذان بالدقائق من حقلَي الوقت «HH:mm». تُرجع 0 إن نقص أحدهما أو كان الترتيب خاطئًا.
+function permissionMinutes(start: string, end: string): number {
+  if (!start || !end) return 0;
+  const [sh, sm] = start.split(':').map(Number);
+  const [eh, em] = end.split(':').map(Number);
+  if ([sh, sm, eh, em].some(Number.isNaN)) return 0;
+  const diff = (eh * 60 + em) - (sh * 60 + sm);
+  return diff > 0 ? diff : 0;
+}
+
 function CreateLeaveForm({ onCreated }: { onCreated: (id: string) => void }) {
   const qc = useQueryClient();
   const [type, setType] = useState<LeaveRequestType>('Leave');
@@ -116,40 +137,86 @@ function CreateLeaveForm({ onCreated }: { onCreated: (id: string) => void }) {
   const [reason, setReason] = useState('');
   const [notes, setNotes] = useState('');
   const [err, setErr] = useState<string | null>(null);
+  // نافذة إقرار الإجازة بدون راتب عند نقص الرصيد السنوي.
+  const [confirmUnpaid, setConfirmUnpaid] = useState(false);
+  // نافذة اختيار قرار الاستئذان عند تجاوز الرصيد الشهري + القرار المختار.
+  const [confirmPermission, setConfirmPermission] = useState(false);
+  const [permResolution, setPermResolution] = useState<PermissionShortfallResolution>('None');
+
+  // رصيد الإجازات/الأذونات لفحص الكفاية قبل الإرسال (الفحص النهائي خادميّ — هذا للتجربة فقط).
+  const { data: balances } = useQuery({
+    queryKey: ['my-balances'],
+    queryFn: async () => (await api.get<MyBalancesDto>('/me/balances')).data,
+  });
 
   const reset = () => {
     setStartDate(''); setEndDate(''); setStartTime(''); setEndTime(''); setReason(''); setNotes('');
   };
 
   const create = useMutation({
-    mutationFn: () => {
+    mutationFn: (vars: { acknowledged?: boolean; resolution?: PermissionShortfallResolution }) => {
       // TimeOnly بالخادم يتوقّع «HH:mm:ss» — حقل الوقت يُرجع «HH:mm» فنُكمله.
       const t = (v: string) => (v ? (v.length === 5 ? `${v}:00` : v) : null);
       const body: CreateLeaveRequestRequest =
         type === 'Leave'
-          ? { type, startDate, endDate: endDate || startDate, reason, notes: notes || null }
-          : { type, startDate, startTime: t(startTime), endTime: t(endTime), reason, notes: notes || null };
+          ? { type, startDate, endDate: endDate || startDate, reason, notes: notes || null, acknowledgedUnpaidDeduction: vars.acknowledged ?? false }
+          : { type, startDate, startTime: t(startTime), endTime: t(endTime), reason, notes: notes || null, permissionShortfallResolution: vars.resolution ?? 'None' };
       return api.post<LeaveRequestDto>('/leave-requests', body);
     },
     onSuccess: (res) => {
       reset();
+      setConfirmUnpaid(false);
+      setConfirmPermission(false);
+      setPermResolution('None');
       void qc.invalidateQueries({ queryKey: ['leave-requests-mine'] });
+      void qc.invalidateQueries({ queryKey: ['my-balances'] });
       onCreated(res.data.id);
     },
-    onError: (e) => setErr(apiErrorMessage(e)),
+    onError: (e) => { setErr(apiErrorMessage(e)); },
   });
 
   const isLeave = type === 'Leave';
-  const canSubmit = isLeave
+  // حدّ مدّة الاستئذان: لا يتجاوز ساعتين (120 دقيقة). الأطول يلزمه طلب إجازة/غياب (يُفرَض خادميًّا أيضًا).
+  const permTooLong = !isLeave && permissionMinutes(startTime, endTime) > 120;
+  const canSubmit = (isLeave
     ? !!startDate && !!endDate && !!reason.trim()
-    : !!startDate && !!startTime && !!endTime && !!reason.trim();
+    : !!startDate && !!startTime && !!endTime && !!reason.trim())
+    && !permTooLong;
+
+  // الإجازة ⇒ رصيد الإجازات السنوي (بالأيام). المطلوب (أيام شاملة) مقابل المتبقّي السنوي.
+  const requestedDays = isLeave ? inclusiveDays(startDate, endDate || startDate) : 0;
+  const annualRemaining = balances?.annualLeave.remaining ?? 0;
+  const uncovered = isLeave ? Math.max(0, requestedDays - annualRemaining) : 0;
+  const insufficient = isLeave && requestedDays > 0 && uncovered > 0;
+
+  // الاستئذان ⇒ رصيد الأذونات الشهري (بالعدد). يوجد قيد شهري فقط إن أعاد الخادم رصيدًا شهريًّا متبقّيًا.
+  // permissionRemainingThisMonth ≤ 0 ⇒ الإذن التالي يتجاوز الرصيد الشهري المتاح ⇒ يلزم اختيار قرار.
+  const hasMonthlyLimit = !isLeave && balances?.permissionRemainingThisMonth != null;
+  const monthlyRemaining = balances?.permissionRemainingThisMonth ?? 0;
+  const monthlyUsed = balances?.permissionUsedThisMonth ?? 0;
+  const monthlyLimit = balances?.permissionMonthlyLimit ?? 0;
+  const permissionInsufficient = hasMonthlyLimit && monthlyRemaining <= 0;
+
+  // عند الإرسال: نقص الرصيد السنوي للإجازة ⇒ نافذة الإقرار؛ تجاوز الرصيد الشهري للاستئذان ⇒ نافذة اختيار القرار.
+  const handleSubmit = () => {
+    setErr(null);
+    if (permTooLong) {
+      setErr('مدة الاستئذان لا يمكن أن تتجاوز ساعتين. إذا كانت المدة أطول، يرجى تقديم طلب إجازة/غياب وفق السياسة.');
+      return;
+    }
+    if (insufficient) { setConfirmUnpaid(true); return; }
+    if (permissionInsufficient) { setPermResolution('None'); setConfirmPermission(true); return; }
+    create.mutate(isLeave ? { acknowledged: false } : { resolution: 'None' });
+  };
 
   return (
     <Card>
       <div className="mb-3">
         <div className="text-sm font-semibold text-navy">طلب جديد</div>
         <div className="text-xs text-navy/60">
-          الإجازة تغطّي يومًا كاملًا أو أكثر؛ الاستئذان لجزء من يوم واحد (من وقت إلى وقت).
+          {isLeave
+            ? 'الإجازة تغطّي يومًا كاملًا أو أكثر وتخصم من رصيد الإجازات السنوي.'
+            : 'الاستئذان لجزء من يوم واحد (من وقت إلى وقت) ويخصم من رصيد الاستئذانات الشهري.'}
         </div>
       </div>
       {err && <div className="mb-3"><Alert tone="alert">{err}</Alert></div>}
@@ -186,11 +253,114 @@ function CreateLeaveForm({ onCreated }: { onCreated: (id: string) => void }) {
           <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="أي تفاصيل إضافية…" />
         </Field>
       </div>
+      {permTooLong && (
+        <div className="mt-3">
+          <Alert tone="alert">
+            مدة الاستئذان لا يمكن أن تتجاوز ساعتين. إذا كانت المدة أطول، يرجى تقديم طلب إجازة/غياب وفق السياسة.
+          </Alert>
+        </div>
+      )}
+      {insufficient && (
+        <div className="mt-3">
+          <Alert tone="alert">
+            رصيد الإجازات السنوي المتاح لديك غير كافٍ لهذا الطلب (المطلوب {requestedDays} يوم، المتبقّي {annualRemaining} يوم،
+            غير المغطّى {uncovered} يوم). عند الإرسال سيُطلب إقرارك باحتمال احتساب الأيام غير المغطّاة إجازةً بدون راتب.
+          </Alert>
+        </div>
+      )}
+      {permissionInsufficient && (
+        <div className="mt-3">
+          <Alert tone="alert">
+            رصيد الاستئذانات الشهري المتاح لديك غير كافٍ لهذا الطلب (الحدّ الشهري {monthlyLimit}، المستخدَم هذا الشهر {monthlyUsed}،
+            المتبقّي {Math.max(0, monthlyRemaining)}). عند الإرسال سيُطلب منك اختيار أحد قرارين قبل المتابعة.
+          </Alert>
+        </div>
+      )}
       <div className="mt-4">
-        <Button disabled={!canSubmit || create.isPending} onClick={() => { setErr(null); create.mutate(); }}>
+        <Button disabled={!canSubmit || create.isPending} onClick={handleSubmit}>
           إرسال الطلب
         </Button>
       </div>
+
+      {confirmUnpaid && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
+          <Card className="w-full max-w-lg">
+            <h2 className="mb-3 text-lg font-bold text-navy">تنبيه: رصيد الإجازات السنوي غير كافٍ</h2>
+            <Alert tone="alert">
+              أقرّ بأن رصيد الإجازات المتاح لدي غير كافٍ لهذا الطلب، وأعلم أنه في حال موافقة الإدارة قد تُحتسب
+              الأيام غير المغطاة كإجازة بدون راتب وقد يتم خصمها من راتب نهاية الشهر.
+            </Alert>
+            <div className="mt-3 grid gap-2 text-sm text-ink-2 sm:grid-cols-3">
+              <div>المطلوب: <span className="font-semibold text-navy">{requestedDays} يوم</span></div>
+              <div>الرصيد السنوي المتاح: <span className="font-semibold text-navy">{annualRemaining} يوم</span></div>
+              <div>غير المغطّى: <span className="font-semibold text-orange-600">{uncovered} يوم</span></div>
+            </div>
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <Button variant="ghost" disabled={create.isPending} onClick={() => setConfirmUnpaid(false)}>
+                إلغاء
+              </Button>
+              <Button variant="danger" disabled={create.isPending} onClick={() => create.mutate({ acknowledged: true })}>
+                الاستمرار مع الإقرار
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {confirmPermission && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
+          <Card className="w-full max-w-lg">
+            <h2 className="mb-3 text-lg font-bold text-navy">تنبيه: رصيد الاستئذانات الشهري غير كافٍ</h2>
+            <Alert tone="alert">
+              هذا الطلب يتجاوز رصيد الاستئذانات الشهري المتاح لديك. اختر أحد الخيارين للمتابعة. لا يوجد أي خصم آلي
+              من الراتب — القرار يُسجَّل للمراجعة الإدارية فقط.
+            </Alert>
+            <div className="mt-3 grid gap-2 text-sm text-ink-2 sm:grid-cols-3">
+              <div>الحدّ الشهري: <span className="font-semibold text-navy">{monthlyLimit}</span></div>
+              <div>المستخدَم هذا الشهر: <span className="font-semibold text-navy">{monthlyUsed}</span></div>
+              <div>المتبقّي: <span className="font-semibold text-orange-600">{Math.max(0, monthlyRemaining)}</span></div>
+            </div>
+            <div className="mt-4 space-y-2">
+              <label className="flex cursor-pointer items-start gap-2 rounded-md border border-line p-3 text-sm hover:bg-offwhite">
+                <input
+                  type="radio"
+                  name="perm-resolution"
+                  className="mt-1"
+                  checked={permResolution === 'CompensateAfterHours'}
+                  onChange={() => setPermResolution('CompensateAfterHours')}
+                />
+                <span className="text-ink">نعم، أتعهد بتعويض وقت الاستئذان بعد مواعيد العمل</span>
+              </label>
+              <label className="flex cursor-pointer items-start gap-2 rounded-md border border-line p-3 text-sm hover:bg-offwhite">
+                <input
+                  type="radio"
+                  name="perm-resolution"
+                  className="mt-1"
+                  checked={permResolution === 'AdminOrPayrollReview'}
+                  onChange={() => setPermResolution('AdminOrPayrollReview')}
+                />
+                <span className="text-ink">لا، أرغب في تقديم الطلب مع علمي بأنه قد تتم معالجته إداريًا أو ماليًا حسب قرار الإدارة، وأوافق على إقرار الخصم المالي عند اعتماده</span>
+              </label>
+            </div>
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <Button variant="ghost" disabled={create.isPending} onClick={() => { setConfirmPermission(false); setPermResolution('None'); }}>
+                إلغاء
+              </Button>
+              <Button
+                disabled={create.isPending || permResolution === 'None'}
+                title={permResolution === 'None' ? 'اختر أحد الخيارين أولًا' : undefined}
+                onClick={() => create.mutate({ resolution: permResolution })}
+              >
+                {permResolution === 'AdminOrPayrollReview'
+                  ? 'إرسال الطلب مع إقرار الخصم المالي'
+                  : permResolution === 'CompensateAfterHours'
+                    ? 'إرسال الطلب مع التعهد بالتعويض'
+                    : 'الاستمرار'}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
     </Card>
   );
 }
@@ -378,6 +548,46 @@ function LeaveDetail({ id, onBack }: { id: string; onBack: () => void }) {
           </div>
         )}
       </Card>
+
+      {/* تنبيه تجاوز الرصيد — يظهر للمراجع/الإدارة. الإجازة ⇒ أيام سنوية غير مغطّاة قد تُحتسب بدون راتب.
+          الاستئذان ⇒ تجاوز الرصيد الشهري مع قرار الموظّف (تعويض الوقت / معالجة إدارية-مالية). لا خصم آلي في الحالتين. */}
+      {r.isPotentialUnpaidLeave && (
+        <Alert tone="alert">
+          {r.type === 'Leave' ? (
+            <div className="space-y-2">
+              <p className="font-semibold">
+                هذا الطلب يتجاوز رصيد الإجازات السنوي المتاح للموظف. أقرّ الموظف بأنه في حال الموافقة قد تُحتسب
+                الأيام غير المغطاة كإجازة بدون راتب وقد تُخصم من الراتب.
+              </p>
+              <div className="grid gap-3 text-sm sm:grid-cols-3">
+                <Detail label="الرصيد السنوي وقت الطلب" value={r.balanceAtRequest != null ? `${r.balanceAtRequest} يوم` : '—'} />
+                <Detail label="الأيام المطلوبة" value={r.requestedLeaveDays != null ? `${r.requestedLeaveDays} يوم` : '—'} />
+                <Detail label="الأيام غير المغطّاة" value={r.uncoveredLeaveDays != null ? `${r.uncoveredLeaveDays} يوم` : '—'} />
+              </div>
+              {r.employeeAcknowledgedAtUtc && (
+                <p className="text-xs">أقرّ الموظّف بذلك في {formatDate(r.employeeAcknowledgedAtUtc)}.</p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <p className="font-semibold">
+                {r.permissionShortfallResolution === 'CompensateAfterHours'
+                  ? 'هذا الطلب يتجاوز رصيد الاستئذانات الشهري. الموظف أقرّ بتعويض وقت الاستئذان بعد مواعيد العمل.'
+                  : 'هذا الطلب يتجاوز رصيد الاستئذانات الشهري، وقد يحتاج معالجة إدارية أو مالية حسب قرار الإدارة.'}
+              </p>
+              <div className="grid gap-3 text-sm sm:grid-cols-3">
+                <Detail label="الرصيد الشهري وقت الطلب" value={r.balanceAtRequest != null ? `${r.balanceAtRequest}` : '—'} />
+                <Detail label="الأذونات المطلوبة" value={r.requestedLeaveDays != null ? `${r.requestedLeaveDays}` : '—'} />
+                <Detail label="غير المغطّى بالرصيد الشهري" value={r.uncoveredLeaveDays != null ? `${r.uncoveredLeaveDays}` : '—'} />
+              </div>
+              <Detail label="قرار الموظّف" value={permissionShortfallResolutionLabel[r.permissionShortfallResolution]} />
+              {r.employeeAcknowledgedAtUtc && (
+                <p className="text-xs">سجّل الموظّف قراره في {formatDate(r.employeeAcknowledgedAtUtc)}.</p>
+              )}
+            </div>
+          )}
+        </Alert>
+      )}
 
       {/* المعتمِدون المسجَّلون — مسار طلب الموارد البشرية يختلف (مراجعة المدير العام ثم اعتماد الإدارة العليا). */}
       <Card>

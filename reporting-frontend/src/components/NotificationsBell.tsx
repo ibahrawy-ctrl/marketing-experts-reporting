@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { useUnreadCount, useNotifications } from '../lib/useNotifications';
 import { formatDate } from '../lib/format';
+import { normalizeNotificationLink } from '../lib/notificationLink';
 
 export function NotificationsBell() {
   const [open, setOpen] = useState(false);
@@ -55,7 +56,7 @@ export function NotificationsBell() {
                   key={n.id}
                   onClick={() => {
                     setOpen(false);
-                    if (n.link) navigate(n.link);
+                    if (n.link) navigate(normalizeNotificationLink(n.link));
                   }}
                   className={`block w-full border-b border-line px-4 py-3 text-right hover:bg-offwhite ${
                     n.isRead ? '' : 'bg-navy-50'

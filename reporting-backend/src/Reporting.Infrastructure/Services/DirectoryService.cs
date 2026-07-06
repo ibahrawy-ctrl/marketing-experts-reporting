@@ -1,8 +1,11 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Reporting.Application.Audit;
 using Reporting.Application.Common;
 using Reporting.Application.Directory;
 using Reporting.Domain.Entities.Org;
+using Reporting.Domain.Enums;
 using Reporting.Infrastructure.Identity;
 using Reporting.Infrastructure.Persistence;
 
@@ -13,12 +16,14 @@ public class DirectoryService : IDirectoryService
     private readonly AppDbContext _db;
     private readonly UserManager<ApplicationUser> _users;
     private readonly IScopeResolver _scope;
+    private readonly IAuditService _audit;
 
-    public DirectoryService(AppDbContext db, UserManager<ApplicationUser> users, IScopeResolver scope)
+    public DirectoryService(AppDbContext db, UserManager<ApplicationUser> users, IScopeResolver scope, IAuditService audit)
     {
         _db = db;
         _users = users;
         _scope = scope;
+        _audit = audit;
     }
 
     public async Task<IReadOnlyList<DirectoryUserDto>> ListUsersAsync(bool includeInactive, CancellationToken ct = default)
@@ -50,7 +55,8 @@ public class DirectoryService : IDirectoryService
             rolesByUser.GetValueOrDefault(u.Id) ?? new List<string>(),
             u.DepartmentId,
             u.TeamId,
-            u.ManagerId)).ToList();
+            u.ManagerId,
+            u.JobRoleId)).ToList();
     }
 
     public async Task<IReadOnlyList<DepartmentDto>> ListDepartmentsAsync(CancellationToken ct = default)
@@ -89,11 +95,218 @@ public class DirectoryService : IDirectoryService
             .ToListAsync(ct);
     }
 
-    public async Task<IReadOnlyList<JobRoleDto>> ListJobRolesAsync(CancellationToken ct = default)
-        => await _db.JobRoles.AsNoTracking()
-            .OrderBy(j => j.NameAr)
+    public async Task<IReadOnlyList<JobRoleDto>> ListJobRolesAsync(bool activeOnly = false, CancellationToken ct = default)
+    {
+        var q = _db.JobRoles.AsNoTracking().AsQueryable();
+        if (activeOnly) q = q.Where(j => j.IsActive);
+        return await q.OrderBy(j => j.NameAr)
             .Select(j => new JobRoleDto(j.Id, j.NameAr, j.NameEn, j.Code, j.DepartmentId, j.IsActive))
             .ToListAsync(ct);
+    }
+
+    // ===== دليل الموارد البشرية المخصّص (قراءة فقط لحزمة A) =====
+    // على مستوى الشركة عمدًا (بلا استدعاء _scope) — الحماية عبر سياسة HrDirectoryRead عند نقطة النهاية.
+    // منفصل تمامًا عن ListUsersAsync/ListDepartmentsAsync/ListTeamsAsync العامة (لم تتغيّر سلوكًا).
+
+    public async Task<IReadOnlyList<HrDirectoryUserDto>> ListHrDirectoryUsersAsync(bool includeInactive, bool actingIsAdmin, CancellationToken ct = default)
+        => await BuildHrDirectoryUsersAsync(includeInactive ? null : true, actingIsAdmin, ct);
+
+    public async Task<IReadOnlyList<HrDirectoryUserDto>> ListHrDirectoryManagersAsync(bool actingIsAdmin, CancellationToken ct = default)
+        // المديرون المتاحون = المستخدمون النشطون فقط (استبعاد الذات ومنع الدائرية يُفرضان في الخدمة عند الحفظ).
+        => await BuildHrDirectoryUsersAsync(true, actingIsAdmin, ct);
+
+    private async Task<IReadOnlyList<HrDirectoryUserDto>> BuildHrDirectoryUsersAsync(bool? activeOnly, bool actingIsAdmin, CancellationToken ct)
+    {
+        var usersQuery = _db.Users.AsNoTracking();
+        if (activeOnly == true) usersQuery = usersQuery.Where(u => u.IsActive);
+        var users = await usersQuery.OrderBy(u => u.FullName).ToListAsync(ct);
+
+        // أدوار كل مستخدم عبر جداول Identity (لتحديد الحسابات الحسّاسة فقط — لا تُعاد الأدوار في الـDTO).
+        var userRoles = await (
+            from ur in _db.UserRoles
+            join r in _db.Roles on ur.RoleId equals r.Id
+            select new { ur.UserId, RoleName = r.Name! }).ToListAsync(ct);
+        var rolesByUser = userRoles
+            .GroupBy(x => x.UserId)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.RoleName).ToHashSet());
+
+        return users.Select(u =>
+        {
+            var roles = rolesByUser.GetValueOrDefault(u.Id) ?? new HashSet<string>();
+            var isSensitive = roles.Any(r => SensitiveAccountRoles.Contains(r));
+            // CanEdit يعتمد على دور المنفّذ لا على حساسية الهدف فقط:
+            // الأدمن يستطيع تعديل الاسم/التنظيم لأيّ حساب (بما فيه الحسّاس) من هذا السطح؛ غير الأدمن (HR/CeoSupport/GM/CEO) ممنوع من الحسّاس.
+            var canEdit = actingIsAdmin || !isSensitive;
+            return new HrDirectoryUserDto(
+                u.Id, u.FullName, u.Email ?? string.Empty, u.IsActive,
+                u.DepartmentId, u.TeamId, u.ManagerId, u.JobRoleId,
+                isSensitive, canEdit);
+        }).ToList();
+    }
+
+    public async Task<IReadOnlyList<DepartmentDto>> ListHrDirectoryDepartmentsAsync(CancellationToken ct = default)
+        => await _db.Departments.AsNoTracking().OrderBy(d => d.NameAr)
+            .Select(d => new DepartmentDto(d.Id, d.NameAr, d.NameEn, d.Code, d.ManagerId, d.IsActive))
+            .ToListAsync(ct);
+
+    public async Task<IReadOnlyList<TeamDto>> ListHrDirectoryTeamsAsync(CancellationToken ct = default)
+        => await _db.Teams.AsNoTracking().OrderBy(t => t.NameAr)
+            .Select(t => new TeamDto(t.Id, t.NameAr, t.NameEn, t.DepartmentId, t.TeamLeaderId, t.IsActive))
+            .ToListAsync(ct);
+
+    // عدد القوالب المرتبطة بمسمّى = القوالب المربوطة مباشرةً (JobRoleId) + الإسنادات الصريحة النشطة (scope=JobRole, Include).
+    private async Task<Dictionary<Guid, int>> TemplateCountsByJobRoleAsync(CancellationToken ct)
+    {
+        var directPairs = await _db.ReportTemplates.AsNoTracking()
+            .Where(t => t.JobRoleId != null)
+            .Select(t => new { JobRoleId = t.JobRoleId!.Value, TemplateId = t.Id })
+            .ToListAsync(ct);
+        var assignPairs = await _db.ReportTemplateAssignments.AsNoTracking()
+            .Where(a => a.IsActive && a.ScopeType == TemplateAssignmentScope.JobRole && a.Kind == TemplateAssignmentKind.Include)
+            .Select(a => new { JobRoleId = a.ScopeId, TemplateId = a.ReportTemplateId })
+            .ToListAsync(ct);
+        return directPairs.Concat(assignPairs)
+            .GroupBy(x => x.JobRoleId)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.TemplateId).Distinct().Count());
+    }
+
+    private async Task<Dictionary<Guid, int>> EmployeeCountsByJobRoleAsync(CancellationToken ct)
+        => await _db.Users.AsNoTracking()
+            .Where(u => u.JobRoleId != null)
+            .GroupBy(u => u.JobRoleId!.Value)
+            .Select(g => new { JobRoleId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.JobRoleId, x => x.Count, ct);
+
+    public async Task<IReadOnlyList<JobRoleDetailDto>> ListJobRolesWithCountsAsync(CancellationToken ct = default)
+    {
+        var roles = await _db.JobRoles.AsNoTracking().OrderBy(j => j.NameAr).ToListAsync(ct);
+        var depts = await _db.Departments.AsNoTracking().ToDictionaryAsync(d => d.Id, d => d.NameAr, ct);
+        var empCounts = await EmployeeCountsByJobRoleAsync(ct);
+        var tplCounts = await TemplateCountsByJobRoleAsync(ct);
+
+        return roles.Select(j => new JobRoleDetailDto(
+            j.Id, j.NameAr, j.NameEn, j.Code, j.DepartmentId,
+            j.DepartmentId is { } did ? depts.GetValueOrDefault(did) : null,
+            j.IsActive,
+            empCounts.GetValueOrDefault(j.Id),
+            tplCounts.GetValueOrDefault(j.Id))).ToList();
+    }
+
+    private async Task<JobRoleDetailDto> BuildJobRoleDetailAsync(JobRole j, CancellationToken ct)
+    {
+        var deptName = j.DepartmentId is { } did
+            ? await _db.Departments.AsNoTracking().Where(d => d.Id == did).Select(d => d.NameAr).FirstOrDefaultAsync(ct)
+            : null;
+        var empCount = await _db.Users.AsNoTracking().CountAsync(u => u.JobRoleId == j.Id, ct);
+        var tplCount = (await TemplateCountsByJobRoleAsync(ct)).GetValueOrDefault(j.Id);
+        return new JobRoleDetailDto(j.Id, j.NameAr, j.NameEn, j.Code, j.DepartmentId, deptName, j.IsActive, empCount, tplCount);
+    }
+
+    public async Task<Result<JobRoleDetailDto>> CreateJobRoleAsync(CreateJobRoleRequest req, Guid actingUserId, CancellationToken ct = default)
+    {
+        var nameAr = req.NameAr?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(nameAr))
+            return Result<JobRoleDetailDto>.Failure("الاسم العربي للمسمّى الوظيفي مطلوب.", "jobrole.name_required");
+
+        var dup = await _db.JobRoles.AsNoTracking().AnyAsync(j => j.NameAr.ToLower() == nameAr.ToLower(), ct);
+        if (dup)
+            return Result<JobRoleDetailDto>.Failure("يوجد مسمّى وظيفي بنفس الاسم العربي.", "jobrole.name_duplicate.conflict");
+
+        var code = string.IsNullOrWhiteSpace(req.Code) ? null : req.Code!.Trim();
+        if (code is not null)
+        {
+            var codeDup = await _db.JobRoles.AsNoTracking().AnyAsync(j => j.Code != null && j.Code.ToLower() == code.ToLower(), ct);
+            if (codeDup)
+                return Result<JobRoleDetailDto>.Failure("يوجد مسمّى وظيفي بنفس الرمز.", "jobrole.code_duplicate.conflict");
+        }
+
+        if (req.DepartmentId is { } depId)
+        {
+            var depExists = await _db.Departments.AsNoTracking().AnyAsync(d => d.Id == depId, ct);
+            if (!depExists)
+                return Result<JobRoleDetailDto>.Failure("الإدارة المحدّدة غير موجودة.", "department.not_found");
+        }
+
+        var role = new JobRole
+        {
+            NameAr = nameAr,
+            NameEn = string.IsNullOrWhiteSpace(req.NameEn) ? null : req.NameEn!.Trim(),
+            Code = code,
+            DepartmentId = req.DepartmentId,
+            IsActive = true,
+        };
+        _db.JobRoles.Add(role);
+        await _db.SaveChangesAsync(ct);
+
+        await _audit.LogAsync(actingUserId, "jobrole.created", "JobRole", role.Id,
+            JsonSerializer.Serialize(new { role.NameAr, role.NameEn, role.Code, role.DepartmentId }), null, ct);
+        return Result<JobRoleDetailDto>.Success(await BuildJobRoleDetailAsync(role, ct));
+    }
+
+    public async Task<Result<JobRoleDetailDto>> UpdateJobRoleAsync(Guid jobRoleId, UpdateJobRoleRequest req, Guid actingUserId, CancellationToken ct = default)
+    {
+        var role = await _db.JobRoles.FirstOrDefaultAsync(j => j.Id == jobRoleId, ct);
+        if (role is null)
+            return Result<JobRoleDetailDto>.Failure("المسمّى الوظيفي غير موجود.", "jobrole.not_found");
+
+        var nameAr = req.NameAr?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(nameAr))
+            return Result<JobRoleDetailDto>.Failure("الاسم العربي للمسمّى الوظيفي مطلوب.", "jobrole.name_required");
+
+        var dup = await _db.JobRoles.AsNoTracking()
+            .AnyAsync(j => j.Id != jobRoleId && j.NameAr.ToLower() == nameAr.ToLower(), ct);
+        if (dup)
+            return Result<JobRoleDetailDto>.Failure("يوجد مسمّى وظيفي بنفس الاسم العربي.", "jobrole.name_duplicate.conflict");
+
+        var code = string.IsNullOrWhiteSpace(req.Code) ? null : req.Code!.Trim();
+        if (code is not null)
+        {
+            var codeDup = await _db.JobRoles.AsNoTracking()
+                .AnyAsync(j => j.Id != jobRoleId && j.Code != null && j.Code.ToLower() == code.ToLower(), ct);
+            if (codeDup)
+                return Result<JobRoleDetailDto>.Failure("يوجد مسمّى وظيفي بنفس الرمز.", "jobrole.code_duplicate.conflict");
+        }
+
+        if (req.DepartmentId is { } depId)
+        {
+            var depExists = await _db.Departments.AsNoTracking().AnyAsync(d => d.Id == depId, ct);
+            if (!depExists)
+                return Result<JobRoleDetailDto>.Failure("الإدارة المحدّدة غير موجودة.", "department.not_found");
+        }
+
+        var old = new { role.NameAr, role.NameEn, role.Code, role.DepartmentId };
+        role.NameAr = nameAr;
+        role.NameEn = string.IsNullOrWhiteSpace(req.NameEn) ? null : req.NameEn!.Trim();
+        role.Code = code;
+        role.DepartmentId = req.DepartmentId;
+        role.UpdatedAtUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync(ct);
+
+        await _audit.LogAsync(actingUserId, "jobrole.updated", "JobRole", role.Id,
+            JsonSerializer.Serialize(new { old, @new = new { role.NameAr, role.NameEn, role.Code, role.DepartmentId } }), null, ct);
+        return Result<JobRoleDetailDto>.Success(await BuildJobRoleDetailAsync(role, ct));
+    }
+
+    // الأرشفة/إعادة التفعيل فقط (لا حذف صلب). الأرشفة لا تفكّ ربط الموظفين القائمين — تُخفي المسمّى من الاختيارات الجديدة (تصفية في الواجهة عبر activeOnly).
+    public async Task<Result<JobRoleDetailDto>> SetJobRoleActiveAsync(Guid jobRoleId, bool isActive, Guid actingUserId, CancellationToken ct = default)
+    {
+        var role = await _db.JobRoles.FirstOrDefaultAsync(j => j.Id == jobRoleId, ct);
+        if (role is null)
+            return Result<JobRoleDetailDto>.Failure("المسمّى الوظيفي غير موجود.", "jobrole.not_found");
+
+        if (role.IsActive == isActive)
+            return Result<JobRoleDetailDto>.Failure(
+                isActive ? "المسمّى الوظيفي نشط بالفعل." : "المسمّى الوظيفي مؤرشف بالفعل.",
+                "jobrole.state_unchanged.conflict");
+
+        role.IsActive = isActive;
+        role.UpdatedAtUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync(ct);
+
+        await _audit.LogAsync(actingUserId, isActive ? "jobrole.reactivated" : "jobrole.archived", "JobRole", role.Id,
+            JsonSerializer.Serialize(new { role.NameAr }), null, ct);
+        return Result<JobRoleDetailDto>.Success(await BuildJobRoleDetailAsync(role, ct));
+    }
 
     public IReadOnlyList<RoleAccessDto> GetRoleMatrix()
         => Roles.All.Select(role =>
@@ -107,7 +320,8 @@ public class DirectoryService : IDirectoryService
                 scopeType,
                 RoleAccess.ScopeDescriptionAr(scopeType),
                 perms,
-                perms.Select(RoleAccess.PermissionLabelAr).ToList());
+                perms.Select(RoleAccess.PermissionLabelAr).ToList(),
+                RoleCapabilities.ForRole(role));
         }).ToList();
 
     public async Task<Result> UpdateUserRolesAsync(Guid userId, IReadOnlyList<string> roles, Guid actingUserId, CancellationToken ct = default)
@@ -278,7 +492,148 @@ public class DirectoryService : IDirectoryService
         var roles = (await _users.GetRolesAsync(user)).ToList();
         return Result<DirectoryUserDto>.Success(new DirectoryUserDto(
             user.Id, user.FullName, user.Email ?? string.Empty, user.IsActive,
-            roles, user.DepartmentId, user.TeamId, user.ManagerId));
+            roles, user.DepartmentId, user.TeamId, user.ManagerId, user.JobRoleId));
+    }
+
+    // تعديل المسمّى الوظيفي للموظف فقط — لا يمسّ أي حقل آخر. يسجّل Audit بالقيمة القديمة/الجديدة.
+    public async Task<Result<DirectoryUserDto>> UpdateUserJobRoleAsync(Guid userId, UpdateUserJobRoleRequest req, Guid actingUserId, CancellationToken ct = default)
+    {
+        var user = await _users.FindByIdAsync(userId.ToString());
+        if (user is null)
+            return Result<DirectoryUserDto>.Failure("المستخدم غير موجود.", "user.not_found");
+
+        // التحقق من وجود المسمّى الوظيفي المطلوب (null = إزالة المسمّى).
+        if (req.JobRoleId is Guid newJobRoleId)
+        {
+            var exists = await _db.JobRoles.AsNoTracking().AnyAsync(j => j.Id == newJobRoleId, ct);
+            if (!exists)
+                return Result<DirectoryUserDto>.Failure("المسمّى الوظيفي غير موجود.", "jobrole.not_found");
+        }
+
+        var oldJobRoleId = user.JobRoleId;
+        if (oldJobRoleId == req.JobRoleId)
+            return Result<DirectoryUserDto>.Failure("المسمّى الوظيفي الحالي مطابق للمطلوب — لا تغيير.", "jobrole.unchanged.conflict");
+
+        user.JobRoleId = req.JobRoleId;
+        var upd = await _users.UpdateAsync(user);
+        if (!upd.Succeeded)
+            return Result<DirectoryUserDto>.Failure(string.Join("; ", upd.Errors.Select(e => e.Description)), "user.update_failed.conflict");
+
+        // Audit: الموظف + المسمّى القديم/الجديد + المنفّذ + الوقت (يضبطه AuditService) + ملاحظة اختيارية.
+        var notes = string.IsNullOrWhiteSpace(req.Notes) ? null : req.Notes!.Trim();
+        await _audit.LogAsync(actingUserId, "user.jobrole.changed", "User", userId,
+            JsonSerializer.Serialize(new { targetEmail = user.Email, oldJobRoleId, newJobRoleId = req.JobRoleId, notes }), null, ct);
+
+        var roles = (await _users.GetRolesAsync(user)).ToList();
+        return Result<DirectoryUserDto>.Success(new DirectoryUserDto(
+            user.Id, user.FullName, user.Email ?? string.Empty, user.IsActive,
+            roles, user.DepartmentId, user.TeamId, user.ManagerId, user.JobRoleId));
+    }
+
+    // تعديل البيانات الأساسية غير الحسّاسة للموظف (الاسم الكامل فقط) — لا يمسّ أيّ حقل آخر. يسجّل Audit.
+    public async Task<Result<DirectoryUserDto>> UpdateUserBasicAsync(Guid userId, UpdateUserBasicRequest req, Guid actingUserId, bool actingIsAdmin, CancellationToken ct = default)
+    {
+        var fullName = (req.FullName ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(fullName))
+            return Result<DirectoryUserDto>.Failure("الاسم الكامل مطلوب.", "user.name.required");
+
+        var user = await _users.FindByIdAsync(userId.ToString());
+        if (user is null)
+            return Result<DirectoryUserDto>.Failure("المستخدم غير موجود.", "user.not_found");
+
+        // حاجز الحساب الحسّاس يُطبَّق على غير الأدمن فقط: HR/CeoSupport ممنوعون من تعديل Admin/CEO/GM/CeoSupport.
+        // الأدمن مسموح له بتعديل الاسم لأيّ حساب (الأدوار/التعطيل/كلمة المرور تبقى عبر إدارة المستخدمين).
+        if (!actingIsAdmin && await IsSensitiveAccountAsync(user))
+            return Result<DirectoryUserDto>.Failure("لا يمكن تعديل بيانات حساب إداري/تنفيذي حسّاس من هذا السطح.", "auth.forbidden");
+
+        var oldName = user.FullName;
+        if (string.Equals(oldName, fullName, StringComparison.Ordinal))
+            return Result<DirectoryUserDto>.Failure("الاسم الحالي مطابق للمطلوب — لا تغيير.", "user.basic.unchanged.conflict");
+
+        user.FullName = fullName;
+        var upd = await _users.UpdateAsync(user);
+        if (!upd.Succeeded)
+            return Result<DirectoryUserDto>.Failure(string.Join("; ", upd.Errors.Select(e => e.Description)), "user.update_failed.conflict");
+
+        var notes = string.IsNullOrWhiteSpace(req.Notes) ? null : req.Notes!.Trim();
+        await _audit.LogAsync(actingUserId, "user.basic.updated", "User", userId,
+            JsonSerializer.Serialize(new { targetEmail = user.Email, oldName, newName = fullName, notes }), null, ct);
+
+        var roles = (await _users.GetRolesAsync(user)).ToList();
+        return Result<DirectoryUserDto>.Success(new DirectoryUserDto(
+            user.Id, user.FullName, user.Email ?? string.Empty, user.IsActive,
+            roles, user.DepartmentId, user.TeamId, user.ManagerId, user.JobRoleId));
+    }
+
+    // تعديل الانتماء التنظيمي للموظف فقط (الإدارة/الفريق/المدير) مع قيود أمان صارمة. لا يمسّ الاسم/البريد/الأدوار/التفعيل.
+    public async Task<Result<DirectoryUserDto>> UpdateUserOrgAssignmentAsync(Guid userId, UpdateUserOrgAssignmentRequest req, Guid actingUserId, bool actingIsAdmin, CancellationToken ct = default)
+    {
+        // (1) لا تغيير ذاتي عبر هذا السطح.
+        if (userId == actingUserId)
+            return Result<DirectoryUserDto>.Failure("لا يمكنك تعديل انتمائك التنظيمي من هذا السطح.", "user.org.self.conflict");
+
+        var user = await _users.FindByIdAsync(userId.ToString());
+        if (user is null)
+            return Result<DirectoryUserDto>.Failure("المستخدم غير موجود.", "user.not_found");
+
+        // (2) حاجز الحساب الحسّاس يُطبَّق على غير الأدمن فقط: HR/CeoSupport/GM/CEO ممنوعون من نقل Admin/CEO/GM/CeoSupport.
+        // الأدمن مسموح له بالنقل التنظيمي لأيّ حساب (الأدوار/التعطيل/كلمة المرور تبقى عبر إدارة المستخدمين).
+        if (!actingIsAdmin && await IsSensitiveAccountAsync(user))
+            return Result<DirectoryUserDto>.Failure("لا يمكن تغيير الانتماء التنظيمي لحساب إداري/تنفيذي حسّاس من هذا السطح.", "auth.forbidden");
+
+        // (3) المدير لا يكون المستخدم نفسه.
+        if (req.ManagerId == userId)
+            return Result<DirectoryUserDto>.Failure("لا يمكن أن يكون المستخدم مديرًا لنفسه.", "user.manager.self.conflict");
+
+        // (4) وجود الفريق/الإدارة/المدير.
+        var orgErr = await ValidateOrgAsync(req.TeamId, req.DepartmentId, req.ManagerId, ct);
+        if (orgErr is not null)
+            return Result<DirectoryUserDto>.Failure(orgErr.Value.Error, orgErr.Value.Code);
+
+        // (5) المدير المعيَّن يجب أن يكون نشطًا.
+        if (req.ManagerId is Guid mgrId)
+        {
+            var managerActive = await _db.Users.AsNoTracking().AnyAsync(u => u.Id == mgrId && u.IsActive, ct);
+            if (!managerActive)
+                return Result<DirectoryUserDto>.Failure("لا يمكن تعيين مدير غير نشط.", "user.manager.inactive.conflict");
+
+            // (6) منع علاقة مدير دائرية: لا يجوز أن يصل تسلسل مديري المدير المعيَّن إلى المستخدم نفسه.
+            if (await WouldCreateManagerCycleAsync(userId, mgrId, ct))
+                return Result<DirectoryUserDto>.Failure("لا يمكن إنشاء علاقة مدير دائرية.", "user.manager.cycle.conflict");
+        }
+
+        var oldDepartmentId = user.DepartmentId;
+        var oldTeamId = user.TeamId;
+        var oldManagerId = user.ManagerId;
+
+        var newDepartmentId = await ResolveDepartmentAsync(req.TeamId, req.DepartmentId, ct);
+        if (oldDepartmentId == newDepartmentId && oldTeamId == req.TeamId && oldManagerId == req.ManagerId)
+            return Result<DirectoryUserDto>.Failure("الانتماء التنظيمي الحالي مطابق للمطلوب — لا تغيير.", "user.org.unchanged.conflict");
+
+        user.DepartmentId = newDepartmentId;
+        user.TeamId = req.TeamId;
+        user.ManagerId = req.ManagerId;
+
+        var upd = await _users.UpdateAsync(user);
+        if (!upd.Succeeded)
+            return Result<DirectoryUserDto>.Failure(string.Join("; ", upd.Errors.Select(e => e.Description)), "user.update_failed.conflict");
+
+        // Audit: المستخدم المتأثّر + الإدارة/الفريق/المدير (القديم والجديد) + المنفّذ + الوقت (AuditService) + الملاحظة.
+        var notes = string.IsNullOrWhiteSpace(req.Notes) ? null : req.Notes!.Trim();
+        await _audit.LogAsync(actingUserId, "user.org.changed", "User", userId,
+            JsonSerializer.Serialize(new
+            {
+                targetEmail = user.Email,
+                oldDepartmentId, newDepartmentId,
+                oldTeamId, newTeamId = req.TeamId,
+                oldManagerId, newManagerId = req.ManagerId,
+                notes
+            }), null, ct);
+
+        var roles = (await _users.GetRolesAsync(user)).ToList();
+        return Result<DirectoryUserDto>.Success(new DirectoryUserDto(
+            user.Id, user.FullName, user.Email ?? string.Empty, user.IsActive,
+            roles, user.DepartmentId, user.TeamId, user.ManagerId, user.JobRoleId));
     }
 
     public async Task<Result> DeleteUserAsync(Guid userId, Guid actingUserId, CancellationToken ct = default)
@@ -310,6 +665,47 @@ public class DirectoryService : IDirectoryService
         var del = await _users.DeleteAsync(user);
         if (!del.Succeeded)
             return Result.Failure(string.Join("; ", del.Errors.Select(e => e.Description)), "user.delete_failed.conflict");
+
+        return Result.Success();
+    }
+
+    public async Task<Result> ResetUserPasswordAsync(Guid userId, string newPassword, Guid actingUserId, bool actorIsAdmin, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(newPassword))
+            return Result.Failure("كلمة المرور الجديدة مطلوبة.", "user.password.required");
+
+        var user = await _users.FindByIdAsync(userId.ToString());
+        if (user is null)
+            return Result.Failure("المستخدم غير موجود.", "user.not_found");
+
+        var targetIsAdmin = await _users.IsInRoleAsync(user, Roles.Admin);
+
+        // حساب مدير النظام لا يُعاد تعيين كلمة مروره إلا بواسطة مدير نظام (لا CeoSupport).
+        if (targetIsAdmin && !actorIsAdmin)
+            return Result.Failure("لا يمكن إعادة تعيين كلمة مرور حساب مدير نظام إلا بواسطة مدير نظام.", "auth.forbidden");
+
+        // منع إعادة تعيين كلمة مرور آخر مدير نظام نشط (تجنّب فقدان الوصول).
+        if (targetIsAdmin)
+        {
+            var admins = await _users.GetUsersInRoleAsync(Roles.Admin);
+            if (admins.Count(a => a.IsActive) <= 1)
+                return Result.Failure("لا يمكن إعادة تعيين كلمة مرور آخر مدير نظام نشط.", "user.last_admin.conflict");
+        }
+
+        // إعادة التعيين الذرّية عبر Identity: توليد رمز ثم تطبيقه (يتحقق من قوة كلمة المرور بلا فجوة بلا كلمة مرور).
+        var token = await _users.GeneratePasswordResetTokenAsync(user);
+        var reset = await _users.ResetPasswordAsync(user, token, newPassword);
+        if (!reset.Succeeded)
+            return Result.Failure("كلمة المرور الجديدة لا تستوفي الشروط (8 أحرف على الأقل، وتشمل حرفًا كبيرًا وصغيرًا ورقمًا).", "auth.password_invalid");
+
+        // إبطال كل رموز التجديد النشطة كي تُغلق الجلسات القائمة.
+        var activeTokens = await _db.RefreshTokens.Where(t => t.UserId == userId && t.RevokedAtUtc == null).ToListAsync(ct);
+        foreach (var t in activeTokens) t.RevokedAtUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync(ct);
+
+        // تسجيل العملية في Audit دون أي إشارة لكلمة المرور.
+        await _audit.LogAsync(actingUserId, "user.password.reset", "User", userId,
+            JsonSerializer.Serialize(new { targetEmail = user.Email, targetIsAdmin }), null, ct);
 
         return Result.Success();
     }
@@ -362,6 +758,166 @@ public class DirectoryService : IDirectoryService
         return Result.Success();
     }
 
+    // ===== عضويات الفريق الإضافية (MULTI-TEAM-MEMBERSHIP-MVP-R1) =====
+    // منفصلة تمامًا عن AddTeamMemberAsync: لا تغيّر TeamId/DepartmentId/ManagerId/JobRoleId على المستخدم،
+    // ولا تدخل ScopeResolver ولا تؤثّر على التقارير/الـKPI/المشاريع. الوصول للأدمن فقط (سياسة الكنترولر).
+
+    public async Task<Result<TeamMembershipsDto>> ListTeamMembershipsAsync(Guid teamId, CancellationToken ct = default)
+    {
+        var team = await _db.Teams.AsNoTracking().FirstOrDefaultAsync(t => t.Id == teamId, ct);
+        if (team is null)
+            return Result<TeamMembershipsDto>.Failure("الفريق غير موجود.", "team.not_found");
+
+        // الأعضاء الأساسيون: من TeamId == teamId.
+        var primary = await _db.Users.AsNoTracking()
+            .Where(u => u.TeamId == teamId)
+            .OrderBy(u => u.FullName)
+            .Select(u => new TeamMemberDto(
+                u.Id, u.FullName, u.Email ?? string.Empty, u.IsActive, u.DepartmentId, u.JobRoleId,
+                true, null, true, null, null, null))
+            .ToListAsync(ct);
+
+        // الأعضاء الإضافيون: من جدول العضويات (نشطة فقط) — يُستبعَد من صار أساسيًّا في نفس الفريق.
+        var memberships = await _db.UserTeamMemberships.AsNoTracking()
+            .Where(m => m.TeamId == teamId && m.IsActive)
+            .ToListAsync(ct);
+        var addUserIds = memberships.Select(m => m.UserId).ToList();
+        var addUsers = await _db.Users.AsNoTracking()
+            .Where(u => addUserIds.Contains(u.Id))
+            .ToDictionaryAsync(u => u.Id, ct);
+        var additional = memberships
+            .Where(m => addUsers.ContainsKey(m.UserId) && addUsers[m.UserId].TeamId != teamId)
+            .Select(m =>
+            {
+                var u = addUsers[m.UserId];
+                return new TeamMemberDto(
+                    u.Id, u.FullName, u.Email ?? string.Empty, u.IsActive, u.DepartmentId, u.JobRoleId,
+                    false, m.Id, m.IsActive, m.StartDateUtc, m.EndDateUtc, m.Notes);
+            })
+            .OrderBy(m => m.FullName)
+            .ToList();
+
+        return Result<TeamMembershipsDto>.Success(new TeamMembershipsDto(
+            team.Id, team.NameAr, team.DepartmentId, primary, additional));
+    }
+
+    public async Task<Result<TeamMemberDto>> AddAdditionalTeamMemberAsync(Guid teamId, AddAdditionalMemberRequest req, Guid actingUserId, CancellationToken ct = default)
+    {
+        var team = await _db.Teams.FirstOrDefaultAsync(t => t.Id == teamId, ct);
+        if (team is null)
+            return Result<TeamMemberDto>.Failure("الفريق غير موجود.", "team.not_found");
+
+        var user = await _users.FindByIdAsync(req.UserId.ToString());
+        if (user is null)
+            return Result<TeamMemberDto>.Failure("المستخدم غير موجود.", "user.not_found");
+
+        // لا تُضاف الحسابات الحسّاسة (Admin/CEO/GM/CeoSupport) كعضوية إضافية في MVP.
+        if (await IsSensitiveAccountAsync(user))
+            return Result<TeamMemberDto>.Failure("لا يمكن إضافة حساب إداري/تنفيذي حسّاس كعضو إضافي.", "team.additional_member.sensitive.conflict");
+
+        // إن كان المستخدم عضوًا أساسيًّا في نفس الفريق ⇒ لا تُنشأ عضوية إضافية.
+        if (user.TeamId == teamId)
+            return Result<TeamMemberDto>.Failure("المستخدم عضو أساسي في هذا الفريق بالفعل.", "team.additional_member.already_primary.conflict");
+
+        var existing = await _db.UserTeamMemberships
+            .FirstOrDefaultAsync(m => m.UserId == req.UserId && m.TeamId == teamId, ct);
+        if (existing is not null && existing.IsActive)
+            return Result<TeamMemberDto>.Failure("للمستخدم عضوية إضافية نشطة في هذا الفريق بالفعل.", "team.additional_member.duplicate.conflict");
+
+        if (existing is not null)
+        {
+            // إعادة تفعيل عضوية غير نشطة قائمة بدل إنشاء صفّ مكرّر.
+            existing.IsActive = true;
+            existing.StartDateUtc = req.StartDateUtc ?? DateTime.UtcNow;
+            existing.EndDateUtc = req.EndDateUtc;
+            existing.Notes = req.Notes;
+            existing.CreatedByUserId = actingUserId;
+            existing.UpdatedAtUtc = DateTime.UtcNow;
+        }
+        else
+        {
+            existing = new UserTeamMembership
+            {
+                UserId = req.UserId,
+                TeamId = teamId,
+                IsActive = true,
+                MembershipType = "Secondary",
+                StartDateUtc = req.StartDateUtc ?? DateTime.UtcNow,
+                EndDateUtc = req.EndDateUtc,
+                CreatedByUserId = actingUserId,
+                Notes = req.Notes,
+            };
+            _db.UserTeamMemberships.Add(existing);
+        }
+        await _db.SaveChangesAsync(ct);
+
+        await _audit.LogAsync(actingUserId, "team.additional_member.added", "Team", teamId,
+            JsonSerializer.Serialize(new { teamName = team.NameAr, userId = req.UserId, membershipId = existing.Id }), null, ct);
+
+        return Result<TeamMemberDto>.Success(new TeamMemberDto(
+            user.Id, user.FullName, user.Email ?? string.Empty, user.IsActive, user.DepartmentId, user.JobRoleId,
+            false, existing.Id, existing.IsActive, existing.StartDateUtc, existing.EndDateUtc, existing.Notes));
+    }
+
+    public async Task<Result> RemoveAdditionalTeamMemberAsync(Guid teamId, Guid userId, Guid actingUserId, CancellationToken ct = default)
+    {
+        var team = await _db.Teams.FirstOrDefaultAsync(t => t.Id == teamId, ct);
+        if (team is null)
+            return Result.Failure("الفريق غير موجود.", "team.not_found");
+
+        var membership = await _db.UserTeamMemberships
+            .FirstOrDefaultAsync(m => m.UserId == userId && m.TeamId == teamId && m.IsActive, ct);
+        if (membership is null)
+            return Result.Failure("لا توجد عضوية إضافية نشطة لهذا المستخدم في هذا الفريق.", "team.additional_member.not_found");
+
+        // إلغاء التفعيل (حذف ناعم) يحفظ السجل التاريخي ويسمح بإعادة التفعيل لاحقًا.
+        membership.IsActive = false;
+        membership.EndDateUtc = DateTime.UtcNow;
+        membership.UpdatedAtUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync(ct);
+
+        await _audit.LogAsync(actingUserId, "team.additional_member.removed", "Team", teamId,
+            JsonSerializer.Serialize(new { teamName = team.NameAr, userId, membershipId = membership.Id }), null, ct);
+
+        return Result.Success();
+    }
+
+    public async Task<Result<UserTeamMembershipsDto>> ListUserTeamMembershipsAsync(Guid userId, CancellationToken ct = default)
+    {
+        var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId, ct);
+        if (user is null)
+            return Result<UserTeamMembershipsDto>.Failure("المستخدم غير موجود.", "user.not_found");
+
+        var primaryTeamName = user.TeamId is Guid ptid
+            ? await _db.Teams.AsNoTracking().Where(t => t.Id == ptid).Select(t => t.NameAr).FirstOrDefaultAsync(ct)
+            : null;
+
+        var deptNames = await _db.Departments.AsNoTracking().ToDictionaryAsync(d => d.Id, d => d.NameAr, ct);
+
+        var memberships = await _db.UserTeamMemberships.AsNoTracking()
+            .Where(m => m.UserId == userId && m.IsActive)
+            .ToListAsync(ct);
+        var teamIds = memberships.Select(m => m.TeamId).ToList();
+        var teams = await _db.Teams.AsNoTracking()
+            .Where(t => teamIds.Contains(t.Id))
+            .ToDictionaryAsync(t => t.Id, ct);
+
+        var additional = memberships
+            .Where(m => teams.ContainsKey(m.TeamId))
+            .Select(m =>
+            {
+                var t = teams[m.TeamId];
+                return new UserTeamMembershipDto(
+                    m.Id, t.Id, t.NameAr, t.DepartmentId, deptNames.GetValueOrDefault(t.DepartmentId),
+                    m.IsActive, m.MembershipType, m.StartDateUtc, m.EndDateUtc, m.Notes);
+            })
+            .OrderBy(m => m.TeamNameAr)
+            .ToList();
+
+        return Result<UserTeamMembershipsDto>.Success(new UserTeamMembershipsDto(
+            user.Id, user.FullName, user.TeamId, primaryTeamName, additional));
+    }
+
     /// <summary>
     /// البند 2 — حارس نطاق إدارة الفرق: يسمح للأدوار التي ترى كل المنظومة (Admin/CEO/GM)،
     /// وإلا يشترط أن يكون الفريق ضمن نطاق المُدير (يقوده مستخدم داخل النطاق أو يضمّ عضوًا داخل النطاق).
@@ -409,7 +965,7 @@ public class DirectoryService : IDirectoryService
         return Result<TeamDto>.Success(new TeamDto(team.Id, team.NameAr, team.NameEn, team.DepartmentId, team.TeamLeaderId, team.IsActive));
     }
 
-    public async Task<Result<TeamDto>> UpdateTeamAsync(Guid teamId, UpdateTeamRequest req, CancellationToken ct = default)
+    public async Task<Result<TeamDto>> UpdateTeamAsync(Guid teamId, UpdateTeamRequest req, Guid actingUserId, CancellationToken ct = default)
     {
         var nameAr = (req.NameAr ?? string.Empty).Trim();
         if (string.IsNullOrWhiteSpace(nameAr))
@@ -429,29 +985,236 @@ public class DirectoryService : IDirectoryService
         if (req.TeamLeaderId is Guid lid && !await _db.Users.AnyAsync(u => u.Id == lid, ct))
             return Result<TeamDto>.Failure("قائد الفريق المحدّد غير موجود.", "team.leader.not_found");
 
+        // 1.1 — أمان نقل الفريق: التقاط الإدارة القديمة قبل التطبيق لاكتشاف النقل ومزامنة أعضائه.
+        var oldDepartmentId = team.DepartmentId;
+        var isDepartmentChange = oldDepartmentId != req.DepartmentId;
+
         team.NameAr = nameAr;
         team.NameEn = string.IsNullOrWhiteSpace(req.NameEn) ? null : req.NameEn!.Trim();
         team.DepartmentId = req.DepartmentId;
         team.TeamLeaderId = req.TeamLeaderId;
         team.IsActive = req.IsActive;
+
+        // 1.1 — مزامنة DepartmentId لأعضاء الفريق الحاليين فقط (TeamId == team.Id) إلى الإدارة الجديدة.
+        // لا يمسّ المسمّى/المدير/الفريق، ولا أيّ مستخدم خارج الفريق. يمنع تكوّن عدم تطابق الإدارة.
+        var syncedMembers = 0;
+        if (isDepartmentChange && req.SyncMemberDepartments)
+        {
+            syncedMembers = await _db.Users
+                .Where(u => u.TeamId == teamId && u.DepartmentId != req.DepartmentId)
+                .ExecuteUpdateAsync(s => s.SetProperty(u => u.DepartmentId, (Guid?)req.DepartmentId), ct);
+        }
+
         await _db.SaveChangesAsync(ct);
+
+        if (isDepartmentChange)
+        {
+            await _audit.LogAsync(actingUserId, "team.moved", "Team", team.Id,
+                JsonSerializer.Serialize(new
+                {
+                    teamName = team.NameAr,
+                    oldDepartmentId,
+                    newDepartmentId = req.DepartmentId,
+                    syncMemberDepartments = req.SyncMemberDepartments,
+                    syncedMembersCount = syncedMembers
+                }), null, ct);
+        }
+        else
+        {
+            await _audit.LogAsync(actingUserId, "team.updated", "Team", team.Id,
+                JsonSerializer.Serialize(new { teamName = team.NameAr }), null, ct);
+        }
 
         return Result<TeamDto>.Success(new TeamDto(team.Id, team.NameAr, team.NameEn, team.DepartmentId, team.TeamLeaderId, team.IsActive));
     }
 
-    public async Task<Result> DeleteTeamAsync(Guid teamId, CancellationToken ct = default)
+    public async Task<Result> DeleteTeamAsync(Guid teamId, Guid actingUserId, CancellationToken ct = default)
     {
         var team = await _db.Teams.FirstOrDefaultAsync(t => t.Id == teamId, ct);
         if (team is null)
             return Result.Failure("الفريق غير موجود.", "team.not_found");
 
-        // تنظيف المراجع: تفريغ ربط الأعضاء بالفريق قبل الحذف.
-        await _db.Users.Where(u => u.TeamId == teamId)
-            .ExecuteUpdateAsync(s => s.SetProperty(u => u.TeamId, (Guid?)null), ct);
+        // 1.2 — حارس الحذف: يُمنع الحذف إن كان للفريق أعضاء أو مشاريع يملكها (OwnerTeamId).
+        // الأرشفة (IsActive=false عبر تعديل الفريق) هي البديل الموصى به للفريق المستخدَم.
+        var memberCount = await _db.Users.CountAsync(u => u.TeamId == teamId, ct);
+        var ownedProjectsCount = await _db.Projects.CountAsync(p => p.OwnerTeamId == teamId, ct);
+        // MULTI-TEAM-MEMBERSHIP-MVP-R1: يُمنع الحذف أيضًا إن كان للفريق عضويات إضافية نشطة.
+        var additionalMemberCount = await _db.UserTeamMemberships.CountAsync(m => m.TeamId == teamId && m.IsActive, ct);
+        if (memberCount > 0 || ownedProjectsCount > 0 || additionalMemberCount > 0)
+        {
+            return Result.Failure(
+                $"لا يمكن حذف الفريق لارتباطه ببيانات قائمة ({memberCount} عضوًا أساسيًّا، {additionalMemberCount} عضوًا إضافيًّا، {ownedProjectsCount} مشروعًا). " +
+                "أزل الأعضاء الأساسيين والإضافيين وانقل/أعِد إسناد المشاريع أولًا، أو أرشِف الفريق (إلغاء التفعيل) بدلًا من الحذف.",
+                "team.delete_forbidden.conflict");
+        }
 
         _db.Teams.Remove(team);
         await _db.SaveChangesAsync(ct);
+
+        await _audit.LogAsync(actingUserId, "team.deleted", "Team", teamId,
+            JsonSerializer.Serialize(new { teamName = team.NameAr, departmentId = team.DepartmentId }), null, ct);
+
         return Result.Success();
+    }
+
+    public async Task<IReadOnlyList<TeamSummaryDto>> ListTeamSummariesAsync(CancellationToken ct = default)
+    {
+        var scope = await _scope.ResolveAsync(ct);
+        var teamsQuery = _db.Teams.AsNoTracking().AsQueryable();
+        if (!scope.SeesAll)
+        {
+            var ids = scope.UserIds;
+            var visibleTeamIds = await _db.Users
+                .Where(u => ids.Contains(u.Id) && u.TeamId != null)
+                .Select(u => u.TeamId!.Value).Distinct().ToListAsync(ct);
+            teamsQuery = teamsQuery.Where(t => (t.TeamLeaderId != null && ids.Contains(t.TeamLeaderId.Value)) || visibleTeamIds.Contains(t.Id));
+        }
+        var teams = await teamsQuery.OrderBy(t => t.NameAr).ToListAsync(ct);
+        var teamIds = teams.Select(t => t.Id).ToList();
+
+        var deptNames = await _db.Departments.AsNoTracking()
+            .ToDictionaryAsync(d => d.Id, d => d.NameAr, ct);
+        var leaderIds = teams.Where(t => t.TeamLeaderId != null).Select(t => t.TeamLeaderId!.Value).Distinct().ToList();
+        var leaderNames = await _db.Users.AsNoTracking()
+            .Where(u => leaderIds.Contains(u.Id))
+            .ToDictionaryAsync(u => u.Id, u => u.FullName, ct);
+
+        // أعضاء كل فريق (TeamId) مع إداراتهم لحساب العدد وعدم التطابق.
+        var members = await _db.Users.AsNoTracking()
+            .Where(u => u.TeamId != null && teamIds.Contains(u.TeamId!.Value))
+            .Select(u => new { TeamId = u.TeamId!.Value, u.DepartmentId })
+            .ToListAsync(ct);
+        var membersByTeam = members.GroupBy(m => m.TeamId).ToDictionary(g => g.Key, g => g.ToList());
+
+        var projects = await _db.Projects.AsNoTracking()
+            .Where(p => p.OwnerTeamId != null && teamIds.Contains(p.OwnerTeamId!.Value))
+            .Select(p => new { TeamId = p.OwnerTeamId!.Value, p.Status })
+            .ToListAsync(ct);
+        var projectsByTeam = projects.GroupBy(p => p.TeamId).ToDictionary(g => g.Key, g => g.ToList());
+
+        // عدد العضويات الإضافية النشطة لكل فريق (MULTI-TEAM-MEMBERSHIP-MVP-R1) — منفصل عن العدّ الأساسي،
+        // لا يُدمَج في MemberCount ولا يدخل عدّادات الإدارة (DepartmentId يظل مبنيًّا على الفريق الأساسي فقط).
+        var additionalCounts = (await _db.UserTeamMemberships.AsNoTracking()
+            .Where(m => m.IsActive && teamIds.Contains(m.TeamId))
+            .Select(m => m.TeamId)
+            .ToListAsync(ct))
+            .GroupBy(id => id).ToDictionary(g => g.Key, g => g.Count());
+
+        return teams.Select(t =>
+        {
+            var tm = membersByTeam.GetValueOrDefault(t.Id) ?? new();
+            var pr = projectsByTeam.GetValueOrDefault(t.Id) ?? new();
+            return new TeamSummaryDto(
+                t.Id, t.NameAr, t.NameEn, t.DepartmentId,
+                deptNames.GetValueOrDefault(t.DepartmentId),
+                t.TeamLeaderId,
+                t.TeamLeaderId is Guid lid ? leaderNames.GetValueOrDefault(lid) : null,
+                t.IsActive,
+                tm.Count,
+                pr.Count,
+                pr.Count(p => p.Status == ProjectStatus.Active),
+                tm.Count(m => m.DepartmentId != t.DepartmentId),
+                tm.Count,
+                additionalCounts.GetValueOrDefault(t.Id));
+        }).ToList();
+    }
+
+    public async Task<IReadOnlyList<DepartmentSummaryDto>> ListDepartmentSummariesAsync(CancellationToken ct = default)
+    {
+        var teamSummaries = await ListTeamSummariesAsync(ct);
+
+        var scope = await _scope.ResolveAsync(ct);
+        var deptQuery = _db.Departments.AsNoTracking().AsQueryable();
+        if (!scope.SeesAll)
+        {
+            var ids = scope.UserIds;
+            var visibleDeptIds = await _db.Users
+                .Where(u => ids.Contains(u.Id) && u.DepartmentId != null)
+                .Select(u => u.DepartmentId!.Value).Distinct().ToListAsync(ct);
+            deptQuery = deptQuery.Where(d => (d.ManagerId != null && ids.Contains(d.ManagerId.Value)) || visibleDeptIds.Contains(d.Id));
+        }
+        var depts = await deptQuery.OrderBy(d => d.NameAr).ToListAsync(ct);
+
+        var managerIds = depts.Where(d => d.ManagerId != null).Select(d => d.ManagerId!.Value).Distinct().ToList();
+        var managerNames = await _db.Users.AsNoTracking()
+            .Where(u => managerIds.Contains(u.Id))
+            .ToDictionaryAsync(u => u.Id, u => u.FullName, ct);
+
+        var teamsByDept = teamSummaries.GroupBy(t => t.DepartmentId).ToDictionary(g => g.Key, g => g.ToList());
+
+        return depts.Select(d =>
+        {
+            var teams = teamsByDept.GetValueOrDefault(d.Id) ?? new();
+            return new DepartmentSummaryDto(
+                d.Id, d.NameAr, d.NameEn, d.Code, d.ManagerId,
+                d.ManagerId is Guid mid ? managerNames.GetValueOrDefault(mid) : null,
+                d.ManagerId != null,
+                d.IsActive,
+                teams.Count,
+                teams.Sum(t => t.MemberCount),
+                teams.Sum(t => t.ProjectsCount),
+                teams);
+        }).ToList();
+    }
+
+    public async Task<Result<TeamMoveImpactDto>> GetTeamMoveImpactAsync(Guid teamId, Guid targetDepartmentId, CancellationToken ct = default)
+    {
+        var team = await _db.Teams.AsNoTracking().FirstOrDefaultAsync(t => t.Id == teamId, ct);
+        if (team is null)
+            return Result<TeamMoveImpactDto>.Failure("الفريق غير موجود.", "team.not_found");
+
+        var scopeErr = await EnsureTeamInScopeAsync(teamId, ct);
+        if (scopeErr is not null) return Result<TeamMoveImpactDto>.Failure(scopeErr.Error!, scopeErr.ErrorCode!);
+
+        var targetDept = await _db.Departments.AsNoTracking().FirstOrDefaultAsync(d => d.Id == targetDepartmentId, ct);
+        if (targetDept is null)
+            return Result<TeamMoveImpactDto>.Failure("الإدارة المستهدفة غير موجودة.", "department.not_found");
+
+        var currentDept = await _db.Departments.AsNoTracking().FirstOrDefaultAsync(d => d.Id == team.DepartmentId, ct);
+        var leaderName = team.TeamLeaderId is Guid lid
+            ? await _db.Users.AsNoTracking().Where(u => u.Id == lid).Select(u => u.FullName).FirstOrDefaultAsync(ct)
+            : null;
+
+        var memberDeptIds = await _db.Users.AsNoTracking()
+            .Where(u => u.TeamId == teamId)
+            .Select(u => u.DepartmentId)
+            .ToListAsync(ct);
+        var memberCount = memberDeptIds.Count;
+        var isChange = team.DepartmentId != targetDepartmentId;
+        // عدم التطابق يُقاس مقابل الإدارة المستهدفة (بعد النقل): مَن لن تتطابق إدارته إن لم تُزامَن.
+        var mismatchCount = memberDeptIds.Count(d => d != targetDepartmentId);
+
+        var memberIds = await _db.Users.AsNoTracking()
+            .Where(u => u.TeamId == teamId).Select(u => u.Id).ToListAsync(ct);
+        var projectsCount = await _db.Projects.CountAsync(p => p.OwnerTeamId == teamId, ct);
+        var activeProjectsCount = await _db.Projects.CountAsync(p => p.OwnerTeamId == teamId && p.Status == ProjectStatus.Active, ct);
+        var submissionsCount = await _db.ReportSubmissions.CountAsync(s => memberIds.Contains(s.SubmitterId), ct);
+
+        var willSync = isChange && memberCount > 0;
+        var warnings = new List<string>();
+        if (!isChange)
+            warnings.Add("الإدارة المستهدفة هي نفسها الحالية — لن يحدث نقل.");
+        if (team.TeamLeaderId is null)
+            warnings.Add("لا يوجد قائد فريق محدّد لهذا الفريق.");
+        if (isChange && memberCount > 0)
+            warnings.Add($"سيُحدَّث انتماء {memberCount} عضوًا إلى الإدارة الجديدة عند المزامنة.");
+        if (isChange && mismatchCount > 0)
+            warnings.Add($"{mismatchCount} عضوًا انتماؤهم الحالي يختلف عن الإدارة المستهدفة.");
+        if (activeProjectsCount > 0)
+            warnings.Add($"الفريق يملك {activeProjectsCount} مشروعًا نشطًا (تبقى ملكيتها للفريق بلا تغيير).");
+
+        return Result<TeamMoveImpactDto>.Success(new TeamMoveImpactDto(
+            team.Id, team.NameAr,
+            team.DepartmentId, currentDept?.NameAr,
+            targetDepartmentId, targetDept.NameAr,
+            isChange,
+            team.TeamLeaderId, leaderName,
+            memberCount,
+            projectsCount, activeProjectsCount,
+            submissionsCount,
+            mismatchCount,
+            willSync,
+            warnings));
     }
 
     public async Task<Result<DepartmentDto>> CreateDepartmentAsync(CreateDepartmentRequest req, CancellationToken ct = default)
@@ -520,6 +1283,35 @@ public class DirectoryService : IDirectoryService
     }
 
     // يتحقق من وجود الفريق/الإدارة/المدير المُشار إليها (إن وُجدت).
+    // الأدوار الحسّاسة التي لا يجوز تعديل حساباتها عبر سطح HR الجديد (تُدار حصرًا عبر إدارة الأدمن).
+    private static readonly string[] SensitiveAccountRoles =
+    {
+        Roles.Admin, Roles.Ceo, Roles.GeneralManager, Roles.CeoSupport
+    };
+
+    private async Task<bool> IsSensitiveAccountAsync(ApplicationUser user)
+    {
+        var roles = await _users.GetRolesAsync(user);
+        return roles.Any(r => SensitiveAccountRoles.Contains(r));
+    }
+
+    // هل يُنشئ تعيينُ المدير proposedManagerId للمستخدم userId علاقةً دائرية؟ (تتبّع سلسلة مديري المدير المعيَّن).
+    private async Task<bool> WouldCreateManagerCycleAsync(Guid userId, Guid proposedManagerId, CancellationToken ct)
+    {
+        var visited = new HashSet<Guid>();
+        Guid? cursor = proposedManagerId;
+        while (cursor is Guid current)
+        {
+            if (current == userId) return true;   // السلسلة تعود إلى المستخدم نفسه ⇒ دائرة.
+            if (!visited.Add(current)) return true; // دائرة قائمة في البيانات ⇒ توقّف بأمان.
+            cursor = await _db.Users.AsNoTracking()
+                .Where(u => u.Id == current)
+                .Select(u => u.ManagerId)
+                .FirstOrDefaultAsync(ct);
+        }
+        return false;
+    }
+
     private async Task<(string Error, string Code)?> ValidateOrgAsync(Guid? teamId, Guid? departmentId, Guid? managerId, CancellationToken ct)
     {
         if (teamId is Guid tid && !await _db.Teams.AnyAsync(t => t.Id == tid, ct))

@@ -78,4 +78,18 @@ public class LeaveRequestsController : ApiControllerBase
     [Authorize(Policy = Policies.LeaveFinalApproval)]
     public async Task<IActionResult> HrReject(Guid id, [FromBody] LeaveRejectRequest request, CancellationToken ct)
         => FromResult(await _service.HrRejectAsync(id, request, ct));
+
+    // ===== إبطال إجازة معتمَدة نهائيًّا (V1.1 — مسار محروس للإدارة/HR، يُنشئ عكسًا للخصم الآلي) =====
+
+    [HttpPost("{id:guid}/revoke")]
+    [Authorize(Policy = Policies.BalanceManagement)]
+    public async Task<IActionResult> RevokeApproved(Guid id, [FromBody] LeaveRevokeRequest request, CancellationToken ct)
+        => FromResult(await _service.RevokeApprovedAsync(id, request, ct));
+
+    // ===== معالجة الطلبات العالقة لقادة الفِرق (T-WF1 — Admin فقط، idempotent) =====
+
+    [HttpPost("remediate-team-leader-stuck")]
+    [Authorize(Policy = Policies.AdminOnly)]
+    public async Task<IActionResult> RemediateTeamLeaderStuck(CancellationToken ct)
+        => FromResult(await _service.RemediateTeamLeaderStuckRequestsAsync(ct));
 }

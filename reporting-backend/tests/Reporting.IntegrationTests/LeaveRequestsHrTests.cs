@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Reporting.Application.Common;
+using Reporting.Application.EmployeeServices;
 using Reporting.Application.Leave;
 using Reporting.Domain.Enums;
 using Xunit;
@@ -47,6 +48,16 @@ public class LeaveRequestsHrTests
         var hr = await TestAuth.CreateUserAsync(_factory, Roles.Hr, gm.UserId);
         var hrNoMgr = await TestAuth.CreateUserAsync(_factory, Roles.Hr);
         var hrUnderMgr = await TestAuth.CreateUserAsync(_factory, Roles.Hr, manager.UserId);
+
+        // فريق فعليّ للموظّف العادي قائده tl (T-WF2): طلبات emp العادية تبدأ عند خطوة قائد الفريق
+        // ويعتمدها tl حصرًا. طلبات HR لها مسارها الخاص (لا تحتاج فريقًا).
+        await TestAuth.CreateTeamWithLeaderAsync(_factory, tl.UserId, emp.UserId);
+
+        // رصيد إجازات سنوي كافٍ لكل من ينشئ طلبًا — هذه الاختبارات تخصّ توجيه الاعتماد لا حارس الرصيد.
+        var adminBalance = await TestAuth.LoginAsAdminAsync(_factory);
+        foreach (var id in new[] { emp.UserId, hr.UserId, hrNoMgr.UserId, hrUnderMgr.UserId })
+            await adminBalance.PostAsJsonAsync($"/api/balances/employees/{id}/opening",
+                new OpeningBalanceRequest(BalanceType.AnnualLeave, 365, 2026, "رصيد اختبار"), TestJson.Options);
 
         return new Org
         {

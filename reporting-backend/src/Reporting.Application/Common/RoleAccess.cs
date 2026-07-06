@@ -62,6 +62,10 @@ public static class RoleAccess
             perms.Add("ManageTemplates");
         if (Any(Roles.Admin))
             perms.Add("ManageUsers");
+        // إعادة تعيين كلمات مرور المستخدمين — Admin + CeoSupport فقط (تطابق سياسة UserPasswordReset بالخادم).
+        // عمدًا منفصلة عن ManageUsers كي تُمنح لدعم الرئيس التنفيذي دون فتح إدارة المستخدمين الكاملة.
+        if (Any(Roles.Admin, Roles.CeoSupport))
+            perms.Add("ResetUserPassword");
         if (Any(Roles.Admin, Roles.Ceo))
             perms.Add("ViewAudit");
 
@@ -88,6 +92,7 @@ public static class RoleAccess
         ["ViewGovernance"] = "الحوكمة والمتابعة",
         ["ManageTemplates"] = "إدارة القوالب",
         ["ManageUsers"] = "إدارة المستخدمين والصلاحيات",
+        ["ResetUserPassword"] = "إعادة تعيين كلمات مرور المستخدمين",
         ["ViewAudit"] = "سجل التدقيق",
     };
 

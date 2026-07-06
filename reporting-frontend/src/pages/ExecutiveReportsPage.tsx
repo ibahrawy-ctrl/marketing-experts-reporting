@@ -46,18 +46,21 @@ export default function ExecutiveReportsPage() {
     }
   }
 
-  if (completeness.isLoading || governance.isLoading || kpi.isLoading)
+  // التحميل ينتظر البيانات الجوهرية فقط (الاكتمال + المؤشّرات)؛ الحوكمة اختيارية
+  // وقد تُمنَع شرعيًّا (403) لمن لا يملك صلاحية ViewGovernance (مدير/قائد فريق/Viewer).
+  if (completeness.isLoading || kpi.isLoading)
     return <LoadingState label="يتم تحميل التقارير التنفيذية…" />;
-  if (completeness.isError || governance.isError || kpi.isError)
+  // الفشل القاتل للصفحة يكون فقط عند فشل البيانات الجوهرية المُستحَقّة للجميع؛
+  // فشل الحوكمة (403 لمن لا يملك الصلاحية) لا يكسر الصفحة — يُخفى قسمها فقط.
+  if (completeness.isError || kpi.isError)
     return (
       <QueryError
         onRetry={() => {
           completeness.refetch();
-          governance.refetch();
           kpi.refetch();
         }}
         title="تعذّر تحميل التقارير التنفيذية"
-        description="حدث خطأ أثناء جلب بيانات الاكتمال أو المؤشّرات أو الحوكمة. أعد المحاولة."
+        description="حدث خطأ أثناء جلب بيانات الاكتمال أو المؤشّرات. أعد المحاولة."
       />
     );
 
@@ -212,26 +215,28 @@ export default function ExecutiveReportsPage() {
         )}
       </section>
 
-      {/* الحوكمة */}
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold text-ink">ملخص الحوكمة</h2>
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-          <StatCard label="مخاطر مفتوحة" value={g?.openRisks ?? 0} tone="alert" />
-          <StatCard label="تصعيدات مفتوحة" value={g?.openEscalations ?? 0} />
-          <StatCard label="قرارات مفتوحة" value={g?.openDecisions ?? 0} />
-          <StatCard label="احتياجات تدريب" value={g?.openTrainingNeeds ?? 0} />
-          <StatCard label="خطط تحسين" value={g?.openImprovementPlans ?? 0} />
-        </div>
-        {!!g?.risksBySeverity.length && (
-          <div className="flex flex-wrap gap-2">
-            {g.risksBySeverity.map((s) => (
-              <Badge key={s.severity} tone="gold">
-                {riskSeverityLabel[s.severity]}: {s.count}
-              </Badge>
-            ))}
+      {/* الحوكمة — تظهر فقط لمن يملك صلاحية ViewGovernance (وجود بيانات حوكمة فعلية) */}
+      {g && (
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold text-ink">ملخص الحوكمة</h2>
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+            <StatCard label="مخاطر مفتوحة" value={g.openRisks} tone="alert" />
+            <StatCard label="تصعيدات مفتوحة" value={g.openEscalations} />
+            <StatCard label="قرارات مفتوحة" value={g.openDecisions} />
+            <StatCard label="احتياجات تدريب" value={g.openTrainingNeeds} />
+            <StatCard label="خطط تحسين" value={g.openImprovementPlans} />
           </div>
-        )}
-      </section>
+          {!!g.risksBySeverity.length && (
+            <div className="flex flex-wrap gap-2">
+              {g.risksBySeverity.map((s) => (
+                <Badge key={s.severity} tone="gold">
+                  {riskSeverityLabel[s.severity]}: {s.count}
+                </Badge>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
     </div>
   );
 }

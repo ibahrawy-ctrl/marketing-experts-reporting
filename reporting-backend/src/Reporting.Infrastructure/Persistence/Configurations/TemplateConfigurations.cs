@@ -4,6 +4,25 @@ using Reporting.Domain.Entities.Templates;
 
 namespace Reporting.Infrastructure.Persistence.Configurations;
 
+public class ReportTemplateAssignmentConfiguration : IEntityTypeConfiguration<ReportTemplateAssignment>
+{
+    public void Configure(EntityTypeBuilder<ReportTemplateAssignment> b)
+    {
+        b.ToTable("report_template_assignments");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.ScopeType).HasConversion<string>().HasMaxLength(30);
+        b.Property(x => x.Kind).HasConversion<string>().HasMaxLength(30);
+        b.Property(x => x.Notes).HasMaxLength(1000);
+        // منع تكرار نفس الإسناد/الاستثناء لنفس (القالب، المستوى، المعرّف، النوع).
+        b.HasIndex(x => new { x.ReportTemplateId, x.ScopeType, x.ScopeId, x.Kind }).IsUnique();
+        b.HasIndex(x => x.ReportTemplateId);
+        b.HasOne(x => x.ReportTemplate!)
+            .WithMany()
+            .HasForeignKey(x => x.ReportTemplateId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
 public class ReportTemplateConfiguration : IEntityTypeConfiguration<ReportTemplate>
 {
     public void Configure(EntityTypeBuilder<ReportTemplate> b)

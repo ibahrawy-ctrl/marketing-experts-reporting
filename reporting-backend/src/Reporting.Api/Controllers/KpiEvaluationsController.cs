@@ -66,4 +66,29 @@ public class KpiEvaluationsController : ApiControllerBase
     [Authorize(Policy = Policies.ManagementOnly)]
     public async Task<IActionResult> Approve(Guid id, CancellationToken ct)
         => FromResult(await _service.ApproveAsync(id, ct));
+
+    // ===== تصدير KPI للمالية (KPI-FIN1) — قراءة/تصدير فقط على مستوى الشركة، لا يحسب/يصرف مستحقات =====
+    // النطاق مفروض بالسياسة (Admin/CEO/GM/HR/CeoSupport) بلا ScopeResolver. لا يغيّر أيّ تقييم.
+
+    [HttpGet("finance-export")]
+    [Authorize(Policy = Policies.KpiFinanceExport)]
+    public async Task<IActionResult> FinanceExport(
+        [FromQuery] int year, [FromQuery] int quarter,
+        [FromQuery] Guid? departmentId, [FromQuery] Guid? teamId, [FromQuery] KpiEvaluationStatus? status,
+        CancellationToken ct)
+        => FromResult(await _service.GetFinanceExportAsync(
+            new KpiFinanceExportFilter(year, quarter, departmentId, teamId, status), ct));
+
+    [HttpGet("finance-export/csv")]
+    [Authorize(Policy = Policies.KpiFinanceExport)]
+    public async Task<IActionResult> FinanceExportCsv(
+        [FromQuery] int year, [FromQuery] int quarter,
+        [FromQuery] Guid? departmentId, [FromQuery] Guid? teamId, [FromQuery] KpiEvaluationStatus? status,
+        CancellationToken ct)
+    {
+        var result = await _service.ExportFinanceCsvAsync(
+            new KpiFinanceExportFilter(year, quarter, departmentId, teamId, status), ct);
+        if (!result.Succeeded) return ToProblem(result);
+        return File(result.Value!, "text/csv", $"kpi-finance-export-{year}-Q{quarter}.csv");
+    }
 }

@@ -120,15 +120,38 @@ public static class TemplateSeeder
         bool Required = false,
         string[]? Options = null,
         string[]? Columns = null,
-        string? Help = null);
+        string? Help = null,
+        SubFieldDef[]? SubFields = null,
+        bool ProjectRequired = false,
+        int MinProjects = 0,
+        int MaxProjects = 0);
+
+    // حقل فرعي داخل قسم المشاريع المتكرر. Type من مجموعة RepeatableSubFieldType بالواجهة
+    // (ShortText/LongText/Number/Decimal/Percentage/Currency/Date/Boolean/Grid). Columns للجدول (Grid) فقط.
+    private record SubFieldDef(string Key, string Label, string Type, bool Required = false, string[]? Columns = null);
 
     private record ReportDef(string Title, string? Description, PeriodType Period, FieldDef[] Fields);
     private record MetricDef(string Name, decimal Weight, decimal? Target = null, string? Unit = null, KpiCalcMethod Calc = KpiCalcMethod.Manual);
     private record KpiDef(string Title, string? Description, KpiCadence Cadence, MetricDef[] Metrics);
 
-    // يحوّل خيارات SingleSelect/MultiSelect أو أعمدة TableGrid إلى JSON يُخزَّن في ConfigJson.
+    // يحوّل خيارات SingleSelect/MultiSelect أو أعمدة TableGrid أو إعداد قسم المشاريع المتكرر إلى JSON يُخزَّن في ConfigJson.
     private static string? BuildConfigJson(FieldDef f)
     {
+        if (f.Type == FieldType.ProjectRepeatableSection && f.SubFields is { Length: > 0 })
+            return JsonSerializer.Serialize(new
+            {
+                projectRequired = f.ProjectRequired,
+                minProjects = f.MinProjects,
+                maxProjects = f.MaxProjects,
+                fields = f.SubFields.Select(s => new
+                {
+                    key = s.Key,
+                    label = s.Label,
+                    type = s.Type,
+                    required = s.Required,
+                    columns = s.Columns,
+                }).ToArray(),
+            });
         if (f.Options is { Length: > 0 })
             return JsonSerializer.Serialize(new { options = f.Options });
         if (f.Columns is { Length: > 0 })
@@ -145,7 +168,23 @@ public static class TemplateSeeder
     private static FieldDef Cur(string label, bool req = false) => new(label, FieldType.Currency, req);
     private static FieldDef Pct(string label, bool req = false) => new(label, FieldType.Percentage, req);
     private static FieldDef YesNo(string label) => new(label, FieldType.Boolean);
+    private static FieldDef Dt(string label) => new(label, FieldType.Date);
     private static FieldDef Grid(string label, params string[] columns) => new(label, FieldType.TableGrid, false, null, columns);
+    private static FieldDef GridReq(string label, params string[] columns) => new(label, FieldType.TableGrid, true, null, columns);
+
+    // ===== قسم المشاريع المتكرر (Project Tab) + حقوله الفرعية =====
+    // كل معلومة تنفيذية منسوبة لمشروع تُكتب داخل هذا القسم. البيانات المترابطة داخل المشروع = جدول (SGrid) لا حقول منفصلة.
+    private static FieldDef Proj(string label, params SubFieldDef[] fields)
+        => new(label, FieldType.ProjectRepeatableSection, false, null, null, "أضف قسمًا لكل مشروع.", fields, true, 1, 0);
+    private static SubFieldDef SShort(string key, string label, bool req = false) => new(key, label, "ShortText", req);
+    private static SubFieldDef SLong(string key, string label, bool req = false) => new(key, label, "LongText", req);
+    private static SubFieldDef SNum(string key, string label, bool req = false) => new(key, label, "Number", req);
+    private static SubFieldDef SDec(string key, string label, bool req = false) => new(key, label, "Decimal", req);
+    private static SubFieldDef SPct(string key, string label, bool req = false) => new(key, label, "Percentage", req);
+    private static SubFieldDef SCur(string key, string label, bool req = false) => new(key, label, "Currency", req);
+    private static SubFieldDef SDate(string key, string label, bool req = false) => new(key, label, "Date", req);
+    private static SubFieldDef SBool(string key, string label, bool req = false) => new(key, label, "Boolean", req);
+    private static SubFieldDef SGrid(string key, string label, params string[] columns) => new(key, label, "Grid", false, columns);
 
     // مجموعات خيارات متكرّرة
     private static readonly string[] StatusGYR = { "🟢 ممتازة", "🟡 مستقرة", "🔴 تحتاج تدخل" };
@@ -298,10 +337,12 @@ public static class TemplateSeeder
             Num("عدد الحالات المصعّدة"),
             Num("عدد الشكاوى"),
             Num("عدد الفرص البيعية المحوَّلة"),
-            Sec("📋 جداول المتابعة"),
-            Grid("متابعة النشر", "المنصّة", "عدد المنشورات", "الحالة"),
-            Grid("استلام المحتوى", "المصدر", "تم الاستلام؟", "ملاحظة"),
-            Grid("التعليقات الإشكالية", "التعليق", "المنصّة", "الإجراء المتخذ"),
+            Sec("📁 تفاصيل المشاريع"),
+            Proj("تفاصيل المشروع",
+                SGrid("publishing", "متابعة النشر", "المنصّة", "عدد المنشورات", "الحالة"),
+                SGrid("content_received", "استلام المحتوى", "المصدر", "تم الاستلام؟", "ملاحظة"),
+                SGrid("issue_comments", "التعليقات الإشكالية", "التعليق", "المنصّة", "الإجراء المتخذ"),
+                SLong("project_notes", "ملاحظات المشروع")),
             Sec("📝 ملاحظات تحليلية"),
             Long("أفضل منشور"),
             Long("أكثر منشور سلبي"),
@@ -325,6 +366,11 @@ public static class TemplateSeeder
             Num("متأخرة"),
             Num("بانتظار المراجعة"),
             Num("أعيدت للتعديل"),
+            Sec("📁 تفاصيل المشاريع"),
+            Proj("تفاصيل المشروع",
+                SGrid("designs", "تصاميم المشروع", "التصميم", "النوع", "الحالة", "ملاحظة"),
+                SPct("project_progress", "نسبة إنجاز المشروع"),
+                SLong("project_notes", "ملاحظات المشروع")),
             Sec("📝 التحليل"),
             Long("أسباب التأخير"),
             Long("أفضل التصاميم"),
@@ -346,6 +392,11 @@ public static class TemplateSeeder
             Num("متأخرة"),
             Num("بانتظار المراجعة"),
             Num("أعيدت للتعديل"),
+            Sec("📁 تفاصيل المشاريع"),
+            Proj("تفاصيل المشروع",
+                SGrid("videos", "فيديوهات المشروع", "الفيديو", "النوع", "الحالة", "ملاحظة"),
+                SPct("project_progress", "نسبة إنجاز المشروع"),
+                SLong("project_notes", "ملاحظات المشروع")),
             Sec("📝 التحليل"),
             Long("أسباب التأخير"),
             Long("أفضل الفيديوهات"),
@@ -379,6 +430,10 @@ public static class TemplateSeeder
             Num("عدد القطع المسلَّمة"),
             Num("معتمدة من أول مرة"),
             Num("متأخرة"),
+            Sec("📁 تفاصيل المشاريع"),
+            Proj("تفاصيل المشروع",
+                SGrid("pieces", "قطع المحتوى للمشروع", "العنوان", "النوع", "الحالة", "تاريخ التسليم", "ملاحظة"),
+                SLong("project_notes", "ملاحظات المشروع")),
             Sec("📝 التحليل"),
             Long("أسباب التأخير"),
             Long("أفضل الأفكار"),
@@ -409,9 +464,12 @@ public static class TemplateSeeder
             Num("عدد المقالات المخطط لها"),
             Num("عدد المقالات المنشورة"),
             Num("عدد المقالات المتأخرة"),
-            Sec("📋 الجداول"),
-            Grid("جدول المقالات", "المقال", "الكلمة المفتاحية", "الحالة", "تاريخ النشر"),
-            Grid("تفاصيل المنشورة", "المقال", "الرابط", "عدد الكلمات"),
+            Sec("📁 تفاصيل المشاريع"),
+            Proj("تفاصيل المشروع",
+                SGrid("articles", "مقالات المشروع", "عنوان المقال", "الكلمة المفتاحية", "الحالة", "المراجع", "تاريخ التسليم", "ملاحظات"),
+                SGrid("published", "تفاصيل المنشورة", "المقال", "الرابط", "عدد الكلمات"),
+                SLong("project_notes", "ملاحظات المشروع")),
+            Sec("📋 الجداول العامة"),
             Grid("المتأخرة", "المقال", "سبب التأخير", "الموعد الجديد"),
             Grid("خطة الأسبوع القادم", "المقال", "الكلمة المفتاحية", "الموعد"),
             Sec("📝 ملاحظات"),
@@ -520,6 +578,10 @@ public static class TemplateSeeder
             Cur("تكلفة العميل المحتمل (CPL)"),
             Pct("معدل النقر (CTR)"),
             Pct("معدل التحويل"),
+            Sec("📁 تفاصيل المشاريع"),
+            Proj("تفاصيل المشروع",
+                SGrid("campaigns", "حملات المشروع", "اسم الحملة", "المنصة", "الهدف", "الإنفاق", "النتيجة", "الحالة", "الإجراء التالي"),
+                SLong("project_notes", "ملاحظات المشروع")),
             Sec("📝 التحليل"),
             Long("الرسائل والمحتوى الأفضل أداءً"),
             Pick("سبب المشكلة الأساسي", "الميزانية", "الاستهداف", "الإبداع (Creative)", "اللاندنج بيج", "المنتج/العرض", "المنافسة", "الموسمية", "تتبع البيانات", "أخرى"),
@@ -603,6 +665,10 @@ public static class TemplateSeeder
             Num("الصفحات المفهرسة"),
             Num("المهام المنفّذة"),
             Num("المشاكل التقنية"),
+            Sec("📁 تفاصيل المشاريع"),
+            Proj("تفاصيل المشروع",
+                SGrid("keywords", "كلمات المشروع المفتاحية", "الكلمة المفتاحية", "الصفحة المستهدفة", "Position", "Impressions", "Clicks", "CTR", "التغيّر", "ملاحظة"),
+                SLong("project_notes", "ملاحظات المشروع")),
             Sec("📝 التحليل"),
             Long("تحليل التحسينات"),
             Grid("احتياجات من فريق الويب", "المطلوب", "الأولوية"),
@@ -656,7 +722,7 @@ public static class TemplateSeeder
             Note("قرارات مطلوبة"),
         }),
 
-        // 23) تقرير Account Manager
+        // 23) تقرير Account Manager (سماح) — تحويل كامل: كل تفاصيل العميل داخل قسم العميل/المشروع (لا KPI Auto)
         new("🤝 تقرير مدير الحسابات", "تقرير أسبوعي لمدير الحسابات", PeriodType.Weekly, new[]
         {
             Sec("🚦 الحالة العامة"),
@@ -664,18 +730,139 @@ public static class TemplateSeeder
             Pick("مستوى رضا العملاء", "مرتفع", "متوسط", "منخفض"),
             YesNo("هل توجد مشكلة تحتاج تصعيد؟"),
             Note("ملخص عام"),
-            Sec("👥 حالة العملاء"),
-            Pick("العملاء الكبار (Key Accounts)", StatusGYR),
-            Note("ملاحظة على العملاء الكبار"),
-            Pick("العملاء الجدد (Onboarding)", StatusGYR),
-            Note("ملاحظة على العملاء الجدد"),
-            Pick("العملاء المعرّضون للخطر (At Risk)", StatusGYR),
-            Note("ملاحظة على العملاء المعرّضين للخطر"),
-            Sec("📋 الجداول"),
-            Grid("موقف الحسابات", "العميل", "الحالة", "آخر تواصل", "الخطوة القادمة"),
-            Grid("الفرص (Upsell)", "العميل", "الفرصة", "القيمة المتوقعة"),
+            Sec("📁 تفاصيل العملاء / المشاريع"),
+            Proj("تفاصيل العميل",
+                SShort("segment", "تصنيف العميل (Key/Onboarding/At Risk)"),
+                SShort("account_status", "حالة الحساب"),
+                SShort("last_contact", "آخر تواصل"),
+                SShort("next_step", "الخطوة القادمة"),
+                SDate("content_plan_until", "خطة المحتوى مكتوبة حتى تاريخ"),
+                SShort("content_status", "حالة خطة المحتوى"),
+                SBool("content_reviewed", "هل راجع الأكونت مانجر المحتوى بنفسه؟"),
+                SLong("content_notes", "ملاحظات على المحتوى"),
+                SDate("design_plan_until", "خطة التصميمات جاهزة حتى تاريخ"),
+                SShort("design_status", "حالة التصميمات"),
+                SBool("design_reviewed", "هل راجع الأكونت مانجر التصميمات بنفسه؟"),
+                SLong("design_notes", "ملاحظات على التصميمات"),
+                SLong("risks", "مخاطر أو تعطيلات محتملة"),
+                SGrid("actions", "الإجراء المطلوب للأسبوع القادم", "الإجراء المطلوب", "المسؤول"),
+                SGrid("upsell", "الفرص (Upsell)", "الفرصة", "القيمة المتوقعة")),
+            Sec("📋 عام (على مستوى المحفظة)"),
             Grid("المطلوب من الفرق", "المطلوب", "الفريق", "الأولوية"),
             Note("قرارات مطلوبة"),
+        }),
+
+        // 24) تقرير مبيعات B2C حسب الدورة (ERDS Phase 1 — تجريبي، مُهيكَل، additive)
+        // جدول رئيسي مطلوب (صفّ لكل دورة) بالأعمدة الرقمية القابلة للتجميع + حقول نصية داعمة.
+        new(B2cByCourseReportSchema.TemplateTitle, B2cByCourseReportSchema.Description, PeriodType.Weekly, new[]
+        {
+            Sec("📊 أداء المبيعات لكل دورة"),
+            GridReq(B2cByCourseReportSchema.MainTableLabel, B2cByCourseReportSchema.Columns),
+            Sec("📝 ملخص نوعي (لا يحلّ محلّ الأرقام)"),
+            Long(B2cByCourseReportSchema.TopAchievements),
+            Long(B2cByCourseReportSchema.TopChallenges),
+            Long(B2cByCourseReportSchema.SupportNeeded),
+            Long(B2cByCourseReportSchema.ExceptionalNotes),
+        }),
+
+        // 24-ب) تقرير مبيعات B2C — بيانات جديدة/قديمة (Phase 7 — additive، قالب مستقلّ بعنوان جديد)
+        // جدولان مطلوبان: أداء البيانات الجديدة New Leads + أداء بيانات CRM القديمة Old CRM Data.
+        // القالب القديم أحادي الجدول يبقى Legacy كما هو (لا تحويل تلقائي).
+        new(B2cNewOldReportSchema.TemplateTitle, B2cNewOldReportSchema.Description, PeriodType.Weekly, new[]
+        {
+            Sec("📊 أداء البيانات الجديدة New Leads"),
+            GridReq(B2cNewOldReportSchema.NewLeadsTableLabel, B2cNewOldReportSchema.NewLeadsColumns),
+            Sec("🗄️ أداء بيانات CRM القديمة Old CRM Data"),
+            GridReq(B2cNewOldReportSchema.OldCrmTableLabel, B2cNewOldReportSchema.OldCrmColumns),
+            Sec("📝 ملخص نوعي (لا يحلّ محلّ الأرقام)"),
+            Long(B2cNewOldReportSchema.TopAchievements),
+            Long(B2cNewOldReportSchema.TopChallenges),
+            Long(B2cNewOldReportSchema.SupportNeeded),
+            Long(B2cNewOldReportSchema.ExceptionalNotes),
+        }),
+
+        // 25) تقرير مبيعات B2B حسب الخدمة (ERDS Phase 3 — مُهيكَل، متوازٍ، additive)
+        new(B2bByServiceReportSchema.TemplateTitle, B2bByServiceReportSchema.Description, PeriodType.Weekly, new[]
+        {
+            Sec("📈 أداء المبيعات لكل خدمة"),
+            GridReq(B2bByServiceReportSchema.MainTableLabel, B2bByServiceReportSchema.Columns),
+            Sec("📝 ملخص نوعي (لا يحلّ محلّ الأرقام)"),
+            Long(B2bByServiceReportSchema.TopAchievements),
+            Long(B2bByServiceReportSchema.TopChallenges),
+            Long(B2bByServiceReportSchema.SupportNeeded),
+            Long(B2bByServiceReportSchema.Notes),
+        }),
+
+        // 26) تقرير المشاريع حسب العميل/المشروع (ERDS Phase 3)
+        new(ProjectsByClientReportSchema.TemplateTitle, ProjectsByClientReportSchema.Description, PeriodType.Weekly, new[]
+        {
+            Sec("🗂️ تقدّم المشاريع لكل عميل/مشروع"),
+            GridReq(ProjectsByClientReportSchema.MainTableLabel, ProjectsByClientReportSchema.Columns),
+            Sec("📝 ملخص نوعي (لا يحلّ محلّ الأرقام)"),
+            Long(ProjectsByClientReportSchema.TopAchievements),
+            Long(ProjectsByClientReportSchema.TopObstacles),
+            Long(ProjectsByClientReportSchema.DecisionsNeeded),
+            Long(ProjectsByClientReportSchema.Notes),
+        }),
+
+        // 27) تقرير المحتوى Content Production (ERDS Phase 3)
+        new(ContentProductionReportSchema.TemplateTitle, ContentProductionReportSchema.Description, PeriodType.Weekly, new[]
+        {
+            Sec("✍️ إنتاج المحتوى لكل عميل"),
+            GridReq(ContentProductionReportSchema.MainTableLabel, ContentProductionReportSchema.Columns),
+            Sec("📝 ملخص نوعي (لا يحلّ محلّ الأرقام)"),
+            Long(ContentProductionReportSchema.BestContent),
+            Long(ContentProductionReportSchema.TopChallenges),
+            Long(ContentProductionReportSchema.SupportNeeded),
+            Long(ContentProductionReportSchema.Notes),
+        }),
+
+        // 28) تقرير التصميم Design Production (ERDS Phase 3)
+        new(DesignProductionReportSchema.TemplateTitle, DesignProductionReportSchema.Description, PeriodType.Weekly, new[]
+        {
+            Sec("🎨 إنتاج التصميم لكل عميل"),
+            GridReq(DesignProductionReportSchema.MainTableLabel, DesignProductionReportSchema.Columns),
+            Sec("📝 ملخص نوعي (لا يحلّ محلّ الأرقام)"),
+            Long(DesignProductionReportSchema.BestDesigns),
+            Long(DesignProductionReportSchema.TopChallenges),
+            Long(DesignProductionReportSchema.SupportNeeded),
+            Long(DesignProductionReportSchema.Notes),
+        }),
+
+        // 29) تقرير الفيديو Video Production (ERDS Phase 3)
+        new(VideoProductionReportSchema.TemplateTitle, VideoProductionReportSchema.Description, PeriodType.Weekly, new[]
+        {
+            Sec("🎬 إنتاج الفيديو لكل عميل"),
+            GridReq(VideoProductionReportSchema.MainTableLabel, VideoProductionReportSchema.Columns),
+            Sec("📝 ملخص نوعي (لا يحلّ محلّ الأرقام)"),
+            Long(VideoProductionReportSchema.BestVideos),
+            Long(VideoProductionReportSchema.TopChallenges),
+            Long(VideoProductionReportSchema.SupportNeeded),
+            Long(VideoProductionReportSchema.Notes),
+        }),
+
+        // 30) تقرير النشر والسوشيال ميديا Publishing/Social Media (ERDS Phase 3)
+        new(SocialPublishingReportSchema.TemplateTitle, SocialPublishingReportSchema.Description, PeriodType.Weekly, new[]
+        {
+            Sec("📣 النشر والتفاعل لكل عميل"),
+            GridReq(SocialPublishingReportSchema.MainTableLabel, SocialPublishingReportSchema.Columns),
+            Sec("📝 ملخص نوعي (لا يحلّ محلّ الأرقام)"),
+            Long(SocialPublishingReportSchema.PublishingConsistency),
+            Long(SocialPublishingReportSchema.TopPublishingIssues),
+            Long(SocialPublishingReportSchema.SupportNeeded),
+            Long(SocialPublishingReportSchema.Notes),
+        }),
+
+        // 31) تقرير Media Buyer حسب العميل (ERDS Phase 3)
+        new(MediaBuyerByClientReportSchema.TemplateTitle, MediaBuyerByClientReportSchema.Description, PeriodType.Weekly, new[]
+        {
+            Sec("📊 أداء الحملات لكل عميل"),
+            GridReq(MediaBuyerByClientReportSchema.MainTableLabel, MediaBuyerByClientReportSchema.Columns),
+            Sec("📝 ملخص نوعي (لا يحلّ محلّ الأرقام)"),
+            Long(MediaBuyerByClientReportSchema.BestCampaign),
+            Long(MediaBuyerByClientReportSchema.WeakestCampaign),
+            Long(MediaBuyerByClientReportSchema.ImprovementOrDeclineReasons),
+            Long(MediaBuyerByClientReportSchema.SupportNeeded),
         }),
     };
 

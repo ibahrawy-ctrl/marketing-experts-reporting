@@ -10,6 +10,10 @@ import {
   useUpdateTeam,
   useAddTeamMember,
   useRemoveTeamMember,
+  useTeamMoveImpact,
+  useTeamMemberships,
+  useAddAdditionalTeamMember,
+  useRemoveAdditionalTeamMember,
 } from '../lib/useDirectory';
 import { useAuth } from '../lib/auth';
 import {
@@ -37,7 +41,7 @@ import {
   trainingNeedStatusLabel,
   decisionStatusLabel,
 } from '../lib/format';
-import type { SubmissionStatus, SubmissionListItem, TeamDto, DirectoryUserDto } from '../types/api';
+import type { SubmissionStatus, SubmissionListItem, TeamDto, DirectoryUserDto, DepartmentDto } from '../types/api';
 
 const SUBMITTED_STATES: SubmissionStatus[] = [
   'Submitted',
@@ -60,7 +64,8 @@ const statusTone: Record<SubmissionStatus, 'gold' | 'navy' | 'alert' | 'orange' 
 
 export default function TeamDetailsPage() {
   const { teamId = '' } = useParams();
-  const { canManageTeams } = useAuth();
+  const { canManageTeams, hasAnyRole } = useAuth();
+  const isAdmin = hasAnyRole('Admin');
   const qc = useQueryClient();
   const users = useDirectoryUsers();
   const teams = useTeams();
@@ -116,7 +121,10 @@ export default function TeamDetailsPage() {
   const members = allUsers.filter((u) => u.teamId === team.id);
   const memberIds = new Set(members.map((m) => m.id));
   const leaderName = allUsers.find((u) => u.id === team.teamLeaderId)?.fullName ?? '—';
-  const deptName = (departments.data ?? []).find((d) => d.id === team.departmentId)?.nameAr ?? '—';
+  const deptList = departments.data ?? [];
+  const deptName = deptList.find((d) => d.id === team.departmentId)?.nameAr ?? '—';
+  // أعضاء تختلف إدارتهم عن إدارة الفريق — إشارة لوجوب المزامنة (يُصحَّح بحفظ نقل الفريق مع المزامنة).
+  const mismatchedMembers = members.filter((m) => m.departmentId !== team.departmentId);
   const kpiByUser = new Map((kpi.data?.rows ?? []).map((r) => [r.subjectUserId, r]));
 
   const allSubs = submissions.data ?? [];
@@ -198,6 +206,12 @@ export default function TeamDetailsPage() {
       </div>
 
       {msg && <Alert tone={msg.tone}>{msg.text}</Alert>}
+
+      {canManageTeams && mismatchedMembers.length > 0 && (
+        <Alert tone="alert">
+          {mismatchedMembers.length} من أعضاء هذا الفريق إدارتهم تختلف عن إدارة الفريق ({deptName}). يحدث هذا عادةً بعد نقل الفريق دون مزامنة الأعضاء. افتح «إدارة الفريق» بالأسفل واحفظ مع تفعيل «مزامنة إدارة الأعضاء» لتصحيح الانتماء.
+        </Alert>
+      )}
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
         <StatCard label="الالتزام بالتسليم" value={`${compliance}٪`} tone={compliance < 50 ? 'alert' : 'navy'} />
@@ -341,7 +355,10 @@ export default function TeamDetailsPage() {
       </div>
 
       {/* إدارة الفريق للمستوى الإداري الأعلى فقط (Admin/CEO/GM؛ + HR لاحقًا) — السياسة مفروضة خادميًّا (TeamManagement ⇒ 403 لغير المخوّلين). */}
-      {canManageTeams && <TeamManagementCard team={team} members={members} allUsers={allUsers} />}
+      {canManageTeams && <TeamManagementCard team={team} members={members} allUsers={allUsers} departments={deptList} />}
+
+      {/* عضويات الفريق الإضافية (MVP) — Admin فقط. منفصلة تمامًا عن العضوية الأساسية (User.TeamId). */}
+      {isAdmin && <AdditionalMembershipsCard team={team} allUsers={allUsers} />}
 
       {/* الملاحظات الإدارية المرتبطة بهذا الفريق (طبقة سياقية). */}
       <ManagementNotesPanel
@@ -359,18 +376,26 @@ function TeamManagementCard({
   team,
   members,
   allUsers,
+  departments,
 }: {
   team: TeamDto;
   members: DirectoryUserDto[];
   allUsers: DirectoryUserDto[];
+  departments: DepartmentDto[];
 }) {
   const update = useUpdateTeam();
   const addMember = useAddTeamMember();
   const removeMember = useRemoveTeamMember();
   const [nameAr, setNameAr] = useState(team.nameAr);
   const [leaderId, setLeaderId] = useState(team.teamLeaderId ?? '');
+  const [departmentId, setDepartmentId] = useState(team.departmentId);
+  const [syncMembers, setSyncMembers] = useState(true);
   const [addId, setAddId] = useState('');
   const [msg, setMsg] = useState<{ tone: 'success' | 'alert'; text: string } | null>(null);
+
+  const isDepartmentChange = departmentId !== team.departmentId;
+  // ملخّص أثر النقل يُجلب من الخادم فقط عند اختيار إدارة مختلفة.
+  const impact = useTeamMoveImpact(isDepartmentChange ? team.id : null, isDepartmentChange ? departmentId : null);
 
   // مرشّحون للإضافة: مستخدمون داخل النطاق وليسوا أعضاء بالفريق بالفعل.
   const memberIds = new Set(members.map((m) => m.id));
@@ -383,13 +408,20 @@ function TeamManagementCard({
         req: {
           nameAr: nameAr.trim(),
           nameEn: team.nameEn,
-          departmentId: team.departmentId,
+          departmentId,
           teamLeaderId: leaderId || null,
           isActive: team.isActive,
+          syncMemberDepartments: syncMembers,
         },
       },
       {
-        onSuccess: () => setMsg({ tone: 'success', text: 'تم حفظ بيانات الفريق.' }),
+        onSuccess: () =>
+          setMsg({
+            tone: 'success',
+            text: isDepartmentChange
+              ? 'تم حفظ بيانات الفريق ونقله للإدارة الجديدة' + (syncMembers ? ' مع مزامنة إدارة الأعضاء.' : ' دون مزامنة إدارة الأعضاء.')
+              : 'تم حفظ بيانات الفريق.',
+          }),
         onError: (e) => setMsg({ tone: 'alert', text: apiErrorMessage(e) }),
       },
     );
@@ -442,7 +474,56 @@ function TeamManagementCard({
             ))}
           </Select>
         </Field>
+        <Field label="الإدارة">
+          <Select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.nameAr}
+              </option>
+            ))}
+          </Select>
+        </Field>
       </div>
+
+      {isDepartmentChange && (
+        <div className="mt-3 rounded-lg border border-gold/40 bg-gold/5 p-4">
+          <p className="text-sm font-semibold text-navy">ملخّص أثر نقل الفريق</p>
+          {impact.isLoading ? (
+            <p className="mt-2 text-xs text-ink-2">جارٍ حساب الأثر…</p>
+          ) : impact.isError ? (
+            <p className="mt-2 text-xs text-alert">تعذّر حساب أثر النقل. تحقّق من الإدارة المختارة.</p>
+          ) : impact.data ? (
+            <>
+              <p className="mt-1 text-xs text-ink-2">
+                نقل «{impact.data.teamName}» من «{impact.data.currentDepartmentName ?? '—'}» إلى «{impact.data.targetDepartmentName ?? '—'}».
+              </p>
+              <dl className="mt-3 grid grid-cols-2 gap-y-2 text-center sm:grid-cols-4">
+                <div><dd className="text-lg font-bold text-navy">{impact.data.memberCount}</dd><dt className="text-[11px] text-ink-2">الأعضاء</dt></div>
+                <div><dd className="text-lg font-bold text-navy">{impact.data.projectsCount}</dd><dt className="text-[11px] text-ink-2">المشاريع</dt></div>
+                <div><dd className="text-lg font-bold text-navy">{impact.data.activeProjectsCount}</dd><dt className="text-[11px] text-ink-2">مشاريع نشطة</dt></div>
+                <div><dd className="text-lg font-bold text-navy">{impact.data.submissionsCount}</dd><dt className="text-[11px] text-ink-2">تقارير</dt></div>
+              </dl>
+              <label className="mt-3 flex items-center gap-2 text-sm text-navy">
+                <input type="checkbox" checked={syncMembers} onChange={(e) => setSyncMembers(e.target.checked)} />
+                مزامنة إدارة الأعضاء الحاليين إلى الإدارة الجديدة
+              </label>
+              <p className="mt-1 text-xs text-ink-2">
+                {syncMembers
+                  ? `عند الحفظ ستُحدَّث إدارة ${impact.data.memberCount} عضوًا (من أعضاء الفريق الحاليين فقط) إلى «${impact.data.targetDepartmentName ?? '—'}». لا يتغيّر المسمّى الوظيفي ولا المدير ولا الفريق.`
+                  : 'بدون المزامنة سيبقى أعضاء الفريق على إدارتهم القديمة، ما قد يُحدِث عدم تطابق يؤثّر على التجميع الإداري والتقارير المجمّعة مستقبلًا.'}
+              </p>
+              {impact.data.warnings.length > 0 && (
+                <ul className="mt-2 list-disc space-y-0.5 pr-5 text-xs text-orange-700">
+                  {impact.data.warnings.map((w, i) => (
+                    <li key={i}>{w}</li>
+                  ))}
+                </ul>
+              )}
+            </>
+          ) : null}
+        </div>
+      )}
+
       <div className="mt-3">
         <Button onClick={saveMeta} disabled={update.isPending || !nameAr.trim()}>
           حفظ بيانات الفريق
@@ -486,6 +567,131 @@ function TeamManagementCard({
           تظهر هنا فقط الأسماء ضمن نطاق صلاحيتك. محاولة إضافة مستخدم خارج النطاق تُرفض من الخادم.
         </p>
       </div>
+    </Card>
+  );
+}
+
+// MULTI-TEAM-MEMBERSHIP-MVP-R1 — عضويات الفريق الإضافية (Admin فقط).
+// عضو إضافي = عضوية ثانوية في فريق آخر دون تغيير الفريق/الإدارة/المدير/المسمّى الأساسي للموظف.
+// لا تدخل في النطاق (Scope) ولا KPI ولا التقارير ولا المشاريع — عرض/ربط تنظيمي فقط في هذه المرحلة.
+function AdditionalMembershipsCard({
+  team,
+  allUsers,
+}: {
+  team: TeamDto;
+  allUsers: DirectoryUserDto[];
+}) {
+  const memberships = useTeamMemberships(team.id);
+  const addAdditional = useAddAdditionalTeamMember();
+  const removeAdditional = useRemoveAdditionalTeamMember();
+  const [addId, setAddId] = useState('');
+  const [msg, setMsg] = useState<{ tone: 'success' | 'alert'; text: string } | null>(null);
+
+  const data = memberships.data;
+  const primary = data?.primaryMembers ?? [];
+  const additional = data?.additionalMembers ?? [];
+  const usedIds = new Set([...primary.map((m) => m.userId), ...additional.map((m) => m.userId)]);
+  // مرشّحون للإضافة: مستخدمون نشطون ليسوا أعضاء أساسيين أو إضافيين بالفعل.
+  const candidates = allUsers.filter((u) => u.isActive && !usedIds.has(u.id));
+
+  function doAdd() {
+    if (!addId) return;
+    addAdditional.mutate(
+      { teamId: team.id, req: { userId: addId } },
+      {
+        onSuccess: () => {
+          setMsg({ tone: 'success', text: 'تمت إضافة العضو الإضافي للفريق دون تغيير فريقه الأساسي.' });
+          setAddId('');
+        },
+        onError: (e) => setMsg({ tone: 'alert', text: apiErrorMessage(e) }),
+      },
+    );
+  }
+
+  function doRemove(userId: string) {
+    removeAdditional.mutate(
+      { teamId: team.id, userId },
+      {
+        onSuccess: () => setMsg({ tone: 'success', text: 'تمت إزالة العضوية الإضافية.' }),
+        onError: (e) => setMsg({ tone: 'alert', text: apiErrorMessage(e) }),
+      },
+    );
+  }
+
+  return (
+    <Card>
+      <SectionTitle
+        title="عضويات الفريق الإضافية"
+        hint="عضوية ثانوية لا تغيّر الفريق أو الإدارة الأساسية للموظف (مرحلة أولى — عرض فقط)"
+      />
+      {msg && (
+        <div className="mb-3">
+          <Alert tone={msg.tone}>{msg.text}</Alert>
+        </div>
+      )}
+
+      {memberships.isLoading ? (
+        <p className="py-6 text-center text-sm text-ink-2">جارٍ تحميل العضويات…</p>
+      ) : memberships.isError ? (
+        <p className="py-6 text-center text-sm text-alert">تعذّر تحميل عضويات الفريق.</p>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {/* الأعضاء الأساسيون (من User.TeamId) — قراءة فقط هنا. */}
+          <div>
+            <p className="mb-2 text-sm font-semibold text-navy">الأعضاء الأساسيون ({primary.length})</p>
+            <ul className="space-y-2 text-sm">
+              {primary.map((m) => (
+                <li key={m.userId} className="flex items-center justify-between gap-2 border-b border-line py-2 last:border-0">
+                  <Link className="text-navy hover:text-orange-600 hover:underline" to={`/app/employee/${m.userId}`}>
+                    {m.fullName}
+                  </Link>
+                  <Badge tone="navy">أساسي</Badge>
+                </li>
+              ))}
+              {primary.length === 0 && <li className="py-2 text-ink-2">لا أعضاء أساسيون.</li>}
+            </ul>
+          </div>
+
+          {/* الأعضاء الإضافيون (من UserTeamMemberships) — إضافة/إزالة. */}
+          <div>
+            <p className="mb-2 text-sm font-semibold text-navy">الأعضاء الإضافيون ({additional.length})</p>
+            <ul className="space-y-2 text-sm">
+              {additional.map((m) => (
+                <li key={m.userId} className="flex items-center justify-between gap-2 border-b border-line py-2 last:border-0">
+                  <Link className="text-navy hover:text-orange-600 hover:underline" to={`/app/employee/${m.userId}`}>
+                    {m.fullName}
+                  </Link>
+                  <Button variant="danger" onClick={() => doRemove(m.userId)} disabled={removeAdditional.isPending}>
+                    إزالة
+                  </Button>
+                </li>
+              ))}
+              {additional.length === 0 && <li className="py-2 text-ink-2">لا أعضاء إضافيون بعد.</li>}
+            </ul>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-4 flex flex-wrap items-end gap-2 border-t border-line pt-4">
+        <div className="min-w-[220px] flex-1">
+          <Field label="إضافة عضو إضافي">
+            <Select value={addId} onChange={(e) => setAddId(e.target.value)}>
+              <option value="">اختر مستخدمًا…</option>
+              {candidates.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.fullName}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </div>
+        <Button onClick={doAdd} disabled={addAdditional.isPending || !addId}>
+          إضافة عضو إضافي
+        </Button>
+      </div>
+      <p className="mt-2 text-xs text-ink-3">
+        العضوية الإضافية لا تغيّر الفريق الأساسي ولا الإدارة ولا المدير ولا المسمّى الوظيفي للموظف، ولا تؤثّر على نطاق الرؤية أو مؤشرات الأداء أو التقارير أو المشاريع في هذه المرحلة.
+      </p>
     </Card>
   );
 }

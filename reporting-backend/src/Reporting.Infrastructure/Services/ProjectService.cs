@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Reporting.Application.Audit;
 using Reporting.Application.Clients;
@@ -36,6 +37,12 @@ public class ProjectService : IProjectService
         if (filter.OwnerTeamId is not null) q = q.Where(p => p.OwnerTeamId == filter.OwnerTeamId);
         if (filter.AccountManagerId is not null) q = q.Where(p => p.AccountManagerId == filter.AccountManagerId);
         if (!filter.IncludeClosed) q = q.Where(p => p.Status != ProjectStatus.Closed);
+        // قائمة الاختيار (dropdown): مشاريع نشطة فقط تابعة لعميل غير مؤرشف، ضمن النطاق المُطبَّق أعلاه.
+        if (filter.SelectableOnly)
+        {
+            q = q.Where(p => p.Status == ProjectStatus.Active);
+            q = q.Where(p => _db.Clients.Any(c => c.Id == p.ClientId && c.Status != ClientStatus.Closed));
+        }
 
         var rows = await q.OrderByDescending(p => p.CreatedAtUtc).ToListAsync(ct);
         var dtos = await MapManyAsync(rows, ct);
@@ -130,6 +137,50 @@ public class ProjectService : IProjectService
         return Result<ProjectDto>.Success((await MapManyAsync(new[] { project }, ct))[0]);
     }
 
+    public async Task<Result<ProjectDto>> ReactivateAsync(Guid id, CancellationToken ct = default)
+    {
+        if (_currentUser.UserId is not Guid uid) return Result<ProjectDto>.Failure("غير مصرّح.", "auth.unauthenticated");
+        var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == id, ct);
+        if (project is null) return Result<ProjectDto>.Failure("المشروع غير موجود.", "project.not_found");
+
+        var vis = await _access.ResolveAsync(ct);
+        if (!vis.CanViewProject(id)) return Result<ProjectDto>.Failure("هذا المشروع خارج نطاق صلاحيتك.", "auth.forbidden");
+
+        if (project.Status != ProjectStatus.Closed)
+            return Result<ProjectDto>.Failure("المشروع غير مؤرشف.", "project.not_archived.conflict");
+
+        // لا يُعاد تفعيل مشروع تابع لعميل مؤرشف.
+        var clientClosed = await _db.Clients.AnyAsync(c => c.Id == project.ClientId && c.Status == ClientStatus.Closed, ct);
+        if (clientClosed)
+            return Result<ProjectDto>.Failure("لا يمكن إعادة تفعيل مشروع تابع لعميل مؤرشف. أعِد تفعيل العميل أولًا.", "project.client_archived.conflict");
+
+        project.Status = ProjectStatus.Active;
+        project.UpdatedAtUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync(ct);
+        await _audit.LogAsync(uid, "project.reactivated", nameof(Project), project.Id, ct: ct);
+
+        return Result<ProjectDto>.Success((await MapManyAsync(new[] { project }, ct))[0]);
+    }
+
+    public async Task<Result> DeleteAsync(Guid id, CancellationToken ct = default)
+    {
+        if (_currentUser.UserId is not Guid uid) return Result.Failure("غير مصرّح.", "auth.unauthenticated");
+        var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == id, ct);
+        if (project is null) return Result.Failure("المشروع غير موجود.", "project.not_found");
+
+        var vis = await _access.ResolveAsync(ct);
+        if (!vis.CanViewProject(id)) return Result.Failure("هذا المشروع خارج نطاق صلاحيتك.", "auth.forbidden");
+
+        var reason = await DeleteBlockReasonAsync(project.Id, ct);
+        if (reason is not null)
+            return Result.Failure(reason, "project.delete_forbidden.conflict");
+
+        _db.Projects.Remove(project);
+        await _db.SaveChangesAsync(ct);
+        await _audit.LogAsync(uid, "project.deleted", nameof(Project), id, ct: ct);
+        return Result.Success();
+    }
+
     public async Task<Result<IReadOnlyList<LinkedReportRow>>> GetReportsAsync(Guid id, CancellationToken ct = default)
     {
         if (_currentUser.UserId is null) return Result<IReadOnlyList<LinkedReportRow>>.Failure("غير مصرّح.", "auth.unauthenticated");
@@ -190,6 +241,7 @@ public class ProjectService : IProjectService
 
     private async Task<List<ProjectDto>> MapManyAsync(IReadOnlyCollection<Project> projects, CancellationToken ct)
     {
+        var ids = projects.Select(p => p.Id).ToList();
         var clientIds = projects.Select(p => p.ClientId).Distinct().ToList();
         var clientNames = await _db.Clients.Where(c => clientIds.Contains(c.Id))
             .ToDictionaryAsync(c => c.Id, c => c.Name, ct);
@@ -199,11 +251,94 @@ public class ProjectService : IProjectService
         var amIds = projects.Where(p => p.AccountManagerId != null).Select(p => p.AccountManagerId!.Value);
         var amNames = await UserNamesAsync(amIds, ct);
 
-        return projects.Select(p => new ProjectDto(
-            p.Id, p.ClientId, clientNames.GetValueOrDefault(p.ClientId), p.Name, p.ServiceType, p.Status,
-            p.StartDate, p.EndDate, p.OwnerTeamId, p.OwnerTeamId is Guid tid ? teamNames.GetValueOrDefault(tid) : null,
-            p.AccountManagerId, p.AccountManagerId is Guid aid ? amNames.GetValueOrDefault(aid) : null,
-            p.Notes, p.CreatedAtUtc, p.UpdatedAtUtc)).ToList();
+        // عدّادات الارتباط لاحتساب canHardDelete دفعةً واحدة.
+        var directReports = ids.Count == 0 ? new Dictionary<Guid, int>()
+            : await _db.ReportSubmissions.Where(s => s.ProjectId != null && ids.Contains(s.ProjectId.Value))
+                .GroupBy(s => s.ProjectId!.Value).Select(g => new { g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.Key, x => x.Count, ct);
+        var risksByProject = ids.Count == 0 ? new Dictionary<Guid, int>()
+            : await _db.Risks.Where(r => r.ProjectId != null && ids.Contains(r.ProjectId.Value))
+                .GroupBy(r => r.ProjectId!.Value).Select(g => new { g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.Key, x => x.Count, ct);
+        var notesByProject = ids.Count == 0 ? new Dictionary<Guid, int>()
+            : await _db.ManagementNotes.Where(n => n.EntityType == ManagementNoteEntityType.Project && ids.Contains(n.EntityId))
+                .GroupBy(n => n.EntityId).Select(g => new { g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.Key, x => x.Count, ct);
+        // الاستخدام داخل أقسام المشاريع المتكررة (Multi-Project ValueJson).
+        var inSections = await ReferencedProjectIdsInSectionsAsync(ct);
+
+        return projects.Select(p =>
+        {
+            var (canHardDelete, reason) = BuildDeleteGuard(
+                directReports.GetValueOrDefault(p.Id), inSections.Contains(p.Id),
+                risksByProject.GetValueOrDefault(p.Id), notesByProject.GetValueOrDefault(p.Id));
+            return new ProjectDto(
+                p.Id, p.ClientId, clientNames.GetValueOrDefault(p.ClientId), p.Name, p.ServiceType, p.Status,
+                p.StartDate, p.EndDate, p.OwnerTeamId, p.OwnerTeamId is Guid tid ? teamNames.GetValueOrDefault(tid) : null,
+                p.AccountManagerId, p.AccountManagerId is Guid aid ? amNames.GetValueOrDefault(aid) : null,
+                p.Notes, p.CreatedAtUtc, p.UpdatedAtUtc, canHardDelete, reason);
+        }).ToList();
+    }
+
+    // ===== فحص الاستخدام / منع الحذف النهائي =====
+    private async Task<string?> DeleteBlockReasonAsync(Guid projectId, CancellationToken ct)
+    {
+        var reports = await _db.ReportSubmissions.CountAsync(s => s.ProjectId == projectId, ct);
+        var risks = await _db.Risks.CountAsync(r => r.ProjectId == projectId, ct);
+        var notes = await _db.ManagementNotes.CountAsync(
+            n => n.EntityType == ManagementNoteEntityType.Project && n.EntityId == projectId, ct);
+        var inSection = (await ReferencedProjectIdsInSectionsAsync(ct)).Contains(projectId);
+        return BuildDeleteGuard(reports, inSection, risks, notes).reason;
+    }
+
+    private static (bool canHardDelete, string? reason) BuildDeleteGuard(int reports, bool inSection, int risks, int notes)
+    {
+        var parts = new List<string>();
+        if (reports > 0) parts.Add($"{reports} تقريرًا مباشرًا");
+        if (inSection) parts.Add("مستخدم داخل أقسام تقارير متعدّدة المشاريع");
+        if (risks > 0) parts.Add($"{risks} مخاطرة");
+        if (notes > 0) parts.Add($"{notes} ملاحظة إدارية");
+        if (parts.Count == 0) return (true, null);
+        return (false, "لا يمكن الحذف النهائي — " + string.Join("، ", parts) + ". استخدم الأرشفة بدلًا من ذلك.");
+    }
+
+    private static readonly JsonSerializerOptions SectionJson = new() { PropertyNameCaseInsensitive = true };
+
+    private sealed class SectionEntry
+    {
+        public Guid? ProjectId { get; set; }
+    }
+
+    // يجمع كل معرّفات المشاريع المُشار إليها داخل ValueJson لأقسام ProjectRepeatableSection.
+    private async Task<HashSet<Guid>> ReferencedProjectIdsInSectionsAsync(CancellationToken ct)
+    {
+        var result = new HashSet<Guid>();
+        var sectionFieldIds = await _db.TemplateFields
+            .Where(f => f.FieldType == FieldType.ProjectRepeatableSection)
+            .Select(f => f.Id).ToListAsync(ct);
+        if (sectionFieldIds.Count == 0) return result;
+
+        var jsons = await _db.SubmissionFieldValues
+            .Where(v => sectionFieldIds.Contains(v.TemplateFieldId) && v.ValueJson != null)
+            .Select(v => v.ValueJson!).ToListAsync(ct);
+        foreach (var json in jsons)
+            foreach (var pid in ExtractProjectIds(json))
+                result.Add(pid);
+        return result;
+    }
+
+    private static List<Guid> ExtractProjectIds(string valueJson)
+    {
+        var ids = new List<Guid>();
+        try
+        {
+            var entries = JsonSerializer.Deserialize<List<SectionEntry>>(valueJson, SectionJson);
+            if (entries is not null)
+                foreach (var e in entries)
+                    if (e.ProjectId is Guid pid && pid != Guid.Empty) ids.Add(pid);
+        }
+        catch { /* ValueJson تالف يُتجاهَل بأمان */ }
+        return ids;
     }
 
     private async Task<Dictionary<Guid, string>> UserNamesAsync(IEnumerable<Guid> ids, CancellationToken ct)

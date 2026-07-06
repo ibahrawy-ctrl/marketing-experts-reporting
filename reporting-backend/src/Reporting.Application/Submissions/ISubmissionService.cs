@@ -9,6 +9,7 @@ public interface ISubmissionService
     Task<Result<SubmissionDto>> GetAsync(Guid submissionId, CancellationToken ct = default);
     Task<Result<SubmissionDto>> SaveFieldValuesAsync(Guid submissionId, SaveFieldValuesRequest request, CancellationToken ct = default);
     Task<Result<SubmissionDto>> SubmitAsync(Guid submissionId, CancellationToken ct = default);
+    Task<Result> DeleteDraftAsync(Guid submissionId, CancellationToken ct = default);
 
     Task<Result<SubmissionDto>> ApproveAsync(Guid submissionId, ApprovalActionRequest request, CancellationToken ct = default);
     Task<Result<SubmissionDto>> ReturnAsync(Guid submissionId, ApprovalActionRequest request, CancellationToken ct = default);

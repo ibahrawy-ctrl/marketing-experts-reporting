@@ -22,4 +22,16 @@ public interface IKpiEvaluationService
     /// يُحسب كمتوسط نتائج الأسابيع داخل المدى. مقيَّد خادميًّا بنطاق المستخدم الحالي (ScopeResolver).
     /// </summary>
     Task<Result<KpiAggregateDto>> GetAggregateAsync(KpiAggregateRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// تصدير KPI للمالية (KPI-FIN1): معاينة صفوف التقييمات الأسبوعية المعتمدة الواقعة داخل الربع المختار،
+    /// على مستوى الشركة (بلا ScopeResolver؛ النطاق مفروض بالسياسة). قراءة فقط، لا تغيّر أيّ تقييم.
+    /// </summary>
+    Task<Result<KpiFinanceExportDto>> GetFinanceExportAsync(KpiFinanceExportFilter filter, CancellationToken ct = default);
+
+    /// <summary>
+    /// تصدير KPI للمالية بصيغة CSV (UTF-8 مع BOM لدعم العربية في Excel). يسجّل حدث تدقيق
+    /// kpi.finance_exported (بلا أسماء/درجات). قراءة فقط، لا تغيّر أيّ تقييم.
+    /// </summary>
+    Task<Result<byte[]>> ExportFinanceCsvAsync(KpiFinanceExportFilter filter, CancellationToken ct = default);
 }

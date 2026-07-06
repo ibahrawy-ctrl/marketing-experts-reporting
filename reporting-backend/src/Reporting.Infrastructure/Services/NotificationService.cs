@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Reporting.Application.Notifications;
 using Reporting.Domain.Entities.System;
+using Reporting.Domain.Enums;
 using Reporting.Infrastructure.Persistence;
 
 namespace Reporting.Infrastructure.Services;
@@ -9,11 +11,13 @@ public class NotificationService : INotificationService
 {
     private readonly AppDbContext _db;
     private readonly INotificationPusher _pusher;
+    private readonly EmailOptions _email;
 
-    public NotificationService(AppDbContext db, INotificationPusher pusher)
+    public NotificationService(AppDbContext db, INotificationPusher pusher, IOptions<EmailOptions> email)
     {
         _db = db;
         _pusher = pusher;
+        _email = email.Value;
     }
 
     public async Task NotifyAsync(Guid recipientId, string type, string title, string? body = null, string? link = null, CancellationToken ct = default)
@@ -30,6 +34,9 @@ public class NotificationService : INotificationService
             IsRead = false
         };
         _db.Notifications.Add(entity);
+
+        await EnqueueEmailsAsync(new[] { recipientId }, type, title, body, link, ct);
+
         await _db.SaveChangesAsync(ct);
 
         var dto = Map(entity);
@@ -47,12 +54,50 @@ public class NotificationService : INotificationService
             RecipientId = id, Type = type, Title = title, Body = body, Link = link, IsRead = false
         }).ToList();
         _db.Notifications.AddRange(entities);
+
+        await EnqueueEmailsAsync(ids, type, title, body, link, ct);
+
         await _db.SaveChangesAsync(ct);
 
         foreach (var e in entities)
         {
             try { await _pusher.PushAsync(e.RecipientId, Map(e), ct); }
             catch { /* أفضل-جهد */ }
+        }
+    }
+
+    /// <summary>يُضيف رسائل صندوق الصادر للمستلِمين أصحاب البريد — ضمن نفس المعاملة، عند تفعيل القناة.</summary>
+    private async Task EnqueueEmailsAsync(IReadOnlyCollection<Guid> recipientIds, string type, string title, string? body, string? link, CancellationToken ct)
+    {
+        if (!_email.Enabled) return;
+        // قائمة السماح (إن وُجدت): لا يُرسَل بريد إلا للأنواع المسموح بها صراحةً — تفعيل محدود أثناء التجربة.
+        if (_email.IncludedTypes.Length > 0 &&
+            !_email.IncludedTypes.Contains(type, StringComparer.OrdinalIgnoreCase)) return;
+        if (_email.ExcludedTypes.Contains(type, StringComparer.OrdinalIgnoreCase)) return;
+
+        var recipients = await _db.Users.AsNoTracking()
+            .Where(u => recipientIds.Contains(u.Id) && u.IsActive && u.Email != null && u.Email != "")
+            .Select(u => new { u.Id, u.Email, u.FullName })
+            .ToListAsync(ct);
+
+        if (recipients.Count == 0) return;
+
+        var subject = title;
+        var html = EmailHtml.Build(title, body, link);
+
+        foreach (var r in recipients)
+        {
+            _db.EmailOutbox.Add(new EmailOutbox
+            {
+                RecipientId = r.Id,
+                ToEmail = r.Email!,
+                ToName = r.FullName,
+                Subject = subject,
+                HtmlBody = html,
+                Type = type,
+                Status = EmailOutboxStatus.Pending,
+                NextAttemptUtc = DateTime.UtcNow
+            });
         }
     }
 

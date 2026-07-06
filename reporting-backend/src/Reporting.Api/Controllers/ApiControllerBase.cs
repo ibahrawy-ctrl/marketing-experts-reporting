@@ -27,6 +27,7 @@ public abstract class ApiControllerBase : ControllerBase
             "auth.invalid_refresh" => StatusCodes.Status401Unauthorized,
             "auth.account_disabled" => StatusCodes.Status403Forbidden,
             "auth.forbidden" => StatusCodes.Status403Forbidden,
+            "report.template_not_assigned" => StatusCodes.Status403Forbidden,
             "auth.not_found" => StatusCodes.Status404NotFound,
             _ when result.ErrorCode?.EndsWith(".not_found") == true => StatusCodes.Status404NotFound,
             _ when result.ErrorCode?.EndsWith(".conflict") == true => StatusCodes.Status409Conflict,

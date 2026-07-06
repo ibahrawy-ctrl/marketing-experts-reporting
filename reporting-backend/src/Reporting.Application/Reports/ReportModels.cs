@@ -30,6 +30,114 @@ public record SubmissionCompletenessReport(
     IReadOnlyList<SubmissionStatusCount> ByStatus,
     IReadOnlyList<DepartmentCompletenessRow> ByDepartment);
 
+/// <summary>
+/// صف متابعة التزام التسليم لموظف واحد ضمن أسبوع — <b>بيانات التزام فقط، بلا أيّ محتوى للتقرير</b>.
+/// لا إجابات، لا ملاحظات اعتماد، لا تعليقات مدير، لا تقييم، لا إجراءات. يُستخدم في شاشة متابعة HR.
+/// </summary>
+public record SubmissionComplianceRow(
+    Guid UserId,
+    string FullName,
+    string? DepartmentName,
+    string? TeamName,
+    string? JobRoleName,
+    // هل سلّم التقرير المتوقَّع لهذا الأسبوع (أيّ حالة بعد المسودّة)؟
+    bool Submitted,
+    // حالة التسليم نصًّا (لم يسلّم / مُرسَل / قيد المراجعة / معتمد / … ) — وصف التزام لا محتوى.
+    string StatusLabel,
+    // متأخر = (سلّم بعد موعد دوره) أو (لم يسلّم وانقضى موعد دوره). موحّد عبر الخدمتين.
+    bool Late,
+    // تاريخ التسليم إن وُجد (UTC).
+    DateTime? SubmittedAtUtc,
+    string PeriodKey,
+    // سلّم لكن بعد موعد دوره (جزء من Late، يُحتسب ضمن الالتزام لكن ليس ضمن «في الموعد»).
+    bool LateSubmitted = false);
+
+/// <summary>
+/// تقرير متابعة التزام التسليم (per-person) لأسبوع — متاح للأدوار المراقِبة + HR.
+/// يعكس المتوقَّع مقابل الفعلي (من سلّم/من تأخّر) دون كشف أيّ محتوى تقرير.
+/// </summary>
+public record SubmissionComplianceReport(
+    string PeriodKey,
+    string PeriodLabel,
+    int Expected,
+    int Submitted,
+    int NotSubmitted,
+    int Late,
+    decimal CompletionRate,
+    IReadOnlyList<SubmissionComplianceRow> Rows,
+    // تفصيل التأخّر: سلّم متأخرًا + لم يسلّم وانقضى موعده = إجمالي Late. + من سلّم في الموعد ونسبته.
+    int LateSubmitted = 0,
+    int MissingOverdue = 0,
+    int OnTime = 0,
+    decimal OnTimePercent = 0m);
+
+/// <summary>
+/// ملخّص التزام أسبوع واحد (أرقام مجمّعة فقط، بلا صفوف per-person) — لبطاقات اللوحة والصفحة.
+/// Compliance% = Submitted/Expected (يشمل المتأخر-المُسلَّم)؛ OnTime% = OnTime/Expected.
+/// Late = LateSubmitted + MissingOverdue.
+/// </summary>
+public record ComplianceSummaryReport(
+    string PeriodKey,
+    string PeriodLabel,
+    int Expected,
+    int Submitted,
+    int Missing,
+    int Late,
+    int LateSubmitted,
+    int MissingOverdue,
+    int OnTime,
+    decimal CompliancePercent,
+    decimal OnTimePercent);
+
+/// <summary>نقطة اتجاه أسبوعي للالتزام (للرسم الزمني المبسّط).</summary>
+public record ComplianceTrendPoint(
+    string PeriodKey,
+    string PeriodLabel,
+    int Expected,
+    int Submitted,
+    int Late,
+    decimal CompliancePercent,
+    decimal OnTimePercent);
+
+/// <summary>اتجاه الالتزام عبر آخر N أسابيع (الأقدم → الأحدث) ضمن نطاق المستخدم.</summary>
+public record ComplianceTrendReport(
+    int Weeks,
+    IReadOnlyList<ComplianceTrendPoint> Points);
+
+/// <summary>صفّ «الأكثر تأخّرًا» لقالب/مسمّى وظيفي ضمن أسبوع.</summary>
+public record LateByTemplateRow(
+    Guid JobRoleId,
+    string TemplateTitle,
+    string JobRoleName,
+    int Expected,
+    int Late,
+    int Missing,
+    decimal LatePercent);
+
+/// <summary>القوالب الأكثر تأخّرًا ضمن أسبوع ونطاق المستخدم (مرتّبة تنازليًّا حسب نسبة التأخّر).</summary>
+public record LateByTemplateReport(
+    string PeriodKey,
+    string PeriodLabel,
+    IReadOnlyList<LateByTemplateRow> Rows);
+
+/// <summary>صفّ تجميع الالتزام حسب فريق/إدارة ضمن أسبوع.</summary>
+public record ComplianceBreakdownRow(
+    Guid? GroupId,
+    string GroupName,
+    int Expected,
+    int Submitted,
+    int Late,
+    int Missing,
+    decimal CompliancePercent,
+    decimal OnTimePercent);
+
+/// <summary>تجميع الالتزام حسب البُعد (Team أو Department) ضمن أسبوع ونطاق المستخدم.</summary>
+public record ComplianceBreakdownReport(
+    string PeriodKey,
+    string PeriodLabel,
+    string GroupBy,
+    IReadOnlyList<ComplianceBreakdownRow> Rows);
+
 /// <summary>صف ملخّص مؤشرات أداء موظف.</summary>
 public record KpiSummaryRow(
     Guid SubjectUserId,
@@ -453,3 +561,82 @@ public record GovernanceSummaryReport(
     int OpenTrainingNeeds,
     int OpenImprovementPlans,
     int OpenDecisions);
+
+// ===== RPT-WORKFLOW-BOTTLENECKS-R1: اختناقات مسار الاعتماد (قراءة فقط، ضمن نطاق المستخدم) =====
+// تقرير عالق = حالته انتظار اعتماد (Submitted/ApprovedByDirectManager/ApprovedByNextLevel/Escalated)
+// و CurrentApproverId محدَّد و توجد خطوة اعتماد Pending قائمة. عمر المرحلة = الآن − ApprovalStep.CreatedAtUtc
+// (أعلى Level Pending). تصنيف المرحلة من دور المعتمِد الحالي: قائد فريق(team_leader,SLA 24h) / مدير(manager,48h)
+// / الإدارة العليا(senior_management: GM/CEO/Admin/CeoSupport, 72h). متأخر = العمر > SLA. النطاق عبر ScopeResolver
+// (الموظف يرى تقاريره العالقة فقط، القائد فريقه، المدير إدارته، الإدارة العليا الكل). لا توسيع صلاحيات، بلا migration.
+
+/// <summary>ملخّص اختناقات مسار الاعتماد ضمن نطاق المستخدم (أرقام مجمّعة + أبرز مرحلة/معتمِد).</summary>
+public record WorkflowBottlenecksSummaryReport(
+    int TotalPending,
+    int OverduePending,
+    double OldestPendingAgeHours,
+    double AverageStageAgeHours,
+    // أكثر مرحلة بها تقارير عالقة (المفتاح + التسمية)؛ null إن لا يوجد عالق.
+    string? StageWithMostPending,
+    string? StageWithMostPendingLabel,
+    int StageWithMostPendingCount,
+    // أكثر معتمِد لديه تقارير عالقة ضمن النطاق؛ null إن لا يوجد عالق.
+    Guid? ReviewerWithMostPending,
+    string? ReviewerWithMostPendingName,
+    int ReviewerWithMostPendingCount);
+
+/// <summary>صفّ توزيع الاختناقات حسب المرحلة (قائد فريق/مدير/الإدارة العليا).</summary>
+public record WorkflowBottleneckStageRow(
+    string StageKey,
+    string StageLabel,
+    int PendingCount,
+    int OverdueCount,
+    double AverageAgeHours,
+    double OldestAgeHours,
+    int SlaHours);
+
+/// <summary>توزيع الاختناقات حسب المرحلة ضمن نطاق المستخدم.</summary>
+public record WorkflowBottlenecksByStageReport(
+    IReadOnlyList<WorkflowBottleneckStageRow> Rows);
+
+/// <summary>صفّ توزيع الاختناقات حسب المعتمِد الحالي ضمن النطاق.</summary>
+public record WorkflowBottleneckApproverRow(
+    Guid ApproverId,
+    string ApproverName,
+    string ApproverRole,
+    string ApproverRoleLabel,
+    string StageKey,
+    string StageLabel,
+    int PendingCount,
+    int OverdueCount,
+    double AverageAgeHours,
+    double OldestAgeHours);
+
+/// <summary>توزيع الاختناقات حسب المعتمِد الحالي ضمن نطاق المستخدم.</summary>
+public record WorkflowBottlenecksByApproverReport(
+    IReadOnlyList<WorkflowBottleneckApproverRow> Rows);
+
+/// <summary>صفّ تفصيلي لتقرير عالق واحد — وصف موضع التقرير في المسار وعمره مقابل SLA (بلا أيّ محتوى للتقرير).</summary>
+public record WorkflowBottleneckDetailRow(
+    Guid SubmissionId,
+    string TemplateTitle,
+    string SubmitterName,
+    string? TeamName,
+    string? DepartmentName,
+    Guid? CurrentApproverId,
+    string? CurrentApproverName,
+    string? CurrentApproverRole,
+    string StageKey,
+    string StageLabel,
+    SubmissionStatus Status,
+    string StatusLabel,
+    DateTime? SubmittedAtUtc,
+    DateTime StageEnteredAtUtc,
+    double AgeHours,
+    int SlaHours,
+    bool IsOverdue);
+
+/// <summary>تفاصيل التقارير العالقة ضمن النطاق + الفلاتر الاختيارية (stage/teamId/departmentId/approverId/overdueOnly).</summary>
+public record WorkflowBottlenecksDetailsReport(
+    int Total,
+    int Overdue,
+    IReadOnlyList<WorkflowBottleneckDetailRow> Rows);

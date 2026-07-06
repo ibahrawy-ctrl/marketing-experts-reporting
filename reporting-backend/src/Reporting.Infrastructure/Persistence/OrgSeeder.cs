@@ -1,8 +1,11 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Reporting.Application.Common;
+using Reporting.Domain.Entities.EmployeeServices;
 using Reporting.Domain.Entities.Org;
+using Reporting.Domain.Entities.Templates;
 using Reporting.Domain.Enums;
 using Reporting.Infrastructure.Identity;
 
@@ -31,6 +34,29 @@ public static class OrgSeeder
         await SeedOrgStructureAsync(users, db);
         await SeedJobRolesAsync(db);
         await SeedJobRoleBindingsAsync(db);
+        await SeedBalancePoliciesAsync(db);
+    }
+
+    // ===== سياسة رصيد عامّة لسنة 2026 (بيئة التطوير فقط، عبر OrgSeeder) =====
+    // PermissionUnit=Count، حدّ شهري للأذونات=2، السماح بالرصيد السالب=true، عامّة (JobRoleId=null).
+    // idempotent: لا تُنشأ إن وُجدت سياسة عامّة لنفس السنة (الفهرس الفريد على (Year, JobRoleId)).
+    // لا تمسّ الإنتاج إطلاقًا — OrgSeeder لا يعمل إلا في Development.
+    private static async Task SeedBalancePoliciesAsync(AppDbContext db)
+    {
+        const int year = 2026;
+        var exists = await db.BalancePolicies.AnyAsync(p => p.Year == year && p.JobRoleId == null);
+        if (exists) return;
+
+        db.BalancePolicies.Add(new BalancePolicy
+        {
+            Year = year,
+            JobRoleId = null,
+            PermissionUnit = PermissionUnit.Count,
+            PermissionMonthlyLimit = 2,
+            PermissionAnnualLimit = null,
+            AllowNegativeBalance = true
+        });
+        await db.SaveChangesAsync();
     }
 
     // ===== ربط المستخدمين بالمسميات الوظيفية + ربط قالب B2C الفردي بدور المندوب =====
@@ -97,15 +123,46 @@ public static class OrgSeeder
             }
         }
 
-        // ربط قالب «تقرير مندوب مبيعات B2C الفردي» بدور مندوب B2C ليظهر لمندوبي B2C فقط.
+        // B2C-UAT-FIXPACK + Phase 7.1 — الجزء 1: تفعيل «تقرير مبيعات B2C — بيانات جديدة/قديمة» (قالب الجدولين)
+        // لمندوبي B2C بدل القالب أحادي الجدول القديم. قالب الجدولين يُربَط بدور SALES_B2C فيصبح القالب الأخصّ
+        // (JobRole tier) لمندوب B2C ⇒ يظهر له وحده (يُخفي العام). القالبان القديمان يُنقلان إلى حالة Legacy:
+        //  - «تقرير مندوب مبيعات B2C الفردي» (B2cReportSchema) — القديم جدًّا.
+        //  - «تقرير مبيعات B2C حسب الدورة» (B2cByCourseReportSchema) — أحادي الجدول، كان مُفعَّلًا سابقًا.
+        // Legacy = يُفكّ ربطه بالدور ويُعطَّل (IsActive=false + Archived) كي لا يظهر في إنشاء التقارير الجديدة
+        // ولا يتسرّب كقالب عام — دون حذفه (التقارير القديمة محفوظة عبر الإصدار).
+        // idempotent: التغيير يُطبَّق فقط عند اختلاف الحالة الحالية عن المستهدفة (يعمل ولو كانت قاعدة الاختبار مبذورة مسبقًا).
         if (Role("SALES_B2C") is { } b2cRoleId)
         {
-            var b2cTemplate = await db.ReportTemplates
-                .FirstOrDefaultAsync(t => t.Title == B2cReportSchema.TemplateTitle);
-            if (b2cTemplate is not null && b2cTemplate.JobRoleId is null)
+            var newB2cTemplate = await db.ReportTemplates
+                .Include(t => t.Versions).ThenInclude(v => v.Fields)
+                .FirstOrDefaultAsync(t => t.Title == B2cNewOldReportSchema.TemplateTitle);
+            if (newB2cTemplate is not null && newB2cTemplate.JobRoleId != b2cRoleId)
             {
-                b2cTemplate.JobRoleId = b2cRoleId;
+                newB2cTemplate.JobRoleId = b2cRoleId;
+                newB2cTemplate.Classification = TemplateClassification.Primary;
                 changed = true;
+            }
+
+            // Phase 7.1 — مواءمة أعمدة جدولَي القالب مع الـSchema (بعد حذف Lost/Lost Reason): القالب مزروع مسبقًا
+            // في القواعد الموجودة و TemplateSeeder يتخطّى القوالب الموجودة، لذا نحدّث ConfigJson هنا كي يتوقّف الجدولان
+            // عند Revenue. حذف عمودَي النهاية آمن (التجميع مفهرس بالاسم عبر Array.IndexOf) والقالب لم يُستخدم بعد.
+            if (newB2cTemplate is not null && ReconcileGridColumns(newB2cTemplate)) changed = true;
+
+            // القوالب B2C القديمة تُنقَل إلى Legacy (الفردي + أحادي الجدول حسب الدورة).
+            var legacyB2cTitles = new[] { B2cReportSchema.TemplateTitle, B2cByCourseReportSchema.TemplateTitle };
+            var legacyB2cTemplates = await db.ReportTemplates
+                .Where(t => legacyB2cTitles.Contains(t.Title))
+                .ToListAsync();
+            foreach (var legacyB2cTemplate in legacyB2cTemplates)
+            {
+                if (legacyB2cTemplate.JobRoleId is not null
+                    || legacyB2cTemplate.IsActive || legacyB2cTemplate.Status != TemplateStatus.Archived)
+                {
+                    legacyB2cTemplate.JobRoleId = null;
+                    legacyB2cTemplate.IsActive = false;
+                    legacyB2cTemplate.Status = TemplateStatus.Archived;
+                    changed = true;
+                }
             }
         }
 
@@ -258,6 +315,38 @@ public static class OrgSeeder
         }
 
         if (changed) await db.SaveChangesAsync();
+    }
+
+    // Phase 7.1 — مواءمة أعمدة جدولَي قالب «B2C بيانات جديدة/قديمة» مع الـSchema الحالي.
+    // القالب مزروع مسبقًا و TemplateSeeder يتخطّى القوالب الموجودة (skip-if-exists) فلا يُحدّث الأعمدة،
+    // لذا نُصلح ConfigJson لكل حقل TableGrid هنا كي يتوقّف الجدولان عند Revenue (بلا Lost/Lost Reason).
+    // التنسيق يطابق TemplateSeeder.BuildConfigJson تمامًا: JsonSerializer.Serialize(new { columns }) بلا خيارات.
+    // idempotent: يُرجِع true فقط عند اختلاف ConfigJson الحالي عن المستهدف.
+    private static bool ReconcileGridColumns(ReportTemplate template)
+    {
+        var newLeadsConfig = JsonSerializer.Serialize(new { columns = B2cNewOldReportSchema.NewLeadsColumns });
+        var oldCrmConfig = JsonSerializer.Serialize(new { columns = B2cNewOldReportSchema.OldCrmColumns });
+
+        var changed = false;
+        foreach (var version in template.Versions)
+        {
+            foreach (var field in version.Fields)
+            {
+                string? desired = field.Label switch
+                {
+                    var l when l == B2cNewOldReportSchema.NewLeadsTableLabel => newLeadsConfig,
+                    var l when l == B2cNewOldReportSchema.OldCrmTableLabel => oldCrmConfig,
+                    _ => null,
+                };
+                if (desired is null) continue;
+                if (field.ConfigJson != desired)
+                {
+                    field.ConfigJson = desired;
+                    changed = true;
+                }
+            }
+        }
+        return changed;
     }
 
     // ===== المسميات الوظيفية (idempotent على وجود أي مسمى) =====

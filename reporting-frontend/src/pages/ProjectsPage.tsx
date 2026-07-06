@@ -1,8 +1,14 @@
 // صفحة المشاريع — قائمة شاملة بكل المشاريع ضمن النطاق مع فلاتر (الحالة/الخدمة/العميل).
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useProjects } from '../lib/useClients';
-import { Card, Badge, Select, StatCard, EmptyState } from '../components/ui';
+import {
+  useProjects,
+  useArchiveProject,
+  useReactivateProject,
+  useDeleteProject,
+} from '../lib/useClients';
+import { useAuth } from '../lib/auth';
+import { Card, Badge, Select, Button, StatCard, Alert, EmptyState } from '../components/ui';
 import { LoadingState, QueryError } from '../components/states';
 import {
   projectStatusLabel,
@@ -10,19 +16,24 @@ import {
   serviceTypeLabel,
   formatDate,
 } from '../lib/format';
-import type { ProjectStatus, ServiceType } from '../types/api';
+import { apiErrorMessage } from '../lib/api';
+import type { ProjectDto, ProjectStatus, ServiceType } from '../types/api';
 
 const SERVICE_TYPES: ServiceType[] = ['Social', 'Seo', 'MediaBuying', 'Website', 'Video', 'Branding', 'Other'];
 
+// عرض القائمة: النشط (غير المؤرشفة) / المؤرشف (Closed فقط) / الكل.
+type ProjectView = 'active' | 'archived' | 'all';
+
 export default function ProjectsPage() {
+  const { canManageClients } = useAuth();
+  const [view, setView] = useState<ProjectView>('active');
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | ''>('');
   const [serviceFilter, setServiceFilter] = useState<ServiceType | ''>('');
-  const [includeClosed, setIncludeClosed] = useState(false);
 
   const projects = useProjects({
-    status: statusFilter || undefined,
+    status: view === 'archived' ? 'Closed' : statusFilter || undefined,
     serviceType: serviceFilter || undefined,
-    includeClosed,
+    includeClosed: view !== 'active',
   });
 
   if (projects.isLoading) return <LoadingState label="يتم تحميل المشاريع…" />;
@@ -56,18 +67,25 @@ export default function ProjectsPage() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <Select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as ProjectStatus | '')}
-          className="max-w-xs"
-        >
-          <option value="">كل الحالات</option>
-          {(['Active', 'Paused', 'Completed', 'AtRisk', 'Closed'] as ProjectStatus[]).map((s) => (
-            <option key={s} value={s}>
-              {projectStatusLabel[s]}
-            </option>
-          ))}
+        <Select value={view} onChange={(e) => setView(e.target.value as ProjectView)} className="max-w-xs">
+          <option value="active">النشط</option>
+          <option value="archived">المؤرشف</option>
+          <option value="all">الكل</option>
         </Select>
+        {view !== 'archived' && (
+          <Select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as ProjectStatus | '')}
+            className="max-w-xs"
+          >
+            <option value="">كل الحالات</option>
+            {(['Active', 'Paused', 'Completed', 'AtRisk'] as ProjectStatus[]).map((s) => (
+              <option key={s} value={s}>
+                {projectStatusLabel[s]}
+              </option>
+            ))}
+          </Select>
+        )}
         <Select
           value={serviceFilter}
           onChange={(e) => setServiceFilter(e.target.value as ServiceType | '')}
@@ -80,10 +98,7 @@ export default function ProjectsPage() {
             </option>
           ))}
         </Select>
-        <label className="flex items-center gap-2 text-sm text-ink-2">
-          <input type="checkbox" checked={includeClosed} onChange={(e) => setIncludeClosed(e.target.checked)} />
-          إظهار المغلقة
-        </label>
+        <span className="text-xs text-ink-3">«مؤرشف» يقابل الحالة Closed داخليًا.</span>
       </div>
 
       {rows.length === 0 ? (
@@ -104,42 +119,120 @@ export default function ProjectsPage() {
                 <th className="px-3 py-2.5 font-semibold">البداية</th>
                 <th className="px-3 py-2.5 font-semibold">النهاية</th>
                 <th className="px-3 py-2.5 font-semibold"></th>
+                {canManageClients && <th className="px-3 py-2.5 font-semibold">إجراءات</th>}
               </tr>
             </thead>
             <tbody>
               {rows.map((p) => (
-                <tr key={p.id} className="border-b border-line last:border-0 hover:bg-offwhite">
-                  <td className="px-3 py-2.5 font-semibold text-navy">{p.name}</td>
-                  <td className="px-3 py-2.5 text-ink-2">
-                    {p.clientName ? (
-                      <Link to={`/app/clients/${p.clientId}`} className="hover:underline">
-                        {p.clientName}
-                      </Link>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                  <td className="px-3 py-2.5 text-ink-2">{serviceTypeLabel[p.serviceType]}</td>
-                  <td className="px-3 py-2.5">
-                    <Badge tone={projectStatusTone(p.status)}>{projectStatusLabel[p.status]}</Badge>
-                  </td>
-                  <td className="px-3 py-2.5 text-ink-2">{p.ownerTeamName ?? '—'}</td>
-                  <td className="px-3 py-2.5 text-ink-2">{formatDate(p.startDate)}</td>
-                  <td className="px-3 py-2.5 text-ink-2">{formatDate(p.endDate)}</td>
-                  <td className="px-3 py-2.5">
-                    <Link
-                      to={`/app/projects/${p.id}`}
-                      className="text-sm font-semibold text-orange-600 hover:underline"
-                    >
-                      تفاصيل
-                    </Link>
-                  </td>
-                </tr>
+                <ProjectRow key={p.id} project={p} canManage={canManageClients} />
               ))}
             </tbody>
           </table>
         </Card>
       )}
     </div>
+  );
+}
+
+function ProjectRow({ project: p, canManage }: { project: ProjectDto; canManage: boolean }) {
+  const archive = useArchiveProject();
+  const reactivate = useReactivateProject();
+  const del = useDeleteProject();
+  const [err, setErr] = useState<string | null>(null);
+  const isArchived = p.status === 'Closed';
+  const busy = archive.isPending || reactivate.isPending || del.isPending;
+
+  async function run(action: () => Promise<unknown>, fallback: string) {
+    setErr(null);
+    try {
+      await action();
+    } catch (e) {
+      setErr(apiErrorMessage(e, fallback));
+    }
+  }
+
+  return (
+    <>
+      <tr className="border-b border-line last:border-0 hover:bg-offwhite">
+        <td className="px-3 py-2.5 font-semibold text-navy">{p.name}</td>
+        <td className="px-3 py-2.5 text-ink-2">
+          {p.clientName ? (
+            <Link to={`/app/clients/${p.clientId}`} className="hover:underline">
+              {p.clientName}
+            </Link>
+          ) : (
+            '—'
+          )}
+        </td>
+        <td className="px-3 py-2.5 text-ink-2">{serviceTypeLabel[p.serviceType]}</td>
+        <td className="px-3 py-2.5">
+          <Badge tone={projectStatusTone(p.status)}>{projectStatusLabel[p.status]}</Badge>
+        </td>
+        <td className="px-3 py-2.5 text-ink-2">{p.ownerTeamName ?? '—'}</td>
+        <td className="px-3 py-2.5 text-ink-2">{formatDate(p.startDate)}</td>
+        <td className="px-3 py-2.5 text-ink-2">{formatDate(p.endDate)}</td>
+        <td className="px-3 py-2.5">
+          <Link to={`/app/projects/${p.id}`} className="text-sm font-semibold text-orange-600 hover:underline">
+            تفاصيل
+          </Link>
+        </td>
+        {canManage && (
+          <td className="px-3 py-2.5">
+            <div className="flex flex-wrap gap-1.5">
+              {!isArchived ? (
+                <Button
+                  variant="ghost"
+                  className="!px-2 !py-1 text-xs"
+                  disabled={busy}
+                  onClick={() => {
+                    if (window.confirm(`أرشفة المشروع «${p.name}»؟ يمكن إعادة تفعيله لاحقًا.`))
+                      run(() => archive.mutateAsync(p.id), 'تعذّرت الأرشفة.');
+                  }}
+                >
+                  أرشفة
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    variant="ghost"
+                    className="!px-2 !py-1 text-xs"
+                    disabled={busy}
+                    onClick={() => run(() => reactivate.mutateAsync(p.id), 'تعذّرت إعادة التفعيل.')}
+                  >
+                    إعادة تفعيل
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="!px-2 !py-1 text-xs !text-alert"
+                    disabled={busy || !p.canHardDelete}
+                    title={!p.canHardDelete ? p.deleteBlockReason ?? undefined : undefined}
+                    onClick={() => {
+                      if (window.confirm(`حذف المشروع «${p.name}» نهائيًا؟ لا يمكن التراجع.`))
+                        run(() => del.mutateAsync(p.id), 'تعذّر الحذف النهائي.');
+                    }}
+                  >
+                    حذف نهائي
+                  </Button>
+                </>
+              )}
+            </div>
+          </td>
+        )}
+      </tr>
+      {isArchived && !p.canHardDelete && p.deleteBlockReason && canManage && (
+        <tr>
+          <td colSpan={9} className="px-3 pb-2 pt-0">
+            <p className="text-xs text-ink-2">{p.deleteBlockReason}</p>
+          </td>
+        </tr>
+      )}
+      {err && (
+        <tr>
+          <td colSpan={9} className="px-3 pb-2 pt-0">
+            <Alert tone="alert">{err}</Alert>
+          </td>
+        </tr>
+      )}
+    </>
   );
 }

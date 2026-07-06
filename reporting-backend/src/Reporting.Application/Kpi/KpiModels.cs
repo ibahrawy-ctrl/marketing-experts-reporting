@@ -67,6 +67,70 @@ public record KpiTemplateFilter(
     bool? IsActive = null,
     Guid? SubjectUserId = null);
 
+// ===== إسناد قوالب KPI (Phase T1) — رؤية/اختيار قالب فقط =====
+// يحاكي إسناد قوالب التقارير: مستويات Employee/JobRole/Team/Department + Include/Exclude،
+// مع أولوية موحَّدة: استثناء موظّف > إسناد موظّف > مسمّى > فريق > إدارة > عام (JobRoleId == null).
+// لا يمسّ التقييمات القائمة (مرتبطة بنسخة مجمّدة) ولا منطق الاعتماد/الاحتساب.
+
+// مستخدم ضمن تغطية قالب KPI: مرتبط (Matched) أو مستثنى (Excluded) مع سبب الربط أو الاستثناء.
+public record KpiTemplateAssignmentUserDto(
+    Guid UserId,
+    string FullName,
+    string? Email,
+    Guid? JobRoleId,
+    string? JobRoleName,
+    bool IsActive,
+    // أسباب الاستثناء: excludedBecauseInactive / excludedBecauseMoreSpecificTemplateExists /
+    // excludedBecauseTemplateNotAssignable / excludedManually
+    string? ExclusionReason,
+    // سبب الربط للمرتبطين: matchedByUser / matchedByJobRole / matchedByTeam / matchedByDepartment / matchedByGeneral
+    string? MatchReason = null,
+    // انتماء تنظيمي (قراءة فقط) لتمكين أزرار الاستثناء السريع على مستوى الفريق/الإدارة في الواجهة.
+    Guid? TeamId = null,
+    string? TeamName = null,
+    Guid? DepartmentId = null,
+    string? DepartmentName = null);
+
+// صفّ إسناد/استثناء صريح لقالب KPI (للعرض والإدارة في تبويب الإسناد).
+public record KpiTemplateAssignmentRowDto(
+    Guid Id,
+    TemplateAssignmentScope ScopeType,
+    Guid ScopeId,
+    string? ScopeName,
+    TemplateAssignmentKind Kind,
+    string? Notes,
+    bool IsActive,
+    DateTime CreatedAtUtc);
+
+// تغطية قالب KPI: المعلومات + المرتبطون + المستثنون بأسبابهم + الإسنادات/الاستثناءات الصريحة.
+// تطبّق نفس أولوية الاختيار بالخادم (Employee→JobRole→Team→Department→General، Exclude يتفوّق)
+// ضمن نفس الدورية (Cadence) عند موازنة الأخصّية عبر القوالب.
+public record KpiTemplateAssignmentsDto(
+    Guid TemplateId,
+    string Title,
+    Guid? JobRoleId,
+    string? JobRoleName,
+    KpiCadence Cadence,
+    TemplateStatus Status,
+    bool IsActive,
+    // قابل للاختيار فعليًّا في إنشاء التقييمات (منشور ونشط).
+    bool IsAssignable,
+    // قالب متخصص مربوط بمسمّى وظيفي؟ (عكسه: قالب عام بلا مسمّى).
+    bool IsRoleSpecific,
+    IReadOnlyList<KpiTemplateAssignmentUserDto> MatchedUsers,
+    IReadOnlyList<KpiTemplateAssignmentUserDto> ExcludedUsers,
+    IReadOnlyList<KpiTemplateAssignmentRowDto> Assignments);
+
+// إنشاء إسناد/استثناء صريح لقالب KPI على مستوى (موظّف/مسمّى/فريق/إدارة).
+public record CreateKpiAssignmentRequest(
+    TemplateAssignmentScope ScopeType,
+    Guid ScopeId,
+    TemplateAssignmentKind Kind,
+    string? Notes = null);
+
+// تعطيل/تفعيل إسناد قائم + تعديل الملاحظة.
+public record UpdateKpiAssignmentRequest(bool IsActive, string? Notes = null);
+
 // ===== تقييمات KPI =====
 
 public record KpiResultDto(
@@ -75,6 +139,7 @@ public record KpiResultDto(
     decimal Weight,
     decimal? TargetValue,
     string? Unit,
+    KpiCalcMethod CalcMethod,
     decimal? RawValue,
     decimal? Score,
     string? Note);
@@ -157,3 +222,46 @@ public record KpiAggregateDto(
     string ScopeType,
     bool CanViewRows,
     IReadOnlyList<KpiWeeklyPointDto> Weeks);
+
+// ===== تصدير KPI للمالية (KPI-FIN1) — قراءة/تصدير فقط على مستوى الشركة =====
+// صفّ لكل تقييم KPI أسبوعي معتمَد يقع داخل الربع المختار (لا متوسط ربع سنوي). إعلامي بحت:
+// لا يحسب أو يصرف أيّ مستحقات، ولا يغيّر حالة أيّ تقييم. النطاق مفروض بالسياسة (بلا ScopeResolver).
+// «تاريخ آخر تحديث/اعتماد» = UpdatedAtUtc (لا يوجد ApprovedAtUtc بعد؛ تاريخ الاعتماد الدقيق يحتاج مرحلة لاحقة).
+
+/// <summary>مُرشِّحات تصدير KPI للمالية: السنة والربع إلزاميان، والإدارة/الفريق/الحالة اختيارية.</summary>
+public record KpiFinanceExportFilter(
+    int Year,
+    int Quarter,
+    Guid? DepartmentId = null,
+    Guid? TeamId = null,
+    // الحالة المسموح تصديرها: Approved افتراضيًّا، أو Closed. أيّ حالة أخرى تُرفَض (kpi_finance.status_invalid).
+    KpiEvaluationStatus? Status = null);
+
+/// <summary>صفّ تصدير KPI للمالية: تقييم أسبوعي معتمَد واحد داخل الربع (لا تجميع).</summary>
+public record KpiFinanceExportRowDto(
+    Guid EvaluationId,
+    Guid SubjectUserId,
+    string EmployeeName,
+    string? DepartmentName,
+    string? TeamName,
+    string? JobRoleName,
+    PeriodType PeriodType,
+    string PeriodKey,
+    int Year,
+    int Quarter,
+    string TemplateTitle,
+    decimal? TotalScore,
+    KpiEvaluationStatus Status,
+    // UpdatedAtUtc — يُعرَض في الواجهة/الـCSV بعنوان «تاريخ آخر تحديث / اعتماد».
+    DateTime LastUpdatedAtUtc);
+
+/// <summary>نتيجة معاينة تصدير KPI للمالية: وصف الفترة + عدد الصفوف + الصفوف.</summary>
+public record KpiFinanceExportDto(
+    int Year,
+    int Quarter,
+    string PeriodLabel,
+    DateOnly RangeStart,
+    DateOnly RangeEnd,
+    KpiEvaluationStatus Status,
+    int RowCount,
+    IReadOnlyList<KpiFinanceExportRowDto> Rows);

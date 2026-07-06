@@ -15,6 +15,14 @@ import {
   CeoSupportDashboard,
 } from './RoleDashboards';
 import { AdminHome } from './AdminHome';
+import {
+  HrHomeDashboard,
+  FinanceHomeDashboard,
+  AccountPortfolioHomeDashboard,
+} from './RoleHomeDashboards';
+import { DashboardHero, HeroChip } from '../components/dashboard';
+import { ReportDueSection } from '../components/ReportDueCards';
+import type { IconName } from '../components/icons';
 
 // دلتا KPI = الفرق بين آخر نقطتين في اتجاه KPI (للبطاقات ذات شارة المقارنة).
 function kpiDeltaFrom(dash: DashboardDto): { value: number; up: boolean } | null {
@@ -26,7 +34,7 @@ function kpiDeltaFrom(dash: DashboardDto): { value: number; up: boolean } | null
 }
 
 export default function HomePage() {
-  const { user } = useAuth();
+  const { user, hasAnyRole } = useAuth();
 
   const { data: dash, isLoading, isError, refetch } = useQuery({
     queryKey: ['dashboard-me'],
@@ -49,10 +57,45 @@ export default function HomePage() {
   const roles = user?.roles.map((r) => roleLabel[r]).join(' · ');
   const kpiDelta = kpiDeltaFrom(dash);
 
+  // الأدوار التي يصنّفها الخادم Employee (لغياب dashboardType مخصّص لها: HR/المالية/محفظة
+  // الحسابات) لكن لها سطح عمل مستقل ⇒ نوجّهها للوحة الملائمة بالأولوية، وإلا لوحة الموظّف
+  // الافتراضية. الخادم يُرجِع dashboardType='Employee' لهذه الأدوار، لذا الفحص يكون داخل
+  // حالة Employee تحديدًا (لا في default). مصدر البيانات والصلاحية يبقى الخادم؛ تفرّع عرضٍ فقط.
+  const resolveEmployeeHome = () => {
+    if (hasAnyRole('HR')) return <HrHomeDashboard />;
+    if (hasAnyRole('FinanceManager', 'Accountant')) return <FinanceHomeDashboard />;
+    if (hasAnyRole('AccountPortfolioReader')) return <AccountPortfolioHomeDashboard />;
+    return <EmployeeDashboard dash={dash} kpiDelta={kpiDelta} />;
+  };
+
+  // عنوان/أيقونة/وصف الترويسة (Hero) حسب نوع اللوحة، ولأدوار Employee حسب الدور الفعليّ.
+  const heroMeta = (): { title: string; icon: IconName; subtitle: string } => {
+    switch (dash.dashboardType) {
+      case 'TeamLeader':
+        return { title: 'لوحة قائد الفريق', icon: 'teams', subtitle: 'متابعة التزام فريقك واعتماد تقاريرهم' };
+      case 'Manager':
+        return { title: 'لوحة مدير القسم', icon: 'departments', subtitle: 'أداء القسم وسير الاعتماد والاختناقات' };
+      case 'GM':
+        return { title: 'لوحة المدير العام', icon: 'analytics', subtitle: 'نظرة شاملة على الأقسام والالتزام والحوكمة' };
+      case 'CEO':
+        return { title: 'لوحة الرئيس التنفيذي', icon: 'analytics', subtitle: 'المؤشّرات التنفيذية والمخاطر والقرارات' };
+      case 'Governance':
+        return { title: 'لوحة الحوكمة والمتابعة', icon: 'governance', subtitle: 'متابعة الالتزام والحوكمة دون اعتماد فنّي' };
+      default:
+        if (hasAnyRole('HR')) return { title: 'لوحة الموارد البشرية', icon: 'users', subtitle: 'طلبات الموظفين والأرصدة وبيانات الفريق' };
+        if (hasAnyRole('FinanceManager', 'Accountant'))
+          return { title: 'لوحة المالية', icon: 'reports', subtitle: 'تأثير الإجازات على الرواتب وتصدير KPI' };
+        if (hasAnyRole('AccountPortfolioReader'))
+          return { title: 'لوحة محفظة العملاء', icon: 'clients', subtitle: 'عملاؤك ومشاريعك ضمن نطاقك' };
+        return { title: 'لوحة الموظف', icon: 'home', subtitle: 'تقاريرك ومؤشّراتك ومهامك الشخصية' };
+    }
+  };
+  const hero = heroMeta();
+
   const body = (() => {
     switch (dash.dashboardType) {
       case 'Employee':
-        return <EmployeeDashboard dash={dash} kpiDelta={kpiDelta} />;
+        return resolveEmployeeHome();
       case 'TeamLeader':
         return <TeamLeaderDashboard dash={dash} />;
       case 'Manager':
@@ -64,17 +107,25 @@ export default function HomePage() {
       case 'Governance':
         return <CeoSupportDashboard dash={dash} />;
       default:
-        return <EmployeeDashboard dash={dash} kpiDelta={kpiDelta} />;
+        // أمان احتياطيّ: أيّ dashboardType غير متوقّع يتبع نفس منطق Employee fallback.
+        return resolveEmployeeHome();
     }
   })();
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="font-semibold text-orange">{roles}</p>
-        <h1 className="text-2xl font-bold text-navy">أهلاً، {user?.fullName}</h1>
-        <p className="mt-1 text-ink-2">نظام تقارير الأداء والتشغيل الداخلي — {dash.period.label}.</p>
-      </div>
+      <DashboardHero
+        title={hero.title}
+        subtitle={`أهلاً، ${user?.fullName} — ${hero.subtitle}`}
+        icon={hero.icon}
+        badges={
+          <>
+            {roles && <HeroChip>{roles}</HeroChip>}
+            <HeroChip>الفترة: {dash.period.label}</HeroChip>
+          </>
+        }
+      />
+      <ReportDueSection />
       {body}
     </div>
   );

@@ -33,4 +33,17 @@ public interface ILeaveRequestService
 
     /// <summary>إعادة الطلب للموظّف للتعديل (من أي مراجِع ضمن نطاقه).</summary>
     Task<Result<LeaveRequestDto>> ReturnAsync(Guid id, LeaveReturnRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// إبطال إجازة/إذن معتمَد نهائيًّا (V1.1) — مسار محروس للإدارة/HR (Roles.BalanceManagers). سبب إلزامي.
+    /// ينقل HrApproved → Cancelled ويُنشئ حركة عكس (Reversal) للخصم الآلي في نفس المعاملة. idempotent.
+    /// </summary>
+    Task<Result<LeaveRequestDto>> RevokeApprovedAsync(Guid id, LeaveRevokeRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// معالجة الطلبات العالقة لقادة الفِرق (T-WF1، Admin فقط). تنقل كل طلب (مقدّمه قائد فريق،
+    /// Status=Submitted، CurrentStep=TeamLeader، غير طلب موارد بشرية، لم يُراجَع بعد) إلى
+    /// TeamLeaderApproved/Manager مع حدث team_leader_step_skipped. idempotent (لا تمسّ المعالَج سابقًا).
+    /// </summary>
+    Task<Result<TeamLeaderStuckRemediationResultDto>> RemediateTeamLeaderStuckRequestsAsync(CancellationToken ct = default);
 }

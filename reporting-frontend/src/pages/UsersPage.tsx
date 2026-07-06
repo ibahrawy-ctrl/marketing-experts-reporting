@@ -10,12 +10,14 @@ import {
   useCreateUser,
   useUpdateUser,
   useDeleteUser,
+  useResetUserPassword,
   useAddTeamMember,
   useRemoveTeamMember,
   useCreateTeam,
   useUpdateTeam,
   useDeleteTeam,
 } from '../lib/useDirectory';
+import { usePositions, useUserPositions, useAssignPosition, useRevokePosition } from '../lib/usePositions';
 import { Card, Badge, Select, Input, StatCard, Button, Alert, Field } from '../components/ui';
 import { LoadingState, QueryError, TableSkeleton } from '../components/states';
 import { SectionTitle } from '../components/dashboard';
@@ -23,7 +25,15 @@ import { ManagementNotesPanel } from '../components/ManagementNotesPanel';
 import { roleLabel } from '../lib/format';
 import { apiErrorMessage } from '../lib/api';
 import { useAuth } from '../lib/auth';
-import type { Role, RoleAccessDto, DirectoryUserDto, DepartmentDto, TeamDto } from '../types/api';
+import type { Role, RoleAccessDto, CapabilityStatus, DirectoryUserDto, DepartmentDto, TeamDto } from '../types/api';
+
+// خريطة حالة القدرة ⟵ لون الشارة + التسمية العربية (Phase A — عرض فقط).
+const STATUS_META: Record<CapabilityStatus, { label: string; tone: 'success' | 'muted' | 'gold' | 'orange' }> = {
+  Active: { label: 'مُفعّلة', tone: 'success' },
+  NotGranted: { label: 'غير ممنوحة', tone: 'muted' },
+  ProposedLater: { label: 'مقترح لاحقًا', tone: 'gold' },
+  SensitiveDecision: { label: 'قرار مستقل', tone: 'orange' },
+};
 
 const roleTone: Partial<Record<Role, 'navy' | 'orange' | 'success' | 'gold' | 'muted'>> = {
   Admin: 'orange',
@@ -48,9 +58,14 @@ const scopeTone: Record<string, 'orange' | 'navy' | 'success' | 'gold' | 'muted'
 export default function UsersPage() {
   const { user, hasAnyRole, canApprove, canViewGovernance } = useAuth();
   const isAdmin = hasAnyRole('Admin');
+  // إدارة المستخدمين الكاملة (إنشاء/تعديل/أدوار/تعطيل/حذف) عبر «إدارة فريق العمل» — Admin + CEO (GOV-R1) تطابق سياسة UserManagement بالخادم.
+  // ملاحظة: TeamManager ومحرّر المناصب و actorIsAdmin يبقون على isAdmin الصارم (خارج نطاق GOV-R1 / سياسات Admin-only).
+  const canManageUsers = hasAnyRole('Admin', 'CEO');
+  // إعادة تعيين كلمات المرور: Admin + CEO + CeoSupport (GOV-R1) — تطابق سياسة UserPasswordReset بالخادم. حساب Admin لا يُعاد ضبطه إلا بفاعل Admin (حارس الخدمة).
+  const canResetPassword = hasAnyRole('Admin', 'CEO', 'CeoSupport');
   // من يملك صلاحية إدارية (اعتماد أو حوكمة) يستطيع كتابة ملاحظات إدارية على ملف الموظف.
   const canManageNotes = canApprove || canViewGovernance;
-  const showActions = isAdmin || canManageNotes;
+  const showActions = canManageUsers || canManageNotes || canResetPassword;
   const users = useDirectoryUsers(true);
   const teams = useTeams();
   const departments = useDepartments();
@@ -60,7 +75,7 @@ export default function UsersPage() {
   const [deptFilter, setDeptFilter] = useState('');
   const [activeFilter, setActiveFilter] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editMode, setEditMode] = useState<'roles' | 'data' | 'notes'>('roles');
+  const [editMode, setEditMode] = useState<'roles' | 'data' | 'notes' | 'reset' | 'positions'>('roles');
   const [showAdd, setShowAdd] = useState(false);
 
   if (users.isLoading || teams.isLoading) return <LoadingState label="يتم تحميل المستخدمين…" />;
@@ -90,7 +105,7 @@ export default function UsersPage() {
   const activeCount = allUsers.filter((u) => u.isActive).length;
   const roleCount = (r: Role) => allUsers.filter((u) => u.roles.includes(r)).length;
 
-  const openEditor = (id: string, mode: 'roles' | 'data' | 'notes') => {
+  const openEditor = (id: string, mode: 'roles' | 'data' | 'notes' | 'reset' | 'positions') => {
     if (editingId === id && editMode === mode) {
       setEditingId(null);
     } else {
@@ -104,7 +119,7 @@ export default function UsersPage() {
       <div>
         <h1 className="text-2xl font-bold text-navy">المستخدمون والأدوار</h1>
         <p className="mt-1 text-sm text-ink-2">
-          دليل المستخدمين وأدوارهم وصلاحياتهم ونطاق رؤيتهم — {isAdmin ? 'يمكنك إضافة وتعديل وحذف المستخدمين وتوزيع الصلاحيات.' : 'عرض فقط.'}
+          دليل المستخدمين وأدوارهم وصلاحياتهم ونطاق رؤيتهم — {canManageUsers ? 'يمكنك إضافة وتعديل وحذف المستخدمين وتوزيع الصلاحيات.' : 'عرض فقط.'}
         </p>
       </div>
 
@@ -115,47 +130,16 @@ export default function UsersPage() {
         <StatCard label="قادة فرق" value={roleCount('TeamLeader')} />
       </div>
 
-      {/* مرجع الصلاحيات ونطاق الرؤية لكل دور */}
+      {/* مرجع الصلاحيات ونطاق الرؤية لكل دور — مصفوفة كاملة تعكس السياسات الفعلية (عرض فقط) */}
       <Card>
         <SectionTitle
           title="الصلاحيات ونطاق الرؤية لكل دور"
-          hint="مَن يرى ماذا وما الذي يستطيع فعله — مرجع موحّد"
+          hint="مصفوفة كاملة تعكس الحقيقة الحالية في النظام — عرض فقط، لا يُغيّر أي تفويض"
         />
         {matrix.isLoading ? (
           <TableSkeleton rows={5} cols={4} />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-right text-sm">
-              <thead className="border-b border-line text-xs text-ink-2">
-                <tr>
-                  <th className="px-2 py-2 font-semibold">الدور</th>
-                  <th className="px-2 py-2 font-semibold">نطاق الرؤية</th>
-                  <th className="px-2 py-2 font-semibold">الصلاحيات</th>
-                  <th className="px-2 py-2 font-semibold">عدد المستخدمين</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(matrix.data ?? []).map((m) => (
-                  <tr key={m.role} className="border-b border-line last:border-0 align-top">
-                    <td className="px-2 py-3">
-                      <Badge tone={roleTone[m.role] ?? 'muted'}>{m.roleLabelAr}</Badge>
-                    </td>
-                    <td className="px-2 py-3">
-                      <Badge tone={scopeTone[m.scopeType] ?? 'muted'}>{m.scopeDescriptionAr}</Badge>
-                    </td>
-                    <td className="px-2 py-3">
-                      <div className="flex flex-wrap gap-1">
-                        {m.permissionLabelsAr.map((p) => (
-                          <span key={p} className="rounded-md bg-navy-50 px-2 py-0.5 text-xs text-navy">{p}</span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-2 py-3 text-ink-2">{roleCount(m.role)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <RoleCapabilityMatrix matrix={matrix.data ?? []} roleCount={roleCount} />
         )}
       </Card>
 
@@ -165,14 +149,14 @@ export default function UsersPage() {
       <Card>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <SectionTitle title={`المستخدمون (${list.length})`} />
-          {isAdmin && (
+          {canManageUsers && (
             <Button onClick={() => setShowAdd((s) => !s)}>
               {showAdd ? 'إغلاق' : '+ إضافة مستخدم'}
             </Button>
           )}
         </div>
 
-        {isAdmin && showAdd && (
+        {canManageUsers && showAdd && (
           <div className="mb-4 rounded-lg border border-line bg-offwhite p-4">
             <AddUserForm
               teams={teams.data ?? []}
@@ -247,7 +231,7 @@ export default function UsersPage() {
                       {showActions && (
                         <td className="px-2 py-2">
                           <div className="flex flex-wrap gap-2 text-sm font-semibold">
-                            {isAdmin && (
+                            {canManageUsers && (
                               <>
                                 <button
                                   onClick={() => openEditor(u.id, 'data')}
@@ -263,6 +247,15 @@ export default function UsersPage() {
                                 </button>
                               </>
                             )}
+                            {/* المناصب المرنة = سياسة Admin-only بالخادم؛ تبقى للأدمن فقط (خارج نطاق GOV-R1). */}
+                            {isAdmin && (
+                              <button
+                                onClick={() => openEditor(u.id, 'positions')}
+                                className="text-navy hover:underline"
+                              >
+                                المناصب
+                              </button>
+                            )}
                             {canManageNotes && (
                               <button
                                 onClick={() => openEditor(u.id, 'notes')}
@@ -271,7 +264,15 @@ export default function UsersPage() {
                                 ملاحظات
                               </button>
                             )}
-                            {isAdmin && <DeleteUserButton target={u} isSelf={u.id === user?.userId} />}
+                            {canResetPassword && (
+                              <button
+                                onClick={() => openEditor(u.id, 'reset')}
+                                className="text-orange-600 hover:underline"
+                              >
+                                إعادة تعيين كلمة المرور
+                              </button>
+                            )}
+                            {canManageUsers && <DeleteUserButton target={u} isSelf={u.id === user?.userId} />}
                           </div>
                         </td>
                       )}
@@ -285,14 +286,22 @@ export default function UsersPage() {
                               entityId={u.id}
                               title={`الملاحظات الإدارية على ${u.fullName}`}
                             />
-                          ) : editMode === 'roles' && isAdmin ? (
+                          ) : editMode === 'reset' && canResetPassword ? (
+                            <ResetPasswordEditor
+                              target={u}
+                              actorIsAdmin={isAdmin}
+                              onDone={() => setEditingId(null)}
+                            />
+                          ) : editMode === 'positions' && isAdmin ? (
+                            <UserPositionsEditor target={u} />
+                          ) : editMode === 'roles' && canManageUsers ? (
                             <RoleEditor
                               target={u}
                               matrix={matrix.data ?? []}
                               isSelf={u.id === user?.userId}
                               onDone={() => setEditingId(null)}
                             />
-                          ) : isAdmin ? (
+                          ) : canManageUsers ? (
                             <UserDataEditor
                               target={u}
                               teams={teams.data ?? []}
@@ -311,7 +320,7 @@ export default function UsersPage() {
               {list.length === 0 && (
                 <tr><td colSpan={showActions ? 8 : 7} className="py-10 text-center">
                   <p className="text-sm font-medium text-ink-2">لا يوجد مستخدمون مطابقون.</p>
-                  <p className="mx-auto mt-1 max-w-md text-xs text-ink-3">لا يطابق أحد البحث أو الفلتر الحالي. جرّب تعديل كلمة البحث أو إظهار غير النشطين{isAdmin ? '، أو أضِف مستخدمًا جديدًا من زر «إضافة مستخدم».' : '.'}</p>
+                  <p className="mx-auto mt-1 max-w-md text-xs text-ink-3">لا يطابق أحد البحث أو الفلتر الحالي. جرّب تعديل كلمة البحث أو إظهار غير النشطين{canManageUsers ? '، أو أضِف مستخدمًا جديدًا من زر «إضافة مستخدم».' : '.'}</p>
                 </td></tr>
               )}
             </tbody>
@@ -322,13 +331,194 @@ export default function UsersPage() {
   );
 }
 
+// مصفوفة الصلاحيات المجمّعة لكل دور (Phase A) — تعرض الحقيقة الكاملة بحالات، عرض فقط.
+function RoleCapabilityMatrix({
+  matrix,
+  roleCount,
+}: {
+  matrix: RoleAccessDto[];
+  roleCount: (r: Role) => number;
+}) {
+  const defaultRole = (matrix.find((m) => m.role === 'HR') ?? matrix[0])?.role ?? null;
+  const [selected, setSelected] = useState<Role | null>(defaultRole);
+  const current = matrix.find((m) => m.role === selected) ?? matrix[0];
+  if (!current) return null;
+
+  const allItems = current.capabilityGroups.flatMap((g) => g.items);
+  const activeItems = allItems.filter((i) => i.status === 'Active');
+  const missingItems = allItems.filter((i) => i.status === 'ProposedLater' || i.status === 'NotGranted');
+
+  return (
+    <div className="space-y-4">
+      {/* مفتاح الحالات */}
+      <div className="flex flex-wrap items-center gap-3 text-xs text-ink-2">
+        <span className="font-semibold">المفتاح:</span>
+        {(['Active', 'NotGranted', 'ProposedLater', 'SensitiveDecision'] as CapabilityStatus[]).map((s) => (
+          <span key={s} className="inline-flex items-center gap-1">
+            <Badge tone={STATUS_META[s].tone}>{STATUS_META[s].label}</Badge>
+          </span>
+        ))}
+      </div>
+
+      {/* منتقي الدور */}
+      <div className="flex flex-wrap gap-2">
+        {matrix.map((m) => (
+          <button
+            key={m.role}
+            type="button"
+            onClick={() => setSelected(m.role)}
+            className={`rounded-lg border px-3 py-1.5 text-sm transition ${
+              m.role === current.role
+                ? 'border-navy bg-navy text-white'
+                : 'border-line bg-white text-ink hover:border-navy/40'
+            }`}
+          >
+            {m.roleLabelAr}
+            <span className="ms-1 text-xs opacity-70">({roleCount(m.role)})</span>
+          </button>
+        ))}
+      </div>
+
+      {/* رأس الدور المحدّد + نطاق رؤيته */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge tone={roleTone[current.role] ?? 'muted'}>{current.roleLabelAr}</Badge>
+        <span className="text-xs text-ink-2">نطاق الرؤية:</span>
+        <Badge tone={scopeTone[current.scopeType] ?? 'muted'}>{current.scopeDescriptionAr}</Badge>
+        <span className="text-xs text-ink-2">— {activeItems.length} قدرة مُفعّلة</span>
+      </div>
+
+      {/* تنبيه خاص بدور HR يوضّح المُفعّل والناقص صراحةً */}
+      {current.role === 'HR' && (
+        <Alert tone="navy">
+          <div className="space-y-1 text-sm">
+            <div>
+              <span className="font-semibold text-success">مُفعّل فعليًّا لـ HR:</span>{' '}
+              {activeItems.map((i) => i.labelAr).join('، ')}
+            </div>
+            <div>
+              <span className="font-semibold text-orange-600">لا يملكه HR حاليًّا</span>{' '}
+              (مقترح لاحقًا/غير ممنوح): {missingItems.map((i) => i.labelAr).join('، ')}
+            </div>
+            <div className="text-xs text-ink-2">
+              HR مستهدف لاحقًا ليكون People Operations — البنود «مقترح لاحقًا» غير مُفعّلة الآن.
+            </div>
+          </div>
+        </Alert>
+      )}
+
+      {/* القدرات مجمّعة حسب المجال */}
+      <div className="grid gap-4 md:grid-cols-2">
+        {current.capabilityGroups.map((g) => (
+          <div key={g.key} className="rounded-xl border border-line p-3">
+            <h4 className="mb-2 text-sm font-semibold text-navy">{g.titleAr}</h4>
+            <div className="flex flex-wrap gap-1.5">
+              {g.items.map((i) => (
+                <span key={i.key} title={STATUS_META[i.status].label}>
+                  <Badge tone={STATUS_META[i.status].tone}>{i.labelAr}</Badge>
+                </span>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // أعلى دور صلاحيةً (لعرض نطاق الرؤية الفعّال).
-const ROLE_ORDER: Role[] = ['Admin', 'CEO', 'GeneralManager', 'Manager', 'TeamLeader', 'CeoSupport', 'HR', 'Employee', 'Viewer'];
+const ROLE_ORDER: Role[] = ['Admin', 'CEO', 'GeneralManager', 'Manager', 'TeamLeader', 'CeoSupport', 'HR', 'FinanceManager', 'Accountant', 'Employee', 'Viewer'];
 function primaryRole(roles: Role[]): Role | null {
   return ROLE_ORDER.find((r) => roles.includes(r)) ?? null;
 }
 
-const ALL_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'Manager', 'TeamLeader', 'CeoSupport', 'HR', 'Employee', 'Viewer'];
+const ALL_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'Manager', 'TeamLeader', 'CeoSupport', 'HR', 'FinanceManager', 'Accountant', 'Employee', 'Viewer'];
+
+// ── المناصب المرنة المُسنَدة للمستخدم (Phase 1A — رؤية فقط) ───────────────
+function UserPositionsEditor({ target }: { target: DirectoryUserDto }) {
+  const assigned = useUserPositions(target.id);
+  const positions = usePositions();
+  const assign = useAssignPosition();
+  const revoke = useRevokePosition();
+  const [positionId, setPositionId] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const assignedIds = new Set((assigned.data ?? []).map((a) => a.positionId));
+  const selectable = (positions.data ?? []).filter((p) => p.isActive && !assignedIds.has(p.id));
+
+  async function doAssign() {
+    if (!positionId) return;
+    setError(null);
+    try {
+      await assign.mutateAsync({ id: positionId, userId: target.id });
+      setPositionId('');
+    } catch (e) {
+      setError(apiErrorMessage(e));
+    }
+  }
+
+  async function doRevoke(pid: string, name: string) {
+    if (!window.confirm(`إلغاء إسناد المنصب «${name}» عن ${target.fullName}؟`)) return;
+    setError(null);
+    try {
+      await revoke.mutateAsync({ id: pid, userId: target.id });
+    } catch (e) {
+      setError(apiErrorMessage(e));
+    }
+  }
+
+  const busy = assign.isPending || revoke.isPending;
+
+  return (
+    <div className="space-y-3">
+      <SectionTitle
+        title={`المناصب المُسنَدة — ${target.fullName}`}
+        hint="المنصب يوسّع نطاق الرؤية فقط (تقارير/لوحة) ولا يمنح اعتمادًا أو تعديلًا."
+      />
+      {error && <Alert tone="alert">{error}</Alert>}
+
+      {assigned.isLoading ? (
+        <p className="text-sm text-ink-2">يتم تحميل المناصب…</p>
+      ) : (assigned.data ?? []).length === 0 ? (
+        <p className="text-sm text-ink-3">لا توجد مناصب مُسنَدة لهذا المستخدم.</p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {(assigned.data ?? []).map((a) => (
+            <span
+              key={a.id}
+              className="inline-flex items-center gap-2 rounded-lg border border-line bg-white px-2.5 py-1 text-xs"
+            >
+              <span className="font-medium text-navy">{a.positionName}</span>
+              <Badge tone={a.positionIsActive ? 'success' : 'muted'}>{a.positionIsActive ? 'نشط' : 'معطّل'}</Badge>
+              <button
+                onClick={() => doRevoke(a.positionId, a.positionName)}
+                disabled={busy}
+                className="text-alert hover:underline"
+                title="إلغاء الإسناد"
+              >
+                ✕
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-end gap-2">
+        <Field label="إسناد منصب">
+          <Select value={positionId} onChange={(e) => setPositionId(e.target.value)} className="min-w-[220px]">
+            <option value="">— اختر منصبًا —</option>
+            {selectable.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </Select>
+        </Field>
+        <Button onClick={doAssign} disabled={!positionId || busy}>إسناد</Button>
+      </div>
+      {selectable.length === 0 && (
+        <p className="text-xs text-ink-3">لا توجد مناصب نشطة متاحة للإسناد (أنشئ منصبًا أو فعّله من صفحة «المناصب المرنة»).</p>
+      )}
+    </div>
+  );
+}
 
 // ── إضافة مستخدم جديد ─────────────────────────────────────────────────
 function AddUserForm({
@@ -591,6 +781,101 @@ function DeleteUserButton({ target, isSelf }: { target: DirectoryUserDto; isSelf
   );
 }
 
+// ── إعادة تعيين كلمة مرور مستخدم (Admin + CeoSupport) ─────────────────
+function ResetPasswordEditor({
+  target,
+  actorIsAdmin,
+  onDone,
+}: {
+  target: DirectoryUserDto;
+  actorIsAdmin: boolean;
+  onDone: () => void;
+}) {
+  const reset = useResetUserPassword();
+  const [newPassword, setNewPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [adminAck, setAdminAck] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+
+  const targetIsAdmin = target.roles.includes('Admin');
+  // حساب مدير النظام لا يُعاد تعيينه إلا بواسطة مدير نظام (مفروض أيضًا بالخادم).
+  const blockedByRole = targetIsAdmin && !actorIsAdmin;
+
+  const submit = () => {
+    setError(null);
+    if (blockedByRole) return;
+    if (newPassword !== confirm) { setError('كلمتا المرور غير متطابقتين.'); return; }
+    if (targetIsAdmin && !adminAck) { setError('يجب تأكيد إعادة تعيين كلمة مرور حساب مدير نظام.'); return; }
+    reset.mutate(
+      { userId: target.id, newPassword },
+      {
+        onSuccess: () => { setDone(true); setNewPassword(''); setConfirm(''); },
+        onError: (e) => setError(apiErrorMessage(e)),
+      },
+    );
+  };
+
+  if (done) {
+    return (
+      <div className="space-y-3">
+        <Alert tone="success">تم تحديث كلمة المرور لـ «{target.fullName}». أُبطلت الجلسات النشطة؛ يلزم تسجيل الدخول بكلمة المرور الجديدة.</Alert>
+        <Button variant="ghost" onClick={onDone}>إغلاق</Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm font-semibold text-navy">إعادة تعيين كلمة المرور: {target.fullName}</p>
+
+      {blockedByRole ? (
+        <Alert tone="alert">لا يمكن إعادة تعيين كلمة مرور حساب مدير نظام إلا بواسطة مدير نظام.</Alert>
+      ) : (
+        <>
+          {targetIsAdmin && (
+            <Alert tone="alert">
+              تنبيه: هذا الحساب يملك دور «مدير النظام». إعادة تعيين كلمة مروره عملية حسّاسة — تأكّد من الهوية قبل المتابعة.
+            </Alert>
+          )}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="كلمة المرور الجديدة" help="٨ أحرف على الأقل، تشمل حرفًا كبيرًا وصغيرًا ورقمًا">
+              <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} autoComplete="new-password" />
+            </Field>
+            <Field label="تأكيد كلمة المرور">
+              <Input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" />
+            </Field>
+          </div>
+
+          {targetIsAdmin && (
+            <label className="flex items-center gap-2 text-sm text-ink">
+              <input
+                type="checkbox"
+                checked={adminAck}
+                onChange={(e) => setAdminAck(e.target.checked)}
+                className="h-4 w-4 rounded border-line"
+              />
+              أؤكّد إعادة تعيين كلمة مرور حساب مدير النظام هذا.
+            </label>
+          )}
+
+          {error && <Alert tone="alert">{error}</Alert>}
+
+          <div className="flex gap-2">
+            <Button
+              onClick={submit}
+              disabled={reset.isPending || !newPassword || !confirm || (targetIsAdmin && !adminAck)}
+            >
+              {reset.isPending ? 'جارٍ…' : 'تعيين كلمة المرور'}
+            </Button>
+            <Button variant="ghost" onClick={onDone}>إلغاء</Button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── إدارة أعضاء الفرق ─────────────────────────────────────────────────
 function TeamManager({ users, departments }: { users: DirectoryUserDto[]; departments: DepartmentDto[] }) {
   const teams = useTeams();
@@ -755,19 +1040,23 @@ function TeamManager({ users, departments }: { users: DirectoryUserDto[]; depart
 }
 
 // ── إنشاء فريق جديد ───────────────────────────────────────────────────
-function CreateTeamForm({
+// مُصدَّر لإعادة الاستخدام في صفحتَي «فرق العمل» و«الإدارات» (نفس النموذج، نفس useCreateTeam).
+// presetDepartmentId (اختياري): يثبّت الإدارة مسبقًا ويخفي منتقي الإدارة — يُستخدم عند الإنشاء داخل إدارة بعينها.
+export function CreateTeamForm({
   departments,
   users,
   onDone,
+  presetDepartmentId,
 }: {
   departments: DepartmentDto[];
   users: DirectoryUserDto[];
   onDone: (newId: string) => void;
+  presetDepartmentId?: string;
 }) {
   const create = useCreateTeam();
   const [nameAr, setNameAr] = useState('');
   const [nameEn, setNameEn] = useState('');
-  const [departmentId, setDepartmentId] = useState('');
+  const [departmentId, setDepartmentId] = useState(presetDepartmentId ?? '');
   const [teamLeaderId, setTeamLeaderId] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -781,6 +1070,8 @@ function CreateTeamForm({
     );
   };
 
+  const presetDeptName = presetDepartmentId ? departments.find((d) => d.id === presetDepartmentId)?.nameAr : undefined;
+
   return (
     <div className="rounded-lg border border-line bg-offwhite p-4">
       <p className="mb-3 text-sm font-semibold text-navy">فريق جديد</p>
@@ -791,14 +1082,20 @@ function CreateTeamForm({
         <Field label="الاسم (إنجليزي) — اختياري">
           <Input value={nameEn} onChange={(e) => setNameEn(e.target.value)} placeholder="Sales Team" />
         </Field>
-        <Field label="الإدارة">
-          <Select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
-            <option value="">— اختر الإدارة —</option>
-            {departments.map((d) => (
-              <option key={d.id} value={d.id}>{d.nameAr}</option>
-            ))}
-          </Select>
-        </Field>
+        {presetDepartmentId ? (
+          <Field label="الإدارة">
+            <div className="rounded-lg border border-line bg-white px-3 py-2 text-sm text-navy">{presetDeptName ?? '—'}</div>
+          </Field>
+        ) : (
+          <Field label="الإدارة">
+            <Select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
+              <option value="">— اختر الإدارة —</option>
+              {departments.map((d) => (
+                <option key={d.id} value={d.id}>{d.nameAr}</option>
+              ))}
+            </Select>
+          </Field>
+        )}
         <Field label="قائد الفريق — اختياري">
           <Select value={teamLeaderId} onChange={(e) => setTeamLeaderId(e.target.value)}>
             <option value="">— بدون قائد —</option>

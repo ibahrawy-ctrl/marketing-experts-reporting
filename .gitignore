@@ -14,8 +14,12 @@ secrets.json
 **/bin/
 **/obj/
 **/publish/
+**/publish-test/
 *.user
 **/TestResults/
+
+# ===== Runtime local file storage (uploaded documents, outside web root) =====
+**/App_Data/
 
 # ===== Node / frontend =====
 **/node_modules/

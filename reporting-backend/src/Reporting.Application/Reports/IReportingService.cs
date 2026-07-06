@@ -6,8 +6,39 @@ namespace Reporting.Application.Reports;
 public interface IReportingService
 {
     Task<Result<SubmissionCompletenessReport>> SubmissionCompletenessAsync(ReportFilter filter, CancellationToken ct = default);
+
+    /// <summary>
+    /// متابعة التزام التسليم (per-person) لأسبوع — لشاشة HR/الإدارة: من سلّم، من تأخّر، حالة كلّ موظف متوقَّع منه تقرير أسبوعي.
+    /// <b>بيانات التزام فقط — بلا أيّ محتوى للتقرير</b> (لا إجابات، لا ملاحظات، لا تقييم، لا إجراءات). HR يرى مستوى الشركة.
+    /// </summary>
+    Task<Result<SubmissionComplianceReport>> SubmissionComplianceAsync(string? weekKey, Guid? departmentId, Guid? teamId, CancellationToken ct = default);
+
+    /// <summary>ملخّص التزام أسبوع (أرقام مجمّعة: متوقَّع/مُسلَّم/متأخر/في الموعد + النسب) ضمن نطاق المستخدم.</summary>
+    Task<Result<ComplianceSummaryReport>> ComplianceSummaryAsync(string? weekKey, Guid? departmentId, Guid? teamId, CancellationToken ct = default);
+
+    /// <summary>اتجاه الالتزام عبر آخر N أسابيع (الأقدم → الأحدث) ضمن نطاق المستخدم.</summary>
+    Task<Result<ComplianceTrendReport>> ComplianceTrendAsync(int weeks, Guid? departmentId, Guid? teamId, CancellationToken ct = default);
+
+    /// <summary>القوالب/المسمّيات الأكثر تأخّرًا ضمن أسبوع ونطاق المستخدم.</summary>
+    Task<Result<LateByTemplateReport>> LateByTemplateAsync(string? weekKey, Guid? departmentId, Guid? teamId, CancellationToken ct = default);
+
+    /// <summary>تجميع الالتزام حسب فريق/إدارة ضمن أسبوع ونطاق المستخدم (groupBy = "team" | "department").</summary>
+    Task<Result<ComplianceBreakdownReport>> ComplianceBreakdownAsync(string? weekKey, string? groupBy, Guid? departmentId, Guid? teamId, CancellationToken ct = default);
+
     Task<Result<KpiSummaryReport>> KpiSummaryAsync(ReportFilter filter, CancellationToken ct = default);
     Task<Result<GovernanceSummaryReport>> GovernanceSummaryAsync(CancellationToken ct = default);
+
+    /// <summary>ملخّص اختناقات مسار الاعتماد ضمن نطاق المستخدم (متاح لأيّ مستخدم مصادَق؛ النطاق وحده يحدّد ما يظهر). RPT-WORKFLOW-BOTTLENECKS-R1.</summary>
+    Task<Result<WorkflowBottlenecksSummaryReport>> WorkflowBottlenecksSummaryAsync(Guid? departmentId, Guid? teamId, CancellationToken ct = default);
+
+    /// <summary>توزيع الاختناقات حسب المرحلة (قائد فريق/مدير/الإدارة العليا) ضمن نطاق المستخدم.</summary>
+    Task<Result<WorkflowBottlenecksByStageReport>> WorkflowBottlenecksByStageAsync(Guid? departmentId, Guid? teamId, CancellationToken ct = default);
+
+    /// <summary>توزيع الاختناقات حسب المعتمِد الحالي ضمن نطاق المستخدم.</summary>
+    Task<Result<WorkflowBottlenecksByApproverReport>> WorkflowBottlenecksByApproverAsync(Guid? departmentId, Guid? teamId, CancellationToken ct = default);
+
+    /// <summary>تفاصيل التقارير العالقة ضمن النطاق + فلاتر (stage/teamId/departmentId/approverId/overdueOnly). بلا أيّ محتوى للتقرير.</summary>
+    Task<Result<WorkflowBottlenecksDetailsReport>> WorkflowBottlenecksDetailsAsync(string? stage, Guid? departmentId, Guid? teamId, Guid? approverId, bool overdueOnly, CancellationToken ct = default);
 
     /// <summary>
     /// تجميع (Rollup) أرقام تقارير مندوبي B2C الفردية ضمن نطاق رؤية المستخدم الحالي.

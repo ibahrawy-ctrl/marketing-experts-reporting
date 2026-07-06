@@ -14,11 +14,12 @@ import {
   healthLabel,
   healthTone,
 } from '../lib/useOrg';
-import { MetricTile, SectionTitle, ActionItem } from '../components/dashboard';
+import { MetricTile, SectionTitle, ActionItem, DashboardHero, HeroChip } from '../components/dashboard';
 import { Card, Badge, Button } from '../components/ui';
 import { LoadingState, QueryError } from '../components/states';
 import { NavIcon, type IconName } from '../components/icons';
 import { submissionStatusLabel, formatPercent } from '../lib/format';
+import { ReportInsightsSection } from './RoleHomeDashboards';
 
 const QUICK: { to: string; label: string; icon: IconName }[] = [
   { to: '/app/users', label: 'إضافة مستخدم', icon: 'users' },
@@ -93,20 +94,21 @@ export function AdminHome() {
 
   return (
     <div className="space-y-6">
-      {/* شريط ترحيب */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-gradient-to-l from-navy to-navy-600 p-6 text-white">
-        <div>
-          <h1 className="text-2xl font-bold">لوحة الإدارة والحوكمة</h1>
-          <p className="mt-1 text-sm text-navy-100">
-            نظرة شاملة على المستخدمين والفرق والتقارير والمؤشرات — وبوّابة سريعة لكل أقسام النظام.
-          </p>
-        </div>
-        <Link to="/app/governance">
-          <span className="inline-block rounded-lg bg-orange px-4 py-2 text-sm font-bold text-white hover:bg-orange-600">
-            فتح مركز الحوكمة
-          </span>
-        </Link>
-      </div>
+      {/* ترويسة موحّدة */}
+      <DashboardHero
+        title="لوحة الإدارة والحوكمة"
+        subtitle="نظرة شاملة على المستخدمين والفرق والتقارير والمؤشرات — وبوّابة سريعة لكل أقسام النظام."
+        icon="governance"
+        accent="orange"
+        badges={<HeroChip>مدير النظام والحوكمة</HeroChip>}
+        cta={
+          <Link to="/app/governance">
+            <span className="inline-block rounded-lg bg-orange px-4 py-2 text-sm font-bold text-white hover:bg-orange-600">
+              فتح مركز الحوكمة
+            </span>
+          </Link>
+        }
+      />
 
       {/* توضيح الأسبوع المعروض في مؤشرات «الأسبوع» */}
       {displayedWeek && (
@@ -126,19 +128,20 @@ export function AdminHome() {
 
       {/* بطاقات موجزة */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <MetricTile label="المستخدمون" value={userList.length} tone="navy" to="/app/users" />
-        <MetricTile label="الفرق" value={teamList.length} tone="navy" to="/app/teams" />
-        <MetricTile label="تقارير مطلوبة (الأسبوع)" value={requiredThisWeek} tone="navy" to="/app/submissions" />
-        <MetricTile label="تقارير مُسلّمة" value={submittedThisWeek} tone="success" to="/app/submissions" />
-        <MetricTile label="تقارير متأخرة" value={lateThisWeek} tone="alert" to="/app/submissions" />
+        <MetricTile label="المستخدمون" value={userList.length} tone="navy" to="/app/users" icon="users" />
+        <MetricTile label="الفرق" value={teamList.length} tone="navy" to="/app/teams" icon="teams" />
+        <MetricTile label="تقارير مطلوبة (الأسبوع)" value={requiredThisWeek} tone="navy" to="/app/submissions" icon="reports" />
+        <MetricTile label="تقارير مُسلّمة" value={submittedThisWeek} tone="success" to="/app/submissions" icon="reports" />
+        <MetricTile label="تقارير متأخرة" value={lateThisWeek} tone="alert" to="/app/submissions" icon="workflow" />
         <MetricTile
           label="متوسط مؤشرات الأداء"
           value={avgKpi === null ? '—' : formatPercent(avgKpi)}
           tone="orange"
           to="/app/kpi"
+          icon="kpi"
         />
-        <MetricTile label="مخاطر مفتوحة" value={(risks.data ?? []).length} tone="alert" to="/app/governance" />
-        <MetricTile label="قرارات قيد البتّ" value={openDecisions.length} tone="gold" to="/app/governance" />
+        <MetricTile label="مخاطر مفتوحة" value={(risks.data ?? []).length} tone="alert" to="/app/governance" icon="governance" />
+        <MetricTile label="قرارات قيد البتّ" value={openDecisions.length} tone="gold" to="/app/governance" icon="governance" />
       </div>
 
       {/* إجراءات سريعة */}
@@ -159,6 +162,9 @@ export function AdminHome() {
           ))}
         </div>
       </Card>
+
+      {/* الفلتر الزمني + التزام التقارير + اختناقات سير الاعتماد — RPT-ROLE-HOME-REPORT-CARDS-R1 */}
+      <ReportInsightsSection />
 
       {/* المطلوب الآن */}
       <div className="grid gap-4 lg:grid-cols-2">

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Reporting.Application.Common;
 using Reporting.Application.Reports;
 using Reporting.Domain.Enums;
 
@@ -10,13 +11,76 @@ namespace Reporting.Api.Controllers;
 public class ReportsController : ApiControllerBase
 {
     private readonly IReportingService _service;
+    private readonly IReportDueService _due;
 
-    public ReportsController(IReportingService service) => _service = service;
+    public ReportsController(IReportingService service, IReportDueService due)
+    {
+        _service = service;
+        _due = due;
+    }
+
+    // ===== RPT-DUE1: مواعيد التقارير والتأخّر (قراءة فقط، محسوب عند الطلب، بلا بريد/إشعارات) =====
+    // my-status: self-only متاح لأيّ موظّف. overview/overdue: أيّ مستخدم موثَّق وScopeResolver وحده يحدّد ما يظهر.
+
+    /// <summary>حالة تقرير الأسبوع الحالي للمستخدم نفسه (self-only). يعكس اليومي لمندوبي المبيعات.</summary>
+    [HttpGet("due/my-status")]
+    public async Task<IActionResult> DueMyStatus([FromQuery] string? weekKey, CancellationToken ct)
+        => FromResult(await _due.MyStatusAsync(weekKey, ct));
+
+    /// <summary>نظرة عامة على مواعيد التقارير لأسبوع ضمن نطاق المستخدم + فلاتر إدارة/فريق.</summary>
+    [HttpGet("due/overview")]
+    public async Task<IActionResult> DueOverview([FromQuery] string? weekKey,
+        [FromQuery] Guid? departmentId, [FromQuery] Guid? teamId, CancellationToken ct)
+        => FromResult(await _due.OverviewAsync(weekKey, departmentId, teamId, ct));
+
+    /// <summary>قائمة التأخّر (تقارير غير مُسلَّمة + مراجعات متأخّرة) ضمن نطاق المستخدم + فلاتر.</summary>
+    [HttpGet("due/overdue")]
+    public async Task<IActionResult> DueOverdue([FromQuery] string? weekKey,
+        [FromQuery] Guid? departmentId, [FromQuery] Guid? teamId, CancellationToken ct)
+        => FromResult(await _due.OverdueAsync(weekKey, departmentId, teamId, ct));
 
     [HttpGet("submission-completeness")]
     public async Task<IActionResult> SubmissionCompleteness([FromQuery] PeriodType? periodType,
         [FromQuery] string? periodKey, [FromQuery] Guid? departmentId, [FromQuery] Guid? teamId, CancellationToken ct)
         => FromResult(await _service.SubmissionCompletenessAsync(new ReportFilter(periodType, periodKey, departmentId, teamId), ct));
+
+    /// <summary>
+    /// متابعة التزام التسليم (per-person) لأسبوع — Admin/CEO/GM/Manager/TeamLeader/CeoSupport/Viewer/HR.
+    /// شاشة متابعة التزام فقط: من سلّم، من تأخّر، الحالة لكلّ موظف متوقَّع. <b>بلا أيّ محتوى للتقرير</b>.
+    /// </summary>
+    [HttpGet("submission-compliance")]
+    [Authorize(Policy = Policies.ReportCompletionView)]
+    public async Task<IActionResult> SubmissionCompliance([FromQuery] string? weekKey,
+        [FromQuery] Guid? departmentId, [FromQuery] Guid? teamId, CancellationToken ct)
+        => FromResult(await _service.SubmissionComplianceAsync(weekKey, departmentId, teamId, ct));
+
+    /// <summary>ملخّص التزام أسبوع (أرقام مجمّعة: متوقَّع/مُسلَّم/متأخر/في الموعد + النسب) ضمن نطاق المستخدم.</summary>
+    [HttpGet("compliance-summary")]
+    [Authorize(Policy = Policies.ReportCompletionView)]
+    public async Task<IActionResult> ComplianceSummary([FromQuery] string? weekKey,
+        [FromQuery] Guid? departmentId, [FromQuery] Guid? teamId, CancellationToken ct)
+        => FromResult(await _service.ComplianceSummaryAsync(weekKey, departmentId, teamId, ct));
+
+    /// <summary>اتجاه الالتزام عبر آخر N أسابيع (الأقدم → الأحدث) ضمن نطاق المستخدم.</summary>
+    [HttpGet("compliance-trend")]
+    [Authorize(Policy = Policies.ReportCompletionView)]
+    public async Task<IActionResult> ComplianceTrend([FromQuery] int weeks,
+        [FromQuery] Guid? departmentId, [FromQuery] Guid? teamId, CancellationToken ct)
+        => FromResult(await _service.ComplianceTrendAsync(weeks, departmentId, teamId, ct));
+
+    /// <summary>القوالب/المسمّيات الأكثر تأخّرًا ضمن أسبوع ونطاق المستخدم.</summary>
+    [HttpGet("late-by-template")]
+    [Authorize(Policy = Policies.ReportCompletionView)]
+    public async Task<IActionResult> LateByTemplate([FromQuery] string? weekKey,
+        [FromQuery] Guid? departmentId, [FromQuery] Guid? teamId, CancellationToken ct)
+        => FromResult(await _service.LateByTemplateAsync(weekKey, departmentId, teamId, ct));
+
+    /// <summary>تجميع الالتزام حسب فريق/إدارة ضمن أسبوع ونطاق المستخدم (groupBy = "team" | "department").</summary>
+    [HttpGet("compliance-breakdown")]
+    [Authorize(Policy = Policies.ReportCompletionView)]
+    public async Task<IActionResult> ComplianceBreakdown([FromQuery] string? weekKey,
+        [FromQuery] string? groupBy, [FromQuery] Guid? departmentId, [FromQuery] Guid? teamId, CancellationToken ct)
+        => FromResult(await _service.ComplianceBreakdownAsync(weekKey, groupBy, departmentId, teamId, ct));
 
     [HttpGet("kpi-summary")]
     public async Task<IActionResult> KpiSummary([FromQuery] PeriodType? periodType,
@@ -26,6 +90,35 @@ public class ReportsController : ApiControllerBase
     [HttpGet("governance-summary")]
     public async Task<IActionResult> GovernanceSummary(CancellationToken ct)
         => FromResult(await _service.GovernanceSummaryAsync(ct));
+
+    // ===== RPT-WORKFLOW-BOTTLENECKS-R1: اختناقات مسار الاعتماد (قراءة فقط، ضمن نطاق المستخدم) =====
+    // متاحة لأيّ مستخدم مصادَق؛ ScopeResolver وحده يحدّد ما يظهر (الموظف تقاريره العالقة، القائد فريقه،
+    // المدير إدارته، الإدارة العليا الكل). لا توسيع صلاحيات — RBAC الخادمي مصدر الحقيقة.
+
+    /// <summary>ملخّص الاختناقات: إجمالي العالق/المتأخر/أقدم عمر/متوسط العمر/أبرز مرحلة ومعتمِد ضمن النطاق.</summary>
+    [HttpGet("workflow-bottlenecks/summary")]
+    public async Task<IActionResult> WorkflowBottlenecksSummary(
+        [FromQuery] Guid? departmentId, [FromQuery] Guid? teamId, CancellationToken ct)
+        => FromResult(await _service.WorkflowBottlenecksSummaryAsync(departmentId, teamId, ct));
+
+    /// <summary>توزيع الاختناقات حسب المرحلة (قائد فريق/مدير/الإدارة العليا) ضمن النطاق.</summary>
+    [HttpGet("workflow-bottlenecks/by-stage")]
+    public async Task<IActionResult> WorkflowBottlenecksByStage(
+        [FromQuery] Guid? departmentId, [FromQuery] Guid? teamId, CancellationToken ct)
+        => FromResult(await _service.WorkflowBottlenecksByStageAsync(departmentId, teamId, ct));
+
+    /// <summary>توزيع الاختناقات حسب المعتمِد الحالي ضمن النطاق.</summary>
+    [HttpGet("workflow-bottlenecks/by-approver")]
+    public async Task<IActionResult> WorkflowBottlenecksByApprover(
+        [FromQuery] Guid? departmentId, [FromQuery] Guid? teamId, CancellationToken ct)
+        => FromResult(await _service.WorkflowBottlenecksByApproverAsync(departmentId, teamId, ct));
+
+    /// <summary>تفاصيل التقارير العالقة ضمن النطاق + فلاتر (stage/teamId/departmentId/approverId/overdueOnly). بلا أيّ محتوى للتقرير.</summary>
+    [HttpGet("workflow-bottlenecks/details")]
+    public async Task<IActionResult> WorkflowBottlenecksDetails(
+        [FromQuery] string? stage, [FromQuery] Guid? departmentId, [FromQuery] Guid? teamId,
+        [FromQuery] Guid? approverId, [FromQuery] bool overdueOnly, CancellationToken ct)
+        => FromResult(await _service.WorkflowBottlenecksDetailsAsync(stage, departmentId, teamId, approverId, overdueOnly, ct));
 
     /// <summary>تجميع أرقام مبيعات B2C ضمن نطاق رؤية المستخدم — الموظف أرقامه، القائد فريقه… إلخ.</summary>
     [HttpGet("b2c-rollup")]

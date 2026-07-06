@@ -2,24 +2,34 @@
 // النطاق ومستوى الرؤية مفروضان من الخادم؛ أزرار الإدارة تظهر فقط لمن يملك canManageClients.
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useClients, useClientHealth, useCreateClient } from '../lib/useClients';
+import {
+  useClients,
+  useClientHealth,
+  useCreateClient,
+  useArchiveClient,
+  useReactivateClient,
+  useDeleteClient,
+} from '../lib/useClients';
 import { useDirectoryUsers } from '../lib/useDirectory';
 import { useAuth } from '../lib/auth';
 import { Card, Badge, Select, Button, StatCard, Field, Input, Alert, EmptyState } from '../components/ui';
 import { LoadingState, QueryError } from '../components/states';
 import { clientStatusLabel, clientStatusTone, formatDate } from '../lib/format';
 import { apiErrorMessage } from '../lib/api';
-import type { ClientStatus, CreateClientRequest } from '../types/api';
+import type { ClientDto, ClientStatus, CreateClientRequest } from '../types/api';
+
+// عرض القائمة: النشط (غير المؤرشفين) / المؤرشف (Closed فقط) / الكل.
+type ClientView = 'active' | 'archived' | 'all';
 
 export default function ClientsPage() {
   const { canManageClients } = useAuth();
+  const [view, setView] = useState<ClientView>('active');
   const [statusFilter, setStatusFilter] = useState<ClientStatus | ''>('');
-  const [includeClosed, setIncludeClosed] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
 
   const clients = useClients({
-    status: statusFilter || undefined,
-    includeClosed,
+    status: view === 'archived' ? 'Closed' : statusFilter || undefined,
+    includeClosed: view !== 'active',
   });
   const health = useClientHealth();
 
@@ -72,21 +82,29 @@ export default function ClientsPage() {
 
       <div className="flex flex-wrap items-center gap-3">
         <Select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as ClientStatus | '')}
+          value={view}
+          onChange={(e) => setView(e.target.value as ClientView)}
           className="max-w-xs"
         >
-          <option value="">كل الحالات</option>
-          {(['Active', 'Paused', 'AtRisk', 'Closed'] as ClientStatus[]).map((s) => (
-            <option key={s} value={s}>
-              {clientStatusLabel[s]}
-            </option>
-          ))}
+          <option value="active">النشط</option>
+          <option value="archived">المؤرشف</option>
+          <option value="all">الكل</option>
         </Select>
-        <label className="flex items-center gap-2 text-sm text-ink-2">
-          <input type="checkbox" checked={includeClosed} onChange={(e) => setIncludeClosed(e.target.checked)} />
-          إظهار المغلقين
-        </label>
+        {view !== 'archived' && (
+          <Select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as ClientStatus | '')}
+            className="max-w-xs"
+          >
+            <option value="">كل الحالات</option>
+            {(['Active', 'Paused', 'AtRisk'] as ClientStatus[]).map((s) => (
+              <option key={s} value={s}>
+                {clientStatusLabel[s]}
+              </option>
+            ))}
+          </Select>
+        )}
+        <span className="text-xs text-ink-3">«مؤرشف» يقابل الحالة Closed داخليًا.</span>
       </div>
 
       {rows.length === 0 ? (
@@ -107,37 +125,115 @@ export default function ClientsPage() {
                 <th className="px-3 py-2.5 font-semibold">في خطر</th>
                 <th className="px-3 py-2.5 font-semibold">جهة الاتصال</th>
                 <th className="px-3 py-2.5 font-semibold"></th>
+                {canManageClients && <th className="px-3 py-2.5 font-semibold">إجراءات</th>}
               </tr>
             </thead>
             <tbody>
               {rows.map((c) => (
-                <tr key={c.id} className="border-b border-line last:border-0 hover:bg-offwhite">
-                  <td className="px-3 py-2.5 font-semibold text-navy">{c.name}</td>
-                  <td className="px-3 py-2.5">
-                    <Badge tone={clientStatusTone(c.status)}>{clientStatusLabel[c.status]}</Badge>
-                  </td>
-                  <td className="px-3 py-2.5 text-ink-2">{c.accountManagerName ?? '—'}</td>
-                  <td className="px-3 py-2.5">{c.projectCount}</td>
-                  <td className="px-3 py-2.5 text-success">{c.activeProjectCount}</td>
-                  <td className={`px-3 py-2.5 ${c.atRiskProjectCount > 0 ? 'font-semibold text-alert' : ''}`}>
-                    {c.atRiskProjectCount}
-                  </td>
-                  <td className="px-3 py-2.5 text-ink-2">{c.mainContactName ?? '—'}</td>
-                  <td className="px-3 py-2.5">
-                    <Link
-                      to={`/app/clients/${c.id}`}
-                      className="text-sm font-semibold text-orange-600 hover:underline"
-                    >
-                      تفاصيل
-                    </Link>
-                  </td>
-                </tr>
+                <ClientRow key={c.id} client={c} canManage={canManageClients} />
               ))}
             </tbody>
           </table>
         </Card>
       )}
     </div>
+  );
+}
+
+function ClientRow({ client: c, canManage }: { client: ClientDto; canManage: boolean }) {
+  const archive = useArchiveClient();
+  const reactivate = useReactivateClient();
+  const del = useDeleteClient();
+  const [err, setErr] = useState<string | null>(null);
+  const isArchived = c.status === 'Closed';
+  const busy = archive.isPending || reactivate.isPending || del.isPending;
+
+  async function run(action: () => Promise<unknown>, fallback: string) {
+    setErr(null);
+    try {
+      await action();
+    } catch (e) {
+      setErr(apiErrorMessage(e, fallback));
+    }
+  }
+
+  return (
+    <>
+      <tr className="border-b border-line last:border-0 hover:bg-offwhite">
+        <td className="px-3 py-2.5 font-semibold text-navy">{c.name}</td>
+        <td className="px-3 py-2.5">
+          <Badge tone={clientStatusTone(c.status)}>{clientStatusLabel[c.status]}</Badge>
+        </td>
+        <td className="px-3 py-2.5 text-ink-2">{c.accountManagerName ?? '—'}</td>
+        <td className="px-3 py-2.5">{c.projectCount}</td>
+        <td className="px-3 py-2.5 text-success">{c.activeProjectCount}</td>
+        <td className={`px-3 py-2.5 ${c.atRiskProjectCount > 0 ? 'font-semibold text-alert' : ''}`}>
+          {c.atRiskProjectCount}
+        </td>
+        <td className="px-3 py-2.5 text-ink-2">{c.mainContactName ?? '—'}</td>
+        <td className="px-3 py-2.5">
+          <Link to={`/app/clients/${c.id}`} className="text-sm font-semibold text-orange-600 hover:underline">
+            تفاصيل
+          </Link>
+        </td>
+        {canManage && (
+          <td className="px-3 py-2.5">
+            <div className="flex flex-wrap gap-1.5">
+              {!isArchived ? (
+                <Button
+                  variant="ghost"
+                  className="!px-2 !py-1 text-xs"
+                  disabled={busy}
+                  onClick={() => {
+                    if (window.confirm(`أرشفة العميل «${c.name}»؟ يمكن إعادة تفعيله لاحقًا.`))
+                      run(() => archive.mutateAsync(c.id), 'تعذّرت الأرشفة.');
+                  }}
+                >
+                  أرشفة
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    variant="ghost"
+                    className="!px-2 !py-1 text-xs"
+                    disabled={busy}
+                    onClick={() => run(() => reactivate.mutateAsync(c.id), 'تعذّرت إعادة التفعيل.')}
+                  >
+                    إعادة تفعيل
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="!px-2 !py-1 text-xs !text-alert"
+                    disabled={busy || !c.canHardDelete}
+                    title={!c.canHardDelete ? c.deleteBlockReason ?? undefined : undefined}
+                    onClick={() => {
+                      if (window.confirm(`حذف العميل «${c.name}» نهائيًا؟ لا يمكن التراجع.`))
+                        run(() => del.mutateAsync(c.id), 'تعذّر الحذف النهائي.');
+                    }}
+                  >
+                    حذف نهائي
+                  </Button>
+                </>
+              )}
+            </div>
+          </td>
+        )}
+      </tr>
+      {isArchived && !c.canHardDelete && c.deleteBlockReason && canManage && (
+        <tr>
+          <td colSpan={9} className="px-3 pb-2 pt-0">
+            <p className="text-xs text-ink-2">{c.deleteBlockReason}</p>
+          </td>
+        </tr>
+      )}
+      {err && (
+        <tr>
+          <td colSpan={9} className="px-3 pb-2 pt-0">
+            <Alert tone="alert">{err}</Alert>
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
 

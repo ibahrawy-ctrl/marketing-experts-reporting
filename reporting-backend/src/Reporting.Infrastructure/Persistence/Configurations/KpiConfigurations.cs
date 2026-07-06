@@ -71,3 +71,19 @@ public class KpiResultConfiguration : IEntityTypeConfiguration<KpiResult>
         b.HasIndex(x => new { x.KpiEvaluationId, x.KpiMetricId }).IsUnique();
     }
 }
+
+public class KpiTemplateAssignmentConfiguration : IEntityTypeConfiguration<KpiTemplateAssignment>
+{
+    public void Configure(EntityTypeBuilder<KpiTemplateAssignment> b)
+    {
+        b.ToTable("kpi_template_assignments");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.ScopeType).HasConversion<string>().HasMaxLength(30);
+        b.Property(x => x.Kind).HasConversion<string>().HasMaxLength(30);
+        b.Property(x => x.Notes).HasMaxLength(1000);
+        b.HasIndex(x => x.KpiTemplateId);
+        b.HasIndex(x => new { x.KpiTemplateId, x.ScopeType, x.ScopeId, x.Kind }).IsUnique();
+        b.HasOne(x => x.KpiTemplate).WithMany()
+            .HasForeignKey(x => x.KpiTemplateId).OnDelete(DeleteBehavior.Cascade);
+    }
+}

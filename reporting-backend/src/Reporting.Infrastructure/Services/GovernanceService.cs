@@ -125,7 +125,7 @@ public class GovernanceService : IGovernanceService
         await _db.SaveChangesAsync(ct);
 
         await _notifications.NotifyAsync(request.TargetUserId, "escalation.raised",
-            "تصعيد جديد بانتظار معالجتك", null, $"/escalations/{escalation.Id}", ct);
+            "تصعيد جديد بانتظار معالجتك", null, "/app/governance/escalations", ct);
         await _audit.LogAsync(uid, "escalation.raised", nameof(Escalation), escalation.Id, ct: ct);
 
         return Result<EscalationDto>.Success(await BuildEscalationAsync(escalation.Id, ct));
@@ -165,7 +165,7 @@ public class GovernanceService : IGovernanceService
         await _db.SaveChangesAsync(ct);
 
         await _notifications.NotifyAsync(e.RaisedById, "escalation.updated",
-            "تم تحديث حالة تصعيدك", null, $"/escalations/{e.Id}", ct);
+            "تم تحديث حالة تصعيدك", null, "/app/governance/escalations", ct);
         await _audit.LogAsync(uid, "escalation." + request.Status.ToString().ToLowerInvariant(), nameof(Escalation), e.Id, ct: ct);
 
         return Result<EscalationDto>.Success(await BuildEscalationAsync(e.Id, ct));

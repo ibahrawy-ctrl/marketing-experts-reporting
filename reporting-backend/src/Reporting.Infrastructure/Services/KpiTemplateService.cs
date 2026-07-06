@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Reporting.Application.Audit;
 using Reporting.Application.Common;
 using Reporting.Application.Kpi;
 using Reporting.Domain.Entities.Kpi;
@@ -10,8 +11,15 @@ namespace Reporting.Infrastructure.Services;
 public class KpiTemplateService : IKpiTemplateService
 {
     private readonly AppDbContext _db;
+    private readonly ICurrentUser _currentUser;
+    private readonly IAuditService _audit;
 
-    public KpiTemplateService(AppDbContext db) => _db = db;
+    public KpiTemplateService(AppDbContext db, ICurrentUser currentUser, IAuditService audit)
+    {
+        _db = db;
+        _currentUser = currentUser;
+        _audit = audit;
+    }
 
     public async Task<Result<KpiTemplateDetailDto>> CreateAsync(CreateKpiTemplateRequest request, Guid ownerId, CancellationToken ct = default)
     {
@@ -42,23 +50,15 @@ public class KpiTemplateService : IKpiTemplateService
         if (filter.Status is not null) q = q.Where(t => t.Status == filter.Status);
         if (filter.IsActive is not null) q = q.Where(t => t.IsActive == filter.IsActive);
 
-        // SubjectUserId: أولوية اختيار قالب KPI في مسار إنشاء تقييم الأداء العادي.
-        // القاعدة: إذا وُجد قالب متخصص مطابق لمسمّى الموظّف الوظيفي (JobRoleId == subject.JobRoleId)
-        // نُرجع القالب المتخصص وحده ولا نُظهر القالب العام معه (منعًا للازدواج والتشويش).
-        // وإلا — لا قالب متخصص مناسب — نُرجع القوالب العامّة فقط (JobRoleId == null).
+        // SubjectUserId: أولوية اختيار قالب KPI في مسار إنشاء تقييم الأداء العادي (Phase T1).
+        // الأولوية الموحَّدة (الأخصّ يطغى، والاستثناء يتفوّق): استثناء موظّف > إسناد موظّف > مسمّى
+        // (الصريح أو KpiTemplate.JobRoleId) > فريق > إدارة > عام (JobRoleId == null).
+        // القوالب العامّة احتياطية فقط: تُستخدم لمن لا يملك أيّ مطابقة أخصّ — حفاظًا على السلوك القديم
+        // «قالب الدور إن وُجد وإلّا العام» مع توسعته بإسنادات الموظّف/الفريق/الإدارة والاستثناءات الصريحة.
         if (filter.SubjectUserId is { } subjectId)
         {
-            var subjectJobRoleId = await _db.Users.AsNoTracking()
-                .Where(u => u.Id == subjectId)
-                .Select(u => u.JobRoleId)
-                .FirstOrDefaultAsync(ct);
-
-            var hasRoleSpecific = subjectJobRoleId is { } roleId
-                && await q.AnyAsync(t => t.JobRoleId == roleId, ct);
-
-            q = hasRoleSpecific
-                ? q.Where(t => t.JobRoleId == subjectJobRoleId)
-                : q.Where(t => t.JobRoleId == null);
+            var allowed = await ResolveAssignedTemplateIdsAsync(q, subjectId, ct);
+            q = q.Where(t => allowed.Contains(t.Id));
         }
 
         var rows = await q.OrderByDescending(t => t.CreatedAtUtc)
@@ -109,6 +109,25 @@ public class KpiTemplateService : IKpiTemplateService
         if (template is null) return Result.Failure("القالب غير موجود.", "kpi_template.not_found");
         template.Status = TemplateStatus.Archived;
         template.IsActive = false;
+        template.UpdatedAtUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync(ct);
+        return Result.Success();
+    }
+
+    public async Task<Result> ReactivateAsync(Guid id, CancellationToken ct = default)
+    {
+        var template = await _db.KpiTemplates.Include(t => t.Versions)
+            .FirstOrDefaultAsync(t => t.Id == id, ct);
+        if (template is null) return Result.Failure("القالب غير موجود.", "kpi_template.not_found");
+        if (template.Status != TemplateStatus.Archived)
+            return Result.Failure("القالب غير مؤرشف.", "kpi_template.not_archived.conflict");
+
+        // إعادة التفعيل تُرجِع الحالة لما يناسب إصداراته: منشور إن وُجد إصدار منشور، وإلا مسودة.
+        // لا تمسّ الإصدارات أو المؤشّرات أو التقييمات القائمة (التقييمات مرتبطة بنسخة مجمّدة).
+        template.Status = template.Versions.Any(v => v.IsPublished)
+            ? TemplateStatus.Published
+            : TemplateStatus.Draft;
+        template.IsActive = true;
         template.UpdatedAtUtc = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct);
         return Result.Success();
@@ -256,6 +275,318 @@ public class KpiTemplateService : IKpiTemplateService
             return Result.Failure("الوزن يجب أن يكون بين 0 و100.", "kpi_metric.weight_invalid");
         return Result.Success();
     }
+
+    // ===== محرّك أولوية إسناد قوالب KPI (Phase T1) — يحاكي محرّك إسناد التقارير =====
+
+    // مستوى أخصّية الإسناد (تنازليًّا): الأصغر رقمًا = الأخصّ.
+    private enum MatchTier { Employee = 1, JobRole = 2, Team = 3, Department = 4, General = 5 }
+
+    private sealed record KpiMeta(Guid Id, Guid? JobRoleId, KpiCadence Cadence);
+    private sealed record UserScopes(Guid UserId, Guid? JobRoleId, Guid? TeamId, Guid? DepartmentId);
+    private sealed record ResolveResult(bool Included, MatchTier Tier, string Reason);
+
+    /// <summary>
+    /// حلّ قالب KPI واحد لمستخدم واحد بترتيب الأولوية المعتمَد (الأخصّ أولًا، والاستثناء يتفوّق في
+    /// مستواه وما دونه): ① استثناء موظّف ② إسناد موظّف ③ استثناء مسمّى ④ إسناد مسمّى (الصريح أو
+    /// <see cref="KpiTemplate.JobRoleId"/>) ⑤ استثناء فريق ⑥ إسناد فريق ⑦ استثناء إدارة ⑧ إسناد إدارة
+    /// ⑨ عام (قالب بلا مسمّى). تُرجِع null إذا كان القالب متخصصًا ولم يطابق المستخدم بأيّ مستوى.
+    /// </summary>
+    private static ResolveResult? ResolveOne(
+        KpiMeta t, UserScopes u,
+        HashSet<(Guid, TemplateAssignmentScope, Guid, TemplateAssignmentKind)> assignments)
+    {
+        bool Has(TemplateAssignmentScope scope, Guid? id, TemplateAssignmentKind kind)
+            => id is Guid g && assignments.Contains((t.Id, scope, g, kind));
+
+        if (Has(TemplateAssignmentScope.Employee, u.UserId, TemplateAssignmentKind.Exclude))
+            return new(false, MatchTier.Employee, "excludedManually");
+        if (Has(TemplateAssignmentScope.Employee, u.UserId, TemplateAssignmentKind.Include))
+            return new(true, MatchTier.Employee, "matchedByUser");
+
+        if (Has(TemplateAssignmentScope.JobRole, u.JobRoleId, TemplateAssignmentKind.Exclude))
+            return new(false, MatchTier.JobRole, "excludedManually");
+        if ((u.JobRoleId is Guid jr && t.JobRoleId == jr)
+            || Has(TemplateAssignmentScope.JobRole, u.JobRoleId, TemplateAssignmentKind.Include))
+            return new(true, MatchTier.JobRole, "matchedByJobRole");
+
+        if (Has(TemplateAssignmentScope.Team, u.TeamId, TemplateAssignmentKind.Exclude))
+            return new(false, MatchTier.Team, "excludedManually");
+        if (Has(TemplateAssignmentScope.Team, u.TeamId, TemplateAssignmentKind.Include))
+            return new(true, MatchTier.Team, "matchedByTeam");
+
+        if (Has(TemplateAssignmentScope.Department, u.DepartmentId, TemplateAssignmentKind.Exclude))
+            return new(false, MatchTier.Department, "excludedManually");
+        if (Has(TemplateAssignmentScope.Department, u.DepartmentId, TemplateAssignmentKind.Include))
+            return new(true, MatchTier.Department, "matchedByDepartment");
+
+        if (t.JobRoleId is null)
+            return new(true, MatchTier.General, "matchedByGeneral");
+
+        return null;
+    }
+
+    private async Task<HashSet<(Guid, TemplateAssignmentScope, Guid, TemplateAssignmentKind)>> LoadActiveAssignmentsAsync(
+        IReadOnlyCollection<Guid> templateIds, CancellationToken ct)
+    {
+        if (templateIds.Count == 0)
+            return new HashSet<(Guid, TemplateAssignmentScope, Guid, TemplateAssignmentKind)>();
+        var rows = await _db.KpiTemplateAssignments.AsNoTracking()
+            .Where(a => a.IsActive && templateIds.Contains(a.KpiTemplateId))
+            .Select(a => new { a.KpiTemplateId, a.ScopeType, a.ScopeId, a.Kind })
+            .ToListAsync(ct);
+        return rows.Select(r => (r.KpiTemplateId, r.ScopeType, r.ScopeId, r.Kind)).ToHashSet();
+    }
+
+    /// <summary>
+    /// أولوية اختيار قوالب KPI لموظّف ضمن المرشّحات الحالية (عادةً منشور/نشط/دورية محدّدة):
+    /// تُحلّ كل القوالب بترتيب الأخصّية، ثم يُبقى فقط على القوالب عند أدنى مستوى أخصّية مطابق
+    /// (الأخصّ يطغى، غير تراكمي): موظّف صريح > مسمّى > فريق > إدارة > عام. فلا يظهر قالب أعمّ
+    /// (فريق/إدارة/عام) لمن طابق بمستوى أخصّ. عند غياب أي إسناد صريح يؤول السلوك إلى «قالب المسمّى
+    /// إن وُجد وإلّا العام» (توافق خلفي تام). هذا يطابق تمامًا منطق Preview في GetAssignmentsAsync.
+    /// موازنة الأخصّية تتمّ داخل المرشّحات نفسها (الدورية مُطبَّقة مسبقًا في q).
+    /// </summary>
+    private async Task<List<Guid>> ResolveAssignedTemplateIdsAsync(
+        IQueryable<KpiTemplate> q, Guid subjectId, CancellationToken ct)
+    {
+        var u = await _db.Users.AsNoTracking()
+            .Where(x => x.Id == subjectId)
+            .Select(x => new { x.JobRoleId, x.TeamId, x.DepartmentId })
+            .FirstOrDefaultAsync(ct);
+        var scopes = new UserScopes(subjectId, u?.JobRoleId, u?.TeamId, u?.DepartmentId);
+
+        var metas = await q
+            .Select(t => new KpiMeta(t.Id, t.JobRoleId, t.Cadence))
+            .ToListAsync(ct);
+        var ids = metas.Select(m => m.Id).ToList();
+        var assignments = await LoadActiveAssignmentsAsync(ids, ct);
+
+        var included = new List<(KpiMeta Meta, MatchTier Tier)>();
+        foreach (var m in metas)
+        {
+            var r = ResolveOne(m, scopes, assignments);
+            if (r is { Included: true }) included.Add((m, r.Tier));
+        }
+
+        // الأخصّ يطغى (غير تراكمي): أبقِ فقط القوالب عند أدنى مستوى أخصّية مطابق لهذا الموظّف،
+        // فلا يظهر قالب فريق/إدارة لمن لديه قالب أخصّ (موظّف صريح أو مسمّى). يطابق تمامًا منطق
+        // Preview في GetAssignmentsAsync (minTier) كي يتطابق المنتقي مع المعاينة.
+        if (included.Count == 0) return new List<Guid>();
+        var minTier = included.Min(x => x.Tier);
+        var effective = included.Where(x => x.Tier == minTier).ToList();
+
+        return effective.Select(x => x.Meta.Id).Distinct().ToList();
+    }
+
+    public async Task<Result<KpiTemplateAssignmentsDto>> GetAssignmentsAsync(Guid id, CancellationToken ct = default)
+    {
+        var t = await _db.KpiTemplates.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (t is null) return Result<KpiTemplateAssignmentsDto>.Failure("القالب غير موجود.", "kpi_template.not_found");
+
+        var isRoleSpecific = t.JobRoleId is not null;
+        var isAssignable = t.Status == TemplateStatus.Published && t.IsActive;
+
+        var jobRoles = await _db.JobRoles.AsNoTracking().ToDictionaryAsync(r => r.Id, r => r.NameAr, ct);
+        var teams = await _db.Teams.AsNoTracking().ToDictionaryAsync(r => r.Id, r => r.NameAr, ct);
+        var depts = await _db.Departments.AsNoTracking().ToDictionaryAsync(r => r.Id, r => r.NameAr, ct);
+        var templateJobRoleName = t.JobRoleId is { } trid ? jobRoles.GetValueOrDefault(trid) : null;
+
+        var users = await _db.Users.AsNoTracking()
+            .Select(u => new { u.Id, u.FullName, u.Email, u.IsActive, u.JobRoleId, u.TeamId, u.DepartmentId })
+            .ToListAsync(ct);
+        var userNames = users.ToDictionary(u => u.Id, u => u.FullName);
+
+        // كل قوالب KPI القابلة للاختيار (منشورة ونشطة) بنفس الدورية — لحساب «الأخصّية تسبق العام».
+        var candidates = await _db.KpiTemplates.AsNoTracking()
+            .Where(x => x.Status == TemplateStatus.Published && x.IsActive && x.Cadence == t.Cadence)
+            .Select(x => new { x.Id, x.JobRoleId, x.Cadence })
+            .ToListAsync(ct);
+        var candidateMetas = candidates.Select(x => new KpiMeta(x.Id, x.JobRoleId, x.Cadence)).ToList();
+
+        var assignmentTemplateIds = candidateMetas.Select(m => m.Id).ToList();
+        if (!assignmentTemplateIds.Contains(t.Id)) assignmentTemplateIds.Add(t.Id);
+        var assignments = await LoadActiveAssignmentsAsync(assignmentTemplateIds, ct);
+
+        var thisMeta = new KpiMeta(t.Id, t.JobRoleId, t.Cadence);
+
+        var matched = new List<KpiTemplateAssignmentUserDto>();
+        var excluded = new List<KpiTemplateAssignmentUserDto>();
+
+        foreach (var u in users)
+        {
+            var scopes = new UserScopes(u.Id, u.JobRoleId, u.TeamId, u.DepartmentId);
+            var jobRoleName = u.JobRoleId is { } urid ? jobRoles.GetValueOrDefault(urid) : null;
+            var teamName = u.TeamId is { } utid ? teams.GetValueOrDefault(utid) : null;
+            var deptName = u.DepartmentId is { } udid ? depts.GetValueOrDefault(udid) : null;
+
+            KpiTemplateAssignmentUserDto Make(string? exclusion, string? match) =>
+                new(u.Id, u.FullName, u.Email, u.JobRoleId, jobRoleName, u.IsActive, exclusion, match,
+                    u.TeamId, teamName, u.DepartmentId, deptName);
+
+            if (!u.IsActive) { excluded.Add(Make("excludedBecauseInactive", null)); continue; }
+
+            var r = ResolveOne(thisMeta, scopes, assignments);
+            // عدم المطابقة لمسمّى القالب المتخصّص = «بقيّة الموظّفين»، وليست استثناءً ذا معنى للعرض.
+            if (r is null) continue;
+            if (!r.Included) { excluded.Add(Make(r.Reason, null)); continue; }
+
+            // أعلى مستوى أخصّية مطابق لهذا المستخدم بين قوالب KPI بنفس الدورية.
+            var userMatches = new List<MatchTier>();
+            foreach (var m in candidateMetas)
+            {
+                var rr = ResolveOne(m, scopes, assignments);
+                if (rr is { Included: true }) userMatches.Add(rr.Tier);
+            }
+            var minTier = userMatches.Count > 0 ? userMatches.Min() : r.Tier;
+
+            if (r.Tier > minTier)
+            {
+                // يوجد قالب KPI أخصّ لهذا المستخدم بنفس الدورية ⇒ هذا القالب لا يظهر له في المنتقي.
+                excluded.Add(Make("excludedBecauseMoreSpecificTemplateExists", null));
+                continue;
+            }
+
+            matched.Add(Make(null, r.Reason));
+        }
+
+        // إن كان القالب غير قابل للاختيار (مسودة/مؤرشف/غير نشط) فلا أحد يستلمه فعليًّا الآن.
+        if (!isAssignable)
+        {
+            excluded.AddRange(matched.Select(m => m with
+            {
+                ExclusionReason = "excludedBecauseTemplateNotAssignable",
+                MatchReason = null
+            }));
+            matched = new List<KpiTemplateAssignmentUserDto>();
+        }
+
+        var rawRows = await _db.KpiTemplateAssignments.AsNoTracking()
+            .Where(x => x.KpiTemplateId == id)
+            .OrderBy(x => x.ScopeType).ThenByDescending(x => x.Kind).ThenBy(x => x.CreatedAtUtc)
+            .Select(x => new { x.Id, x.ScopeType, x.ScopeId, x.Kind, x.Notes, x.IsActive, x.CreatedAtUtc })
+            .ToListAsync(ct);
+
+        string? ScopeName(TemplateAssignmentScope s, Guid sid) => s switch
+        {
+            TemplateAssignmentScope.Employee => userNames.GetValueOrDefault(sid),
+            TemplateAssignmentScope.JobRole => jobRoles.GetValueOrDefault(sid),
+            TemplateAssignmentScope.Team => teams.GetValueOrDefault(sid),
+            TemplateAssignmentScope.Department => depts.GetValueOrDefault(sid),
+            _ => null
+        };
+
+        var assignmentRows = rawRows.Select(x => new KpiTemplateAssignmentRowDto(
+            x.Id, x.ScopeType, x.ScopeId, ScopeName(x.ScopeType, x.ScopeId), x.Kind, x.Notes, x.IsActive, x.CreatedAtUtc))
+            .ToList();
+
+        return Result<KpiTemplateAssignmentsDto>.Success(new KpiTemplateAssignmentsDto(
+            t.Id, t.Title, t.JobRoleId, templateJobRoleName, t.Cadence, t.Status, t.IsActive,
+            isAssignable, isRoleSpecific,
+            matched.OrderBy(m => m.FullName).ToList(),
+            excluded.OrderBy(m => m.FullName).ToList(),
+            assignmentRows));
+    }
+
+    public async Task<Result<KpiTemplateAssignmentRowDto>> AddAssignmentAsync(
+        Guid templateId, CreateKpiAssignmentRequest request, CancellationToken ct = default)
+    {
+        var template = await _db.KpiTemplates.AsNoTracking().FirstOrDefaultAsync(t => t.Id == templateId, ct);
+        if (template is null) return Result<KpiTemplateAssignmentRowDto>.Failure("القالب غير موجود.", "kpi_template.not_found");
+
+        var (exists, name) = await ResolveScopeAsync(request.ScopeType, request.ScopeId, ct);
+        if (!exists)
+            return Result<KpiTemplateAssignmentRowDto>.Failure("الكيان المُسنَد إليه غير موجود.", "kpi_assignment.scope_not_found");
+
+        var notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim();
+
+        // منع التكرار لنفس (القالب/المستوى/المعرّف/النوع)؛ إن وُجد صفّ معطّل أعِد تفعيله بدل إنشاء جديد.
+        var dup = await _db.KpiTemplateAssignments.FirstOrDefaultAsync(a =>
+            a.KpiTemplateId == templateId && a.ScopeType == request.ScopeType &&
+            a.ScopeId == request.ScopeId && a.Kind == request.Kind, ct);
+        if (dup is not null)
+        {
+            if (dup.IsActive)
+                return Result<KpiTemplateAssignmentRowDto>.Failure(
+                    "هذا الإسناد/الاستثناء موجود بالفعل لنفس الكيان.", "kpi_assignment.duplicate.conflict");
+            dup.IsActive = true;
+            dup.Notes = notes;
+            dup.UpdatedById = _currentUser.UserId;
+            dup.UpdatedAtUtc = DateTime.UtcNow;
+            await _db.SaveChangesAsync(ct);
+            await LogAssignmentAsync("kpi_template.assignment.enabled", dup, templateId, ct);
+            return Result<KpiTemplateAssignmentRowDto>.Success(MapAssignment(dup, name));
+        }
+
+        var row = new KpiTemplateAssignment
+        {
+            KpiTemplateId = templateId,
+            ScopeType = request.ScopeType,
+            ScopeId = request.ScopeId,
+            Kind = request.Kind,
+            Notes = notes,
+            IsActive = true,
+            CreatedById = _currentUser.UserId
+        };
+        _db.KpiTemplateAssignments.Add(row);
+        await _db.SaveChangesAsync(ct);
+        await LogAssignmentAsync("kpi_template.assignment.added", row, templateId, ct);
+        return Result<KpiTemplateAssignmentRowDto>.Success(MapAssignment(row, name));
+    }
+
+    public async Task<Result<KpiTemplateAssignmentRowDto>> UpdateAssignmentAsync(
+        Guid templateId, Guid assignmentId, UpdateKpiAssignmentRequest request, CancellationToken ct = default)
+    {
+        var row = await _db.KpiTemplateAssignments
+            .FirstOrDefaultAsync(a => a.Id == assignmentId && a.KpiTemplateId == templateId, ct);
+        if (row is null) return Result<KpiTemplateAssignmentRowDto>.Failure("الإسناد غير موجود.", "kpi_assignment.not_found");
+
+        row.IsActive = request.IsActive;
+        row.Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim();
+        row.UpdatedById = _currentUser.UserId;
+        row.UpdatedAtUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync(ct);
+
+        await LogAssignmentAsync(row.IsActive ? "kpi_template.assignment.enabled" : "kpi_template.assignment.disabled", row, templateId, ct);
+        var (_, name) = await ResolveScopeAsync(row.ScopeType, row.ScopeId, ct);
+        return Result<KpiTemplateAssignmentRowDto>.Success(MapAssignment(row, name));
+    }
+
+    public async Task<Result> RemoveAssignmentAsync(Guid templateId, Guid assignmentId, CancellationToken ct = default)
+    {
+        var row = await _db.KpiTemplateAssignments
+            .FirstOrDefaultAsync(a => a.Id == assignmentId && a.KpiTemplateId == templateId, ct);
+        if (row is null) return Result.Failure("الإسناد غير موجود.", "kpi_assignment.not_found");
+
+        _db.KpiTemplateAssignments.Remove(row);
+        await _db.SaveChangesAsync(ct);
+        await LogAssignmentAsync("kpi_template.assignment.removed", row, templateId, ct);
+        return Result.Success();
+    }
+
+    private async Task<(bool Exists, string? Name)> ResolveScopeAsync(
+        TemplateAssignmentScope scope, Guid scopeId, CancellationToken ct) => scope switch
+    {
+        TemplateAssignmentScope.Employee => (
+            await _db.Users.AnyAsync(x => x.Id == scopeId, ct),
+            await _db.Users.AsNoTracking().Where(x => x.Id == scopeId).Select(x => x.FullName).FirstOrDefaultAsync(ct)),
+        TemplateAssignmentScope.JobRole => (
+            await _db.JobRoles.AnyAsync(x => x.Id == scopeId, ct),
+            await _db.JobRoles.AsNoTracking().Where(x => x.Id == scopeId).Select(x => x.NameAr).FirstOrDefaultAsync(ct)),
+        TemplateAssignmentScope.Team => (
+            await _db.Teams.AnyAsync(x => x.Id == scopeId, ct),
+            await _db.Teams.AsNoTracking().Where(x => x.Id == scopeId).Select(x => x.NameAr).FirstOrDefaultAsync(ct)),
+        TemplateAssignmentScope.Department => (
+            await _db.Departments.AnyAsync(x => x.Id == scopeId, ct),
+            await _db.Departments.AsNoTracking().Where(x => x.Id == scopeId).Select(x => x.NameAr).FirstOrDefaultAsync(ct)),
+        _ => (false, null)
+    };
+
+    private async Task LogAssignmentAsync(string action, KpiTemplateAssignment row, Guid templateId, CancellationToken ct)
+        => await _audit.LogAsync(_currentUser.UserId, action, nameof(KpiTemplateAssignment), row.Id,
+            $"{{\"templateId\":\"{templateId}\",\"scopeType\":\"{row.ScopeType}\",\"scopeId\":\"{row.ScopeId}\",\"kind\":\"{row.Kind}\",\"isActive\":{row.IsActive.ToString().ToLowerInvariant()}}}",
+            ct: ct);
+
+    private static KpiTemplateAssignmentRowDto MapAssignment(KpiTemplateAssignment a, string? name)
+        => new(a.Id, a.ScopeType, a.ScopeId, name, a.Kind, a.Notes, a.IsActive, a.CreatedAtUtc);
 
     private async Task<KpiTemplateDetailDto> BuildDetailAsync(Guid id, CancellationToken ct)
     {

@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Reporting.Application.Common;
 using Reporting.Application.Reports;
@@ -18,6 +19,14 @@ public class ReportingService : IReportingService
     /// <summary>الأدوار المسموح لها بعرض تقارير المراقبة (إداريون + دعم الرئيس + مُطّلِع).</summary>
     private static readonly string[] MonitoringRoles =
         Roles.Management.Concat(new[] { Roles.CeoSupport, Roles.Viewer }).ToArray();
+
+    // حالات «أُرسِل التقرير» — تُعدّ تسليمًا قائمًا في متابعة الالتزام (أيّ حالة بعد المسودّة).
+    private static readonly SubmissionStatus[] SubmittedStatuses =
+    {
+        SubmissionStatus.Submitted, SubmissionStatus.Returned, SubmissionStatus.ApprovedByDirectManager,
+        SubmissionStatus.ApprovedByNextLevel, SubmissionStatus.Escalated, SubmissionStatus.Closed,
+        SubmissionStatus.Visible
+    };
 
     private const decimal AlertThreshold = 60m;
 
@@ -67,6 +76,596 @@ public class ReportingService : IReportingService
 
         return Result<SubmissionCompletenessReport>.Success(new SubmissionCompletenessReport(
             filter.PeriodKey, total, closed, pending, Rate(closed, total), byStatus, byDept));
+    }
+
+    public async Task<Result<SubmissionComplianceReport>> SubmissionComplianceAsync(string? weekKey, Guid? departmentId, Guid? teamId, CancellationToken ct = default)
+    {
+        var candRes = await ResolveComplianceCandidatesAsync(departmentId, teamId, ct);
+        if (!candRes.Succeeded) return Result<SubmissionComplianceReport>.Failure(candRes.Error!, candRes.ErrorCode);
+
+        var key = NormalizeWeekKey(weekKey);
+        var candidates = candRes.Value!;
+        if (candidates.Count == 0)
+            return Result<SubmissionComplianceReport>.Success(new SubmissionComplianceReport(
+                key, ReportCalendarPolicy.ShortWeekLabel(key), 0, 0, 0, 0, 0m, new List<SubmissionComplianceRow>()));
+
+        var evals = await EvaluateComplianceWeekAsync(key, candidates, ct);
+
+        // صفّ واحد لكلّ شخص: الأسبوعي وحدة واحدة؛ اليومي يُلخَّص («سلّم X من Y يوم») لتفادي صفوف متعدّدة.
+        var rows = evals
+            .GroupBy(e => e.Candidate.UserId)
+            .Select(g => BuildPersonRow(key, g.ToList()))
+            .OrderBy(r => r.Submitted)        // غير المُسلِّمين أولًا.
+            .ThenByDescending(r => r.Late)
+            .ThenBy(r => r.FullName, StringComparer.Ordinal)
+            .ToList();
+
+        var agg = Aggregate(evals);
+        return Result<SubmissionComplianceReport>.Success(new SubmissionComplianceReport(
+            key, ReportCalendarPolicy.ShortWeekLabel(key), agg.Expected, agg.Submitted, agg.Missing, agg.Late,
+            agg.CompliancePercent, rows, agg.LateSubmitted, agg.MissingOverdue, agg.OnTime, agg.OnTimePercent));
+    }
+
+    public async Task<Result<ComplianceSummaryReport>> ComplianceSummaryAsync(string? weekKey, Guid? departmentId, Guid? teamId, CancellationToken ct = default)
+    {
+        var candRes = await ResolveComplianceCandidatesAsync(departmentId, teamId, ct);
+        if (!candRes.Succeeded) return Result<ComplianceSummaryReport>.Failure(candRes.Error!, candRes.ErrorCode);
+
+        var key = NormalizeWeekKey(weekKey);
+        var evals = await EvaluateComplianceWeekAsync(key, candRes.Value!, ct);
+        var a = Aggregate(evals);
+        return Result<ComplianceSummaryReport>.Success(new ComplianceSummaryReport(
+            key, ReportCalendarPolicy.ShortWeekLabel(key), a.Expected, a.Submitted, a.Missing, a.Late,
+            a.LateSubmitted, a.MissingOverdue, a.OnTime, a.CompliancePercent, a.OnTimePercent));
+    }
+
+    public async Task<Result<ComplianceTrendReport>> ComplianceTrendAsync(int weeks, Guid? departmentId, Guid? teamId, CancellationToken ct = default)
+    {
+        var candRes = await ResolveComplianceCandidatesAsync(departmentId, teamId, ct);
+        if (!candRes.Succeeded) return Result<ComplianceTrendReport>.Failure(candRes.Error!, candRes.ErrorCode);
+
+        var n = weeks <= 0 ? 8 : Math.Min(weeks, 26);
+        var candidates = candRes.Value!;
+        var today = ReportCalendarPolicy.RiyadhToday();
+
+        // مفاتيح آخر n أسابيع (الأقدم → الأحدث)، بلا تكرار مع الحفاظ على الترتيب.
+        var keys = new List<string>(n);
+        for (var i = n - 1; i >= 0; i--)
+        {
+            var wk = ReportCalendarPolicy.WeekKeyFor(today.AddDays(-7 * i));
+            if (!keys.Contains(wk)) keys.Add(wk);
+        }
+
+        var points = new List<ComplianceTrendPoint>(keys.Count);
+        foreach (var key in keys)
+        {
+            var evals = await EvaluateComplianceWeekAsync(key, candidates, ct);
+            var a = Aggregate(evals);
+            points.Add(new ComplianceTrendPoint(
+                key, ReportCalendarPolicy.ShortWeekLabel(key), a.Expected, a.Submitted, a.Late, a.CompliancePercent, a.OnTimePercent));
+        }
+
+        return Result<ComplianceTrendReport>.Success(new ComplianceTrendReport(keys.Count, points));
+    }
+
+    public async Task<Result<LateByTemplateReport>> LateByTemplateAsync(string? weekKey, Guid? departmentId, Guid? teamId, CancellationToken ct = default)
+    {
+        var candRes = await ResolveComplianceCandidatesAsync(departmentId, teamId, ct);
+        if (!candRes.Succeeded) return Result<LateByTemplateReport>.Failure(candRes.Error!, candRes.ErrorCode);
+
+        var key = NormalizeWeekKey(weekKey);
+        var candidates = candRes.Value!;
+        var evals = await EvaluateComplianceWeekAsync(key, candidates, ct);
+
+        // عنوان القالب الأساسي المنشور لكلّ مسمّى وظيفي ضمن المرشّحين (المصدر المتوقَّع للتقرير).
+        var jobRoleIds = candidates.Where(c => c.JobRoleId is not null).Select(c => c.JobRoleId!.Value).Distinct().ToList();
+        var titleByRole = (await _db.ReportTemplates.AsNoTracking()
+                .Where(t => t.JobRoleId != null && jobRoleIds.Contains(t.JobRoleId!.Value) && t.IsActive
+                            && t.Classification == TemplateClassification.Primary
+                            && _db.ReportTemplateVersions.Any(v => v.ReportTemplateId == t.Id && v.IsPublished))
+                .Select(t => new { RoleId = t.JobRoleId!.Value, t.Title })
+                .ToListAsync(ct))
+            .GroupBy(x => x.RoleId)
+            .ToDictionary(g => g.Key, g => g.First().Title);
+
+        var rows = evals
+            .Where(e => e.Candidate.JobRoleId is not null)
+            .GroupBy(e => e.Candidate.JobRoleId!.Value)
+            .Select(g =>
+            {
+                var expected = g.Count();
+                var late = g.Count(e => e.Late);
+                var missing = g.Count(e => !e.HasSubmission);
+                var roleName = g.First().Candidate.JobRoleName ?? "—";
+                return new LateByTemplateRow(
+                    g.Key, titleByRole.GetValueOrDefault(g.Key, roleName), roleName,
+                    expected, late, missing, Rate(late, expected));
+            })
+            .Where(r => r.Expected > 0)
+            .OrderByDescending(r => r.LatePercent)
+            .ThenByDescending(r => r.Late)
+            .ThenBy(r => r.TemplateTitle, StringComparer.Ordinal)
+            .ToList();
+
+        return Result<LateByTemplateReport>.Success(new LateByTemplateReport(
+            key, ReportCalendarPolicy.ShortWeekLabel(key), rows));
+    }
+
+    public async Task<Result<ComplianceBreakdownReport>> ComplianceBreakdownAsync(string? weekKey, string? groupBy, Guid? departmentId, Guid? teamId, CancellationToken ct = default)
+    {
+        var candRes = await ResolveComplianceCandidatesAsync(departmentId, teamId, ct);
+        if (!candRes.Succeeded) return Result<ComplianceBreakdownReport>.Failure(candRes.Error!, candRes.ErrorCode);
+
+        var byDept = string.Equals(groupBy?.Trim(), "department", StringComparison.OrdinalIgnoreCase);
+        var dim = byDept ? "department" : "team";
+        var key = NormalizeWeekKey(weekKey);
+        var evals = await EvaluateComplianceWeekAsync(key, candRes.Value!, ct);
+
+        var rows = evals
+            .GroupBy(e => byDept ? e.Candidate.DepartmentId : e.Candidate.TeamId)
+            .Select(g =>
+            {
+                var a = Aggregate(g.ToList());
+                var name = byDept
+                    ? (g.First().Candidate.DepartmentName ?? "بدون إدارة")
+                    : (g.First().Candidate.TeamName ?? "بدون فريق");
+                return new ComplianceBreakdownRow(
+                    g.Key, name, a.Expected, a.Submitted, a.Late, a.Missing, a.CompliancePercent, a.OnTimePercent);
+            })
+            .OrderBy(r => r.CompliancePercent)        // الأضعف التزامًا أولًا.
+            .ThenBy(r => r.GroupName, StringComparer.Ordinal)
+            .ToList();
+
+        return Result<ComplianceBreakdownReport>.Success(new ComplianceBreakdownReport(
+            key, ReportCalendarPolicy.ShortWeekLabel(key), dim, rows));
+    }
+
+    // ===== RPT-WORKFLOW-BOTTLENECKS-R1: اختناقات مسار الاعتماد (قراءة فقط، نطاق ScopeResolver) =====
+
+    // حالات «بانتظار اعتماد» — تقرير قد يكون عالقًا عند معتمِد. (Draft/Returned/Closed/Visible مستبعَدة:
+    // المسودّة لم تُرسَل، المُعادة بلا معتمِد حالي، المُغلق/الظاهر انتهى مساره.)
+    private static readonly SubmissionStatus[] PendingApprovalStatuses =
+    {
+        SubmissionStatus.Submitted, SubmissionStatus.ApprovedByDirectManager,
+        SubmissionStatus.ApprovedByNextLevel, SubmissionStatus.Escalated
+    };
+
+    public async Task<Result<WorkflowBottlenecksSummaryReport>> WorkflowBottlenecksSummaryAsync(Guid? departmentId, Guid? teamId, CancellationToken ct = default)
+    {
+        if (!_currentUser.IsAuthenticated)
+            return Result<WorkflowBottlenecksSummaryReport>.Failure("غير مصرّح.", "auth.unauthenticated");
+
+        var items = await LoadBottlenecksAsync(null, departmentId, teamId, null, false, ct);
+        if (items.Count == 0)
+            return Result<WorkflowBottlenecksSummaryReport>.Success(new WorkflowBottlenecksSummaryReport(
+                0, 0, 0, 0, null, null, 0, null, null, 0));
+
+        var byStage = items.GroupBy(i => i.StageKey)
+            .Select(g => new { g.Key, Label = g.First().StageLabel, Count = g.Count() })
+            .OrderByDescending(x => x.Count).First();
+        var byApprover = items.GroupBy(i => i.ApproverId)
+            .Select(g => new { g.Key, Name = g.First().ApproverName, Count = g.Count() })
+            .OrderByDescending(x => x.Count).First();
+
+        return Result<WorkflowBottlenecksSummaryReport>.Success(new WorkflowBottlenecksSummaryReport(
+            items.Count,
+            items.Count(i => i.IsOverdue),
+            Math.Round(items.Max(i => i.AgeHours), 1),
+            Math.Round(items.Average(i => i.AgeHours), 1),
+            byStage.Key, byStage.Label, byStage.Count,
+            byApprover.Key, byApprover.Name, byApprover.Count));
+    }
+
+    public async Task<Result<WorkflowBottlenecksByStageReport>> WorkflowBottlenecksByStageAsync(Guid? departmentId, Guid? teamId, CancellationToken ct = default)
+    {
+        if (!_currentUser.IsAuthenticated)
+            return Result<WorkflowBottlenecksByStageReport>.Failure("غير مصرّح.", "auth.unauthenticated");
+
+        var items = await LoadBottlenecksAsync(null, departmentId, teamId, null, false, ct);
+        var rows = items.GroupBy(i => i.StageKey)
+            .Select(g => new WorkflowBottleneckStageRow(
+                g.Key, g.First().StageLabel, g.Count(), g.Count(i => i.IsOverdue),
+                Math.Round(g.Average(i => i.AgeHours), 1), Math.Round(g.Max(i => i.AgeHours), 1),
+                g.First().SlaHours))
+            .OrderByDescending(r => r.OverdueCount)
+            .ThenByDescending(r => r.PendingCount)
+            .ToList();
+        return Result<WorkflowBottlenecksByStageReport>.Success(new WorkflowBottlenecksByStageReport(rows));
+    }
+
+    public async Task<Result<WorkflowBottlenecksByApproverReport>> WorkflowBottlenecksByApproverAsync(Guid? departmentId, Guid? teamId, CancellationToken ct = default)
+    {
+        if (!_currentUser.IsAuthenticated)
+            return Result<WorkflowBottlenecksByApproverReport>.Failure("غير مصرّح.", "auth.unauthenticated");
+
+        var items = await LoadBottlenecksAsync(null, departmentId, teamId, null, false, ct);
+        var rows = items.GroupBy(i => i.ApproverId)
+            .Select(g =>
+            {
+                var f = g.First();
+                return new WorkflowBottleneckApproverRow(
+                    g.Key, f.ApproverName, f.ApproverRole, Roles.DisplayAr(f.ApproverRole),
+                    f.StageKey, f.StageLabel, g.Count(), g.Count(i => i.IsOverdue),
+                    Math.Round(g.Average(i => i.AgeHours), 1), Math.Round(g.Max(i => i.AgeHours), 1));
+            })
+            .OrderByDescending(r => r.OverdueCount)
+            .ThenByDescending(r => r.PendingCount)
+            .ThenBy(r => r.ApproverName, StringComparer.Ordinal)
+            .ToList();
+        return Result<WorkflowBottlenecksByApproverReport>.Success(new WorkflowBottlenecksByApproverReport(rows));
+    }
+
+    public async Task<Result<WorkflowBottlenecksDetailsReport>> WorkflowBottlenecksDetailsAsync(string? stage, Guid? departmentId, Guid? teamId, Guid? approverId, bool overdueOnly, CancellationToken ct = default)
+    {
+        if (!_currentUser.IsAuthenticated)
+            return Result<WorkflowBottlenecksDetailsReport>.Failure("غير مصرّح.", "auth.unauthenticated");
+
+        var stageKey = string.IsNullOrWhiteSpace(stage) ? null : stage!.Trim().ToLowerInvariant();
+        var items = await LoadBottlenecksAsync(stageKey, departmentId, teamId, approverId, overdueOnly, ct);
+
+        var rows = items
+            .OrderByDescending(i => i.IsOverdue)
+            .ThenByDescending(i => i.AgeHours)
+            .Select(i => new WorkflowBottleneckDetailRow(
+                i.SubmissionId, i.TemplateTitle, i.SubmitterName, i.TeamName, i.DepartmentName,
+                i.ApproverId, i.ApproverName, Roles.DisplayAr(i.ApproverRole),
+                i.StageKey, i.StageLabel, i.Status, StatusLabelAr(i.Status),
+                i.SubmittedAtUtc, i.StageEnteredAtUtc, i.AgeHours, i.SlaHours, i.IsOverdue))
+            .ToList();
+
+        return Result<WorkflowBottlenecksDetailsReport>.Success(new WorkflowBottlenecksDetailsReport(
+            rows.Count, rows.Count(r => r.IsOverdue), rows));
+    }
+
+    private sealed record BottleneckItem(
+        Guid SubmissionId, string TemplateTitle, Guid SubmitterId, string SubmitterName,
+        Guid? TeamId, string? TeamName, Guid? DepartmentId, string? DepartmentName,
+        Guid ApproverId, string ApproverName, string ApproverRole,
+        string StageKey, string StageLabel, SubmissionStatus Status,
+        DateTime? SubmittedAtUtc, DateTime StageEnteredAtUtc, double AgeHours, int SlaHours, bool IsOverdue);
+
+    // تصنيف المرحلة + SLA من دور المعتمِد الحالي. قائد فريق=24h، مدير=48h، الإدارة العليا(GM/CEO/Admin/CeoSupport)=72h.
+    private static (string Key, string Label, int Sla) StageForRole(string primaryRole) => primaryRole switch
+    {
+        Roles.TeamLeader => ("team_leader", "خطوة قائد الفريق", 24),
+        Roles.Manager => ("manager", "خطوة المدير", 48),
+        Roles.GeneralManager or Roles.Ceo or Roles.Admin or Roles.CeoSupport => ("senior_management", "الإدارة العليا", 72),
+        _ => ("other", "مرحلة أخرى", 72)
+    };
+
+    /// <summary>
+    /// المصدر الوحيد لقائمة التقارير العالقة ضمن نطاق ScopeResolver + الفلاتر. تقرير عالق = حالته انتظار اعتماد
+    /// و CurrentApproverId محدَّد و توجد خطوة Pending. عمر المرحلة = الآن − أحدث (أعلى Level) خطوة Pending.CreatedAtUtc.
+    /// </summary>
+    private async Task<List<BottleneckItem>> LoadBottlenecksAsync(
+        string? stageKey, Guid? departmentId, Guid? teamId, Guid? approverId, bool overdueOnly, CancellationToken ct)
+    {
+        var scope = await _scope.ResolveAsync(ct);
+
+        var q = _db.ReportSubmissions.AsNoTracking()
+            .Where(s => PendingApprovalStatuses.Contains(s.Status) && s.CurrentApproverId != null);
+        if (!scope.SeesAll)
+        {
+            var ids = scope.UserIds;
+            q = q.Where(s => ids.Contains(s.SubmitterId));
+        }
+        if (departmentId is not null) q = q.Where(s => s.DepartmentId == departmentId);
+        if (teamId is not null) q = q.Where(s => s.TeamId == teamId);
+        if (approverId is not null) q = q.Where(s => s.CurrentApproverId == approverId);
+
+        var raw = await q.Select(s => new
+        {
+            s.Id, s.ReportTemplateVersionId, s.SubmitterId, s.TeamId, s.DepartmentId,
+            s.Status, s.SubmittedAtUtc, ApproverId = s.CurrentApproverId!.Value,
+            PendingSteps = s.ApprovalSteps
+                .Where(a => a.Status == ApprovalStatus.Pending)
+                .Select(a => new { a.Level, a.CreatedAtUtc })
+                .ToList()
+        }).ToListAsync(ct);
+
+        // يجب وجود خطوة Pending قائمة (تعريف العالق). عمر المرحلة من أحدث خطوة Pending (أعلى Level).
+        var withStep = raw
+            .Select(s => new { s, Step = s.PendingSteps.OrderByDescending(p => p.Level).FirstOrDefault() })
+            .Where(x => x.Step != null)
+            .ToList();
+        if (withStep.Count == 0) return new List<BottleneckItem>();
+
+        var versionIds = withStep.Select(x => x.s.ReportTemplateVersionId).Distinct().ToList();
+        var titleByVersion = await (from v in _db.ReportTemplateVersions.AsNoTracking()
+                                    join t in _db.ReportTemplates on v.ReportTemplateId equals t.Id
+                                    where versionIds.Contains(v.Id)
+                                    select new { v.Id, t.Title })
+            .ToDictionaryAsync(x => x.Id, x => x.Title, ct);
+
+        var submitterIds = withStep.Select(x => x.s.SubmitterId).Distinct().ToList();
+        var approverIds = withStep.Select(x => x.s.ApproverId).Distinct().ToList();
+        var names = await UserNamesAsync(submitterIds.Concat(approverIds), ct);
+        var approverRoles = await UserPrimaryRolesAsync(approverIds, ct);
+
+        var teamIds = withStep.Where(x => x.s.TeamId is not null).Select(x => x.s.TeamId!.Value).Distinct().ToList();
+        var teamNames = teamIds.Count == 0
+            ? new Dictionary<Guid, string>()
+            : await _db.Teams.AsNoTracking().Where(t => teamIds.Contains(t.Id)).ToDictionaryAsync(t => t.Id, t => t.NameAr, ct);
+        var deptIds = withStep.Where(x => x.s.DepartmentId is not null).Select(x => x.s.DepartmentId!.Value).Distinct().ToList();
+        var deptNames = deptIds.Count == 0
+            ? new Dictionary<Guid, string>()
+            : await _db.Departments.AsNoTracking().Where(d => deptIds.Contains(d.Id)).ToDictionaryAsync(d => d.Id, d => d.NameAr, ct);
+
+        var now = DateTime.UtcNow;
+        var items = new List<BottleneckItem>(withStep.Count);
+        foreach (var x in withStep)
+        {
+            var s = x.s;
+            var enteredAt = x.Step!.CreatedAtUtc;
+            var role = RoleAccess.PrimaryRole(approverRoles.GetValueOrDefault(s.ApproverId) ?? new List<string>());
+            var (key, label, sla) = StageForRole(role);
+            var ageHours = Math.Round(Math.Max(0d, (now - enteredAt).TotalHours), 1);
+            var overdue = ageHours > sla;
+
+            items.Add(new BottleneckItem(
+                s.Id, titleByVersion.GetValueOrDefault(s.ReportTemplateVersionId, "تقرير"),
+                s.SubmitterId, names.GetValueOrDefault(s.SubmitterId, "—"),
+                s.TeamId, s.TeamId is Guid tid ? teamNames.GetValueOrDefault(tid) : null,
+                s.DepartmentId, s.DepartmentId is Guid did ? deptNames.GetValueOrDefault(did) : null,
+                s.ApproverId, names.GetValueOrDefault(s.ApproverId, "—"), role,
+                key, label, s.Status, s.SubmittedAtUtc, enteredAt, ageHours, sla, overdue));
+        }
+
+        if (stageKey is not null) items = items.Where(i => i.StageKey == stageKey).ToList();
+        if (overdueOnly) items = items.Where(i => i.IsOverdue).ToList();
+        return items;
+    }
+
+    // ===== البنية التحتية المشتركة لمتابعة الالتزام (مصدر واحد للمتوقَّع + التصنيف الموحّد للتأخّر) =====
+    // تعريف «متأخر» الموحّد عبر الخدمتين: (سلّم بعد موعد دوره) أو (لم يسلّم وانقضى موعد دوره).
+    // Compliance% = Submitted/Expected (المتأخر-المُسلَّم يُحتسب التزامًا)؛ OnTime% = OnTime/Expected.
+    // كلّ حسابات «اليوم»/الاستحقاق/التأخّر بتوقيت الرياض (ReportCalendarPolicy.RiyadhToday/RiyadhDate).
+
+    private enum ComplianceState { OnTime, LateSubmitted, MissingOverdue, MissingNotOverdue }
+
+    private sealed record ComplianceCandidate(
+        Guid UserId, string FullName,
+        Guid? DepartmentId, Guid? TeamId, Guid? JobRoleId,
+        string? DepartmentName, string? TeamName, string? JobRoleName,
+        string PrimaryRole, PeriodType Cadence);
+
+    private sealed record ComplianceEval(
+        ComplianceCandidate Candidate, bool HasSubmission, SubmissionStatus? Status,
+        DateTime? SubmittedAtUtc, ComplianceState State)
+    {
+        public bool LateSubmitted => State == ComplianceState.LateSubmitted;
+        public bool MissingOverdue => State == ComplianceState.MissingOverdue;
+        public bool Late => LateSubmitted || MissingOverdue;     // التعريف الموحّد.
+        public bool OnTime => State == ComplianceState.OnTime;
+    }
+
+    private readonly record struct ComplianceAggregate(
+        int Expected, int Submitted, int Missing, int Late, int LateSubmitted, int MissingOverdue,
+        int OnTime, decimal CompliancePercent, decimal OnTimePercent);
+
+    private static string NormalizeWeekKey(string? weekKey) =>
+        string.IsNullOrWhiteSpace(weekKey) ? ReportCalendarPolicy.WeekKeyFor(ReportCalendarPolicy.RiyadhToday()) : weekKey!.Trim();
+
+    private static ComplianceAggregate Aggregate(IReadOnlyCollection<ComplianceEval> evals)
+    {
+        var expected = evals.Count;
+        var submitted = evals.Count(e => e.HasSubmission);
+        var lateSubmitted = evals.Count(e => e.LateSubmitted);
+        var missingOverdue = evals.Count(e => e.MissingOverdue);
+        var onTime = evals.Count(e => e.OnTime);
+        return new ComplianceAggregate(
+            expected, submitted, expected - submitted, lateSubmitted + missingOverdue,
+            lateSubmitted, missingOverdue, onTime, Rate(submitted, expected), Rate(onTime, expected));
+    }
+
+    /// <summary>
+    /// المصدر الوحيد للمرشّحين المتوقَّع منهم تقرير (أسبوعي أو يومي) ضمن نطاق المستخدم + الفلاتر الاختيارية.
+    /// نفس منطق التذكير: مستخدم نشط بمسمّى له قالب أساسي منشور فعّال دوريّته غير شهرية. الدورية الفعلية للمرشّح
+    /// تُشتقّ من ReportCadencePolicy.ExpectedCadence (مبيعات B2C/B2B = يومي، البقية = أسبوعي). (Archived/Draft/
+    /// Supplementary و Monthly مستبعَدة — الشهري Known Limitation؛ اليومي مشمول.) RPT-SCOPE1: تقييد بنطاق
+    /// ScopeResolver (HR استثناء company-wide موثّق)، ثم الفلاتر.
+    /// </summary>
+    private async Task<Result<List<ComplianceCandidate>>> ResolveComplianceCandidatesAsync(Guid? departmentId, Guid? teamId, CancellationToken ct)
+    {
+        // حارس مخصّص يشمل HR (متابعة التزام فقط) — منفصل عن حارس تقارير المراقبة (MonitoringRoles) الذي يستثني HR.
+        if (!_currentUser.IsAuthenticated)
+            return Result<List<ComplianceCandidate>>.Failure("غير مصرّح.", "auth.unauthenticated");
+        if (!_currentUser.IsInAnyRole(Roles.CompletionMonitors))
+            return Result<List<ComplianceCandidate>>.Failure("لا تملك صلاحية عرض متابعة الالتزام.", "auth.forbidden");
+
+        // المسمّيات المتوقَّع منها تقرير = لها قالب أساسي منشور فعّال دوريّته غير شهرية (أسبوعي أو يومي).
+        // قيد PeriodType != Monthly يستبعد القوالب الشهرية فقط (Known Limitation)، ويُبقي الأسبوعي واليومي.
+        var reportingRoleIds = await _db.ReportTemplates.AsNoTracking()
+            .Where(t => t.JobRoleId != null && t.IsActive
+                        && t.Classification == TemplateClassification.Primary
+                        && t.DefaultPeriodType != PeriodType.Monthly
+                        && _db.ReportTemplateVersions.Any(v => v.ReportTemplateId == t.Id && v.IsPublished))
+            .Select(t => t.JobRoleId!.Value)
+            .Distinct()
+            .ToListAsync(ct);
+
+        // الدورية الفعلية لكلّ مسمّى من ReportCadencePolicy (تُرجِع Daily أو Weekly فقط — الشهري مُستبعَد سلفًا بقيد القالب).
+        var roleCadence = (await _db.JobRoles.AsNoTracking()
+                .Where(j => reportingRoleIds.Contains(j.Id))
+                .Select(j => new { j.Id, j.Code })
+                .ToListAsync(ct))
+            .ToDictionary(j => j.Id, j => ReportCadencePolicy.ExpectedCadence(j.Code));
+
+        var reportingRoleIdSet = roleCadence.Keys.ToHashSet();
+
+        var candQ = _db.Users.AsNoTracking()
+            .Where(u => u.IsActive && u.JobRoleId != null && reportingRoleIdSet.Contains(u.JobRoleId!.Value));
+
+        var scope = await _scope.ResolveAsync(ct);
+        var companyWide = scope.SeesAll || _currentUser.IsInRole(Roles.Hr);
+        if (!companyWide)
+        {
+            var allowedIds = scope.UserIds;
+            candQ = candQ.Where(u => allowedIds.Contains(u.Id));
+        }
+
+        if (departmentId is not null) candQ = candQ.Where(u => u.DepartmentId == departmentId);
+        if (teamId is not null) candQ = candQ.Where(u => u.TeamId == teamId);
+
+        var raw = await candQ
+            .Select(u => new { u.Id, u.FullName, u.DepartmentId, u.TeamId, u.JobRoleId })
+            .ToListAsync(ct);
+
+        if (raw.Count == 0) return Result<List<ComplianceCandidate>>.Success(new List<ComplianceCandidate>());
+
+        var ids = raw.Select(c => c.Id).ToList();
+        var deptIds = raw.Where(c => c.DepartmentId is not null).Select(c => c.DepartmentId!.Value).Distinct().ToList();
+        var teamIds = raw.Where(c => c.TeamId is not null).Select(c => c.TeamId!.Value).Distinct().ToList();
+        var jobRoleIds = raw.Where(c => c.JobRoleId is not null).Select(c => c.JobRoleId!.Value).Distinct().ToList();
+        var deptNames = await _db.Departments.AsNoTracking().Where(d => deptIds.Contains(d.Id)).ToDictionaryAsync(d => d.Id, d => d.NameAr, ct);
+        var teamNames = await _db.Teams.AsNoTracking().Where(t => teamIds.Contains(t.Id)).ToDictionaryAsync(t => t.Id, t => t.NameAr, ct);
+        var jobRoleNames = await _db.JobRoles.AsNoTracking().Where(j => jobRoleIds.Contains(j.Id)).ToDictionaryAsync(j => j.Id, j => j.NameAr, ct);
+        var rolesByUser = await UserPrimaryRolesAsync(ids, ct);
+
+        var list = raw.Select(c => new ComplianceCandidate(
+            c.Id, c.FullName, c.DepartmentId, c.TeamId, c.JobRoleId,
+            c.DepartmentId is Guid did ? deptNames.GetValueOrDefault(did) : null,
+            c.TeamId is Guid tid ? teamNames.GetValueOrDefault(tid) : null,
+            c.JobRoleId is Guid jid ? jobRoleNames.GetValueOrDefault(jid) : null,
+            RoleAccess.PrimaryRole(rolesByUser.GetValueOrDefault(c.Id, new List<string>())),
+            c.JobRoleId is Guid jrc ? roleCadence.GetValueOrDefault(jrc, PeriodType.Weekly) : PeriodType.Weekly)).ToList();
+
+        return Result<List<ComplianceCandidate>>.Success(list);
+    }
+
+    /// <summary>
+    /// أيام التسليم اليومي المتوقَّعة داخل الأسبوع التشغيلي (الخميس → الأربعاء): أيام العمل فقط (تُستبعَد
+    /// الجمعة والسبت عطلة نهاية الأسبوع السعودية)، حتى «اليوم» بتوقيت الرياض كحدّ أقصى (لا تُحتسب أيام مستقبلية).
+    /// </summary>
+    private static List<DateOnly> DailyExpectedDates(string weekKey, DateOnly today)
+    {
+        var (start, end) = ReportCalendarPolicy.WeekRange(weekKey);
+        var cap = today < end ? today : end;
+        var dates = new List<DateOnly>();
+        for (var d = start; d <= cap; d = d.AddDays(1))
+            if (d.DayOfWeek is not (DayOfWeek.Friday or DayOfWeek.Saturday))
+                dates.Add(d);
+        return dates;
+    }
+
+    /// <summary>
+    /// تقييم التزام أسبوع تشغيلي واحد لمجموعة مرشّحين. الأسبوعي = وحدة متوقَّعة واحدة لكلّ مرشّح وفق موعد دوره
+    /// (DueDateForRole). اليومي (مبيعات B2C/B2B) = وحدة متوقَّعة لكلّ يوم عمل ضمن الأسبوع (DailyExpectedDates)،
+    /// موعد كلّ يوم نهايته نفسه. «اليوم» والتأخّر بتوقيت الرياض. لا يكشف أيّ محتوى — حالة + وقت التسليم فقط.
+    /// </summary>
+    private async Task<List<ComplianceEval>> EvaluateComplianceWeekAsync(string key, IReadOnlyList<ComplianceCandidate> candidates, CancellationToken ct)
+    {
+        if (candidates.Count == 0) return new List<ComplianceEval>();
+
+        var today = ReportCalendarPolicy.RiyadhToday();
+        var weeklyCandidates = candidates.Where(c => c.Cadence != PeriodType.Daily).ToList();
+        var dailyCandidates = candidates.Where(c => c.Cadence == PeriodType.Daily).ToList();
+        var evals = new List<ComplianceEval>(candidates.Count);
+
+        // ===== الأسبوعيون: وحدة واحدة لكلّ مرشّح =====
+        if (weeklyCandidates.Count > 0)
+        {
+            var weeklyIds = weeklyCandidates.Select(c => c.UserId).ToList();
+            var submittedRows = await _db.ReportSubmissions.AsNoTracking()
+                .Where(s => s.PeriodKey == key && s.PeriodType == PeriodType.Weekly
+                            && SubmittedStatuses.Contains(s.Status)
+                            && weeklyIds.Contains(s.SubmitterId))
+                .Select(s => new { s.SubmitterId, s.Status, s.SubmittedAtUtc })
+                .ToListAsync(ct);
+
+            var submittedByUser = submittedRows
+                .GroupBy(s => s.SubmitterId)
+                .ToDictionary(g => g.Key, g => g.OrderBy(x => x.SubmittedAtUtc ?? DateTime.MaxValue).First());
+
+            foreach (var c in weeklyCandidates)
+            {
+                var due = ReportCalendarPolicy.DueDateForRole(key, c.PrimaryRole);
+                if (submittedByUser.TryGetValue(c.UserId, out var sub))
+                {
+                    var submittedDate = sub.SubmittedAtUtc is DateTime at ? ReportCalendarPolicy.RiyadhDate(at) : today;
+                    var state = submittedDate > due ? ComplianceState.LateSubmitted : ComplianceState.OnTime;
+                    evals.Add(new ComplianceEval(c, true, sub.Status, sub.SubmittedAtUtc, state));
+                }
+                else
+                {
+                    var state = today > due ? ComplianceState.MissingOverdue : ComplianceState.MissingNotOverdue;
+                    evals.Add(new ComplianceEval(c, false, null, null, state));
+                }
+            }
+        }
+
+        // ===== اليوميون (مبيعات): وحدة لكلّ يوم عمل متوقَّع ضمن الأسبوع =====
+        if (dailyCandidates.Count > 0)
+        {
+            var dates = DailyExpectedDates(key, today);
+            if (dates.Count > 0)
+            {
+                var dailyIds = dailyCandidates.Select(c => c.UserId).ToList();
+                var dateKeys = dates.Select(d => d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)).ToList();
+
+                var dailyRows = await _db.ReportSubmissions.AsNoTracking()
+                    .Where(s => s.PeriodType == PeriodType.Daily && dateKeys.Contains(s.PeriodKey)
+                                && SubmittedStatuses.Contains(s.Status)
+                                && dailyIds.Contains(s.SubmitterId))
+                    .Select(s => new { s.SubmitterId, s.PeriodKey, s.Status, s.SubmittedAtUtc })
+                    .ToListAsync(ct);
+
+                var dailyByUserDay = dailyRows
+                    .GroupBy(s => (s.SubmitterId, s.PeriodKey))
+                    .ToDictionary(g => g.Key, g => g.OrderBy(x => x.SubmittedAtUtc ?? DateTime.MaxValue).First());
+
+                foreach (var c in dailyCandidates)
+                {
+                    foreach (var day in dates)
+                    {
+                        var dayKey = day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+                        // موعد التقرير اليومي = نهاية يومه؛ متأخّر إن سُلّم بعد ذلك اليوم.
+                        if (dailyByUserDay.TryGetValue((c.UserId, dayKey), out var sub))
+                        {
+                            var submittedDate = sub.SubmittedAtUtc is DateTime at ? ReportCalendarPolicy.RiyadhDate(at) : day;
+                            var state = submittedDate > day ? ComplianceState.LateSubmitted : ComplianceState.OnTime;
+                            evals.Add(new ComplianceEval(c, true, sub.Status, sub.SubmittedAtUtc, state));
+                        }
+                        else
+                        {
+                            var state = today > day ? ComplianceState.MissingOverdue : ComplianceState.MissingNotOverdue;
+                            evals.Add(new ComplianceEval(c, false, null, null, state));
+                        }
+                    }
+                }
+            }
+        }
+
+        return evals;
+    }
+
+    /// <summary>
+    /// يبني صفّ متابعة واحدًا لشخص من تقييماته في الأسبوع. الأسبوعي = تقييم واحد (حالته كما هي).
+    /// اليومي = تلخيص أيام العمل المتوقَّعة («سلّم X من Y يوم» + «(متأخر)» إن وُجد تأخّر): Submitted حين سلّم كلّ
+    /// الأيام المتوقَّعة، Late حين تأخّر أو تجاوز يومًا واحدًا على الأقل، وقت التسليم = أحدث تسليم.
+    /// </summary>
+    private static SubmissionComplianceRow BuildPersonRow(string key, IReadOnlyList<ComplianceEval> userEvals)
+    {
+        var c = userEvals[0].Candidate;
+        if (c.Cadence != PeriodType.Daily)
+        {
+            var e = userEvals[0];
+            return new SubmissionComplianceRow(
+                c.UserId, c.FullName, c.DepartmentName, c.TeamName, c.JobRoleName,
+                e.HasSubmission,
+                e.HasSubmission ? StatusLabelAr(e.Status!.Value) : "لم يسلّم",
+                e.Late, e.SubmittedAtUtc, key, e.LateSubmitted);
+        }
+
+        var expected = userEvals.Count;
+        var submitted = userEvals.Count(x => x.HasSubmission);
+        var lateSubmitted = userEvals.Count(x => x.LateSubmitted);
+        var late = userEvals.Any(x => x.Late);
+        var lastSubmittedAt = userEvals.Where(x => x.SubmittedAtUtc is not null).Max(x => x.SubmittedAtUtc);
+        var label = $"سلّم {submitted} من {expected} يوم" + (lateSubmitted > 0 ? " (متأخر)" : "");
+        return new SubmissionComplianceRow(
+            c.UserId, c.FullName, c.DepartmentName, c.TeamName, c.JobRoleName,
+            submitted == expected && expected > 0, label, late, lastSubmittedAt, key, lateSubmitted > 0);
     }
 
     public async Task<Result<KpiSummaryReport>> KpiSummaryAsync(ReportFilter filter, CancellationToken ct = default)
@@ -308,17 +907,27 @@ public class ReportingService : IReportingService
             .Select(v => new { v.ReportSubmissionId, v.TemplateFieldId, v.ValueNumber, v.ValueText })
             .ToListAsync(ct);
 
+        // v5: المؤشرات مضمَّنة داخل المشاريع (PRS) — تُضاف فوق مجموع top-level (v1–v4). لا ازدواج (مفاتيح v5 غائبة عن v4).
+        var prsFieldIds = fields.Where(f => f.FieldType == FieldType.ProjectRepeatableSection).Select(f => f.Id).ToList();
+        var prs = await LoadPrsAsync(prsFieldIds, subIds, ct);
+
         var names = await UserNamesAsync(subs.Select(s => s.SubmitterId), ct);
 
-        decimal Sum(IEnumerable<Guid> ids, Guid? fid) =>
-            fid is null ? 0m
-            : values.Where(v => ids.Contains(v.ReportSubmissionId) && v.TemplateFieldId == fid).Sum(v => v.ValueNumber ?? 0m);
-
-        decimal Avg(IEnumerable<Guid> ids, Guid? fid)
+        decimal Sum(IEnumerable<Guid> ids, Guid? fid, string prsKey)
         {
-            if (fid is null) return 0m;
-            var nums = values.Where(v => ids.Contains(v.ReportSubmissionId) && v.TemplateFieldId == fid && v.ValueNumber is not null)
-                .Select(v => v.ValueNumber!.Value).ToList();
+            var idList = ids as IList<Guid> ?? ids.ToList();
+            var top = fid is null ? 0m
+                : values.Where(v => idList.Contains(v.ReportSubmissionId) && v.TemplateFieldId == fid).Sum(v => v.ValueNumber ?? 0m);
+            return top + prs.Sum(idList, prsKey);
+        }
+
+        decimal Avg(IEnumerable<Guid> ids, Guid? fid, string prsKey)
+        {
+            var idList = ids as IList<Guid> ?? ids.ToList();
+            var nums = fid is null ? new List<decimal>()
+                : values.Where(v => idList.Contains(v.ReportSubmissionId) && v.TemplateFieldId == fid && v.ValueNumber is not null)
+                    .Select(v => v.ValueNumber!.Value).ToList();
+            nums.AddRange(prs.Values(idList, prsKey));
             return nums.Count > 0 ? Math.Round(nums.Average(), 1) : 0m;
         }
 
@@ -327,12 +936,12 @@ public class ReportingService : IReportingService
         foreach (var g in bySubmitter)
         {
             var sIds = g.Select(x => x.Id).ToList();
-            var spend = Sum(sIds, spendFid);
-            var leads = Sum(sIds, leadsFid);
+            var spend = Sum(sIds, spendFid, MediaBuyerReportSchema.Prs.Spend);
+            var leads = Sum(sIds, leadsFid, MediaBuyerReportSchema.Prs.Leads);
             // CPL يُحتسب آليًا = الإنفاق/الليدز (Auto) — أدق من القيمة المُبلَّغة.
             var cpl = leads > 0 ? Math.Round(spend / leads, 2) : 0m;
-            var ctr = Avg(sIds, ctrFid);
-            var conversion = Avg(sIds, conversionFid);
+            var ctr = Avg(sIds, ctrFid, MediaBuyerReportSchema.Prs.Ctr);
+            var conversion = Avg(sIds, conversionFid, MediaBuyerReportSchema.Prs.ConversionRate);
             rows.Add(new MediaBuyerRollupRow(g.Key, names.GetValueOrDefault(g.Key, string.Empty),
                 spend, leads, cpl, ctr, conversion, false));
         }
@@ -354,13 +963,15 @@ public class ReportingService : IReportingService
         var best = withLeads.OrderBy(r => r.Cpl).ThenByDescending(r => r.Leads).FirstOrDefault();
         var worst = withLeads.OrderByDescending(r => r.Cpl).ThenBy(r => r.Leads).FirstOrDefault();
 
-        List<string> TextList(Guid? fid) =>
-            fid is null ? new List<string>()
-            : values.Where(v => v.TemplateFieldId == fid && !string.IsNullOrWhiteSpace(v.ValueText))
-                .Select(v => v.ValueText!.Trim()).Distinct().Take(5).ToList();
+        List<string> TextList(Guid? fid, string prsKey) =>
+            (fid is null
+                ? Enumerable.Empty<string>()
+                : values.Where(v => v.TemplateFieldId == fid && !string.IsNullOrWhiteSpace(v.ValueText)).Select(v => v.ValueText!.Trim()))
+                .Concat(prs.Texts(prsKey))
+                .Distinct().Take(5).ToList();
 
-        var issueCauses = TextList(issueCauseFid);
-        var decisions = TextList(decisionsFid);
+        var issueCauses = TextList(issueCauseFid, MediaBuyerReportSchema.Prs.IssueCause);
+        var decisions = TextList(decisionsFid, MediaBuyerReportSchema.Prs.DecisionsNeeded);
 
         // تقليل البيانات: الأدوار المؤسسية (company/governance) تحصل على الإجماليات فقط — تُحذف الصفوف والأفضل/الأضعف.
         var shapedRows = canViewRows ? (IReadOnlyList<MediaBuyerRollupRow>)finalRows : new List<MediaBuyerRollupRow>();
@@ -456,30 +1067,39 @@ public class ReportingService : IReportingService
             .Select(v => new { v.ReportSubmissionId, v.TemplateFieldId, v.ValueNumber, v.ValueText })
             .ToListAsync(ct);
 
+        // v5: المؤشرات مضمَّنة داخل المشاريع (PRS) — تُضاف فوق مجموع top-level (v1–v4). لا ازدواج (مفاتيح v5 غائبة عن v4).
+        var prsFieldIds = fields.Where(f => f.FieldType == FieldType.ProjectRepeatableSection).Select(f => f.Id).ToList();
+        var prs = await LoadPrsAsync(prsFieldIds, subIds, ct);
+
         var names = await UserNamesAsync(subs.Select(s => s.SubmitterId), ct);
 
-        decimal Sum(IEnumerable<Guid> ids, HashSet<Guid> fids) =>
-            fids.Count == 0 ? 0m
-            : values.Where(v => ids.Contains(v.ReportSubmissionId) && fids.Contains(v.TemplateFieldId)).Sum(v => v.ValueNumber ?? 0m);
+        decimal Sum(IEnumerable<Guid> ids, HashSet<Guid> fids, string prsKey)
+        {
+            var idList = ids as IList<Guid> ?? ids.ToList();
+            var top = fids.Count == 0 ? 0m
+                : values.Where(v => idList.Contains(v.ReportSubmissionId) && fids.Contains(v.TemplateFieldId)).Sum(v => v.ValueNumber ?? 0m);
+            return top + prs.Sum(idList, prsKey);
+        }
 
         var bySubmitter = subs.GroupBy(s => s.SubmitterId).ToList();
         var rows = new List<SeoRollupRow>();
         foreach (var g in bySubmitter)
         {
             var sIds = g.Select(x => x.Id).ToList();
-            var improved = Sum(sIds, improvedFids);
-            var declined = Sum(sIds, declinedFids);
+            var improved = Sum(sIds, improvedFids, SeoReportSchema.Prs.ImprovedKeywords);
+            var declined = Sum(sIds, declinedFids, SeoReportSchema.Prs.DeclinedKeywords);
             // صافي تحسّن الكلمات يُحتسب آليًا = تحسّنت − تراجعت (Auto من حقول يدوية).
             var net = improved - declined;
-            var planned = Sum(sIds, plannedFids);
-            var published = Sum(sIds, publishedFids);
+            var planned = Sum(sIds, plannedFids, SeoReportSchema.Prs.ArticlesPlanned);
+            var published = Sum(sIds, publishedFids, SeoReportSchema.Prs.ArticlesPublished);
             // معدّل إنجاز المحتوى لهذا العضو = منشورة/مخطّط لها (٪).
             var contentRate = planned > 0 ? Math.Round(published / planned * 100m, 1) : 0m;
             rows.Add(new SeoRollupRow(
                 g.Key, names.GetValueOrDefault(g.Key, string.Empty),
                 improved, declined, net,
-                Sum(sIds, tasksFids), Sum(sIds, techIssuesFids), Sum(sIds, indexedFids), Sum(sIds, organicFids),
-                planned, published, Sum(sIds, lateFids),
+                Sum(sIds, tasksFids, SeoReportSchema.Prs.TasksDone), Sum(sIds, techIssuesFids, SeoReportSchema.Prs.TechnicalIssues),
+                Sum(sIds, indexedFids, SeoReportSchema.Prs.IndexedPages), Sum(sIds, organicFids, SeoReportSchema.Prs.OrganicTraffic),
+                planned, published, Sum(sIds, lateFids, SeoReportSchema.Prs.ArticlesLate),
                 contentRate, false));
         }
 
@@ -501,13 +1121,14 @@ public class ReportingService : IReportingService
         var best = finalRows.OrderByDescending(r => r.NetKeywords).FirstOrDefault();
         var worst = finalRows.OrderBy(r => r.NetKeywords).FirstOrDefault();
 
-        List<string> TextList(HashSet<Guid> fids) =>
-            fids.Count == 0 ? new List<string>()
-            : values.Where(v => fids.Contains(v.TemplateFieldId) && !string.IsNullOrWhiteSpace(v.ValueText))
-                .Select(v => v.ValueText!.Trim()).Distinct().Take(5).ToList();
+        List<string> TextList(HashSet<Guid> fids, string prsKey) =>
+            values.Where(v => fids.Contains(v.TemplateFieldId) && !string.IsNullOrWhiteSpace(v.ValueText))
+                .Select(v => v.ValueText!.Trim())
+                .Concat(prs.Texts(prsKey))
+                .Distinct().Take(5).ToList();
 
-        var decisions = TextList(decisionsFids);
-        var recommendations = TextList(recommendationsFids);
+        var decisions = TextList(decisionsFids, SeoReportSchema.Prs.DecisionsNeeded);
+        var recommendations = TextList(recommendationsFids, SeoReportSchema.Prs.Recommendations);
 
         // تقليل البيانات: الأدوار المؤسسية (company/governance) تحصل على الإجماليات فقط — تُحذف الصفوف والأفضل/الأحوج.
         var shapedRows = canViewRows ? (IReadOnlyList<SeoRollupRow>)finalRows : new List<SeoRollupRow>();
@@ -601,20 +1222,29 @@ public class ReportingService : IReportingService
             .Select(v => new { v.ReportSubmissionId, v.TemplateFieldId, v.ValueNumber, v.ValueText })
             .ToListAsync(ct);
 
+        // v5: المؤشرات مضمَّنة داخل المشاريع (PRS) — تُضاف فوق مجموع top-level (v1–v4). لا ازدواج (مفاتيح v5 غائبة عن v4).
+        var prsFieldIds = fields.Where(f => f.FieldType == FieldType.ProjectRepeatableSection).Select(f => f.Id).ToList();
+        var prs = await LoadPrsAsync(prsFieldIds, subIds, ct);
+
         var names = await UserNamesAsync(subs.Select(s => s.SubmitterId), ct);
 
-        decimal Sum(IEnumerable<Guid> ids, HashSet<Guid> fids) =>
-            fids.Count == 0 ? 0m
-            : values.Where(v => ids.Contains(v.ReportSubmissionId) && fids.Contains(v.TemplateFieldId)).Sum(v => v.ValueNumber ?? 0m);
-
-        decimal Avg(IEnumerable<Guid> ids, HashSet<Guid> fids)
+        decimal Sum(IEnumerable<Guid> ids, HashSet<Guid> fids, string prsKey)
         {
-            if (fids.Count == 0) return 0m;
+            var idList = ids as IList<Guid> ?? ids.ToList();
+            var top = fids.Count == 0 ? 0m
+                : values.Where(v => idList.Contains(v.ReportSubmissionId) && fids.Contains(v.TemplateFieldId)).Sum(v => v.ValueNumber ?? 0m);
+            return top + prs.Sum(idList, prsKey);
+        }
+
+        decimal Avg(IEnumerable<Guid> ids, HashSet<Guid> fids, string prsKey)
+        {
             var idsList = ids as ICollection<Guid> ?? ids.ToList();
-            var nums = values
-                .Where(v => idsList.Contains(v.ReportSubmissionId) && fids.Contains(v.TemplateFieldId) && v.ValueNumber.HasValue)
-                .Select(v => v.ValueNumber!.Value)
-                .ToList();
+            var nums = fids.Count == 0 ? new List<decimal>()
+                : values
+                    .Where(v => idsList.Contains(v.ReportSubmissionId) && fids.Contains(v.TemplateFieldId) && v.ValueNumber.HasValue)
+                    .Select(v => v.ValueNumber!.Value)
+                    .ToList();
+            nums.AddRange(prs.Values(idsList, prsKey));
             return nums.Count == 0 ? 0m : Math.Round(nums.Average(), 1);
         }
 
@@ -623,15 +1253,15 @@ public class ReportingService : IReportingService
         foreach (var g in bySubmitter)
         {
             var sIds = g.Select(x => x.Id).ToList();
-            var required = Sum(sIds, requiredFids);
-            var delivered = Sum(sIds, deliveredFids);
-            var approved = Sum(sIds, approvedFids);
-            var late = Sum(sIds, lateFids);
+            var required = Sum(sIds, requiredFids, ContentWriterReportSchema.Prs.RequiredPieces);
+            var delivered = Sum(sIds, deliveredFids, ContentWriterReportSchema.Prs.DeliveredPieces);
+            var approved = Sum(sIds, approvedFids, ContentWriterReportSchema.Prs.ApprovedFirstTime);
+            var late = Sum(sIds, lateFids, ContentWriterReportSchema.Prs.LatePieces);
             // المعادة للتعديل تُحتسب آليًا = المسلَّمة − المعتمدة من أول مرة (لا تقل عن صفر).
             var revised = Math.Max(0m, delivered - approved);
             var firstApproval = delivered > 0 ? Math.Round(approved / delivered * 100m, 1) : 0m;
             var revisionRate = delivered > 0 ? Math.Round(revised / delivered * 100m, 1) : 0m;
-            var planAdherence = Avg(sIds, achievementFids);
+            var planAdherence = Avg(sIds, achievementFids, ContentWriterReportSchema.Prs.OutputAchievement);
             rows.Add(new ContentWriterRollupRow(
                 g.Key, names.GetValueOrDefault(g.Key, string.Empty),
                 required, delivered, approved, late, revised,
@@ -658,13 +1288,14 @@ public class ReportingService : IReportingService
         var best = finalRows.OrderByDescending(r => r.FirstApprovalRate).FirstOrDefault();
         var worst = finalRows.OrderBy(r => r.FirstApprovalRate).FirstOrDefault();
 
-        List<string> TextList(HashSet<Guid> fids) =>
-            fids.Count == 0 ? new List<string>()
-            : values.Where(v => fids.Contains(v.TemplateFieldId) && !string.IsNullOrWhiteSpace(v.ValueText))
-                .Select(v => v.ValueText!.Trim()).Distinct().Take(5).ToList();
+        List<string> TextList(HashSet<Guid> fids, string prsKey) =>
+            values.Where(v => fids.Contains(v.TemplateFieldId) && !string.IsNullOrWhiteSpace(v.ValueText))
+                .Select(v => v.ValueText!.Trim())
+                .Concat(prs.Texts(prsKey))
+                .Distinct().Take(5).ToList();
 
-        var delayReasons = TextList(delayFids);
-        var decisions = TextList(challengesFids);
+        var delayReasons = TextList(delayFids, ContentWriterReportSchema.Prs.DelayReasons);
+        var decisions = TextList(challengesFids, ContentWriterReportSchema.Prs.Challenges);
 
         // تقليل البيانات: الأدوار المؤسسية (company/governance) تحصل على الإجماليات فقط — تُحذف الصفوف والأفضل/الأحوج.
         var shapedRows = canViewRows ? (IReadOnlyList<ContentWriterRollupRow>)finalRows : new List<ContentWriterRollupRow>();
@@ -758,20 +1389,29 @@ public class ReportingService : IReportingService
             .Select(v => new { v.ReportSubmissionId, v.TemplateFieldId, v.ValueNumber, v.ValueText })
             .ToListAsync(ct);
 
+        // v5: المؤشرات مضمَّنة داخل المشاريع (PRS) — تُضاف فوق مجموع top-level (v1–v4). لا ازدواج (مفاتيح v5 غائبة عن v4).
+        var prsFieldIds = fields.Where(f => f.FieldType == FieldType.ProjectRepeatableSection).Select(f => f.Id).ToList();
+        var prs = await LoadPrsAsync(prsFieldIds, subIds, ct);
+
         var names = await UserNamesAsync(subs.Select(s => s.SubmitterId), ct);
 
-        decimal Sum(IEnumerable<Guid> ids, HashSet<Guid> fids) =>
-            fids.Count == 0 ? 0m
-            : values.Where(v => ids.Contains(v.ReportSubmissionId) && fids.Contains(v.TemplateFieldId)).Sum(v => v.ValueNumber ?? 0m);
-
-        decimal Avg(IEnumerable<Guid> ids, HashSet<Guid> fids)
+        decimal Sum(IEnumerable<Guid> ids, HashSet<Guid> fids, string prsKey)
         {
-            if (fids.Count == 0) return 0m;
+            var idList = ids as IList<Guid> ?? ids.ToList();
+            var top = fids.Count == 0 ? 0m
+                : values.Where(v => idList.Contains(v.ReportSubmissionId) && fids.Contains(v.TemplateFieldId)).Sum(v => v.ValueNumber ?? 0m);
+            return top + prs.Sum(idList, prsKey);
+        }
+
+        decimal Avg(IEnumerable<Guid> ids, HashSet<Guid> fids, string prsKey)
+        {
             var idsList = ids as ICollection<Guid> ?? ids.ToList();
-            var nums = values
-                .Where(v => idsList.Contains(v.ReportSubmissionId) && fids.Contains(v.TemplateFieldId) && v.ValueNumber.HasValue)
-                .Select(v => v.ValueNumber!.Value)
-                .ToList();
+            var nums = fids.Count == 0 ? new List<decimal>()
+                : values
+                    .Where(v => idsList.Contains(v.ReportSubmissionId) && fids.Contains(v.TemplateFieldId) && v.ValueNumber.HasValue)
+                    .Select(v => v.ValueNumber!.Value)
+                    .ToList();
+            nums.AddRange(prs.Values(idsList, prsKey));
             return nums.Count == 0 ? 0m : Math.Round(nums.Average(), 1);
         }
 
@@ -780,18 +1420,18 @@ public class ReportingService : IReportingService
         foreach (var g in bySubmitter)
         {
             var sIds = g.Select(x => x.Id).ToList();
-            var requested = Sum(sIds, requestedFids);
-            var delivered = Sum(sIds, deliveredFids);
-            var approved = Sum(sIds, approvedFids);
-            var late = Sum(sIds, lateFids);
-            var pending = Sum(sIds, pendingFids);
+            var requested = Sum(sIds, requestedFids, DesignerReportSchema.Prs.RequestedDesigns);
+            var delivered = Sum(sIds, deliveredFids, DesignerReportSchema.Prs.DeliveredDesigns);
+            var approved = Sum(sIds, approvedFids, DesignerReportSchema.Prs.ApprovedFirstTime);
+            var late = Sum(sIds, lateFids, DesignerReportSchema.Prs.LateDesigns);
+            var pending = Sum(sIds, pendingFids, DesignerReportSchema.Prs.PendingReview);
             // المعادة للتعديل تُقرأ مباشرة من حقل «أعيدت للتعديل» (القالب أغنى من كاتب المحتوى).
-            var revised = Sum(sIds, revisedFids);
+            var revised = Sum(sIds, revisedFids, DesignerReportSchema.Prs.RevisedDesigns);
             var firstApproval = delivered > 0 ? Math.Round(approved / delivered * 100m, 1) : 0m;
             var revisionRate = delivered > 0 ? Math.Round(revised / delivered * 100m, 1) : 0m;
             // نسبة الالتزام بالمواعيد = (المسلَّمة − المتأخرة) / المسلَّمة (٪).
             var onTime = delivered > 0 ? Math.Round(Math.Max(0m, delivered - late) / delivered * 100m, 1) : 0m;
-            var planAdherence = Avg(sIds, achievementFids);
+            var planAdherence = Avg(sIds, achievementFids, DesignerReportSchema.Prs.OutputAchievement);
             rows.Add(new DesignerRollupRow(
                 g.Key, names.GetValueOrDefault(g.Key, string.Empty),
                 requested, delivered, approved, late, pending, revised,
@@ -820,13 +1460,14 @@ public class ReportingService : IReportingService
         var best = finalRows.OrderByDescending(r => r.FirstApprovalRate).FirstOrDefault();
         var worst = finalRows.OrderBy(r => r.FirstApprovalRate).FirstOrDefault();
 
-        List<string> TextList(HashSet<Guid> fids) =>
-            fids.Count == 0 ? new List<string>()
-            : values.Where(v => fids.Contains(v.TemplateFieldId) && !string.IsNullOrWhiteSpace(v.ValueText))
-                .Select(v => v.ValueText!.Trim()).Distinct().Take(5).ToList();
+        List<string> TextList(HashSet<Guid> fids, string prsKey) =>
+            values.Where(v => fids.Contains(v.TemplateFieldId) && !string.IsNullOrWhiteSpace(v.ValueText))
+                .Select(v => v.ValueText!.Trim())
+                .Concat(prs.Texts(prsKey))
+                .Distinct().Take(5).ToList();
 
-        var delayReasons = TextList(delayFids);
-        var decisions = TextList(challengesFids);
+        var delayReasons = TextList(delayFids, DesignerReportSchema.Prs.DelayReasons);
+        var decisions = TextList(challengesFids, DesignerReportSchema.Prs.Challenges);
 
         // تقليل البيانات: الأدوار المؤسسية (company/governance) تحصل على الإجماليات فقط — تُحذف الصفوف والأفضل/الأحوج.
         var shapedRows = canViewRows ? (IReadOnlyList<DesignerRollupRow>)finalRows : new List<DesignerRollupRow>();
@@ -922,20 +1563,29 @@ public class ReportingService : IReportingService
             .Select(v => new { v.ReportSubmissionId, v.TemplateFieldId, v.ValueNumber, v.ValueText })
             .ToListAsync(ct);
 
+        // v5: المؤشرات مضمَّنة داخل المشاريع (PRS) — تُضاف فوق مجموع top-level (v1–v4). لا ازدواج (مفاتيح v5 غائبة عن v4).
+        var prsFieldIds = fields.Where(f => f.FieldType == FieldType.ProjectRepeatableSection).Select(f => f.Id).ToList();
+        var prs = await LoadPrsAsync(prsFieldIds, subIds, ct);
+
         var names = await UserNamesAsync(subs.Select(s => s.SubmitterId), ct);
 
-        decimal Sum(IEnumerable<Guid> ids, HashSet<Guid> fids) =>
-            fids.Count == 0 ? 0m
-            : values.Where(v => ids.Contains(v.ReportSubmissionId) && fids.Contains(v.TemplateFieldId)).Sum(v => v.ValueNumber ?? 0m);
-
-        decimal Avg(IEnumerable<Guid> ids, HashSet<Guid> fids)
+        decimal Sum(IEnumerable<Guid> ids, HashSet<Guid> fids, string prsKey)
         {
-            if (fids.Count == 0) return 0m;
+            var idList = ids as IList<Guid> ?? ids.ToList();
+            var top = fids.Count == 0 ? 0m
+                : values.Where(v => idList.Contains(v.ReportSubmissionId) && fids.Contains(v.TemplateFieldId)).Sum(v => v.ValueNumber ?? 0m);
+            return top + prs.Sum(idList, prsKey);
+        }
+
+        decimal Avg(IEnumerable<Guid> ids, HashSet<Guid> fids, string prsKey)
+        {
             var idsList = ids as ICollection<Guid> ?? ids.ToList();
-            var nums = values
-                .Where(v => idsList.Contains(v.ReportSubmissionId) && fids.Contains(v.TemplateFieldId) && v.ValueNumber.HasValue)
-                .Select(v => v.ValueNumber!.Value)
-                .ToList();
+            var nums = fids.Count == 0 ? new List<decimal>()
+                : values
+                    .Where(v => idsList.Contains(v.ReportSubmissionId) && fids.Contains(v.TemplateFieldId) && v.ValueNumber.HasValue)
+                    .Select(v => v.ValueNumber!.Value)
+                    .ToList();
+            nums.AddRange(prs.Values(idsList, prsKey));
             return nums.Count == 0 ? 0m : Math.Round(nums.Average(), 1);
         }
 
@@ -944,18 +1594,18 @@ public class ReportingService : IReportingService
         foreach (var g in bySubmitter)
         {
             var sIds = g.Select(x => x.Id).ToList();
-            var requested = Sum(sIds, requestedFids);
-            var delivered = Sum(sIds, deliveredFids);
-            var approved = Sum(sIds, approvedFids);
-            var late = Sum(sIds, lateFids);
-            var pending = Sum(sIds, pendingFids);
+            var requested = Sum(sIds, requestedFids, VideoReportSchema.Prs.RequestedVideos);
+            var delivered = Sum(sIds, deliveredFids, VideoReportSchema.Prs.DeliveredVideos);
+            var approved = Sum(sIds, approvedFids, VideoReportSchema.Prs.ApprovedFirstTime);
+            var late = Sum(sIds, lateFids, VideoReportSchema.Prs.LateVideos);
+            var pending = Sum(sIds, pendingFids, VideoReportSchema.Prs.PendingReview);
             // المعادة للتعديل تُقرأ مباشرة من حقل «أعيدت للتعديل» (القالب أغنى من كاتب المحتوى).
-            var revised = Sum(sIds, revisedFids);
+            var revised = Sum(sIds, revisedFids, VideoReportSchema.Prs.RevisedVideos);
             var firstApproval = delivered > 0 ? Math.Round(approved / delivered * 100m, 1) : 0m;
             var revisionRate = delivered > 0 ? Math.Round(revised / delivered * 100m, 1) : 0m;
             // نسبة الالتزام بالمواعيد = (المسلَّمة − المتأخرة) / المسلَّمة (٪).
             var onTime = delivered > 0 ? Math.Round(Math.Max(0m, delivered - late) / delivered * 100m, 1) : 0m;
-            var planAdherence = Avg(sIds, achievementFids);
+            var planAdherence = Avg(sIds, achievementFids, VideoReportSchema.Prs.OutputAchievement);
             rows.Add(new VideoRollupRow(
                 g.Key, names.GetValueOrDefault(g.Key, string.Empty),
                 requested, delivered, approved, late, pending, revised,
@@ -984,13 +1634,14 @@ public class ReportingService : IReportingService
         var best = finalRows.OrderByDescending(r => r.FirstApprovalRate).FirstOrDefault();
         var worst = finalRows.OrderBy(r => r.FirstApprovalRate).FirstOrDefault();
 
-        List<string> TextList(HashSet<Guid> fids) =>
-            fids.Count == 0 ? new List<string>()
-            : values.Where(v => fids.Contains(v.TemplateFieldId) && !string.IsNullOrWhiteSpace(v.ValueText))
-                .Select(v => v.ValueText!.Trim()).Distinct().Take(5).ToList();
+        List<string> TextList(HashSet<Guid> fids, string prsKey) =>
+            values.Where(v => fids.Contains(v.TemplateFieldId) && !string.IsNullOrWhiteSpace(v.ValueText))
+                .Select(v => v.ValueText!.Trim())
+                .Concat(prs.Texts(prsKey))
+                .Distinct().Take(5).ToList();
 
-        var delayReasons = TextList(delayFids);
-        var decisions = TextList(challengesFids);
+        var delayReasons = TextList(delayFids, VideoReportSchema.Prs.DelayReasons);
+        var decisions = TextList(challengesFids, VideoReportSchema.Prs.Challenges);
 
         // تقليل البيانات: الأدوار المؤسسية (company/governance) تحصل على الإجماليات فقط — تُحذف الصفوف والأفضل/الأحوج.
         var shapedRows = canViewRows ? (IReadOnlyList<VideoRollupRow>)finalRows : new List<VideoRollupRow>();
@@ -1086,20 +1737,29 @@ public class ReportingService : IReportingService
             .Select(v => new { v.ReportSubmissionId, v.TemplateFieldId, v.ValueNumber, v.ValueText })
             .ToListAsync(ct);
 
+        // v5: المؤشرات مضمَّنة داخل المشاريع (PRS) — تُضاف فوق مجموع top-level (v1–v4). لا ازدواج (مفاتيح v5 غائبة عن v4).
+        var prsFieldIds = fields.Where(f => f.FieldType == FieldType.ProjectRepeatableSection).Select(f => f.Id).ToList();
+        var prs = await LoadPrsAsync(prsFieldIds, subIds, ct);
+
         var names = await UserNamesAsync(subs.Select(s => s.SubmitterId), ct);
 
-        decimal Sum(IEnumerable<Guid> ids, HashSet<Guid> fids) =>
-            fids.Count == 0 ? 0m
-            : values.Where(v => ids.Contains(v.ReportSubmissionId) && fids.Contains(v.TemplateFieldId)).Sum(v => v.ValueNumber ?? 0m);
-
-        decimal Avg(IEnumerable<Guid> ids, HashSet<Guid> fids)
+        decimal Sum(IEnumerable<Guid> ids, HashSet<Guid> fids, string prsKey)
         {
-            if (fids.Count == 0) return 0m;
+            var idList = ids as IList<Guid> ?? ids.ToList();
+            var top = fids.Count == 0 ? 0m
+                : values.Where(v => idList.Contains(v.ReportSubmissionId) && fids.Contains(v.TemplateFieldId)).Sum(v => v.ValueNumber ?? 0m);
+            return top + prs.Sum(idList, prsKey);
+        }
+
+        decimal Avg(IEnumerable<Guid> ids, HashSet<Guid> fids, string prsKey)
+        {
             var idsList = ids as ICollection<Guid> ?? ids.ToList();
-            var nums = values
-                .Where(v => idsList.Contains(v.ReportSubmissionId) && fids.Contains(v.TemplateFieldId) && v.ValueNumber.HasValue)
-                .Select(v => v.ValueNumber!.Value)
-                .ToList();
+            var nums = fids.Count == 0 ? new List<decimal>()
+                : values
+                    .Where(v => idsList.Contains(v.ReportSubmissionId) && fids.Contains(v.TemplateFieldId) && v.ValueNumber.HasValue)
+                    .Select(v => v.ValueNumber!.Value)
+                    .ToList();
+            nums.AddRange(prs.Values(idsList, prsKey));
             return nums.Count == 0 ? 0m : Math.Round(nums.Average(), 1);
         }
 
@@ -1108,14 +1768,14 @@ public class ReportingService : IReportingService
         foreach (var g in bySubmitter)
         {
             var sIds = g.Select(x => x.Id).ToList();
-            var incoming = Sum(sIds, incomingFids);
-            var answered = Sum(sIds, answeredFids);
+            var incoming = Sum(sIds, incomingFids, ModerationReportSchema.Prs.IncomingMessages);
+            var answered = Sum(sIds, answeredFids, ModerationReportSchema.Prs.AnsweredMessages);
             var unhandled = Math.Max(0m, incoming - answered);
-            var avgResponse = Avg(sIds, responseMinFids);
-            var problematic = Sum(sIds, problematicFids);
-            var escalations = Sum(sIds, escalationsFids);
-            var complaints = Sum(sIds, complaintsFids);
-            var converted = Sum(sIds, convertedFids);
+            var avgResponse = Avg(sIds, responseMinFids, ModerationReportSchema.Prs.AvgResponseMinutes);
+            var problematic = Sum(sIds, problematicFids, ModerationReportSchema.Prs.ProblematicComments);
+            var escalations = Sum(sIds, escalationsFids, ModerationReportSchema.Prs.Escalations);
+            var complaints = Sum(sIds, complaintsFids, ModerationReportSchema.Prs.Complaints);
+            var converted = Sum(sIds, convertedFids, ModerationReportSchema.Prs.ConvertedOpportunities);
             // نسبة الرد = المُجاب عليها / الواردة (٪).
             var responseRate = incoming > 0 ? Math.Round(answered / incoming * 100m, 1) : 0m;
             rows.Add(new ModerationRollupRow(
@@ -1144,13 +1804,14 @@ public class ReportingService : IReportingService
         var best = finalRows.OrderByDescending(r => r.ResponseRate).FirstOrDefault();
         var worst = finalRows.OrderBy(r => r.ResponseRate).FirstOrDefault();
 
-        List<string> TextList(HashSet<Guid> fids) =>
-            fids.Count == 0 ? new List<string>()
-            : values.Where(v => fids.Contains(v.TemplateFieldId) && !string.IsNullOrWhiteSpace(v.ValueText))
-                .Select(v => v.ValueText!.Trim()).Distinct().Take(5).ToList();
+        List<string> TextList(HashSet<Guid> fids, string prsKey) =>
+            values.Where(v => fids.Contains(v.TemplateFieldId) && !string.IsNullOrWhiteSpace(v.ValueText))
+                .Select(v => v.ValueText!.Trim())
+                .Concat(prs.Texts(prsKey))
+                .Distinct().Take(5).ToList();
 
-        var recurringIssues = TextList(recurringFids);
-        var decisions = TextList(recommendationsFids);
+        var recurringIssues = TextList(recurringFids, ModerationReportSchema.Prs.RecurringQuestions);
+        var decisions = TextList(recommendationsFids, ModerationReportSchema.Prs.Recommendations);
 
         // تقليل البيانات: الأدوار المؤسسية (company/governance) تحصل على الإجماليات فقط — تُحذف الصفوف والأفضل/الأحوج.
         var shapedRows = canViewRows ? (IReadOnlyList<ModerationRollupRow>)finalRows : new List<ModerationRollupRow>();
@@ -1425,6 +2086,31 @@ public class ReportingService : IReportingService
     private static bool IsComplete(SubmissionStatus s) =>
         s is SubmissionStatus.Closed or SubmissionStatus.Visible;
 
+    // وصف حالة الالتزام نصًّا (لا يكشف محتوى — وصف موضع التسليم في دورة الحياة فقط).
+    private static string StatusLabelAr(SubmissionStatus s) => s switch
+    {
+        SubmissionStatus.Submitted => "مُرسَل (قيد المراجعة)",
+        SubmissionStatus.Returned => "مُعاد للتعديل",
+        SubmissionStatus.ApprovedByDirectManager => "معتمد من المدير المباشر",
+        SubmissionStatus.ApprovedByNextLevel => "معتمد من المستوى الأعلى",
+        SubmissionStatus.Escalated => "مُصعَّد",
+        SubmissionStatus.Closed => "مُغلق",
+        SubmissionStatus.Visible => "ظاهر",
+        _ => "لم يسلّم"
+    };
+
+    // الأدوار النظامية (Identity) لكل مستخدم — لتحديد موعد التسليم الخاص بدوره (حساب التأخّر فقط).
+    private async Task<Dictionary<Guid, List<string>>> UserPrimaryRolesAsync(IReadOnlyCollection<Guid> userIds, CancellationToken ct)
+    {
+        if (userIds.Count == 0) return new Dictionary<Guid, List<string>>();
+        var pairs = await (from ur in _db.UserRoles
+                           join r in _db.Roles on ur.RoleId equals r.Id
+                           where userIds.Contains(ur.UserId) && r.Name != null
+                           select new { ur.UserId, r.Name }).ToListAsync(ct);
+        return pairs.GroupBy(p => p.UserId)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.Name!).ToList());
+    }
+
     private static decimal Rate(int part, int total) =>
         total == 0 ? 0m : Math.Round((decimal)part / total * 100m, 1);
 
@@ -1442,5 +2128,125 @@ public class ReportingService : IReportingService
         if (distinct.Count == 0) return new Dictionary<Guid, string>();
         return await _db.Users.Where(u => distinct.Contains(u.Id))
             .ToDictionaryAsync(u => u.Id, u => u.FullName, ct);
+    }
+
+    // ======================= قراءة أقسام المشاريع المتكررة (PRS) للـ Rollups (v5 backward-compat) =======================
+    // v1–v4: مؤشرات الأداء مخزَّنة top-level في SubmissionFieldValue.ValueNumber (يجمعها كل rollup كما كان).
+    // v5: المؤشرات مضمَّنة داخل كل مشروع في ValueJson للحقل من نوع ProjectRepeatableSection.
+    // هذا المحمِّل يقرأ PRS ويجمّعه لكل تسليم حسب مفتاح الحقل الفرعي، ليضيفه كل rollup فوق مجموع top-level.
+    // لا ازدواج حساب: كل تسليم يتبع نسخة واحدة؛ تسليمات v1–v4 لا تحمل مفاتيح v5 الفرعية (قيمتها 0)،
+    // وتسليمات v5 لا تحمل قيمًا top-level للمؤشرات (قيمتها 0). فالمجموع (top-level + PRS) صحيح للطرفين.
+
+    private sealed class PrsEntryDto
+    {
+        public Guid? ProjectId { get; set; }
+        public Dictionary<string, JsonElement>? Answers { get; set; }
+    }
+
+    /// <summary>تجميع قيم PRS لكل تسليم حسب المفتاح الفرعي: قائمة قيمة لكل مشروع (تسمح بـ Sum أو Average).</summary>
+    private sealed class PrsAggregate
+    {
+        private readonly Dictionary<Guid, Dictionary<string, List<decimal>>> _numeric = new();
+        private readonly Dictionary<string, List<string>> _text = new(StringComparer.OrdinalIgnoreCase);
+
+        public void AddNumeric(Guid subId, string key, decimal value)
+        {
+            if (!_numeric.TryGetValue(subId, out var byKey))
+                _numeric[subId] = byKey = new Dictionary<string, List<decimal>>(StringComparer.OrdinalIgnoreCase);
+            if (!byKey.TryGetValue(key, out var list)) byKey[key] = list = new List<decimal>();
+            list.Add(value);
+        }
+
+        public void AddText(string key, string value)
+        {
+            if (!_text.TryGetValue(key, out var list)) _text[key] = list = new List<string>();
+            list.Add(value);
+        }
+
+        /// <summary>مجموع كل قيم المفتاح عبر التسليمات المحدَّدة (كل المشاريع).</summary>
+        public decimal Sum(IEnumerable<Guid> ids, string key)
+        {
+            decimal total = 0m;
+            foreach (var id in ids)
+                if (_numeric.TryGetValue(id, out var byKey) && byKey.TryGetValue(key, out var list))
+                    total += list.Sum();
+            return total;
+        }
+
+        /// <summary>كل القيم الرقمية (قيمة لكل مشروع) للمفتاح عبر التسليمات — للمتوسّطات.</summary>
+        public List<decimal> Values(IEnumerable<Guid> ids, string key)
+        {
+            var res = new List<decimal>();
+            foreach (var id in ids)
+                if (_numeric.TryGetValue(id, out var byKey) && byKey.TryGetValue(key, out var list))
+                    res.AddRange(list);
+            return res;
+        }
+
+        /// <summary>القيم النصّية المميّزة للمفتاح عبر كل التسليمات (لقوائم القرارات/التوصيات).</summary>
+        public IEnumerable<string> Texts(string key) =>
+            _text.TryGetValue(key, out var list) ? list : Enumerable.Empty<string>();
+    }
+
+    private static readonly JsonSerializerOptions PrsJsonOptions = new() { PropertyNameCaseInsensitive = true };
+
+    /// <summary>يحمّل ويجمّع قيم حقول PRS ضمن الإصدارات/التسليمات المحدَّدة. آمن على الأنواع القديمة (لا PRS ⇒ فارغ).</summary>
+    private async Task<PrsAggregate> LoadPrsAsync(
+        IReadOnlyCollection<Guid> prsFieldIds, IReadOnlyCollection<Guid> subIds, CancellationToken ct)
+    {
+        var agg = new PrsAggregate();
+        if (prsFieldIds.Count == 0 || subIds.Count == 0) return agg;
+
+        var raw = await _db.SubmissionFieldValues.AsNoTracking()
+            .Where(v => subIds.Contains(v.ReportSubmissionId)
+                && prsFieldIds.Contains(v.TemplateFieldId)
+                && v.ValueJson != null)
+            .Select(v => new { v.ReportSubmissionId, v.ValueJson })
+            .ToListAsync(ct);
+
+        foreach (var r in raw)
+        {
+            List<PrsEntryDto>? entries;
+            try { entries = JsonSerializer.Deserialize<List<PrsEntryDto>>(r.ValueJson!, PrsJsonOptions); }
+            catch { continue; }
+            if (entries is null) continue;
+
+            foreach (var e in entries)
+            {
+                if (e.Answers is null) continue;
+                foreach (var (key, el) in e.Answers)
+                {
+                    if (TryReadPrsNumber(el, out var num)) agg.AddNumeric(r.ReportSubmissionId, key, num);
+                    else if (TryReadPrsText(el, out var txt)) agg.AddText(key, txt);
+                }
+            }
+        }
+        return agg;
+    }
+
+    private static bool TryReadPrsNumber(JsonElement el, out decimal value)
+    {
+        value = 0m;
+        switch (el.ValueKind)
+        {
+            case JsonValueKind.Number:
+                return el.TryGetDecimal(out value);
+            case JsonValueKind.String:
+                var s = el.GetString();
+                return !string.IsNullOrWhiteSpace(s)
+                    && decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out value);
+            default:
+                return false;
+        }
+    }
+
+    private static bool TryReadPrsText(JsonElement el, out string value)
+    {
+        value = string.Empty;
+        if (el.ValueKind != JsonValueKind.String) return false;
+        var s = el.GetString();
+        if (string.IsNullOrWhiteSpace(s)) return false;
+        value = s.Trim();
+        return true;
     }
 }

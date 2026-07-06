@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, Badge, Button } from './ui';
+import { NavIcon, type IconName } from './icons';
 
 type Tone = 'navy' | 'orange' | 'success' | 'alert' | 'gold' | 'muted';
 
@@ -37,7 +38,61 @@ export function SectionTitle({ title, hint, action }: { title: string; hint?: st
   );
 }
 
-// بطاقة مؤشّر كبيرة — قيمة + شارة دلتا اختيارية + قابلية الضغط (drill-down).
+// ترويسة لوحة موحّدة (Hero) — عنوان حسب الدور + شارة الدور/النطاق + وصف + إجراء اختياري.
+// تدرّج كحلي أنيق RTL؛ تُستهلك مركزيًّا في HomePage و AdminHome لتوحيد رأس كل اللوحات.
+const heroAccent: Record<'navy' | 'orange', string> = {
+  navy: 'from-navy via-navy-600 to-navy',
+  orange: 'from-navy via-navy-600 to-orange-600',
+};
+
+export function DashboardHero({
+  title,
+  subtitle,
+  icon,
+  badges,
+  cta,
+  accent = 'navy',
+}: {
+  title: string;
+  subtitle?: string;
+  icon?: IconName;
+  badges?: ReactNode;
+  cta?: ReactNode;
+  accent?: 'navy' | 'orange';
+}) {
+  return (
+    <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-l ${heroAccent[accent]} p-6 text-white shadow-sm`}>
+      <span className="pointer-events-none absolute -left-10 -top-10 h-40 w-40 rounded-full bg-white/5" />
+      <span className="pointer-events-none absolute -bottom-12 -left-4 h-32 w-32 rounded-full bg-white/5" />
+      <div className="relative flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          {icon && (
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/10 ring-1 ring-white/20">
+              <NavIcon name={icon} className="h-6 w-6 text-white" />
+            </span>
+          )}
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold">{title}</h1>
+            {subtitle && <p className="mt-1 text-sm text-white/85">{subtitle}</p>}
+            {badges && <div className="mt-2 flex flex-wrap items-center gap-2">{badges}</div>}
+          </div>
+        </div>
+        {cta}
+      </div>
+    </div>
+  );
+}
+
+// شارة صغيرة داخل الـHero (دور/نطاق/فترة) بخلفية شفافة على التدرّج.
+export function HeroChip({ children }: { children: ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/20">
+      {children}
+    </span>
+  );
+}
+
+// بطاقة مؤشّر كبيرة — قيمة + شارة دلتا اختيارية + أيقونة اختيارية + قابلية الضغط (drill-down).
 export function MetricTile({
   label,
   value,
@@ -45,6 +100,7 @@ export function MetricTile({
   delta,
   hint,
   to,
+  icon,
 }: {
   label: string;
   value: ReactNode;
@@ -52,11 +108,19 @@ export function MetricTile({
   delta?: { value: number; up: boolean } | null;
   hint?: string;
   to?: string;
+  icon?: IconName;
 }) {
   const body = (
     <div className="relative h-full overflow-hidden rounded-2xl border border-line bg-white p-5 transition hover:shadow-sm">
       <span className={`absolute inset-y-0 right-0 w-1.5 ${accentBar[tone]}`} />
-      <p className="text-sm text-ink-2">{label}</p>
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-sm text-ink-2">{label}</p>
+        {icon && (
+          <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-offwhite ${valueTone[tone]}`}>
+            <NavIcon name={icon} className="h-4 w-4" />
+          </span>
+        )}
+      </div>
       <div className="mt-2 flex items-end gap-2">
         <span className={`text-3xl font-extrabold ${valueTone[tone]}`}>{value}</span>
         {delta && (
@@ -284,5 +348,147 @@ export function NeedsActionPanel({
         </>
       )}
     </Card>
+  );
+}
+
+// ===== عناصر نظام التصميم الموحّد للوحات القيادة (Design System primitives) =====
+
+// لون حلقة/شريط التقدّم حسب العتبة: ≥80 أخضر، ≥50 ذهبي، وإلا أحمر.
+const strokeTone: Record<Tone, string> = {
+  navy: 'stroke-navy',
+  orange: 'stroke-orange',
+  success: 'stroke-success',
+  alert: 'stroke-alert',
+  gold: 'stroke-gold',
+  muted: 'stroke-line-2',
+};
+
+export function toneForPercent(pct: number): Tone {
+  if (pct >= 80) return 'success';
+  if (pct >= 50) return 'gold';
+  return 'alert';
+}
+
+// حلقة تقدّم دائرية (SVG) — النسبة في المنتصف بلون العتبة. للبطاقة التحليلية للالتزام.
+export function ProgressRing({
+  value,
+  size = 104,
+  thickness = 10,
+  tone,
+  caption,
+}: {
+  value: number;
+  size?: number;
+  thickness?: number;
+  tone?: Tone;
+  caption?: string;
+}) {
+  const pct = Math.max(0, Math.min(100, Math.round(value)));
+  const t = tone ?? toneForPercent(pct);
+  const r = (size - thickness) / 2;
+  const c = 2 * Math.PI * r;
+  const offset = c - (pct / 100) * c;
+  return (
+    <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          strokeWidth={thickness}
+          className="stroke-line"
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          strokeWidth={thickness}
+          strokeLinecap="round"
+          strokeDasharray={c}
+          strokeDashoffset={offset}
+          className={`${strokeTone[t]} transition-[stroke-dashoffset] duration-500`}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className={`text-2xl font-extrabold ${valueTone[t]}`}>{pct}%</span>
+        {caption && <span className="text-[10px] font-medium text-ink-3">{caption}</span>}
+      </div>
+    </div>
+  );
+}
+
+// مؤشّر صغير: نقطة ملوّنة + تسمية + قيمة. لشبكة مؤشرات الالتزام الأربعة.
+export function StatPill({
+  label,
+  value,
+  tone = 'navy',
+}: {
+  label: string;
+  value: ReactNode;
+  tone?: Tone;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-xl border border-line bg-offwhite px-3 py-2">
+      <div className="flex items-center gap-2">
+        <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${accentBar[tone]}`} />
+        <span className="text-xs font-medium text-ink-2">{label}</span>
+      </div>
+      <span className={`text-sm font-bold ${valueTone[tone]}`}>{value}</span>
+    </div>
+  );
+}
+
+// شريحة مرحلة في سير الاعتماد: اسم المرحلة + عدد العالق. لبطاقة الاختناقات.
+export function StageChip({
+  label,
+  count,
+  tone = 'muted',
+  active = false,
+}: {
+  label: string;
+  count?: number;
+  tone?: Tone;
+  active?: boolean;
+}) {
+  return (
+    <div
+      className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs ${
+        active ? 'border-orange bg-orange-50' : 'border-line bg-white'
+      }`}
+    >
+      <span className={`h-2 w-2 shrink-0 rounded-full ${accentBar[tone]}`} />
+      <span className="font-medium text-ink">{label}</span>
+      {count != null && <span className={`font-bold ${valueTone[tone]}`}>{count}</span>}
+    </div>
+  );
+}
+
+// قسم لوحة موحّد: عنوان/وصف/إجراء اختياري ثم المحتوى. لتوحيد المسافات بين أقسام اللوحة.
+export function DashboardSection({
+  title,
+  description,
+  action,
+  children,
+}: {
+  title?: string;
+  description?: string;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className="space-y-3">
+      {(title || action) && (
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            {title && <h2 className="text-lg font-bold text-navy">{title}</h2>}
+            {description && <p className="text-xs text-ink-2">{description}</p>}
+          </div>
+          {action}
+        </div>
+      )}
+      {children}
+    </section>
   );
 }

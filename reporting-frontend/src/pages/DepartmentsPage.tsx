@@ -14,6 +14,7 @@ import { LoadingState, QueryError } from '../components/states';
 import { SectionTitle } from '../components/dashboard';
 import { apiErrorMessage } from '../lib/api';
 import type { DepartmentDto, DirectoryUserDto, TeamDto } from '../types/api';
+import { CreateTeamForm } from './UsersPage';
 
 export function DepartmentsPage() {
   const departments = useDepartments();
@@ -21,6 +22,7 @@ export function DepartmentsPage() {
   const users = useDirectoryUsers(true);
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [addingTeamFor, setAddingTeamFor] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const del = useDeleteDepartment();
@@ -106,7 +108,13 @@ export function DepartmentsPage() {
                         {d.nameEn && <span className="block text-xs text-ink-3">{d.nameEn}</span>}
                       </td>
                       <td className="px-2 py-2 text-ink-2">{d.code ?? '—'}</td>
-                      <td className="px-2 py-2 text-ink-2">{manager?.fullName ?? '—'}</td>
+                      <td className="px-2 py-2">
+                        {manager ? (
+                          <span className="text-ink-2">{manager.fullName}</span>
+                        ) : (
+                          <Badge tone="gold">بلا مدير</Badge>
+                        )}
+                      </td>
                       <td className="px-2 py-2">{dteams.length}</td>
                       <td className="px-2 py-2">{membersOf(d.id)}</td>
                       <td className="px-2 py-2">
@@ -115,13 +123,19 @@ export function DepartmentsPage() {
                       <td className="px-2 py-2">
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={() => { setEditingId(editingId === d.id ? null : d.id); setConfirmDelete(null); }}
+                            onClick={() => { setAddingTeamFor(addingTeamFor === d.id ? null : d.id); setEditingId(null); setConfirmDelete(null); }}
+                            className="text-sm font-semibold text-navy hover:underline"
+                          >
+                            {addingTeamFor === d.id ? 'إخفاء' : '+ فريق'}
+                          </button>
+                          <button
+                            onClick={() => { setEditingId(editingId === d.id ? null : d.id); setConfirmDelete(null); setAddingTeamFor(null); }}
                             className="text-sm font-semibold text-orange-600 hover:underline"
                           >
                             {editingId === d.id ? 'إخفاء' : 'تعديل'}
                           </button>
                           <button
-                            onClick={() => { setConfirmDelete(confirmDelete === d.id ? null : d.id); setEditingId(null); }}
+                            onClick={() => { setConfirmDelete(confirmDelete === d.id ? null : d.id); setEditingId(null); setAddingTeamFor(null); }}
                             className="text-sm font-semibold text-red-600 hover:underline"
                           >
                             حذف
@@ -129,11 +143,19 @@ export function DepartmentsPage() {
                         </div>
                       </td>
                     </tr>
-                    {(editingId === d.id || confirmDelete === d.id || dteams.length > 0) && (
+                    {(editingId === d.id || confirmDelete === d.id || addingTeamFor === d.id || dteams.length > 0) && (
                       <tr>
                         <td colSpan={7} className="px-2 pb-3">
-                          {dteams.length > 0 && editingId !== d.id && confirmDelete !== d.id && (
+                          {dteams.length > 0 && editingId !== d.id && confirmDelete !== d.id && addingTeamFor !== d.id && (
                             <TeamChips teams={dteams} />
+                          )}
+                          {addingTeamFor === d.id && (
+                            <CreateTeamForm
+                              departments={deptList}
+                              users={userList}
+                              presetDepartmentId={d.id}
+                              onDone={() => setAddingTeamFor(null)}
+                            />
                           )}
                           {editingId === d.id && (
                             <DepartmentEditor

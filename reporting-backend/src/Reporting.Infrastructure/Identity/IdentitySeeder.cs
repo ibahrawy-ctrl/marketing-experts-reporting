@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Reporting.Application.Common;
 
 namespace Reporting.Infrastructure.Identity;
@@ -13,6 +15,8 @@ public static class IdentitySeeder
         var roleManager = services.GetRequiredService<RoleManager<ApplicationRole>>();
         var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
         var config = services.GetRequiredService<IConfiguration>();
+        var env = services.GetRequiredService<IHostEnvironment>();
+        var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("IdentitySeeder");
 
         foreach (var role in Roles.All)
         {
@@ -26,8 +30,28 @@ public static class IdentitySeeder
             }
         }
 
-        var adminEmail = config["Seed:AdminEmail"] ?? "admin@marketingexperts.local";
-        var adminPassword = config["Seed:AdminPassword"] ?? "Admin#12345";
+        // أمان: في الإنتاج لا يُنشأ مدير نظام افتراضي ولا تُستخدم قيم افتراضية للبريد/كلمة المرور
+        // إطلاقًا. لا يُبذَر مدير إلا بقيم صريحة وآمنة عبر متغيّرات البيئة (Seed:AdminEmail و
+        // Seed:AdminPassword). خارج الإنتاج (Development/Testing) تبقى القيم الافتراضية لتسهيل
+        // الاختبارات والتطوير. هذا الفرع لا يمسّ حسابًا قائمًا — يُنشئ فقط عند الغياب.
+        var configuredEmail = config["Seed:AdminEmail"];
+        var configuredPassword = config["Seed:AdminPassword"];
+
+        var adminEmail = string.IsNullOrWhiteSpace(configuredEmail)
+            ? (env.IsProduction() ? null : "admin@marketingexperts.local")
+            : configuredEmail;
+        var adminPassword = string.IsNullOrWhiteSpace(configuredPassword)
+            ? (env.IsProduction() ? null : "Admin#12345")
+            : configuredPassword;
+
+        if (string.IsNullOrWhiteSpace(adminEmail) || string.IsNullOrWhiteSpace(adminPassword))
+        {
+            // الإنتاج بلا بذور صريحة: لا تُنشئ مدير نظام افتراضيًا (يُنشأ المديرون يدويًا).
+            logger.LogWarning(
+                "IdentitySeeder: تخطّي إنشاء مدير نظام افتراضي في {Environment} لعدم توفّر Seed:AdminEmail/Seed:AdminPassword صريحة.",
+                env.EnvironmentName);
+            return;
+        }
 
         var admin = await userManager.FindByEmailAsync(adminEmail);
         if (admin is null)

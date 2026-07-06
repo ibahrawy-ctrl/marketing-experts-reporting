@@ -4,6 +4,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useDirectoryUsers, useTeams, useDepartments } from '../lib/useDirectory';
+import { useProjects } from '../lib/useClients';
+import { useActiveCourses } from '../lib/useCourses';
 import { Alert, Badge, Button, Card, Field, Input, Select } from '../components/ui';
 import { LoadingState, QueryError } from '../components/states';
 import { ApprovalPath, ProgressBar, type PathStep } from '../components/dashboard';
@@ -14,6 +16,7 @@ import {
   approvalStatusLabel,
   formatDate,
 } from '../lib/format';
+import { operationalWeekKey, riyadhToday } from '../lib/dashboardPeriod';
 import type {
   SubmissionListItem,
   SubmissionDto,
@@ -24,6 +27,10 @@ import type {
   PeriodType,
   SubmissionStatus,
   ApprovalStepDto,
+  ProjectDto,
+  ProjectRepeatableConfig,
+  ProjectRepeatableEntry,
+  RepeatableSubField,
 } from '../types/api';
 
 type Tab = 'all' | 'mine' | 'pending';
@@ -314,12 +321,16 @@ function AllReportsTab({ onOpen, initialTeam }: { onOpen: (id: string) => void; 
 function SubmissionTable({
   items,
   onOpen,
+  onDeleteDraft,
+  deletingId,
   showSubmitter,
   emptyText = 'لا توجد تقارير.',
   emptyHint,
 }: {
   items: SubmissionListItem[];
   onOpen: (id: string) => void;
+  onDeleteDraft?: (id: string) => void;
+  deletingId?: string | null;
   showSubmitter?: boolean;
   emptyText?: string;
   emptyHint?: string;
@@ -349,7 +360,20 @@ function SubmissionTable({
             {showSubmitter && <td className="py-2">{s.submitterName}</td>}
             <td className="py-2">{periodTypeLabel[s.periodType]} {s.periodKey}</td>
             <td className="py-2"><Badge tone={statusTone[s.status] ?? 'muted'}>{submissionStatusLabel[s.status]}</Badge></td>
-            <td className="py-2 text-left"><Button variant="ghost" onClick={() => onOpen(s.id)}>عرض</Button></td>
+            <td className="py-2 text-left">
+              <div className="flex items-center justify-end gap-1">
+                <Button variant="ghost" onClick={() => onOpen(s.id)}>عرض</Button>
+                {onDeleteDraft && s.status === 'Draft' && (
+                  <Button
+                    variant="danger"
+                    disabled={deletingId === s.id}
+                    onClick={() => onDeleteDraft(s.id)}
+                  >
+                    حذف المسودة
+                  </Button>
+                )}
+              </div>
+            </td>
           </tr>
         ))}
       </tbody>
@@ -375,8 +399,16 @@ function MineTab({ onOpen }: { onOpen: (id: string) => void }) {
   const periodType: PeriodType = user?.expectedReportCadence ?? 'Weekly';
   const isDaily = periodType === 'Daily';
 
+  // مفتاح الفترة الافتراضي = الفترة الحالية المطابقة لمنطق الخادم (يومي: تاريخ اليوم، أسبوعي: الأسبوع التشغيلي)،
+  // فلا يحتاج المستخدم لكتابة الصيغة يدويًّا. النص الإرشادي الأحمر يبقى توضيحًا للصيغة فقط عند تعديلها بقيمة خاطئة.
+  const defaultPeriodKey = () => {
+    const today = riyadhToday();
+    if (isDaily) return today.toISOString().slice(0, 10); // YYYY-MM-DD (تاريخ تقويميّ UTC)
+    return operationalWeekKey(today);
+  };
+
   const [reportTemplateId, setReportTemplateId] = useState('');
-  const [periodKey, setPeriodKey] = useState('');
+  const [periodKey, setPeriodKey] = useState(defaultPeriodKey);
   const [err, setErr] = useState<string | null>(null);
 
   // البند 9 — منع ازدواج التقارير الأسبوعية الإلزامية: نوضّح أيّ قالب «أساسي مطلوب» وأيّها «تكميلي اختياري».
@@ -386,10 +418,16 @@ function MineTab({ onOpen }: { onOpen: (id: string) => void }) {
   const create = useMutation({
     mutationFn: () => api.post<SubmissionDto>('/submissions', { reportTemplateId, periodType, periodKey }),
     onSuccess: (res) => {
-      setPeriodKey('');
+      setPeriodKey(defaultPeriodKey());
       void qc.invalidateQueries({ queryKey: ['submissions-mine'] });
       onOpen(res.data.id);
     },
+    onError: (e) => setErr(apiErrorMessage(e)),
+  });
+
+  const deleteDraft = useMutation({
+    mutationFn: (submissionId: string) => api.delete(`/submissions/${submissionId}`),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['submissions-mine'] }); },
     onError: (e) => setErr(apiErrorMessage(e)),
   });
 
@@ -462,6 +500,11 @@ function MineTab({ onOpen }: { onOpen: (id: string) => void }) {
         <SubmissionTable
           items={items ?? []}
           onOpen={onOpen}
+          onDeleteDraft={(sid) => {
+            setErr(null);
+            if (window.confirm('هل تريد حذف هذه المسودة؟ لا يمكن التراجع عن هذا الإجراء.')) deleteDraft.mutate(sid);
+          }}
+          deletingId={deleteDraft.isPending ? deleteDraft.variables ?? null : null}
           emptyText="لم تُنشئ أي تقرير بعد."
           emptyHint="اختر قالبًا والفترة من الأعلى ثم اضغط «إنشاء تقرير» لبدء أول تقرير لك. ستظهر تقاريرك هنا."
         />
@@ -514,7 +557,7 @@ function parseConfig(json: string | null): FieldConfig {
 }
 
 // شبكة الجدول: مصفوفة صفوف، كل صف مصفوفة خلايا نصية. تُخزَّن في valueJson.
-function parseGrid(json: string | null | undefined): string[][] {
+export function parseGrid(json: string | null | undefined): string[][] {
   if (!json) return [];
   try {
     const v = JSON.parse(json);
@@ -524,6 +567,47 @@ function parseGrid(json: string | null | undefined): string[][] {
   }
 }
 
+// ===== قسم المشاريع المتكرر — تحليل الإعداد والقيمة =====
+export function parseRepeatableConfig(json: string | null): ProjectRepeatableConfig {
+  const fallback: ProjectRepeatableConfig = { projectRequired: true, minProjects: 1, maxProjects: 10, fields: [] };
+  if (!json) return fallback;
+  try {
+    const p = JSON.parse(json) as Partial<ProjectRepeatableConfig>;
+    return {
+      projectRequired: p.projectRequired ?? true,
+      minProjects: Number.isFinite(p.minProjects) ? Number(p.minProjects) : 1,
+      maxProjects: Number.isFinite(p.maxProjects) ? Number(p.maxProjects) : 10,
+      fields: Array.isArray(p.fields) ? p.fields : [],
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+export function parseRepeatableEntries(json: string | null | undefined): ProjectRepeatableEntry[] {
+  if (!json) return [];
+  try {
+    const v = JSON.parse(json);
+    if (!Array.isArray(v)) return [];
+    return (v as ProjectRepeatableEntry[]).map((e) => ({
+      projectId: e?.projectId ?? null,
+      answers: e?.answers && typeof e.answers === 'object' ? e.answers : {},
+    }));
+  } catch {
+    return [];
+  }
+}
+
+// نوع إدخال الحقل الفرعي داخل القسم المتكرر.
+export function subFieldInputKind(t: RepeatableSubField['type']): 'number' | 'longtext' | 'date' | 'bool' | 'select' | 'text' {
+  if (['Currency', 'Number', 'Decimal', 'Percentage'].includes(t)) return 'number';
+  if (t === 'LongText') return 'longtext';
+  if (t === 'Date') return 'date';
+  if (t === 'Boolean') return 'bool';
+  if (t === 'Select') return 'select';
+  return 'text';
+}
+
 function SubmissionDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const qc = useQueryClient();
   const { user } = useAuth();
@@ -531,6 +615,13 @@ function SubmissionDetail({ id, onBack }: { id: string; onBack: () => void }) {
     queryKey: ['submission', id],
     queryFn: async () => (await api.get<SubmissionDto>(`/submissions/${id}`)).data,
   });
+  // قابلة للاختيار فقط (نشطة + عميل غير مؤرشف + ضمن النطاق) لقوائم اختيار قسم المشاريع الجديدة.
+  const { data: selectableProjects } = useProjects({ selectableOnly: true });
+  // كل المشاريع ضمن النطاق (تشمل المؤرشفة) — لحلّ أسماء المشاريع في تفاصيل التقارير القديمة فقط.
+  const { data: allProjects } = useProjects({ includeClosed: true });
+  // كتالوج الدورات النشطة — يغذّي منتقي «الدورة» في شبكة قالب مبيعات B2C.
+  const { data: activeCourses } = useActiveCourses();
+  const courseNames = useMemo(() => (activeCourses ?? []).map((c) => c.nameAr), [activeCourses]);
   const [draft, setDraft] = useState<Record<string, FieldValueInput>>({});
   const [comment, setComment] = useState('');
   const [err, setErr] = useState<string | null>(null);
@@ -553,6 +644,12 @@ function SubmissionDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const submit = useMutation({
     mutationFn: () => api.post(`/submissions/${id}/submit`),
     onSuccess: () => invalidateAll(),
+    onError: (e) => setErr(apiErrorMessage(e)),
+  });
+
+  const deleteDraft = useMutation({
+    mutationFn: () => api.delete(`/submissions/${id}`),
+    onSuccess: () => { invalidateAll(); onBack(); },
     onError: (e) => setErr(apiErrorMessage(e)),
   });
 
@@ -589,6 +686,167 @@ function SubmissionDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const currentApproverName =
     sub.approvalSteps.find((a) => a.approverId === sub.currentApproverId)?.approverName ?? null;
   const inFlight = pendingApprovalStatuses.includes(sub.status);
+
+  // تصنيف الحقول للعرض Project-first: جسم المشاريع (PRS) + Scorecard رقمي ثانوي + نظرة عامة.
+  // القوالب v4 خارج المشاريع = ملخص الأسبوع + التحديات فقط (+ مؤشرات KPI رقمية في Scorecard منفصل).
+  const NUMERIC_TYPES = ['Number', 'Currency', 'Percentage'];
+  const prsFields = sub.fieldValues.filter((f) => f.fieldType === 'ProjectRepeatableSection');
+  const hasPRS = prsFields.length > 0;
+  const scorecardFields = sub.fieldValues.filter((f) => NUMERIC_TYPES.includes(f.fieldType));
+  const overviewFields = sub.fieldValues.filter(
+    (f) =>
+      f.fieldType !== 'ProjectRepeatableSection' &&
+      f.fieldType !== 'SectionHeader' &&
+      !NUMERIC_TYPES.includes(f.fieldType),
+  );
+
+  // عرض قسم المشاريع المتكرر (جسم التقرير) — تحرير أو قراءة.
+  const renderPRS = (f: SubmissionFieldValueDto) => {
+    const rcfg = parseRepeatableConfig(f.configJson);
+    const cur = draft[f.templateFieldId] ?? toInput(f);
+    const entries = parseRepeatableEntries(cur.valueJson);
+    const update = (patch: Partial<FieldValueInput>) =>
+      setDraft((prev) => ({ ...prev, [f.templateFieldId]: { ...cur, ...patch } }));
+    if (!sub.canEdit) {
+      return <ProjectRepeatableDisplay key={f.templateFieldId} config={rcfg} entries={entries} projects={allProjects ?? []} />;
+    }
+    return (
+      <div key={f.templateFieldId}>
+        {f.helpText && <p className="mb-2 text-xs text-ink-2">{f.helpText}</p>}
+        <ProjectRepeatableEditor
+          config={rcfg}
+          entries={entries}
+          projects={selectableProjects ?? []}
+          allProjects={allProjects ?? []}
+          onChange={(next) => update({ valueJson: JSON.stringify(next) })}
+        />
+      </div>
+    );
+  };
+
+  // عرض حقل مفرد (نظرة عامة / Scorecard / التدفّق القديم) — تحرير أو قراءة.
+  const renderField = (f: SubmissionFieldValueDto) => {
+    const kind = fieldInputKind(f.fieldType);
+    const cfg = parseConfig(f.configJson);
+    const cur = draft[f.templateFieldId] ?? toInput(f);
+    const update = (patch: Partial<FieldValueInput>) =>
+      setDraft((prev) => ({ ...prev, [f.templateFieldId]: { ...cur, ...patch } }));
+
+    // عنوان قسم — يُعرض كعنوان وليس كحقل إدخال (يُستخدم في التدفّق القديم فقط).
+    if (kind === 'section') {
+      return (
+        <h3 key={f.templateFieldId} className="mt-4 border-b border-line pb-1 text-base font-bold text-navy">
+          {f.label}
+        </h3>
+      );
+    }
+
+    const missing = f.isRequired && sub.canEdit && !fieldHasValue(cur);
+    const label = `${f.label}${f.isRequired ? ' *' : ''}${missing ? ' — مطلوب' : ''}`;
+
+    if (!sub.canEdit) {
+      return (
+        <Field key={f.templateFieldId} label={label} help={f.helpText ?? undefined}>
+          {kind === 'grid' ? (
+            <GridDisplay columns={cfg.columns ?? []} rows={parseGrid(f.valueJson)} />
+          ) : (
+            <p className="rounded-lg border border-line bg-offwhite px-3 py-2 text-sm whitespace-pre-wrap">
+              {displayValue(f)}
+            </p>
+          )}
+        </Field>
+      );
+    }
+
+    return (
+      <Field key={f.templateFieldId} label={label} help={f.helpText ?? undefined}>
+        {kind === 'bool' ? (
+          <Select
+            value={cur.valueBool == null ? '' : cur.valueBool ? 'true' : 'false'}
+            onChange={(e) => update({ valueBool: e.target.value === '' ? null : e.target.value === 'true' })}
+          >
+            <option value="">—</option>
+            <option value="true">نعم</option>
+            <option value="false">لا</option>
+          </Select>
+        ) : kind === 'select' ? (
+          <Select value={cur.valueText ?? ''} onChange={(e) => update({ valueText: e.target.value || null })}>
+            <option value="">—</option>
+            {(cfg.options ?? []).map((opt) => (
+              <option key={opt} value={opt}>{opt}</option>
+            ))}
+          </Select>
+        ) : kind === 'multiselect' ? (
+          <MultiSelectInput
+            options={cfg.options ?? []}
+            value={cur.valueText ?? ''}
+            onChange={(v) => update({ valueText: v || null })}
+          />
+        ) : kind === 'grid' ? (
+          <GridEditor
+            columns={cfg.columns ?? []}
+            rows={parseGrid(cur.valueJson)}
+            onChange={(rows) => update({ valueJson: JSON.stringify(rows) })}
+            // عمود «الدورة» (فهرس 0) في قالب مبيعات B2C يصبح منتقيًا من كتالوج الدورات.
+            columnOptions={cfg.columns?.[0] === 'الدورة' && courseNames.length ? { 0: courseNames } : undefined}
+          />
+        ) : kind === 'longtext' ? (
+          <textarea
+            className="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-navy focus:outline-none"
+            rows={3}
+            value={cur.valueText ?? ''}
+            onChange={(e) => update({ valueText: e.target.value })}
+          />
+        ) : kind === 'number' ? (
+          <Input
+            type="number"
+            value={cur.valueNumber ?? ''}
+            onChange={(e) => update({ valueNumber: e.target.value === '' ? null : Number(e.target.value) })}
+          />
+        ) : kind === 'date' ? (
+          <Input
+            type="date"
+            value={cur.valueDate ? cur.valueDate.slice(0, 10) : ''}
+            onChange={(e) => update({ valueDate: e.target.value || null })}
+          />
+        ) : (
+          <Input value={cur.valueText ?? ''} onChange={(e) => update({ valueText: e.target.value })} />
+        )}
+      </Field>
+    );
+  };
+
+  // شريط إجراءات الحفظ/الإرسال/الحذف — يظهر مرة واحدة أسفل الحقول.
+  const actionBar = sub.canEdit ? (
+    <div className="flex flex-wrap items-center gap-2">
+      <Button disabled={save.isPending} onClick={() => { setErr(null); save.mutate(sub.fieldValues); }}>
+        حفظ
+      </Button>
+      <Button
+        variant="ghost"
+        disabled={submit.isPending || missingCount > 0}
+        title={missingCount > 0 ? 'أكمل الحقول المطلوبة أولًا' : undefined}
+        onClick={() => { setErr(null); save.mutate(sub.fieldValues); submit.mutate(); }}
+      >
+        إرسال للاعتماد
+      </Button>
+      {missingCount > 0 && (
+        <span className="text-xs text-alert">يتعذّر الإرسال — أكمل {missingCount} حقلًا مطلوبًا.</span>
+      )}
+      {sub.status === 'Draft' && (
+        <Button
+          variant="danger"
+          disabled={deleteDraft.isPending}
+          onClick={() => {
+            setErr(null);
+            if (window.confirm('هل تريد حذف هذه المسودة؟ لا يمكن التراجع عن هذا الإجراء.')) deleteDraft.mutate();
+          }}
+        >
+          حذف المسودة
+        </Button>
+      )}
+    </div>
+  ) : null;
 
   return (
     <div className="space-y-6">
@@ -636,118 +894,54 @@ function SubmissionDetail({ id, onBack }: { id: string; onBack: () => void }) {
         </Card>
       )}
 
-      <Card>
-        <h2 className="mb-3 font-semibold text-navy">الحقول</h2>
-        <div className="space-y-3">
-          {sub.fieldValues.map((f) => {
-            const kind = fieldInputKind(f.fieldType);
-            const cfg = parseConfig(f.configJson);
-            const cur = draft[f.templateFieldId] ?? toInput(f);
-            const update = (patch: Partial<FieldValueInput>) =>
-              setDraft((prev) => ({ ...prev, [f.templateFieldId]: { ...cur, ...patch } }));
-
-            // عنوان قسم — يُعرض كعنوان وليس كحقل إدخال.
-            if (kind === 'section') {
-              return (
-                <h3 key={f.templateFieldId} className="mt-4 border-b border-line pb-1 text-base font-bold text-navy">
-                  {f.label}
-                </h3>
-              );
-            }
-
-            const missing = f.isRequired && sub.canEdit && !fieldHasValue(cur);
-            const label = `${f.label}${f.isRequired ? ' *' : ''}${missing ? ' — مطلوب' : ''}`;
-
-            // وضع القراءة فقط (بعد الإرسال).
-            if (!sub.canEdit) {
-              return (
-                <Field key={f.templateFieldId} label={label} help={f.helpText ?? undefined}>
-                  {kind === 'grid' ? (
-                    <GridDisplay columns={cfg.columns ?? []} rows={parseGrid(f.valueJson)} />
-                  ) : (
-                    <p className="rounded-lg border border-line bg-offwhite px-3 py-2 text-sm whitespace-pre-wrap">
-                      {displayValue(f)}
-                    </p>
-                  )}
-                </Field>
-              );
-            }
-
-            return (
-              <Field key={f.templateFieldId} label={label} help={f.helpText ?? undefined}>
-                {kind === 'bool' ? (
-                  <Select
-                    value={cur.valueBool == null ? '' : cur.valueBool ? 'true' : 'false'}
-                    onChange={(e) => update({ valueBool: e.target.value === '' ? null : e.target.value === 'true' })}
-                  >
-                    <option value="">—</option>
-                    <option value="true">نعم</option>
-                    <option value="false">لا</option>
-                  </Select>
-                ) : kind === 'select' ? (
-                  <Select value={cur.valueText ?? ''} onChange={(e) => update({ valueText: e.target.value || null })}>
-                    <option value="">—</option>
-                    {(cfg.options ?? []).map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </Select>
-                ) : kind === 'multiselect' ? (
-                  <MultiSelectInput
-                    options={cfg.options ?? []}
-                    value={cur.valueText ?? ''}
-                    onChange={(v) => update({ valueText: v || null })}
-                  />
-                ) : kind === 'grid' ? (
-                  <GridEditor
-                    columns={cfg.columns ?? []}
-                    rows={parseGrid(cur.valueJson)}
-                    onChange={(rows) => update({ valueJson: JSON.stringify(rows) })}
-                  />
-                ) : kind === 'longtext' ? (
-                  <textarea
-                    className="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-navy focus:outline-none"
-                    rows={3}
-                    value={cur.valueText ?? ''}
-                    onChange={(e) => update({ valueText: e.target.value })}
-                  />
-                ) : kind === 'number' ? (
-                  <Input
-                    type="number"
-                    value={cur.valueNumber ?? ''}
-                    onChange={(e) => update({ valueNumber: e.target.value === '' ? null : Number(e.target.value) })}
-                  />
-                ) : kind === 'date' ? (
-                  <Input
-                    type="date"
-                    value={cur.valueDate ? cur.valueDate.slice(0, 10) : ''}
-                    onChange={(e) => update({ valueDate: e.target.value || null })}
-                  />
-                ) : (
-                  <Input value={cur.valueText ?? ''} onChange={(e) => update({ valueText: e.target.value })} />
-                )}
-              </Field>
-            );
-          })}
-        </div>
-        {sub.canEdit && (
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <Button disabled={save.isPending} onClick={() => { setErr(null); save.mutate(sub.fieldValues); }}>
-              حفظ
-            </Button>
-            <Button
-              variant="ghost"
-              disabled={submit.isPending || missingCount > 0}
-              title={missingCount > 0 ? 'أكمل الحقول المطلوبة أولًا' : undefined}
-              onClick={() => { setErr(null); save.mutate(sub.fieldValues); submit.mutate(); }}
-            >
-              إرسال للاعتماد
-            </Button>
-            {missingCount > 0 && (
-              <span className="text-xs text-alert">يتعذّر الإرسال — أكمل {missingCount} حقلًا مطلوبًا.</span>
+      {!hasPRS ? (
+        // التوافق الخلفي: القوالب/التقارير بلا قسم مشاريع تُعرض بالتدفّق المسطّح القديم.
+        <Card>
+          <h2 className="mb-3 font-semibold text-navy">الحقول</h2>
+          <div className="space-y-3">
+            {sub.fieldValues.map((f) =>
+              f.fieldType === 'ProjectRepeatableSection' ? renderPRS(f) : renderField(f),
             )}
           </div>
-        )}
-      </Card>
+          {actionBar && <div className="mt-4">{actionBar}</div>}
+        </Card>
+      ) : (
+        // العرض Project-first: (1) نظرة عامة (2) Scorecard رقمي مطويّ ثانوي (3) جسم المشاريع.
+        <>
+          {overviewFields.length > 0 && (
+            <Card>
+              <h2 className="mb-3 font-semibold text-navy">نظرة عامة</h2>
+              <div className="space-y-3">{overviewFields.map((f) => renderField(f))}</div>
+            </Card>
+          )}
+
+          {scorecardFields.length > 0 && (
+            <Card>
+              <details>
+                <summary className="cursor-pointer select-none font-semibold text-navy">
+                  🔢 مؤشرات الأداء (KPI){' '}
+                  <span className="text-xs font-normal text-ink-2">— اضغط للعرض/الطي</span>
+                </summary>
+                <p className="mt-2 mb-3 text-xs text-ink-2">
+                  مؤشرات رقمية للتجميع والاحتساب — ليست جزءًا من جسم التقرير.
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {scorecardFields.map((f) => renderField(f))}
+                </div>
+              </details>
+            </Card>
+          )}
+
+          <Card>
+            <h2 className="mb-1 font-semibold text-navy">📁 تفاصيل المشاريع / العملاء</h2>
+            <p className="mb-3 text-xs text-ink-2">
+              جسم التقرير — كل مشروع/عميل في بطاقة مستقلّة تحوي كل التفاصيل والجداول.
+            </p>
+            <div className="space-y-4">{prsFields.map((f) => renderPRS(f))}</div>
+            {actionBar && <div className="mt-4 border-t border-line pt-4">{actionBar}</div>}
+          </Card>
+        </>
+      )}
 
       {/* ملاحظات المعتمِدين — تُعرض فقط عند وجود تعليق على أحد المستويات. */}
       {sub.approvalSteps.some((a) => a.comment) && (
@@ -833,7 +1027,12 @@ function buildPath(sub: SubmissionDto): PathStep[] {
     label: a.approverName ?? `المستوى ${a.level}`,
     state: stepState(a),
   }));
-  return [submitter, ...steps];
+  // B2C-UAT-FIXPACK — الجزء 3: عند إغلاق التقرير نُضيف عقدة ختامية صريحة «تم الاعتماد».
+  // المسار يُبنى ديناميكيًّا من approvalSteps فقط، فبعد إيقاف الصعود عند قائد الفريق (الخادم لا يُنشئ
+  // خطوة للمدير) يظهر المسار مبسّطًا: المُرسِل ← قائد الفريق ← تم الاعتماد، بلا مدير/مدير عام/رئيس تنفيذي.
+  const path = [submitter, ...steps];
+  if (sub.status === 'Closed') path.push({ label: 'تم الاعتماد', state: 'done' });
+  return path;
 }
 
 function toInput(f: SubmissionFieldValueDto): FieldValueInput {
@@ -889,14 +1088,17 @@ function MultiSelectInput({
 }
 
 // ===== محرّر شبكة الجدول =====
-function GridEditor({
+export function GridEditor({
   columns,
   rows,
   onChange,
+  columnOptions,
 }: {
   columns: string[];
   rows: string[][];
   onChange: (rows: string[][]) => void;
+  // خيارات منسدلة اختيارية لكل عمود (المفتاح=فهرس العمود). لأعمدة الكتالوج مثل «الدورة».
+  columnOptions?: Record<number, string[]>;
 }) {
   const cols = columns.length ? columns : ['القيمة'];
   const setCell = (r: number, c: number, v: string) => {
@@ -920,15 +1122,36 @@ function GridEditor({
         <tbody>
           {rows.map((row, r) => (
             <tr key={r} className="border-t border-line">
-              {cols.map((_, c) => (
-                <td key={c} className="px-1 py-1">
-                  <input
-                    className="w-full rounded border border-transparent px-2 py-1 focus:border-navy focus:outline-none"
-                    value={row[c] ?? ''}
-                    onChange={(e) => setCell(r, c, e.target.value)}
-                  />
-                </td>
-              ))}
+              {cols.map((_, c) => {
+                const opts = columnOptions?.[c];
+                if (opts) {
+                  const cell = row[c] ?? '';
+                  // نحفظ أيّ قيمة قديمة خارج الكتالوج كخيار إضافي كي لا يُمحى تعديل التقارير القديمة.
+                  const legacy = cell && !opts.includes(cell) ? [cell] : [];
+                  return (
+                    <td key={c} className="px-1 py-1">
+                      <Select value={cell} onChange={(e) => setCell(r, c, e.target.value)}>
+                        <option value="">—</option>
+                        {legacy.map((v) => (
+                          <option key={v} value={v}>{v} (قيمة قديمة)</option>
+                        ))}
+                        {opts.map((v) => (
+                          <option key={v} value={v}>{v}</option>
+                        ))}
+                      </Select>
+                    </td>
+                  );
+                }
+                return (
+                  <td key={c} className="px-1 py-1">
+                    <input
+                      className="w-full rounded border border-transparent px-2 py-1 focus:border-navy focus:outline-none"
+                      value={row[c] ?? ''}
+                      onChange={(e) => setCell(r, c, e.target.value)}
+                    />
+                  </td>
+                );
+              })}
               <td className="px-1 py-1 text-center">
                 <button type="button" onClick={() => removeRow(r)} className="text-alert hover:underline">حذف</button>
               </td>
@@ -943,7 +1166,170 @@ function GridEditor({
   );
 }
 
-function GridDisplay({ columns, rows }: { columns: string[]; rows: string[][] }) {
+// ===== قسم المشاريع المتكرر: محرّر التعبئة =====
+// «نشط» في هذا السياق = مشروع غير مغلق وغير مكتمل (مرتبط بعمل جارٍ). النطاق مفروض خادميًّا أصلًا.
+export function ProjectRepeatableEditor({
+  config, entries, projects, allProjects, onChange,
+}: {
+  config: ProjectRepeatableConfig;
+  entries: ProjectRepeatableEntry[];
+  projects: ProjectDto[];      // المشاريع القابلة للاختيار فقط (مفلترة خادميًّا).
+  allProjects: ProjectDto[];   // كل المشاريع ضمن النطاق — لحلّ القيمة المختارة سابقًا فقط.
+  onChange: (entries: ProjectRepeatableEntry[]) => void;
+}) {
+  const selectable = projects;
+  const atMax = config.maxProjects > 0 && entries.length >= config.maxProjects;
+
+  const addEntry = () => onChange([...entries, { projectId: null, answers: {} }]);
+  const removeEntry = (i: number) => onChange(entries.filter((_, idx) => idx !== i));
+  const setProject = (i: number, projectId: string | null) =>
+    onChange(entries.map((e, idx) => (idx === i ? { ...e, projectId } : e)));
+  const setAnswer = (i: number, key: string, value: string) =>
+    onChange(entries.map((e, idx) => (idx === i ? { ...e, answers: { ...e.answers, [key]: value } } : e)));
+
+  // قائمة الخيارات: المشاريع القابلة للاختيار + المشروع المختار حاليًا إن لم يكن ضمنها (كي لا تنكسر القيم القديمة).
+  const optionsFor = (selected: string | null): ProjectDto[] => {
+    if (selected && !selectable.some((p) => p.id === selected)) {
+      const extra = allProjects.find((p) => p.id === selected);
+      return extra ? [extra, ...selectable] : selectable;
+    }
+    return selectable;
+  };
+
+  return (
+    <div className="space-y-3 rounded-lg border border-dashed border-navy/30 bg-navy/[0.02] p-3">
+      <p className="text-xs text-ink-2">
+        أضِف مشروعًا واحدًا أو أكثر (حد {config.minProjects}–{config.maxProjects > 0 ? config.maxProjects : '∞'}). تظهر مشاريعك ضمن نطاقك فقط.
+      </p>
+      {entries.length === 0 && <p className="text-xs text-ink-3">لا توجد مشاريع مضافة بعد.</p>}
+
+      {entries.map((entry, i) => (
+        <div key={i} className="rounded-lg border border-line bg-white p-3">
+          <div className="mb-2 flex items-end justify-between gap-2">
+            <div className="w-72">
+              <Field label={`المشروع${config.projectRequired ? ' *' : ''}`}>
+                <Select value={entry.projectId ?? ''} onChange={(e) => setProject(i, e.target.value || null)}>
+                  <option value="">اختر مشروعًا…</option>
+                  {optionsFor(entry.projectId).map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}{p.clientName ? ` — ${p.clientName}` : ''}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </div>
+            <Button variant="danger" onClick={() => removeEntry(i)}>حذف المشروع</Button>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            {config.fields.map((sf) => {
+              const val = entry.answers[sf.key] ?? '';
+              const label = `${sf.label}${sf.required ? ' *' : ''}`;
+              // جدول صفوف داخل المشروع: يمتدّ على عرض كامل، صفوفه محفوظة كنصّ JSON في answers[key].
+              if (sf.type === 'Grid') {
+                return (
+                  <div key={sf.key} className="md:col-span-2">
+                    <p className="mb-1 text-sm font-medium text-ink">{label}</p>
+                    <GridEditor
+                      columns={sf.columns ?? []}
+                      rows={parseGrid(val)}
+                      onChange={(rows) => setAnswer(i, sf.key, JSON.stringify(rows))}
+                    />
+                  </div>
+                );
+              }
+              const k = subFieldInputKind(sf.type);
+              return (
+                <Field key={sf.key} label={label}>
+                  {k === 'bool' ? (
+                    <Select value={val} onChange={(e) => setAnswer(i, sf.key, e.target.value)}>
+                      <option value="">—</option>
+                      <option value="true">نعم</option>
+                      <option value="false">لا</option>
+                    </Select>
+                  ) : k === 'select' ? (
+                    <Select value={val} onChange={(e) => setAnswer(i, sf.key, e.target.value)}>
+                      <option value="">اختر…</option>
+                      {(sf.options ?? []).map((o) => (
+                        <option key={o} value={o}>{o}</option>
+                      ))}
+                    </Select>
+                  ) : k === 'longtext' ? (
+                    <textarea
+                      className="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-navy focus:outline-none"
+                      rows={2}
+                      value={val}
+                      onChange={(e) => setAnswer(i, sf.key, e.target.value)}
+                    />
+                  ) : k === 'number' ? (
+                    <Input type="number" value={val} onChange={(e) => setAnswer(i, sf.key, e.target.value)} />
+                  ) : k === 'date' ? (
+                    <Input type="date" value={val ? val.slice(0, 10) : ''} onChange={(e) => setAnswer(i, sf.key, e.target.value)} />
+                  ) : (
+                    <Input value={val} onChange={(e) => setAnswer(i, sf.key, e.target.value)} />
+                  )}
+                </Field>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+
+      <Button variant="ghost" onClick={addEntry} disabled={atMax}
+        title={atMax ? `الحد الأقصى ${config.maxProjects} مشروعًا` : undefined}>
+        + إضافة مشروع
+      </Button>
+    </div>
+  );
+}
+
+// ===== قسم المشاريع المتكرر: عرض للقراءة فقط مجمّع حسب المشروع =====
+export function ProjectRepeatableDisplay({
+  config, entries, projects,
+}: {
+  config: ProjectRepeatableConfig;
+  entries: ProjectRepeatableEntry[];
+  projects: ProjectDto[];
+}) {
+  if (entries.length === 0)
+    return <p className="rounded-lg border border-line bg-offwhite px-3 py-2 text-sm">—</p>;
+
+  const projectName = (pid: string | null) => {
+    if (!pid) return 'بدون مشروع محدّد';
+    const p = projects.find((x) => x.id === pid);
+    return p ? `${p.name}${p.clientName ? ` — ${p.clientName}` : ''}` : 'مشروع غير معروف';
+  };
+  const showAnswer = (sf: RepeatableSubField, raw: string | undefined): string => {
+    if (raw == null || raw === '') return '—';
+    if (sf.type === 'Boolean') return raw === 'true' ? 'نعم' : 'لا';
+    return raw;
+  };
+
+  return (
+    <div className="space-y-3">
+      {entries.map((entry, i) => (
+        <div key={i} className="rounded-lg border border-line bg-white p-3">
+          <p className="mb-2 font-semibold text-navy">{projectName(entry.projectId)}</p>
+          <dl className="grid gap-x-6 gap-y-1.5 text-sm md:grid-cols-2">
+            {config.fields.filter((sf) => sf.type !== 'Grid').map((sf) => (
+              <div key={sf.key} className="flex justify-between gap-3 border-b border-line/60 pb-1">
+                <dt className="text-ink-2">{sf.label}</dt>
+                <dd className="font-medium text-ink whitespace-pre-wrap">{showAnswer(sf, entry.answers[sf.key])}</dd>
+              </div>
+            ))}
+          </dl>
+          {config.fields.filter((sf) => sf.type === 'Grid').map((sf) => (
+            <div key={sf.key} className="mt-3">
+              <p className="mb-1 text-sm font-medium text-ink-2">{sf.label}</p>
+              <GridDisplay columns={sf.columns ?? []} rows={parseGrid(entry.answers[sf.key])} />
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function GridDisplay({ columns, rows }: { columns: string[]; rows: string[][] }) {
   const cols = columns.length ? columns : ['القيمة'];
   if (!rows.length) return <p className="rounded-lg border border-line bg-offwhite px-3 py-2 text-sm">—</p>;
   return (

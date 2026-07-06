@@ -20,7 +20,21 @@ public static class VideoReportSchema
     public const string RevisedVideos = "أعيدت للتعديل";             // المعادة للتعديل (حقل مباشر)
     public const string OutputAchievement = "نسبة تحقيق المخرجات";    // الالتزام بالخطة (٪) — يُتوسَّط
 
-    // ===== حقول نصية (سياق فقط، لا تُجمَّع رقميًا) =====
+    // ===== حقول نصية (سياق فقط, لا تُجمَّع رقميًا) =====
     public const string DelayReasons = "أسباب التأخير"; // أسباب التأخير المتكررة
     public const string Challenges = "التحديات";         // مخاطر / قرارات / نقص المواد أو البريف / مشاكل التصوير أو المونتاج
+
+    // ===== مفاتيح الحقول الفرعية داخل قسم المشاريع (PRS) لنسخة v5 (KPI مضمَّن داخل كل مشروع) =====
+    public static class Prs
+    {
+        public const string RequestedVideos = "requested_videos";
+        public const string DeliveredVideos = "delivered_videos";
+        public const string ApprovedFirstTime = "approved_first_time";
+        public const string LateVideos = "late_videos";
+        public const string PendingReview = "pending_review";
+        public const string RevisedVideos = "revised_videos";
+        public const string OutputAchievement = "output_achievement";
+        public const string DelayReasons = "delay_reasons";
+        public const string Challenges = "challenges";
+    }
 }

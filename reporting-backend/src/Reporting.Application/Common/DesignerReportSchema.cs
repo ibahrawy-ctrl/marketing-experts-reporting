@@ -20,7 +20,21 @@ public static class DesignerReportSchema
     public const string RevisedDesigns = "أعيدت للتعديل";            // المعادة للتعديل (حقل مباشر)
     public const string OutputAchievement = "نسبة تحقيق المخرجات";   // الالتزام بالخطة (٪) — يُتوسَّط
 
-    // ===== حقول نصية (سياق فقط، لا تُجمَّع رقميًا) =====
+    // ===== حقول نصية (سياق فقط, لا تُجمَّع رقميًا) =====
     public const string DelayReasons = "أسباب التأخير"; // أسباب التأخير المتكررة
     public const string Challenges = "التحديات";         // مخاطر / قرارات مطلوبة / مشاكل الهوية ونقص البريف
+
+    // ===== مفاتيح الحقول الفرعية داخل قسم المشاريع (PRS) لنسخة v5 (KPI مضمَّن داخل كل مشروع) =====
+    public static class Prs
+    {
+        public const string RequestedDesigns = "requested_designs";
+        public const string DeliveredDesigns = "delivered_designs";
+        public const string ApprovedFirstTime = "approved_first_time";
+        public const string LateDesigns = "late_designs";
+        public const string PendingReview = "pending_review";
+        public const string RevisedDesigns = "revised_designs";
+        public const string OutputAchievement = "output_achievement";
+        public const string DelayReasons = "delay_reasons";
+        public const string Challenges = "challenges";
+    }
 }

@@ -51,4 +51,33 @@ public class LeaveRequest : BaseEntity
     public string? ReturnReason { get; set; }
 
     public DateTime? CancelledAtUtc { get; set; }
+
+    // ===== لقطة كفاية رصيد الإجازات وقت الإنشاء (V1.1 — حارس الرصيد) =====
+    // تُملأ فقط لطلبات الإجازة (Leave) عندما تتجاوز الأيام المطلوبة الرصيد المتاح. لا تخصم شيئًا ولا
+    // تربط الرواتب آليًّا — لقطة إعلامية + إقرار الموظّف لتمكين الموارد البشرية/الرواتب لاحقًا.
+
+    /// <summary>الرصيد المتبقّي للإجازات السنوية وقت إنشاء الطلب (لقطة). يُملأ فقط عند نقص الرصيد.</summary>
+    public decimal? BalanceAtRequest { get; set; }
+
+    /// <summary>عدد أيام الإجازة المطلوبة (شاملة الطرفين). يُملأ فقط عند نقص الرصيد.</summary>
+    public int? RequestedLeaveDays { get; set; }
+
+    /// <summary>عدد الأيام غير المغطّاة بالرصيد = max(0, المطلوب − المتبقّي). يُملأ فقط عند نقص الرصيد.</summary>
+    public decimal? UncoveredLeaveDays { get; set; }
+
+    /// <summary>علم إعلامي: الطلب قد يتضمّن أيامًا بدون راتب إن اعتُمد (لا خصم آلي — لمساعدة HR/Payroll لاحقًا).</summary>
+    public bool IsPotentialUnpaidLeave { get; set; }
+
+    /// <summary>أقرّ الموظّف بأن الأيام غير المغطّاة قد تُحتسب إجازةً بدون راتب وتُخصم من الراتب.</summary>
+    public bool EmployeeAcknowledgedUnpaidDeduction { get; set; }
+
+    /// <summary>وقت إقرار الموظّف (UTC).</summary>
+    public DateTime? EmployeeAcknowledgedAtUtc { get; set; }
+
+    /// <summary>
+    /// قرار الموظّف عند تجاوز الاستئذان رصيدَ الأذونات الشهري (V1.1.1). None للإجازات وللأذونات ضمن الرصيد.
+    /// CompensateAfterHours: تعهّد بتعويض الوقت بعد الدوام. AdminOrPayrollReview: تقديمٌ مع علمٍ باحتمال المعالجة الإدارية/المالية.
+    /// لا خصم آلي — لقطة إعلامية لمساعدة HR/Payroll لاحقًا.
+    /// </summary>
+    public PermissionShortfallResolution PermissionShortfallResolution { get; set; } = PermissionShortfallResolution.None;
 }

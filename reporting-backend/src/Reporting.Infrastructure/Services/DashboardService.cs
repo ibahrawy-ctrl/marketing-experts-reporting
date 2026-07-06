@@ -15,11 +15,13 @@ public class DashboardService : IDashboardService
 {
     private readonly AppDbContext _db;
     private readonly ICurrentUser _currentUser;
+    private readonly IScopeResolver _scope;
 
-    public DashboardService(AppDbContext db, ICurrentUser currentUser)
+    public DashboardService(AppDbContext db, ICurrentUser currentUser, IScopeResolver scope)
     {
         _db = db;
         _currentUser = currentUser;
+        _scope = scope;
     }
 
     private static readonly SubmissionStatus[] CompletedStatuses =
@@ -503,47 +505,15 @@ public class DashboardService : IDashboardService
 
     private static string ScopeTypeFor(string role) => RoleAccess.ScopeTypeFor(role);
 
-    /// <summary>يحسب معرّفات المستخدمين داخل نطاق الرؤية من شجرة ManagerId.</summary>
+    /// <summary>
+    /// يحسب معرّفات المستخدمين داخل نطاق رؤية المستخدم الحالي عبر المصدر الموحّد <see cref="IScopeResolver"/>،
+    /// فيشمل نطاق الدور (شجرة ManagerId) مُوحَّدًا مع نطاقات المناصب المرنة (رؤية فقط).
+    /// المعامل scopeType يطابق ما يحسبه المُحلِّل من الأدوار ويُحتفظ به لاتّساق التوقيع مع مواضع الاستدعاء.
+    /// </summary>
     private async Task<List<Guid>> ResolveScopeIdsAsync(Guid uid, string scopeType, CancellationToken ct)
     {
-        switch (scopeType)
-        {
-            case "own":
-                return new List<Guid> { uid };
-
-            case "team":
-            {
-                var reports = await _db.Users.Where(u => u.ManagerId == uid).Select(u => u.Id).ToListAsync(ct);
-                reports.Add(uid);
-                return reports.Distinct().ToList();
-            }
-
-            case "department":
-            {
-                // BFS على شجرة المرؤوسين (تقارير التقارير).
-                var all = await _db.Users
-                    .Where(u => u.ManagerId != null)
-                    .Select(u => new { u.Id, u.ManagerId })
-                    .ToListAsync(ct);
-                var byManager = all.GroupBy(x => x.ManagerId!.Value)
-                    .ToDictionary(g => g.Key, g => g.Select(x => x.Id).ToList());
-
-                var result = new HashSet<Guid> { uid };
-                var queue = new Queue<Guid>();
-                queue.Enqueue(uid);
-                while (queue.Count > 0)
-                {
-                    var current = queue.Dequeue();
-                    if (!byManager.TryGetValue(current, out var children)) continue;
-                    foreach (var child in children)
-                        if (result.Add(child)) queue.Enqueue(child);
-                }
-                return result.ToList();
-            }
-
-            default: // company / governance
-                return await _db.Users.Where(u => u.IsActive).Select(u => u.Id).ToListAsync(ct);
-        }
+        var scope = await _scope.ResolveForAsync(uid, _currentUser.Roles, ct);
+        return scope.UserIds.ToList();
     }
 
     // ===== الصلاحيات والأفعال =====

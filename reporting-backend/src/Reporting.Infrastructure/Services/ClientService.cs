@@ -118,6 +118,45 @@ public class ClientService : IClientService
         return Result<ClientDto>.Success((await MapManyAsync(new[] { client }, ct))[0]);
     }
 
+    public async Task<Result<ClientDto>> ReactivateAsync(Guid id, CancellationToken ct = default)
+    {
+        if (_currentUser.UserId is not Guid uid) return Result<ClientDto>.Failure("غير مصرّح.", "auth.unauthenticated");
+        var client = await _db.Clients.FirstOrDefaultAsync(c => c.Id == id, ct);
+        if (client is null) return Result<ClientDto>.Failure("العميل غير موجود.", "client.not_found");
+
+        var vis = await _access.ResolveAsync(ct);
+        if (!vis.CanViewClient(id)) return Result<ClientDto>.Failure("هذا العميل خارج نطاق صلاحيتك.", "auth.forbidden");
+
+        if (client.Status != ClientStatus.Closed)
+            return Result<ClientDto>.Failure("العميل غير مؤرشف.", "client.not_archived.conflict");
+
+        client.Status = ClientStatus.Active;
+        client.UpdatedAtUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync(ct);
+        await _audit.LogAsync(uid, "client.reactivated", nameof(Client), client.Id, ct: ct);
+
+        return Result<ClientDto>.Success((await MapManyAsync(new[] { client }, ct))[0]);
+    }
+
+    public async Task<Result> DeleteAsync(Guid id, CancellationToken ct = default)
+    {
+        if (_currentUser.UserId is not Guid uid) return Result.Failure("غير مصرّح.", "auth.unauthenticated");
+        var client = await _db.Clients.FirstOrDefaultAsync(c => c.Id == id, ct);
+        if (client is null) return Result.Failure("العميل غير موجود.", "client.not_found");
+
+        var vis = await _access.ResolveAsync(ct);
+        if (!vis.CanViewClient(id)) return Result.Failure("هذا العميل خارج نطاق صلاحيتك.", "auth.forbidden");
+
+        var reason = await DeleteBlockReasonAsync(client.Id, ct);
+        if (reason is not null)
+            return Result.Failure(reason, "client.delete_forbidden.conflict");
+
+        _db.Clients.Remove(client);
+        await _db.SaveChangesAsync(ct);
+        await _audit.LogAsync(uid, "client.deleted", nameof(Client), id, ct: ct);
+        return Result.Success();
+    }
+
     public async Task<Result<IReadOnlyList<LinkedReportRow>>> GetReportsAsync(Guid id, CancellationToken ct = default)
     {
         if (_currentUser.UserId is null) return Result<IReadOnlyList<LinkedReportRow>>.Failure("غير مصرّح.", "auth.unauthenticated");
@@ -225,6 +264,29 @@ public class ClientService : IClientService
     }
 
     // ===== helpers =====
+    // يبني سبب منع الحذف النهائي لعميل واحد (يُستخدم في DeleteAsync). يُرجع null عند السماح.
+    private async Task<string?> DeleteBlockReasonAsync(Guid clientId, CancellationToken ct)
+    {
+        var projects = await _db.Projects.CountAsync(p => p.ClientId == clientId, ct);
+        var reports = await _db.ReportSubmissions.CountAsync(s => s.ClientId == clientId, ct);
+        var risks = await _db.Risks.CountAsync(r => r.ClientId == clientId, ct);
+        var notes = await _db.ManagementNotes.CountAsync(
+            n => n.EntityType == ManagementNoteEntityType.Client && n.EntityId == clientId, ct);
+        return BuildDeleteGuard(projects, reports, risks, notes).reason;
+    }
+
+    // قاعدة موحّدة لبناء حالة/سبب منع الحذف من العدّادات.
+    private static (bool canHardDelete, string? reason) BuildDeleteGuard(int projects, int reports, int risks, int notes)
+    {
+        var parts = new List<string>();
+        if (projects > 0) parts.Add($"{projects} مشروعًا");
+        if (reports > 0) parts.Add($"{reports} تقريرًا");
+        if (risks > 0) parts.Add($"{risks} مخاطرة");
+        if (notes > 0) parts.Add($"{notes} ملاحظة إدارية");
+        if (parts.Count == 0) return (true, null);
+        return (false, "لا يمكن الحذف النهائي — مرتبط بـ " + string.Join("، ", parts) + ". استخدم الأرشفة بدلًا من ذلك.");
+    }
+
     private async Task<List<ClientDto>> MapManyAsync(IReadOnlyCollection<Client> clients, CancellationToken ct)
     {
         var ids = clients.Select(c => c.Id).ToList();
@@ -235,9 +297,26 @@ public class ClientService : IClientService
                 .Select(x => (x.ClientId, x.Status)).ToList();
         var amNames = await UserNamesAsync(clients.Where(c => c.AccountManagerId != null).Select(c => c.AccountManagerId!.Value), ct);
 
+        // عدّادات الارتباط لاحتساب canHardDelete دفعةً واحدة.
+        var reportsByClient = ids.Count == 0 ? new Dictionary<Guid, int>()
+            : await _db.ReportSubmissions.Where(s => s.ClientId != null && ids.Contains(s.ClientId.Value))
+                .GroupBy(s => s.ClientId!.Value).Select(g => new { g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.Key, x => x.Count, ct);
+        var risksByClient = ids.Count == 0 ? new Dictionary<Guid, int>()
+            : await _db.Risks.Where(r => r.ClientId != null && ids.Contains(r.ClientId.Value))
+                .GroupBy(r => r.ClientId!.Value).Select(g => new { g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.Key, x => x.Count, ct);
+        var notesByClient = ids.Count == 0 ? new Dictionary<Guid, int>()
+            : await _db.ManagementNotes.Where(n => n.EntityType == ManagementNoteEntityType.Client && ids.Contains(n.EntityId))
+                .GroupBy(n => n.EntityId).Select(g => new { g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.Key, x => x.Count, ct);
+
         return clients.Select(c =>
         {
             var cps = projects.Where(p => p.ClientId == c.Id).ToList();
+            var (canHardDelete, reason) = BuildDeleteGuard(
+                cps.Count, reportsByClient.GetValueOrDefault(c.Id),
+                risksByClient.GetValueOrDefault(c.Id), notesByClient.GetValueOrDefault(c.Id));
             return new ClientDto(
                 c.Id, c.Name, c.Status, c.AccountManagerId,
                 c.AccountManagerId is Guid aid ? amNames.GetValueOrDefault(aid) : null,
@@ -245,7 +324,7 @@ public class ClientService : IClientService
                 cps.Count,
                 cps.Count(p => p.Status == ProjectStatus.Active),
                 cps.Count(p => p.Status == ProjectStatus.AtRisk),
-                c.CreatedAtUtc, c.UpdatedAtUtc);
+                c.CreatedAtUtc, c.UpdatedAtUtc, canHardDelete, reason);
         }).ToList();
     }
 

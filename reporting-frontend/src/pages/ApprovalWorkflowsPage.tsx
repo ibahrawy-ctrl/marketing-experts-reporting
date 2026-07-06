@@ -8,7 +8,13 @@ import { Card, Badge } from '../components/ui';
 import { LoadingState, QueryError } from '../components/states';
 import { SectionTitle } from '../components/dashboard';
 import { submissionStatusLabel } from '../lib/format';
-import type { SubmissionListItem } from '../types/api';
+import type {
+  SubmissionListItem,
+  WorkflowBottlenecksSummaryReport,
+  WorkflowBottlenecksByStageReport,
+  WorkflowBottlenecksByApproverReport,
+  WorkflowBottlenecksDetailsReport,
+} from '../types/api';
 
 interface ChainStep {
   label: string;
@@ -53,10 +59,29 @@ function ageTone(days: number | null): 'success' | 'gold' | 'alert' | 'muted' {
   return 'success';
 }
 
+// لون SLA: أخضر إن العمر < نصف SLA، ذهبي ضمن SLA، أحمر تجاوز SLA.
+function slaTone(ageHours: number, slaHours: number): 'success' | 'gold' | 'alert' {
+  if (slaHours > 0 && ageHours > slaHours) return 'alert';
+  if (slaHours > 0 && ageHours >= slaHours / 2) return 'gold';
+  return 'success';
+}
+
+// صياغة العمر بالساعات إلى نص مقروء (ساعات/أيام).
+function ageText(hours: number): string {
+  if (hours < 24) return `${Math.round(hours)} ساعة`;
+  const days = Math.floor(hours / 24);
+  const rem = Math.round(hours - days * 24);
+  return rem > 0 ? `${days} يوم و${rem} ساعة` : `${days} يوم`;
+}
+
 type WorkflowTab = 'paths' | 'queue' | 'bottleneck';
 
 export default function ApprovalWorkflowsPage() {
   const [tab, setTab] = useState<WorkflowTab>('paths');
+  const [bnStage, setBnStage] = useState<string>('');
+  const [bnTeamId, setBnTeamId] = useState<string>('');
+  const [bnDeptId, setBnDeptId] = useState<string>('');
+  const [bnOverdueOnly, setBnOverdueOnly] = useState<boolean>(false);
   const users = useDirectoryUsers();
   const teams = useTeams();
   const departments = useDepartments();
@@ -65,6 +90,37 @@ export default function ApprovalWorkflowsPage() {
   const queue = useQuery({
     queryKey: ['workflow-pending-approvals'],
     queryFn: async () => (await api.get<SubmissionListItem[]>('/submissions/pending-approvals')).data,
+  });
+
+  // اختناقات مسار الاعتماد — مفروضة النطاق خادمًا عبر ScopeResolver. تُجلب فقط عند فتح التبويب.
+  const bnEnabled = tab === 'bottleneck';
+  const bnSummary = useQuery({
+    queryKey: ['workflow-bottlenecks-summary'],
+    queryFn: async () => (await api.get<WorkflowBottlenecksSummaryReport>('/reports/workflow-bottlenecks/summary')).data,
+    enabled: bnEnabled,
+  });
+  const bnByStage = useQuery({
+    queryKey: ['workflow-bottlenecks-by-stage'],
+    queryFn: async () => (await api.get<WorkflowBottlenecksByStageReport>('/reports/workflow-bottlenecks/by-stage')).data,
+    enabled: bnEnabled,
+  });
+  const bnByApprover = useQuery({
+    queryKey: ['workflow-bottlenecks-by-approver'],
+    queryFn: async () => (await api.get<WorkflowBottlenecksByApproverReport>('/reports/workflow-bottlenecks/by-approver')).data,
+    enabled: bnEnabled,
+  });
+  const bnDetails = useQuery({
+    queryKey: ['workflow-bottlenecks-details', bnStage, bnTeamId, bnDeptId, bnOverdueOnly],
+    queryFn: async () => {
+      const qs = new URLSearchParams();
+      if (bnStage) qs.set('stage', bnStage);
+      if (bnTeamId) qs.set('teamId', bnTeamId);
+      if (bnDeptId) qs.set('departmentId', bnDeptId);
+      if (bnOverdueOnly) qs.set('overdueOnly', 'true');
+      const q = qs.toString();
+      return (await api.get<WorkflowBottlenecksDetailsReport>(`/reports/workflow-bottlenecks/details${q ? `?${q}` : ''}`)).data;
+    },
+    enabled: bnEnabled,
   });
 
   if (users.isLoading || teams.isLoading) return <LoadingState label="يتم تحميل مسارات الاعتماد…" />;
@@ -91,21 +147,6 @@ export default function ApprovalWorkflowsPage() {
   const queueRows = (queue.data ?? [])
     .map((s) => ({ ...s, age: daysWaiting(s.submittedAtUtc) }))
     .sort((a, b) => (b.age ?? -1) - (a.age ?? -1));
-
-  // نقاط الاختناق: تجميع القائمة الحيّة حسب صاحب التقرير مع أقدم عمر انتظار.
-  const bottlenecks = Object.values(
-    queueRows.reduce<Record<string, { submitterId: string; name: string; count: number; maxAge: number }>>(
-      (acc, s) => {
-        const key = s.submitterId;
-        const age = s.age ?? 0;
-        if (!acc[key]) acc[key] = { submitterId: s.submitterId, name: s.submitterName, count: 0, maxAge: 0 };
-        acc[key].count += 1;
-        acc[key].maxAge = Math.max(acc[key].maxAge, age);
-        return acc;
-      },
-      {},
-    ),
-  ).sort((a, b) => b.maxAge - a.maxAge || b.count - a.count);
 
   const tabs: { key: WorkflowTab; label: string }[] = [
     { key: 'paths', label: 'مسارات الاعتماد' },
@@ -238,31 +279,268 @@ export default function ApprovalWorkflowsPage() {
       )}
 
       {tab === 'bottleneck' && (
-        <Card>
-          <SectionTitle title="نقاط الاختناق" hint="من تتراكم تقاريرهم في انتظار اعتمادك — الأطول انتظارًا أولًا" />
-          {queue.isLoading ? (
-            <LoadingState label="يتم تحليل نقاط الاختناق…" />
-          ) : bottlenecks.length === 0 ? (
-            <p className="py-6 text-center text-sm text-ink-2">لا توجد نقاط اختناق — لا تقارير متراكمة بانتظار اعتمادك.</p>
-          ) : (
-            <div className="space-y-2">
-              {bottlenecks.map((b) => (
-                <div key={b.submitterId} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line p-3">
-                  <Link className="font-semibold text-navy hover:text-orange-600 hover:underline" to={`/app/employee/${b.submitterId}`}>
-                    {b.name}
-                  </Link>
-                  <div className="flex items-center gap-2">
-                    <Badge tone="navy">{b.count} تقرير بانتظارك</Badge>
-                    <Badge tone={ageTone(b.maxAge)}>أقدم: {b.maxAge} يوم</Badge>
+        <div className="space-y-6">
+          <Card>
+            <SectionTitle
+              title="ملخّص اختناقات مسار الاعتماد"
+              hint="التقارير العالقة في خطوات الاعتماد ضمن نطاق رؤيتك — موضع وعمر فقط، بلا أيّ محتوى للتقرير"
+            />
+            {bnSummary.isLoading ? (
+              <LoadingState label="يتم تحليل الاختناقات…" />
+            ) : bnSummary.isError ? (
+              <QueryError onRetry={() => bnSummary.refetch()} description="تعذّر جلب ملخّص الاختناقات. أعد المحاولة." />
+            ) : (
+              (() => {
+                const s = bnSummary.data;
+                if (!s) return null;
+                return (
+                  <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                    <div className="rounded-xl border border-line bg-white p-3">
+                      <p className="text-xs text-ink-2">تقارير عالقة</p>
+                      <p className="mt-1 text-2xl font-bold text-navy">{s.totalPending}</p>
+                    </div>
+                    <div className="rounded-xl border border-line bg-white p-3">
+                      <p className="text-xs text-ink-2">متأخرة عن SLA</p>
+                      <p className={`mt-1 text-2xl font-bold ${s.overduePending > 0 ? 'text-red-600' : 'text-success'}`}>
+                        {s.overduePending}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-line bg-white p-3">
+                      <p className="text-xs text-ink-2">الأقدم انتظارًا</p>
+                      <p className="mt-1 text-lg font-bold text-navy">
+                        {s.totalPending > 0 ? ageText(s.oldestPendingAgeHours) : '—'}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-line bg-white p-3">
+                      <p className="text-xs text-ink-2">المرحلة الأكثر اختناقًا</p>
+                      <p className="mt-1 text-sm font-bold text-navy">
+                        {s.stageWithMostPendingLabel ?? '—'}
+                        {s.stageWithMostPending && (
+                          <span className="mr-1 text-ink-2">({s.stageWithMostPendingCount})</span>
+                        )}
+                      </p>
+                    </div>
+                    <div className="col-span-2 rounded-xl border border-line bg-white p-3 md:col-span-2">
+                      <p className="text-xs text-ink-2">متوسّط عمر الخطوة</p>
+                      <p className="mt-1 text-lg font-bold text-navy">
+                        {s.totalPending > 0 ? ageText(s.averageStageAgeHours) : '—'}
+                      </p>
+                    </div>
+                    <div className="col-span-2 rounded-xl border border-line bg-white p-3 md:col-span-2">
+                      <p className="text-xs text-ink-2">المعتمِد الأكثر تراكمًا</p>
+                      <p className="mt-1 text-sm font-bold text-navy">
+                        {s.reviewerWithMostPendingName ?? '—'}
+                        {s.reviewerWithMostPending && (
+                          <span className="mr-1 text-ink-2">({s.reviewerWithMostPendingCount})</span>
+                        )}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))}
-              <p className="pt-2 text-xs text-ink-3">
-                التلوين: أحمر = تجاوز 7 أيام بانتظار اعتمادك، ذهبي = 3–7 أيام، أخضر = أقل من 3 أيام.
-              </p>
+                );
+              })()
+            )}
+          </Card>
+
+          <Card>
+            <SectionTitle title="التوزيع حسب المرحلة" hint="قائد فريق (SLA 24س) / مدير (48س) / الإدارة العليا (72س)" />
+            {bnByStage.isLoading ? (
+              <LoadingState label="يتم تحميل التوزيع…" />
+            ) : (bnByStage.data?.rows.length ?? 0) === 0 ? (
+              <p className="py-6 text-center text-sm text-ink-2">لا توجد مراحل بها تقارير عالقة ضمن نطاقك.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-right text-sm">
+                  <thead className="text-ink-2">
+                    <tr className="border-b border-line">
+                      <th className="py-2">المرحلة</th>
+                      <th className="py-2">عالقة</th>
+                      <th className="py-2">متأخرة</th>
+                      <th className="py-2">متوسّط العمر</th>
+                      <th className="py-2">الأقدم</th>
+                      <th className="py-2">SLA</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bnByStage.data!.rows.map((r) => (
+                      <tr key={r.stageKey} className="border-b border-line/60">
+                        <td className="py-2 font-medium text-ink">{r.stageLabel}</td>
+                        <td className="py-2">
+                          <Badge tone="navy">{r.pendingCount}</Badge>
+                        </td>
+                        <td className="py-2">
+                          <Badge tone={r.overdueCount > 0 ? 'alert' : 'success'}>{r.overdueCount}</Badge>
+                        </td>
+                        <td className="py-2 text-ink-2">{ageText(r.averageAgeHours)}</td>
+                        <td className="py-2">
+                          <Badge tone={slaTone(r.oldestAgeHours, r.slaHours)}>{ageText(r.oldestAgeHours)}</Badge>
+                        </td>
+                        <td className="py-2 text-ink-2">{r.slaHours} ساعة</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+
+          <Card>
+            <SectionTitle title="التوزيع حسب المعتمِد" hint="من تتراكم لديهم التقارير العالقة ضمن نطاقك" />
+            {bnByApprover.isLoading ? (
+              <LoadingState label="يتم تحميل التوزيع…" />
+            ) : (bnByApprover.data?.rows.length ?? 0) === 0 ? (
+              <p className="py-6 text-center text-sm text-ink-2">لا يوجد معتمِدون لديهم تقارير عالقة ضمن نطاقك.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-right text-sm">
+                  <thead className="text-ink-2">
+                    <tr className="border-b border-line">
+                      <th className="py-2">المعتمِد</th>
+                      <th className="py-2">المرحلة</th>
+                      <th className="py-2">عالقة</th>
+                      <th className="py-2">متأخرة</th>
+                      <th className="py-2">متوسّط العمر</th>
+                      <th className="py-2">الأقدم</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bnByApprover.data!.rows.map((r) => (
+                      <tr key={r.approverId} className="border-b border-line/60">
+                        <td className="py-2 font-medium text-ink">
+                          <Link className="text-navy hover:text-orange-600 hover:underline" to={`/app/employee/${r.approverId}`}>
+                            {r.approverName}
+                          </Link>
+                          <span className="mr-1 text-xs text-ink-3">{r.approverRoleLabel}</span>
+                        </td>
+                        <td className="py-2 text-ink-2">{r.stageLabel}</td>
+                        <td className="py-2">
+                          <Badge tone="navy">{r.pendingCount}</Badge>
+                        </td>
+                        <td className="py-2">
+                          <Badge tone={r.overdueCount > 0 ? 'alert' : 'success'}>{r.overdueCount}</Badge>
+                        </td>
+                        <td className="py-2 text-ink-2">{ageText(r.averageAgeHours)}</td>
+                        <td className="py-2">
+                          <Badge tone={ageTone(Math.floor(r.oldestAgeHours / 24))}>{ageText(r.oldestAgeHours)}</Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+
+          <Card>
+            <SectionTitle title="تفاصيل التقارير العالقة" hint="موضع كل تقرير في المسار وعمره مقابل SLA — بلا أيّ محتوى للتقرير" />
+            <div className="mb-4 flex flex-wrap items-end gap-3">
+              <label className="text-sm">
+                <span className="mb-1 block text-ink-2">المرحلة</span>
+                <select
+                  value={bnStage}
+                  onChange={(e) => setBnStage(e.target.value)}
+                  className="rounded-lg border border-line bg-white px-3 py-2 text-navy"
+                >
+                  <option value="">كل المراحل</option>
+                  <option value="team_leader">خطوة قائد الفريق</option>
+                  <option value="manager">خطوة المدير</option>
+                  <option value="senior_management">الإدارة العليا</option>
+                </select>
+              </label>
+              <label className="text-sm">
+                <span className="mb-1 block text-ink-2">الإدارة</span>
+                <select
+                  value={bnDeptId}
+                  onChange={(e) => setBnDeptId(e.target.value)}
+                  className="rounded-lg border border-line bg-white px-3 py-2 text-navy"
+                >
+                  <option value="">كل الإدارات</option>
+                  {deptList.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.nameAr}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm">
+                <span className="mb-1 block text-ink-2">الفريق</span>
+                <select
+                  value={bnTeamId}
+                  onChange={(e) => setBnTeamId(e.target.value)}
+                  className="rounded-lg border border-line bg-white px-3 py-2 text-navy"
+                >
+                  <option value="">كل الفرق</option>
+                  {teamList.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.nameAr}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex items-center gap-2 pb-2 text-sm text-navy">
+                <input type="checkbox" checked={bnOverdueOnly} onChange={(e) => setBnOverdueOnly(e.target.checked)} />
+                المتأخرة عن SLA فقط
+              </label>
             </div>
-          )}
-        </Card>
+            {bnDetails.isLoading ? (
+              <LoadingState label="يتم تحميل التفاصيل…" />
+            ) : bnDetails.isError ? (
+              <QueryError onRetry={() => bnDetails.refetch()} description="تعذّر جلب تفاصيل الاختناقات. أعد المحاولة." />
+            ) : (bnDetails.data?.rows.length ?? 0) === 0 ? (
+              <p className="py-6 text-center text-sm text-ink-2">لا توجد تقارير عالقة مطابقة للفلاتر ضمن نطاقك.</p>
+            ) : (
+              <>
+                <div className="mb-3 flex flex-wrap gap-2 text-sm">
+                  <Badge tone="navy">الإجمالي: {bnDetails.data!.total}</Badge>
+                  <Badge tone={bnDetails.data!.overdue > 0 ? 'alert' : 'success'}>المتأخرة: {bnDetails.data!.overdue}</Badge>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-right text-sm">
+                    <thead className="text-ink-2">
+                      <tr className="border-b border-line">
+                        <th className="py-2">القالب</th>
+                        <th className="py-2">صاحب التقرير</th>
+                        <th className="py-2">الفريق/الإدارة</th>
+                        <th className="py-2">المرحلة</th>
+                        <th className="py-2">المعتمِد الحالي</th>
+                        <th className="py-2">الحالة</th>
+                        <th className="py-2">عمر الخطوة</th>
+                        <th className="py-2"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bnDetails.data!.rows.map((r) => (
+                        <tr key={r.submissionId} className="border-b border-line/60">
+                          <td className="py-2 font-medium text-ink">{r.templateTitle}</td>
+                          <td className="py-2 text-ink-2">{r.submitterName}</td>
+                          <td className="py-2 text-ink-2">{r.teamName ?? r.departmentName ?? '—'}</td>
+                          <td className="py-2 text-ink-2">{r.stageLabel}</td>
+                          <td className="py-2 text-ink-2">{r.currentApproverName ?? '—'}</td>
+                          <td className="py-2">
+                            <Badge tone={r.status === 'Escalated' ? 'alert' : 'navy'}>{submissionStatusLabel[r.status]}</Badge>
+                          </td>
+                          <td className="py-2">
+                            <Badge tone={slaTone(r.ageHours, r.slaHours)}>
+                              {ageText(r.ageHours)}
+                              {r.isOverdue ? ' · متأخر' : ''}
+                            </Badge>
+                          </td>
+                          <td className="py-2">
+                            <Link className="text-orange-600 hover:underline" to={`/app/submissions?open=${r.submissionId}`}>
+                              فتح
+                            </Link>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="pt-3 text-xs text-ink-3">
+                  تلوين SLA: أخضر = أقل من نصف المهلة، ذهبي = ضمن المهلة، أحمر = تجاوز المهلة (متأخر).
+                </p>
+              </>
+            )}
+          </Card>
+        </div>
       )}
     </div>
   );

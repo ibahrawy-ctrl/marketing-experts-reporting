@@ -20,11 +20,35 @@ import type {
   ManagementNoteType,
   ManagementNoteStatus,
   ManagementNoteEntityType,
+  GovernanceCategory,
+  GovernanceSeverity,
+  GovernanceItemStatus,
+  GovernanceItemUpdateType,
+  GovernanceApplicationScope,
+  EscalationType,
+  EscalationSeverity,
+  GovernanceEscalationStatus,
+  EscalationTargetType,
+  EscalationUpdateType,
   ClientStatus,
   ProjectStatus,
   ServiceType,
   LeaveRequestType,
   LeaveRequestStatus,
+  PermissionShortfallResolution,
+  BalanceType,
+  BalanceDirection,
+  BalanceSource,
+  PermissionUnit,
+  EmployeeServiceRequestType,
+  EmployeeServiceRequestStatus,
+  PreferredLanguage,
+  PayrollImpactReviewStatus,
+  PayrollImpactType,
+  ActionItemStatus,
+  ActionItemPriority,
+  ActionItemSourceType,
+  ActionItemUpdateType,
 } from '../types/api';
 
 export const roleLabel: Record<Role, string> = {
@@ -37,6 +61,9 @@ export const roleLabel: Record<Role, string> = {
   CeoSupport: 'دعم الرئيس التنفيذي',
   HR: 'الموارد البشرية',
   Viewer: 'مُطّلع',
+  FinanceManager: 'المدير المالي',
+  Accountant: 'الحسابات',
+  AccountPortfolioReader: 'محفظة مدير الحساب',
 };
 
 export const submissionStatusLabel: Record<SubmissionStatus, string> = {
@@ -176,6 +203,7 @@ export const fieldTypeLabel: Record<FieldType, string> = {
   Phone: 'هاتف',
   TableGrid: 'جدول',
   SectionHeader: 'عنوان قسم',
+  ProjectRepeatableSection: 'قسم مشاريع متكرر',
 };
 
 export const kpiCalcMethodLabel: Record<KpiCalcMethod, string> = {
@@ -208,7 +236,7 @@ export const clientStatusLabel: Record<ClientStatus, string> = {
   Active: 'نشِط',
   Paused: 'متوقّف مؤقتًا',
   AtRisk: 'معرَّض للخطر',
-  Closed: 'مُغلق',
+  Closed: 'مؤرشف',
 };
 
 export const projectStatusLabel: Record<ProjectStatus, string> = {
@@ -216,7 +244,7 @@ export const projectStatusLabel: Record<ProjectStatus, string> = {
   Paused: 'متوقّف مؤقتًا',
   Completed: 'مكتمل',
   AtRisk: 'معرَّض للخطر',
-  Closed: 'مُغلق',
+  Closed: 'مؤرشف',
 };
 
 export const serviceTypeLabel: Record<ServiceType, string> = {
@@ -241,6 +269,13 @@ export function projectStatusTone(s: ProjectStatus): 'success' | 'gold' | 'alert
 export const leaveTypeLabel: Record<LeaveRequestType, string> = {
   Leave: 'إجازة',
   Permission: 'استئذان',
+};
+
+// قرار الموظّف عند تجاوز الاستئذان رصيدَ الأذونات الشهري (V1.1.1).
+export const permissionShortfallResolutionLabel: Record<PermissionShortfallResolution, string> = {
+  None: '—',
+  CompensateAfterHours: 'تعهّد بتعويض وقت الاستئذان بعد مواعيد العمل',
+  AdminOrPayrollReview: 'تقديم الطلب مع العلم باحتمال المعالجة الإدارية/المالية',
 };
 
 export const leaveRequestStatusLabel: Record<LeaveRequestStatus, string> = {
@@ -274,6 +309,277 @@ export function leaveStatusTone(s: LeaveRequestStatus): 'navy' | 'success' | 'al
   if (s === 'Cancelled') return 'muted';
   return 'navy';
 }
+
+// ===== V1.1 — أرصدة الإجازات والأذونات + طلبات الموارد البشرية (خدمات الموظف) =====
+
+export const balanceTypeLabel: Record<BalanceType, string> = {
+  AnnualLeave: 'رصيد الإجازات',
+  Permission: 'رصيد الأذونات',
+};
+
+export const balanceDirectionLabel: Record<BalanceDirection, string> = {
+  Credit: 'إضافة',
+  Debit: 'خصم',
+};
+
+export const balanceSourceLabel: Record<BalanceSource, string> = {
+  OpeningBalance: 'رصيد افتتاحي',
+  ApprovedLeave: 'إجازة معتمَدة',
+  ApprovedPermission: 'إذن معتمَد',
+  ManualAdjustment: 'تعديل يدوي',
+  CarryOver: 'مُرحَّل',
+  Reversal: 'عكس حركة',
+};
+
+export const permissionUnitLabel: Record<PermissionUnit, string> = {
+  Count: 'عدد (إذن)',
+  Hours: 'ساعات',
+};
+
+export const employeeServiceRequestTypeLabel: Record<EmployeeServiceRequestType, string> = {
+  HrLetter: 'خطاب موارد بشرية',
+  SalaryCertificate: 'شهادة راتب',
+  ExperienceCertificate: 'شهادة خبرة',
+  BankLetter: 'خطاب بنكي',
+  EmbassyLetter: 'خطاب سفارة',
+  PersonalDataUpdate: 'تحديث بيانات شخصية',
+  Other: 'أخرى',
+};
+
+export const preferredLanguageLabel: Record<PreferredLanguage, string> = {
+  Arabic: 'العربية',
+  English: 'الإنجليزية',
+};
+
+export const employeeServiceRequestStatusLabel: Record<EmployeeServiceRequestStatus, string> = {
+  Submitted: 'مُقدَّم',
+  InReview: 'قيد المعالجة',
+  Completed: 'مكتمل',
+  Rejected: 'مرفوض',
+  Cancelled: 'مُلغى',
+};
+
+export function employeeServiceRequestStatusTone(
+  s: EmployeeServiceRequestStatus,
+): 'navy' | 'success' | 'alert' | 'gold' | 'muted' {
+  if (s === 'Completed') return 'success';
+  if (s === 'Rejected') return 'alert';
+  if (s === 'InReview') return 'gold';
+  if (s === 'Cancelled') return 'muted';
+  return 'navy';
+}
+
+// ===== FIN-L1 — عرض التأثير على الرواتب =====
+export const payrollImpactReviewStatusLabel: Record<PayrollImpactReviewStatus, string> = {
+  Pending: 'بانتظار المراجعة المالية',
+  Processed: 'تمّت المعالجة',
+  Ignored: 'مُتجاهَل (بلا أثر)',
+  NeedsReview: 'يحتاج مراجعة',
+};
+
+export function payrollImpactReviewStatusTone(
+  s: PayrollImpactReviewStatus,
+): 'navy' | 'success' | 'alert' | 'gold' | 'muted' {
+  if (s === 'Processed') return 'success';
+  if (s === 'NeedsReview') return 'alert';
+  if (s === 'Ignored') return 'muted';
+  return 'gold';
+}
+
+export const payrollImpactTypeLabel: Record<PayrollImpactType, string> = {
+  UnpaidLeave: 'إجازة بدون راتب (محتملة)',
+  PermissionAfterHoursCompensation: 'استئذان بتعهّد تعويض بعد الدوام',
+  PermissionAdminOrPayrollReview: 'استئذان بمعالجة إدارية/مالية',
+};
+
+// ===== ورشة الحوكمة العامة (GOV-GOVERNANCE-UX1) =====
+export const governanceCategoryLabel: Record<GovernanceCategory, string> = {
+  Observation: 'ملاحظة',
+  Risk: 'خطر',
+  Decision: 'قرار',
+  Recommendation: 'توصية',
+  FollowUp: 'متابعة',
+  Compliance: 'التزام',
+  Performance: 'أداء',
+  OperationalIssue: 'مشكلة تشغيلية',
+};
+
+export const governanceSeverityLabel: Record<GovernanceSeverity, string> = {
+  Low: 'منخفضة',
+  Medium: 'متوسطة',
+  High: 'عالية',
+  Critical: 'حرجة',
+};
+
+export function governanceSeverityTone(
+  s: GovernanceSeverity,
+): 'navy' | 'success' | 'alert' | 'gold' | 'muted' {
+  if (s === 'Critical') return 'alert';
+  if (s === 'High') return 'gold';
+  if (s === 'Low') return 'muted';
+  return 'navy';
+}
+
+export const governanceItemStatusLabel: Record<GovernanceItemStatus, string> = {
+  Open: 'مفتوح',
+  InReview: 'قيد المراجعة',
+  Waiting: 'بانتظار',
+  Resolved: 'مُعالَج',
+  Closed: 'مُغلق',
+  Cancelled: 'مُلغى',
+};
+
+export function governanceItemStatusTone(
+  s: GovernanceItemStatus,
+): 'navy' | 'success' | 'alert' | 'gold' | 'muted' {
+  if (s === 'Resolved' || s === 'Closed') return 'success';
+  if (s === 'Waiting') return 'gold';
+  if (s === 'Cancelled') return 'muted';
+  if (s === 'InReview') return 'navy';
+  return 'alert';
+}
+
+export const governanceItemUpdateTypeLabel: Record<GovernanceItemUpdateType, string> = {
+  Created: 'إنشاء',
+  Comment: 'تعليق',
+  StatusChanged: 'تغيير حالة',
+  Reassigned: 'إعادة إسناد',
+  FollowUp: 'متابعة',
+  Edited: 'تعديل',
+};
+
+// نطاق التطبيق لبند الحوكمة (GOV-APPLICATION-SCOPE-R1): «يُطبَّق على من؟»
+export const governanceApplicationScopeLabel: Record<GovernanceApplicationScope, string> = {
+  Company: 'كل الشركة',
+  Department: 'إدارة محددة',
+  Team: 'فريق محدد',
+  User: 'موظّف محدد',
+  RelatedReport: 'تقرير مرتبط',
+};
+
+// ===== التصعيد الفردي (GOV-INDIVIDUAL-ESCALATION1) =====
+export const escalationTypeLabel: Record<EscalationType, string> = {
+  Performance: 'أداء',
+  Delay: 'تأخير',
+  Quality: 'جودة',
+  Compliance: 'التزام',
+  Communication: 'تواصل',
+  Workflow: 'سير عمل',
+  ClientImpact: 'أثر على العميل',
+  PolicyViolation: 'مخالفة سياسة',
+  Other: 'أخرى',
+};
+
+export const escalationSeverityLabel: Record<EscalationSeverity, string> = {
+  Low: 'منخفضة',
+  Medium: 'متوسطة',
+  High: 'عالية',
+  Critical: 'حرجة',
+};
+
+export function escalationSeverityTone(
+  s: EscalationSeverity,
+): 'navy' | 'success' | 'alert' | 'gold' | 'muted' {
+  if (s === 'Critical') return 'alert';
+  if (s === 'High') return 'gold';
+  if (s === 'Low') return 'muted';
+  return 'navy';
+}
+
+export const governanceEscalationStatusLabel: Record<GovernanceEscalationStatus, string> = {
+  Open: 'مفتوح',
+  UnderReview: 'قيد المراجعة',
+  Assigned: 'مُسنَد',
+  WaitingForResponse: 'بانتظار الرد',
+  Resolved: 'مُعالَج',
+  Closed: 'مُغلق',
+  Reopened: 'أُعيد فتحه',
+  Cancelled: 'مُلغى',
+};
+
+export function governanceEscalationStatusTone(
+  s: GovernanceEscalationStatus,
+): 'navy' | 'success' | 'alert' | 'gold' | 'muted' {
+  if (s === 'Resolved' || s === 'Closed') return 'success';
+  if (s === 'WaitingForResponse') return 'gold';
+  if (s === 'Cancelled') return 'muted';
+  if (s === 'UnderReview' || s === 'Assigned' || s === 'Reopened') return 'navy';
+  return 'alert';
+}
+
+export const escalationTargetTypeLabel: Record<EscalationTargetType, string> = {
+  User: 'موظّف',
+  Department: 'إدارة',
+  Team: 'فريق',
+  Report: 'تقرير',
+  Workflow: 'سير عمل',
+  GovernanceItem: 'بند حوكمة',
+  Operational: 'تشغيلي',
+  Other: 'أخرى',
+};
+
+export const escalationUpdateTypeLabel: Record<EscalationUpdateType, string> = {
+  Created: 'إنشاء',
+  Comment: 'تعليق',
+  StatusChanged: 'تغيير حالة',
+  Assigned: 'إسناد',
+  Reopened: 'إعادة فتح',
+  Edited: 'تعديل',
+  Closed: 'إغلاق',
+};
+
+// ===== إجراءات الحوكمة والمتابعة (GOV-ACTION-ITEMS-R1) =====
+
+export const actionItemStatusLabel: Record<ActionItemStatus, string> = {
+  Open: 'مفتوح',
+  InProgress: 'قيد التنفيذ',
+  Blocked: 'مُعطَّل',
+  Completed: 'مكتمل',
+  Cancelled: 'مُلغى',
+};
+
+export function actionItemStatusTone(
+  s: ActionItemStatus,
+): 'navy' | 'success' | 'alert' | 'gold' | 'muted' {
+  if (s === 'Completed') return 'success';
+  if (s === 'Blocked') return 'alert';
+  if (s === 'Cancelled') return 'muted';
+  if (s === 'InProgress') return 'gold';
+  return 'navy';
+}
+
+export const actionItemPriorityLabel: Record<ActionItemPriority, string> = {
+  Low: 'منخفضة',
+  Medium: 'متوسطة',
+  High: 'عالية',
+  Critical: 'حرجة',
+};
+
+export function actionItemPriorityTone(
+  p: ActionItemPriority,
+): 'navy' | 'success' | 'alert' | 'gold' | 'muted' {
+  if (p === 'Critical') return 'alert';
+  if (p === 'High') return 'gold';
+  if (p === 'Low') return 'muted';
+  return 'navy';
+}
+
+export const actionItemSourceTypeLabel: Record<ActionItemSourceType, string> = {
+  Manual: 'يدوي',
+  Escalation: 'تصعيد',
+  GovernanceItem: 'بند حوكمة',
+};
+
+export const actionItemUpdateTypeLabel: Record<ActionItemUpdateType, string> = {
+  Created: 'إنشاء',
+  Comment: 'تعليق',
+  StatusChanged: 'تغيير حالة',
+  DueDateChanged: 'تغيير تاريخ الاستحقاق',
+  AssigneeChanged: 'تغيير المُسنَد إليه',
+  CompletionSubmitted: 'تقديم الإكمال',
+  Reopened: 'إعادة فتح',
+  Cancelled: 'إلغاء',
+};
 
 // ===== سجل التدقيق: ترجمة الأحداث التقنية إلى لغة أعمال مفهومة =====
 

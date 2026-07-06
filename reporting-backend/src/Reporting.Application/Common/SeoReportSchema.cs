@@ -31,4 +31,21 @@ public static class SeoReportSchema
     // ===== حقول نصية (سياق فقط، لا تُجمَّع رقميًا) =====
     public const string DecisionsNeeded = "قرارات مطلوبة";   // من قالب الفريق
     public const string Recommendations = "اقتراحات";          // من قالب المقالات
+
+    // ===== مفاتيح الحقول الفرعية داخل قسم المشاريع (PRS) لنسخة v5 (KPI مضمَّن داخل كل مشروع) =====
+    // تُقرأ من ValueJson وتُضاف فوق مجموع top-level. مختارة كي لا تتصادم مع مفاتيح PRS في v4 (project_progress/نصوص).
+    public static class Prs
+    {
+        public const string ImprovedKeywords = "kw_improved";
+        public const string DeclinedKeywords = "kw_declined";
+        public const string OrganicTraffic = "organic_traffic";
+        public const string IndexedPages = "indexed_pages";
+        public const string TasksDone = "tasks_done";
+        public const string TechnicalIssues = "tech_issues";
+        public const string ArticlesPlanned = "articles_planned";
+        public const string ArticlesPublished = "articles_published";
+        public const string ArticlesLate = "articles_late";
+        public const string DecisionsNeeded = "decisions_needed";
+        public const string Recommendations = "recommendations";
+    }
 }

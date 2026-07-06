@@ -13,11 +13,13 @@ public class ClientProjectAccess : IClientProjectAccess
 {
     private readonly AppDbContext _db;
     private readonly IScopeResolver _scope;
+    private readonly ICurrentUser _currentUser;
 
-    public ClientProjectAccess(AppDbContext db, IScopeResolver scope)
+    public ClientProjectAccess(AppDbContext db, IScopeResolver scope, ICurrentUser currentUser)
     {
         _db = db;
         _scope = scope;
+        _currentUser = currentUser;
     }
 
     public async Task<ClientProjectVisibility> ResolveAsync(CancellationToken ct = default)
@@ -34,6 +36,27 @@ public class ClientProjectAccess : IClientProjectAccess
             .Select(t => t.Id)
             .ToListAsync(ct);
         var teamSet = teamIds.ToHashSet();
+
+        // عضوية الفريق: المستخدم الحالي يرى مشاريع الفريق الذي ينتمي إليه (لاختيار المشروع داخل تقارير PRS)،
+        // دون أي صلاحية إدارة/تعديل/اعتماد — إدارة المشاريع تبقى محكومة بسياسة ManagementOnly على الـController.
+        // مقصور على المستخدم الحالي فقط (لا يوسّع رؤية أي مستخدم آخر داخل النطاق).
+        if (_currentUser.UserId is Guid meId)
+        {
+            var myTeamId = await _db.Users
+                .Where(u => u.Id == meId)
+                .Select(u => u.TeamId)
+                .FirstOrDefaultAsync(ct);
+            if (myTeamId is Guid mt) teamSet.Add(mt);
+
+            // عضويات الفرق الإضافية النشطة (MULTI-TEAM-MEMBERSHIP): يرى المستخدم مشاريع الفرق
+            // التي ينتمي إليها إضافيًّا أيضًا (لاختيار المشروع/عرض التقارير)، بلا أي صلاحية إدارة/اعتماد.
+            // مقصور على المستخدم الحالي، ولا يوسّع رؤية أي مستخدم آخر داخل النطاق. teamSet هو HashSet ⇒ لا تكرار.
+            var extraTeamIds = await _db.UserTeamMemberships
+                .Where(m => m.UserId == meId && m.IsActive)
+                .Select(m => m.TeamId)
+                .ToListAsync(ct);
+            foreach (var et in extraTeamIds) teamSet.Add(et);
+        }
 
         // مشاريع: مدير حسابها داخل النطاق أو فريقها المسؤول يقوده أحد داخل النطاق.
         var byAmOrTeam = await _db.Projects

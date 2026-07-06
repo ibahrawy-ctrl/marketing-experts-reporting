@@ -78,6 +78,11 @@ public class ReportCadenceTests
         var (templateId, _) = await PublishTemplateAsync(admin);
         var (sales, salesId) = await TestAuth.CreateUserAsync(_factory, "Employee");
         await AssignJobRoleCodeAsync(salesId, "SALES_B2C");
+        // قاعدة الاختبار المشتركة قد تحوي قوالب مرتبطة بمسمّى SALES_B2C من تشغيلات سابقة،
+        // فيُسقط حارس الإسناد القالب العام عن المندوب. نُسنِد القالب له صراحةً (Employee Include)
+        // كي يبقى اختبار الدورية صالحًا تحت الحارس دون إضعافه.
+        await admin.PostAsJsonAsync($"/api/report-templates/{templateId}/assignments",
+            new CreateAssignmentRequest(TemplateAssignmentScope.Employee, salesId, TemplateAssignmentKind.Include, null));
 
         var daily = await sales.PostAsJsonAsync("/api/submissions",
             new CreateSubmissionRequest(templateId, PeriodType.Daily, "2026-12-16"));

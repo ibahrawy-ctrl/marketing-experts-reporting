@@ -16,7 +16,9 @@ public record ClientDto(
     int ActiveProjectCount,
     int AtRiskProjectCount,
     DateTime CreatedAtUtc,
-    DateTime? UpdatedAtUtc);
+    DateTime? UpdatedAtUtc,
+    bool CanHardDelete = false,
+    string? DeleteBlockReason = null);
 
 public record CreateClientRequest(
     string Name,

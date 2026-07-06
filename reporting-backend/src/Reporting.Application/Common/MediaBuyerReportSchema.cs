@@ -21,4 +21,15 @@ public static class MediaBuyerReportSchema
     public const string IssueCause = "سبب المشكلة الأساسي";
     public const string DecisionsNeeded = "قرارات مطلوبة";
     public const string BestContent = "الرسائل والمحتوى الأفضل أداءً";
+
+    // ===== مفاتيح الحقول الفرعية داخل قسم المشاريع (PRS) لنسخة v5 (KPI مضمَّن داخل كل مشروع) =====
+    public static class Prs
+    {
+        public const string Spend = "spend";
+        public const string Leads = "mb_leads";
+        public const string Ctr = "ctr";
+        public const string ConversionRate = "conv_rate";
+        public const string IssueCause = "issue_cause";
+        public const string DecisionsNeeded = "decisions_needed";
+    }
 }

@@ -113,6 +113,14 @@ export default function EmployeeProfilePage() {
             <p className="font-medium text-ink">{header.directManagerName ?? '—'}</p>
           </div>
         </div>
+        <div className="mt-4">
+          <Link
+            to={`/app/employees/${userId}/kpi`}
+            className="inline-block rounded-lg bg-orange px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600"
+          >
+            مؤشرات أداء الموظف
+          </Link>
+        </div>
       </Card>
 
       {/* ===== (2) ملخّص الأداء ===== */}
@@ -198,7 +206,12 @@ export default function EmployeeProfilePage() {
 
       {/* ===== (4) تقييمات KPI ===== */}
       <section id="kpi" className="scroll-mt-24">
-        <h2 className="mb-3 font-semibold text-navy">أحدث تقييمات الأداء (KPI)</h2>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-semibold text-navy">أحدث تقييمات الأداء (KPI)</h2>
+          <Link to={`/app/kpi?subject=${userId}`} className="text-sm font-semibold text-orange-600 hover:underline">
+            عرض كل تقييمات الموظّف
+          </Link>
+        </div>
         <Card>
           {kpiEvaluations.length === 0 ? (
             <p className="text-sm text-ink-2">لا توجد تقييمات KPI لهذا الموظّف بعد.</p>

@@ -1,3 +1,6 @@
+using System.Globalization;
+using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using Reporting.Application.Audit;
@@ -214,7 +217,7 @@ public class KpiEvaluationService : IKpiEvaluationService
         await _db.SaveChangesAsync(ct);
 
         await _notifications.NotifyAsync(e.SubjectUserId, "kpi.submitted",
-            "تم احتساب مؤشرات أدائك", null, $"/kpi-evaluations/{e.Id}", ct);
+            "تم احتساب مؤشرات أدائك", null, "/app/my-kpi", ct);
         await _audit.LogAsync(_currentUser.UserId, "kpi.submitted", nameof(KpiEvaluation), e.Id, ct: ct);
 
         return Result<KpiEvaluationDto>.Success(await BuildDtoAsync(evaluationId, ct));
@@ -239,7 +242,7 @@ public class KpiEvaluationService : IKpiEvaluationService
         await _db.SaveChangesAsync(ct);
 
         await _notifications.NotifyAsync(e.SubjectUserId, "kpi.approved",
-            "تم اعتماد تقييم أدائك", null, $"/kpi-evaluations/{e.Id}", ct);
+            "تم اعتماد تقييم أدائك", null, "/app/my-kpi", ct);
         await _audit.LogAsync(_currentUser.UserId, "kpi.approved", nameof(KpiEvaluation), e.Id, ct: ct);
 
         return Result<KpiEvaluationDto>.Success(await BuildDtoAsync(evaluationId, ct));
@@ -377,6 +380,157 @@ public class KpiEvaluationService : IKpiEvaluationService
         return Result<KpiAggregateDto>.Success(dto);
     }
 
+    // ===== تصدير KPI للمالية (KPI-FIN1) — قراءة/تصدير فقط، لا تغيير أيّ تقييم =====
+
+    public async Task<Result<KpiFinanceExportDto>> GetFinanceExportAsync(KpiFinanceExportFilter filter, CancellationToken ct = default)
+        => await BuildFinanceExportAsync(filter, ct);
+
+    public async Task<Result<byte[]>> ExportFinanceCsvAsync(KpiFinanceExportFilter filter, CancellationToken ct = default)
+    {
+        var built = await BuildFinanceExportAsync(filter, ct);
+        if (!built.Succeeded) return Result<byte[]>.Failure(built.Error!, built.ErrorCode);
+        var data = built.Value!;
+
+        var sb = new StringBuilder();
+        sb.Append("اسم الموظف,الإدارة,الفريق,المسمى الوظيفي,نوع الفترة,مفتاح الفترة,السنة,الربع,القالب المستخدم,الدرجة النهائية,الحالة,تاريخ آخر تحديث / اعتماد\n");
+        foreach (var r in data.Rows)
+        {
+            var score = r.TotalScore?.ToString("0.##", CultureInfo.InvariantCulture) ?? string.Empty;
+            var updated = r.LastUpdatedAtUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+            sb.Append(Csv(r.EmployeeName)).Append(',')
+              .Append(Csv(r.DepartmentName ?? string.Empty)).Append(',')
+              .Append(Csv(r.TeamName ?? string.Empty)).Append(',')
+              .Append(Csv(r.JobRoleName ?? string.Empty)).Append(',')
+              .Append(Csv(r.PeriodType.ToString())).Append(',')
+              .Append(Csv(r.PeriodKey)).Append(',')
+              .Append(Csv(r.Year.ToString(CultureInfo.InvariantCulture))).Append(',')
+              .Append(Csv(r.Quarter.ToString(CultureInfo.InvariantCulture))).Append(',')
+              .Append(Csv(r.TemplateTitle)).Append(',')
+              .Append(Csv(score)).Append(',')
+              .Append(Csv(r.Status.ToString())).Append(',')
+              .Append(Csv(updated)).Append('\n');
+        }
+
+        // تدقيق على التصدير فقط — بلا أيّ أسماء أو درجات (وصف الفترة والمرشّحات وعدد الصفوف فقط).
+        var auditData = JsonSerializer.Serialize(new
+        {
+            year = filter.Year,
+            quarter = filter.Quarter,
+            departmentId = filter.DepartmentId,
+            teamId = filter.TeamId,
+            status = data.Status.ToString(),
+            rowCount = data.RowCount
+        });
+        await _audit.LogAsync(_currentUser.UserId, "kpi.finance_exported", nameof(KpiEvaluation), null, auditData, ct: ct);
+
+        var bom = new byte[] { 0xEF, 0xBB, 0xBF };
+        var body = Encoding.UTF8.GetBytes(sb.ToString());
+        return Result<byte[]>.Success(bom.Concat(body).ToArray());
+    }
+
+    private async Task<Result<KpiFinanceExportDto>> BuildFinanceExportAsync(KpiFinanceExportFilter filter, CancellationToken ct)
+    {
+        if (_currentUser.UserId is null)
+            return Result<KpiFinanceExportDto>.Failure("غير مصرّح.", "auth.unauthenticated");
+        if (filter.Quarter is < 1 or > 4)
+            return Result<KpiFinanceExportDto>.Failure("الربع غير صحيح؛ استخدم قيمة بين 1 و4.", "kpi_finance.quarter_invalid");
+        if (filter.Year is < 2000 or > 3000)
+            return Result<KpiFinanceExportDto>.Failure("السنة غير صحيحة.", "kpi_finance.year_invalid");
+
+        // الحالة المسموح تصديرها: Approved (افتراضي) أو Closed فقط — أيّ حالة أخرى تُرفَض.
+        var status = filter.Status ?? KpiEvaluationStatus.Approved;
+        if (status is not (KpiEvaluationStatus.Approved or KpiEvaluationStatus.Closed))
+            return Result<KpiFinanceExportDto>.Failure(
+                "حالة التصدير غير مسموحة؛ يُسمح بتصدير المعتمد (Approved) أو المغلق (Closed) فقط.",
+                "kpi_finance.status_invalid");
+
+        var (from, to) = ReportCalendarPolicy.QuarterRange(filter.Year, filter.Quarter);
+        var label = $"الربع {filter.Quarter} — {filter.Year}";
+
+        // عرض على مستوى الشركة (بلا ScopeResolver؛ النطاق مفروض بالسياسة). تقييمات أسبوعية بالحالة المختارة فقط.
+        var q = _db.KpiEvaluations.AsNoTracking()
+            .Where(e => e.PeriodType == PeriodType.Weekly && e.Status == status);
+        if (filter.DepartmentId is Guid d) q = q.Where(e => e.DepartmentId == d);
+        if (filter.TeamId is Guid t) q = q.Where(e => e.TeamId == t);
+
+        var raw = await q.Select(e => new
+        {
+            e.Id,
+            e.SubjectUserId,
+            e.TeamId,
+            e.DepartmentId,
+            e.KpiTemplateVersionId,
+            e.PeriodType,
+            e.PeriodKey,
+            e.TotalScore,
+            e.Status,
+            e.UpdatedAtUtc,
+            e.CreatedAtUtc
+        }).ToListAsync(ct);
+
+        // فلترة الأسابيع الواقعة داخل مدى الربع (بحسب خميس بداية الأسبوع).
+        var inRange = raw.Where(r => ReportCalendarPolicy.WeekInRange(r.PeriodKey, from, to)).ToList();
+
+        // حلّ الأسماء على دفعات: الموظّفون (الاسم/المسمّى/الإدارة/الفريق الحاليّ)، الإدارات، الفِرق، عناوين القوالب.
+        var subjectIds = inRange.Select(r => r.SubjectUserId).Distinct().ToList();
+        var users = await _db.Users.AsNoTracking().Where(u => subjectIds.Contains(u.Id))
+            .Select(u => new { u.Id, u.FullName, u.JobRoleId }).ToListAsync(ct);
+        var userMap = users.ToDictionary(u => u.Id);
+
+        var deptIds = inRange.Where(r => r.DepartmentId is not null).Select(r => r.DepartmentId!.Value).Distinct().ToList();
+        var deptNames = await _db.Departments.AsNoTracking().Where(x => deptIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, x => x.NameAr, ct);
+
+        var teamIds = inRange.Where(r => r.TeamId is not null).Select(r => r.TeamId!.Value).Distinct().ToList();
+        var teamNames = await _db.Teams.AsNoTracking().Where(x => teamIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, x => x.NameAr, ct);
+
+        var jobRoleIds = users.Where(u => u.JobRoleId is not null).Select(u => u.JobRoleId!.Value).Distinct().ToList();
+        var jobRoleNames = await _db.JobRoles.AsNoTracking().Where(x => jobRoleIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, x => x.NameAr, ct);
+
+        var versionIds = inRange.Select(r => r.KpiTemplateVersionId).Distinct().ToList();
+        var templateTitles = await _db.KpiTemplateVersions.AsNoTracking().Where(v => versionIds.Contains(v.Id))
+            .Select(v => new { v.Id, Title = v.KpiTemplate!.Title })
+            .ToDictionaryAsync(v => v.Id, v => v.Title, ct);
+
+        var rows = inRange
+            .OrderBy(r => r.PeriodKey)
+            .ThenBy(r => userMap.TryGetValue(r.SubjectUserId, out var u) ? u.FullName : string.Empty)
+            .Select(r =>
+            {
+                userMap.TryGetValue(r.SubjectUserId, out var user);
+                Guid? jobRoleId = user?.JobRoleId;
+                return new KpiFinanceExportRowDto(
+                    r.Id,
+                    r.SubjectUserId,
+                    user?.FullName ?? string.Empty,
+                    r.DepartmentId is Guid dd ? deptNames.GetValueOrDefault(dd) : null,
+                    r.TeamId is Guid tt ? teamNames.GetValueOrDefault(tt) : null,
+                    jobRoleId is Guid jr ? jobRoleNames.GetValueOrDefault(jr) : null,
+                    r.PeriodType,
+                    r.PeriodKey,
+                    filter.Year,
+                    filter.Quarter,
+                    templateTitles.GetValueOrDefault(r.KpiTemplateVersionId, string.Empty),
+                    r.TotalScore,
+                    r.Status,
+                    r.UpdatedAtUtc ?? r.CreatedAtUtc);
+            })
+            .ToList();
+
+        return Result<KpiFinanceExportDto>.Success(
+            new KpiFinanceExportDto(filter.Year, filter.Quarter, label, from, to, status, rows.Count, rows));
+    }
+
+    private static string Csv(string value)
+    {
+        if (string.IsNullOrEmpty(value)) return string.Empty;
+        if (value.Contains(',') || value.Contains('"') || value.Contains('\n'))
+            return "\"" + value.Replace("\"", "\"\"") + "\"";
+        return value;
+    }
+
     private static bool TryParseYearMonth(string? key, out (int Year, int Month) value)
     {
         value = default;
@@ -486,13 +640,13 @@ public class KpiEvaluationService : IKpiEvaluationService
 
         var metrics = await _db.KpiMetrics.Where(m => m.KpiTemplateVersionId == e.KpiTemplateVersionId)
             .OrderBy(m => m.Order)
-            .Select(m => new { m.Id, m.Name, m.Weight, m.TargetValue, m.Unit })
+            .Select(m => new { m.Id, m.Name, m.Weight, m.TargetValue, m.Unit, m.CalcMethod })
             .ToListAsync(ct);
 
         var resultDtos = metrics.Select(m =>
         {
             var r = e.Results.FirstOrDefault(x => x.KpiMetricId == m.Id);
-            return new KpiResultDto(m.Id, m.Name, m.Weight, m.TargetValue, m.Unit, r?.RawValue, r?.Score, r?.Note);
+            return new KpiResultDto(m.Id, m.Name, m.Weight, m.TargetValue, m.Unit, m.CalcMethod, r?.RawValue, r?.Score, r?.Note);
         }).ToList();
 
         var ids = new List<Guid> { e.SubjectUserId };

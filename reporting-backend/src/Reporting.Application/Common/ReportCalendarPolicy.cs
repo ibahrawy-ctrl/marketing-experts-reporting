@@ -12,6 +12,21 @@ namespace Reporting.Application.Common;
 /// </summary>
 public static class ReportCalendarPolicy
 {
+    // ===== المنطقة الزمنية المرجعية (آسيا/الرياض، UTC+3 ثابت بلا توقيت صيفي) =====
+    // كلّ حسابات «اليوم الحالي» وموعد الاستحقاق والتأخّر تُبنى على توقيت الرياض لا UTC،
+    // كي يتطابق إدراك «اليوم» مع يوم العمل المحلّي للشركة (السعودية لا تطبّق DST ⇒ +3 ثابت).
+
+    /// <summary>إزاحة توقيت الرياض الثابتة عن UTC (+3 ساعات، بلا توقيت صيفي).</summary>
+    public static readonly TimeSpan RiyadhOffset = TimeSpan.FromHours(3);
+
+    /// <summary>التاريخ الحالي بتوقيت الرياض (يُحوّل لحظة UTC إلى +3 ثم يأخذ التاريخ).</summary>
+    public static DateOnly RiyadhToday() =>
+        DateOnly.FromDateTime(DateTime.UtcNow.Add(RiyadhOffset));
+
+    /// <summary>تاريخ لحظة UTC معيّنة بتوقيت الرياض (لتقييم تأخّر التسليم بيومه المحلّي).</summary>
+    public static DateOnly RiyadhDate(DateTime utc) =>
+        DateOnly.FromDateTime((utc.Kind == DateTimeKind.Utc ? utc : DateTime.SpecifyKind(utc, DateTimeKind.Utc)).Add(RiyadhOffset));
+
     // ===== الأسبوع التشغيلي (الخميس → الأربعاء) =====
 
     /// <summary>الخميس الذي يبدأ به الأسبوع التشغيلي المحتوي على تاريخ معيّن.</summary>

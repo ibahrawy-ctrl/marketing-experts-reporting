@@ -38,6 +38,11 @@ public class KpiTemplatesController : ApiControllerBase
     public async Task<IActionResult> Archive(Guid id, CancellationToken ct)
         => FromResult(await _service.ArchiveAsync(id, ct));
 
+    [HttpPost("{id:guid}/reactivate")]
+    [Authorize(Policy = Policies.TemplateGovernance)]
+    public async Task<IActionResult> Reactivate(Guid id, CancellationToken ct)
+        => FromResult(await _service.ReactivateAsync(id, ct));
+
     [HttpPost("versions/{versionId:guid}/metrics")]
     [Authorize(Policy = Policies.TemplateGovernance)]
     public async Task<IActionResult> AddMetric(Guid versionId, UpsertKpiMetricRequest request, CancellationToken ct)
@@ -62,4 +67,25 @@ public class KpiTemplatesController : ApiControllerBase
     [Authorize(Policy = Policies.TemplateGovernance)]
     public async Task<IActionResult> CreateDraftVersion(Guid templateId, CancellationToken ct)
         => FromResult(await _service.CreateDraftVersionAsync(templateId, ct));
+
+    // ===== إسناد قوالب KPI (Phase T1) — إدارة الأدمن حصرًا =====
+    [HttpGet("{id:guid}/assignments")]
+    [Authorize(Policy = Policies.AdminOnly)]
+    public async Task<IActionResult> GetAssignments(Guid id, CancellationToken ct)
+        => FromResult(await _service.GetAssignmentsAsync(id, ct));
+
+    [HttpPost("{id:guid}/assignments")]
+    [Authorize(Policy = Policies.AdminOnly)]
+    public async Task<IActionResult> AddAssignment(Guid id, CreateKpiAssignmentRequest request, CancellationToken ct)
+        => FromResult(await _service.AddAssignmentAsync(id, request, ct));
+
+    [HttpPut("{templateId:guid}/assignments/{assignmentId:guid}")]
+    [Authorize(Policy = Policies.AdminOnly)]
+    public async Task<IActionResult> UpdateAssignment(Guid templateId, Guid assignmentId, UpdateKpiAssignmentRequest request, CancellationToken ct)
+        => FromResult(await _service.UpdateAssignmentAsync(templateId, assignmentId, request, ct));
+
+    [HttpDelete("{templateId:guid}/assignments/{assignmentId:guid}")]
+    [Authorize(Policy = Policies.AdminOnly)]
+    public async Task<IActionResult> RemoveAssignment(Guid templateId, Guid assignmentId, CancellationToken ct)
+        => FromResult(await _service.RemoveAssignmentAsync(templateId, assignmentId, ct));
 }

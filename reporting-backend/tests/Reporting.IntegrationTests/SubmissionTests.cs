@@ -38,8 +38,9 @@ public class SubmissionTests
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var (templateId, fieldId) = await PublishTemplateAsync(admin);
 
-        var (manager, managerId) = await TestAuth.CreateUserAsync(_factory, "Manager");
-        var (employee, _) = await TestAuth.CreateUserAsync(_factory, "Employee", managerId);
+        // APPROVAL-FALLBACK-R1: المعتمِد الأعلى من الطبقة العليا (CEO) — طبقة عليا بلا مدير ⇒ يُغلق في خطوة واحدة.
+        var (ceo, ceoId) = await TestAuth.CreateUserAsync(_factory, "CEO");
+        var (employee, _) = await TestAuth.CreateUserAsync(_factory, "Employee", ceoId);
 
         // إنشاء مسودة
         var draft = await (await employee.PostAsJsonAsync("/api/submissions",
@@ -61,11 +62,11 @@ public class SubmissionTests
         var submitted = await (await employee.PostAsync($"/api/submissions/{draft.Id}/submit", null))
             .ReadAsync<SubmissionDto>();
         Assert.Equal(SubmissionStatus.Submitted, submitted!.Status);
-        Assert.Equal(managerId, submitted.CurrentApproverId);
+        Assert.Equal(ceoId, submitted.CurrentApproverId);
         Assert.False(submitted.CanEdit);
 
-        // المدير يعتمد — لا مدير أعلى ⇒ مُغلق
-        var approved = await (await manager.PostAsJsonAsync($"/api/submissions/{draft.Id}/approve",
+        // المعتمِد الأعلى (CEO) يعتمد — طبقة عليا بلا مدير ⇒ مُغلق
+        var approved = await (await ceo.PostAsJsonAsync($"/api/submissions/{draft.Id}/approve",
             new ApprovalActionRequest("معتمد"))).ReadAsync<SubmissionDto>();
         Assert.Equal(SubmissionStatus.Closed, approved!.Status);
         Assert.Null(approved.CurrentApproverId);
@@ -221,5 +222,131 @@ public class SubmissionTests
         var client = _factory.CreateClient();
         var res = await client.GetAsync("/api/submissions/mine");
         Assert.Equal(HttpStatusCode.Unauthorized, res.StatusCode);
+    }
+
+    // ==================== حذف المسودة (Draft Deletion) ====================
+
+    [Fact]
+    public async Task DeleteDraft_Owner_DeletesOwnDraft_204_AndDisappearsFromList()
+    {
+        var admin = await TestAuth.LoginAsAdminAsync(_factory);
+        var (templateId, fieldId) = await PublishTemplateAsync(admin);
+        var (employee, _) = await TestAuth.CreateUserAsync(_factory, "Employee");
+
+        var draft = await (await employee.PostAsJsonAsync("/api/submissions",
+            new CreateSubmissionRequest(templateId, PeriodType.Weekly, "2026-W41")))
+            .ReadAsync<SubmissionDto>();
+        // تعبئة قيمة كي نتحقّق من حذف القيم المرتبطة عبر Cascade.
+        await employee.PutAsJsonAsync($"/api/submissions/{draft!.Id}/values",
+            new SaveFieldValuesRequest(new[] { new FieldValueInput(fieldId, null, 42m, null, null, null) }));
+
+        var del = await employee.DeleteAsync($"/api/submissions/{draft.Id}");
+        Assert.Equal(HttpStatusCode.NoContent, del.StatusCode);
+
+        // لم تعد موجودة (GET ⇒ 404) ولا تظهر في قائمتي.
+        var get = await employee.GetAsync($"/api/submissions/{draft.Id}");
+        Assert.Equal(HttpStatusCode.NotFound, get.StatusCode);
+
+        var mine = await (await employee.GetAsync("/api/submissions/mine"))
+            .ReadAsync<List<SubmissionListItemDto>>();
+        Assert.DoesNotContain(mine!, s => s.Id == draft.Id);
+    }
+
+    [Fact]
+    public async Task DeleteDraft_OtherEmployee_CannotDelete_403()
+    {
+        var admin = await TestAuth.LoginAsAdminAsync(_factory);
+        var (templateId, _) = await PublishTemplateAsync(admin);
+        var (owner, _) = await TestAuth.CreateUserAsync(_factory, "Employee");
+        var (attacker, _) = await TestAuth.CreateUserAsync(_factory, "Employee");
+
+        var draft = await (await owner.PostAsJsonAsync("/api/submissions",
+            new CreateSubmissionRequest(templateId, PeriodType.Weekly, "2026-W42")))
+            .ReadAsync<SubmissionDto>();
+
+        var del = await attacker.DeleteAsync($"/api/submissions/{draft!.Id}");
+        Assert.Equal(HttpStatusCode.Forbidden, del.StatusCode);
+
+        // ما زالت موجودة لصاحبها.
+        var get = await owner.GetAsync($"/api/submissions/{draft.Id}");
+        Assert.Equal(HttpStatusCode.OK, get.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteDraft_AdminCannotDeleteOthersDraft_403()
+    {
+        var admin = await TestAuth.LoginAsAdminAsync(_factory);
+        var (templateId, _) = await PublishTemplateAsync(admin);
+        var (owner, _) = await TestAuth.CreateUserAsync(_factory, "Employee");
+
+        var draft = await (await owner.PostAsJsonAsync("/api/submissions",
+            new CreateSubmissionRequest(templateId, PeriodType.Weekly, "2026-W43")))
+            .ReadAsync<SubmissionDto>();
+
+        // حتى الأدمن لا يحذف مسودة موظّف آخر (owner-only).
+        var del = await admin.DeleteAsync($"/api/submissions/{draft!.Id}");
+        Assert.Equal(HttpStatusCode.Forbidden, del.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteDraft_SubmittedReport_CannotDelete_409()
+    {
+        var admin = await TestAuth.LoginAsAdminAsync(_factory);
+        var (templateId, fieldId) = await PublishTemplateAsync(admin);
+        var (_, managerId) = await TestAuth.CreateUserAsync(_factory, "Manager");
+        var (employee, _) = await TestAuth.CreateUserAsync(_factory, "Employee", managerId);
+
+        var draft = await (await employee.PostAsJsonAsync("/api/submissions",
+            new CreateSubmissionRequest(templateId, PeriodType.Weekly, "2026-W44")))
+            .ReadAsync<SubmissionDto>();
+        await employee.PutAsJsonAsync($"/api/submissions/{draft!.Id}/values",
+            new SaveFieldValuesRequest(new[] { new FieldValueInput(fieldId, null, 7m, null, null, null) }));
+        await employee.PostAsync($"/api/submissions/{draft.Id}/submit", null);
+
+        // بعد الإرسال لا يمكن الحذف.
+        var del = await employee.DeleteAsync($"/api/submissions/{draft.Id}");
+        Assert.Equal(HttpStatusCode.Conflict, del.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteDraft_ClosedReport_CannotDelete_409()
+    {
+        var admin = await TestAuth.LoginAsAdminAsync(_factory);
+        var (templateId, fieldId) = await PublishTemplateAsync(admin);
+        // APPROVAL-FALLBACK-R1: موظّف مديره المباشر CEO ⇒ الإرسال يوجَّه للـCEO، واعتماده يُغلق التقرير (طبقة عليا بلا مدير).
+        var (ceo, ceoId) = await TestAuth.CreateUserAsync(_factory, "CEO");
+        var (employee, _) = await TestAuth.CreateUserAsync(_factory, "Employee", ceoId);
+
+        var draft = await (await employee.PostAsJsonAsync("/api/submissions",
+            new CreateSubmissionRequest(templateId, PeriodType.Weekly, "2026-W45")))
+            .ReadAsync<SubmissionDto>();
+        await employee.PutAsJsonAsync($"/api/submissions/{draft!.Id}/values",
+            new SaveFieldValuesRequest(new[] { new FieldValueInput(fieldId, null, 3m, null, null, null) }));
+        var submitted = await (await employee.PostAsync($"/api/submissions/{draft.Id}/submit", null))
+            .ReadAsync<SubmissionDto>();
+        Assert.Equal(SubmissionStatus.Submitted, submitted!.Status);
+
+        var closed = await (await ceo.PostAsJsonAsync($"/api/submissions/{draft.Id}/approve",
+            new ApprovalActionRequest(null))).ReadAsync<SubmissionDto>();
+        Assert.Equal(SubmissionStatus.Closed, closed!.Status);
+
+        var del = await employee.DeleteAsync($"/api/submissions/{draft.Id}");
+        Assert.Equal(HttpStatusCode.Conflict, del.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteDraft_NonExistent_404()
+    {
+        var (employee, _) = await TestAuth.CreateUserAsync(_factory, "Employee");
+        var del = await employee.DeleteAsync($"/api/submissions/{Guid.NewGuid()}");
+        Assert.Equal(HttpStatusCode.NotFound, del.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteDraft_Anonymous_401()
+    {
+        var client = _factory.CreateClient();
+        var del = await client.DeleteAsync($"/api/submissions/{Guid.NewGuid()}");
+        Assert.Equal(HttpStatusCode.Unauthorized, del.StatusCode);
     }
 }

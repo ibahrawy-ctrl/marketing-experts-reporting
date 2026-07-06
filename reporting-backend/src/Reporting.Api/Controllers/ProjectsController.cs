@@ -18,9 +18,9 @@ public class ProjectsController : ApiControllerBase
     public async Task<IActionResult> List(
         [FromQuery] Guid? clientId, [FromQuery] ProjectStatus? status, [FromQuery] ServiceType? serviceType,
         [FromQuery] Guid? ownerTeamId, [FromQuery] Guid? accountManagerId,
-        [FromQuery] bool includeClosed = false, CancellationToken ct = default)
+        [FromQuery] bool includeClosed = false, [FromQuery] bool selectableOnly = false, CancellationToken ct = default)
         => FromResult(await _service.ListAsync(
-            new ProjectFilter(clientId, status, serviceType, ownerTeamId, accountManagerId, includeClosed), ct));
+            new ProjectFilter(clientId, status, serviceType, ownerTeamId, accountManagerId, includeClosed, selectableOnly), ct));
 
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> Get(Guid id, CancellationToken ct)
@@ -48,4 +48,14 @@ public class ProjectsController : ApiControllerBase
     [Authorize(Policy = Policies.ManagementOnly)]
     public async Task<IActionResult> Archive(Guid id, CancellationToken ct)
         => FromResult(await _service.ArchiveAsync(id, ct));
+
+    [HttpPost("{id:guid}/reactivate")]
+    [Authorize(Policy = Policies.ManagementOnly)]
+    public async Task<IActionResult> Reactivate(Guid id, CancellationToken ct)
+        => FromResult(await _service.ReactivateAsync(id, ct));
+
+    [HttpDelete("{id:guid}")]
+    [Authorize(Policy = Policies.ManagementOnly)]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
+        => FromResult(await _service.DeleteAsync(id, ct));
 }

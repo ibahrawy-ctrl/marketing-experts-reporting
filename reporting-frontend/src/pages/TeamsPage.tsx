@@ -17,8 +17,12 @@ import { Card, Badge, Select, Button, StatCard } from '../components/ui';
 import { LoadingState, QueryError } from '../components/states';
 import { ProgressBar } from '../components/dashboard';
 import { formatPercent } from '../lib/format';
+import { useAuth } from '../lib/auth';
+import { CreateTeamForm } from './UsersPage';
 
 export default function TeamsPage() {
+  const { hasAnyRole } = useAuth();
+  const canCreateTeam = hasAnyRole('Admin'); // إنشاء الفريق محصور بالأدمن خادميًّا (Policies.AdminOnly).
   const users = useDirectoryUsers();
   const teams = useTeams();
   const departments = useDepartments();
@@ -29,6 +33,7 @@ export default function TeamsPage() {
   const [view, setView] = useState<'cards' | 'table'>('cards');
   const [deptFilter, setDeptFilter] = useState('');
   const [healthFilter, setHealthFilter] = useState('');
+  const [showCreate, setShowCreate] = useState(false);
 
   if (users.isLoading || teams.isLoading || submissions.isLoading || kpi.isLoading)
     return <LoadingState label="يتم تحميل الفرق…" />;
@@ -72,6 +77,11 @@ export default function TeamsPage() {
           <p className="mt-1 text-sm text-ink-2">حالة كل فريق: الالتزام، المؤشرات، التأخير، والتصعيدات.</p>
         </div>
         <div className="flex gap-2">
+          {canCreateTeam && (
+            <Button variant="primary" onClick={() => setShowCreate((v) => !v)}>
+              {showCreate ? 'إغلاق' : '+ إنشاء فريق جديد'}
+            </Button>
+          )}
           <Button variant={view === 'cards' ? 'primary' : 'ghost'} onClick={() => setView('cards')}>
             بطاقات
           </Button>
@@ -80,6 +90,16 @@ export default function TeamsPage() {
           </Button>
         </div>
       </div>
+
+      {canCreateTeam && showCreate && (
+        <Card>
+          <CreateTeamForm
+            departments={departments.data ?? []}
+            users={users.data ?? []}
+            onDone={() => setShowCreate(false)}
+          />
+        </Card>
+      )}
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard label="عدد الفرق" value={aggregates.length} />
@@ -110,7 +130,8 @@ export default function TeamsPage() {
           <div className="py-10 text-center">
             <p className="text-sm font-medium text-ink-2">لا توجد فرق مطابقة.</p>
             <p className="mx-auto mt-1 max-w-md text-xs text-ink-3">
-              لا يوجد فريق ضمن نطاقك يطابق البحث أو الفلتر الحالي. جرّب تعديل البحث أو اختيار «الكل». تُنشأ الفرق وتُدار من صفحة «المستخدمون».
+              لا يوجد فريق ضمن نطاقك يطابق البحث أو الفلتر الحالي. جرّب تعديل البحث أو اختيار «الكل».
+              {canCreateTeam ? ' لإنشاء فريق جديد استخدم زر «إنشاء فريق جديد» أعلى الصفحة.' : ' تُنشأ الفرق وتُدار من قِبل المسؤول.'}
             </p>
           </div>
         </Card>
