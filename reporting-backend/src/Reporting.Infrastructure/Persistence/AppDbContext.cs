@@ -11,6 +11,7 @@ using Reporting.Domain.Entities.Leave;
 using Reporting.Domain.Entities.Org;
 using Reporting.Domain.Entities.Payroll;
 using Reporting.Domain.Entities.Positions;
+using Reporting.Domain.Entities.Services;
 using Reporting.Domain.Entities.Submissions;
 using Reporting.Domain.Entities.System;
 using Reporting.Domain.Entities.Templates;
@@ -38,6 +39,9 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
 
     // كتالوج الدورات (مصدر أسماء دورات مبيعات B2C)
     public DbSet<Course> Courses => Set<Course>();
+
+    // كتالوج خدمات B2B (مصدر أسماء خدمات مبيعات B2B حسب الخدمة)
+    public DbSet<Service> Services => Set<Service>();
 
     // قوالب التقارير
     public DbSet<ReportTemplate> ReportTemplates => Set<ReportTemplate>();

@@ -18,6 +18,8 @@ interface AuthUser {
   roles: Role[];
   // الدورية المتوقَّعة لتقارير المستخدم (يومي لمندوبي المبيعات، أسبوعي لغيرهم).
   expectedReportCadence: PeriodType;
+  // رمز المسمّى الوظيفي (مثل SALES_B2C) — لتحديد لوحات المبيعات وعناصر التنقّل (null إن لم يُسنَد).
+  jobRoleCode: string | null;
 }
 
 interface AuthContextValue {
@@ -40,7 +42,17 @@ interface AuthContextValue {
   canManageTemplates: boolean;
   // صلاحية إدارة العملاء والمشاريع (إنشاء/تعديل/أرشفة) — تطابق سياسة Policies.ManagementOnly بالخادم.
   canManageClients: boolean;
+  // هل المستخدم مندوب مبيعات فردي (SALES_B2C/SALES_B2B) ⇒ يرى لوحة «مبيعاتي».
+  isSalesRep: boolean;
+  // متغيّر لوحة المندوب حسب مسمّاه ('B2C' | 'B2B' | null لغير المندوب).
+  salesRepType: 'B2C' | 'B2B' | null;
 }
+
+// رموز مسمّيات مندوبي المبيعات الأفراد (تطابق OrgSeeder + منطق SalesContext بالخادم).
+const SALES_REP_CODES: Record<string, 'B2C' | 'B2B'> = {
+  SALES_B2C: 'B2C',
+  SALES_B2B: 'B2B',
+};
 
 // أدوار الإدارة المخوّلة بالاعتماد (مطابقة لمنطق سلسلة الاعتماد بالخادم).
 const APPROVER_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'Manager', 'TeamLeader'];
@@ -78,6 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             email: data.email,
             roles: data.roles,
             expectedReportCadence: data.expectedReportCadence,
+            jobRoleCode: data.jobRoleCode ?? null,
           });
         }
       } catch {
@@ -101,6 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: data.email,
       roles: data.roles,
       expectedReportCadence: data.expectedReportCadence,
+      jobRoleCode: data.jobRoleCode ?? null,
     });
   }, []);
 
@@ -148,10 +162,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => !!user && user.roles.some((r) => CLIENT_MANAGEMENT_ROLES.includes(r)),
     [user],
   );
+  // متغيّر لوحة المندوب حسب مسمّاه ('B2C' | 'B2B' | null لغير المندوب) — يُشتَقّ من JobRoleCode.
+  const salesRepType = useMemo<'B2C' | 'B2B' | null>(
+    () => (user?.jobRoleCode ? SALES_REP_CODES[user.jobRoleCode] ?? null : null),
+    [user],
+  );
+  // هل المستخدم مندوب مبيعات فردي ⇒ يرى «لوحة مبيعاتي».
+  const isSalesRep = useMemo(() => salesRepType !== null, [salesRepType]);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, loading, login, logout, changePassword, changeEmail, hasAnyRole, canApprove, canViewGovernance, canManageTeams, canManageTemplates, canManageClients }),
-    [user, loading, login, logout, changePassword, changeEmail, hasAnyRole, canApprove, canViewGovernance, canManageTeams, canManageTemplates, canManageClients],
+    () => ({ user, loading, login, logout, changePassword, changeEmail, hasAnyRole, canApprove, canViewGovernance, canManageTeams, canManageTemplates, canManageClients, isSalesRep, salesRepType }),
+    [user, loading, login, logout, changePassword, changeEmail, hasAnyRole, canApprove, canViewGovernance, canManageTeams, canManageTemplates, canManageClients, isSalesRep, salesRepType],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

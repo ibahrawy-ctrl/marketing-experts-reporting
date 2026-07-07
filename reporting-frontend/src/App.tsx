@@ -15,6 +15,8 @@ import TeamsPage from './pages/TeamsPage';
 import TeamDetailsPage from './pages/TeamDetailsPage';
 import ComparisonsPage from './pages/ComparisonsPage';
 import SalesAggregationPage from './pages/SalesAggregationPage';
+import TeamLeaderSalesDashboardPage from './pages/TeamLeaderSalesDashboardPage';
+import SalesRepDashboardPage from './pages/SalesRepDashboardPage';
 import ReportTemplatesPage from './pages/ReportTemplatesPage';
 import KpiTemplatesPage from './pages/KpiTemplatesPage';
 import ApprovalWorkflowsPage from './pages/ApprovalWorkflowsPage';
@@ -38,6 +40,7 @@ import KpiFinanceExportPage from './pages/KpiFinanceExportPage';
 import { DepartmentsPage } from './pages/DepartmentsPage';
 import SettingsPage from './pages/SettingsPage';
 import CourseManagementPage from './pages/CourseManagementPage';
+import ServiceManagementPage from './pages/ServiceManagementPage';
 import ClientsPage from './pages/ClientsPage';
 import ClientDetailPage from './pages/ClientDetailPage';
 import ProjectsPage from './pages/ProjectsPage';
@@ -52,6 +55,8 @@ import type { Role } from './types/api';
 
 const EXEC_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'Manager', 'TeamLeader', 'CeoSupport', 'Viewer'];
 const ADMIN: Role[] = ['Admin'];
+// لوحة مبيعات الفريق (RC3-Task1) — لقائد الفريق والأدوار الأعلى فقط؛ النطاق مفروض خادميًّا عبر IScopeResolver.
+const TEAM_SALES_DASHBOARD_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'Manager', 'TeamLeader'];
 // صفحة إدارة فريق العمل (GOV-R1): Admin + CEO يديران المستخدمين بالكامل؛ CeoSupport عرض + إعادة تعيين كلمات المرور فقط.
 // إنشاء/تعديل/أدوار/حذف المستخدمين = Admin + CEO (مفروضة بسياسة UserManagement بالخادم وفي الواجهة).
 const USERS_PAGE_ROLES: Role[] = ['Admin', 'CEO', 'CeoSupport'];
@@ -172,6 +177,11 @@ const APP_ROUTES: { path: string; element: ReactNode; roles?: Role[] }[] = [
   { path: '/app/analytics', element: <ComparisonsPage />, roles: EXEC_ROLES },
   // تجميع المبيعات (B2C-UAT-FIXPACK الجزء 4) — عرض تجميعي للمدير؛ النطاق مفروض خادميًّا عبر IScopeResolver.
   { path: '/app/sales-aggregation', element: <SalesAggregationPage />, roles: EXEC_ROLES },
+  // لوحة مبيعات الفريق (RC3-Task1) — لقائد الفريق؛ يرى فريقه فقط (النطاق مفروض خادميًّا عبر IScopeResolver).
+  { path: '/app/sales/team-dashboard', element: <TeamLeaderSalesDashboardPage />, roles: TEAM_SALES_DASHBOARD_ROLES },
+  // لوحة مبيعاتي الشخصية (RC3-Task1.1) — للمندوب (SALES_B2C/SALES_B2B) والأدمن؛ الحماية داخل الصفحة عبر jobRoleCode.
+  // بلا roles على المسار (المندوب دوره Employee) — النطاق مفروض خادميًّا (المندوب يرى نفسه فقط عبر تقاطع IScopeResolver).
+  { path: '/app/sales/my-dashboard', element: <SalesRepDashboardPage /> },
   // متابعة الالتزام بالتقارير (per-person) — شاشة متابعة فقط، الصلاحية مفروضة خادمًا.
   { path: '/app/compliance', element: <CompliancePage />, roles: COMPLETION_ROLES },
   // إدارة بيانات الموظفين (حزمة HR A) — تعديل الاسم + التنظيم الوظيفي فقط.
@@ -190,6 +200,8 @@ const APP_ROUTES: { path: string; element: ReactNode; roles?: Role[] }[] = [
   { path: '/app/departments', element: <DepartmentsPage />, roles: ADMIN },
   // إدارة كتالوج الدورات (B2C) — تطابق سياسة TemplateGovernance بالخادم (Admin/CEO/GM).
   { path: '/app/courses', element: <CourseManagementPage />, roles: TEMPLATE_GOVERNANCE_ROLES },
+  // إدارة كتالوج خدمات B2B — تطابق سياسة TemplateGovernance بالخادم (Admin/CEO/GM).
+  { path: '/app/services', element: <ServiceManagementPage />, roles: TEMPLATE_GOVERNANCE_ROLES },
   { path: '/app/settings', element: <SettingsPage />, roles: ADMIN },
   { path: '/app/audit', element: <AuditPage />, roles: ['Admin', 'CEO', 'GeneralManager'] },
   { path: '/app/development', element: <DevelopmentPage /> },

@@ -75,8 +75,10 @@ public class ErdsPhase6ExecutiveDashboardTests
         => new[] { course, hours, leads, leads, leads, "0", sales, revenue, "0", "" };
 
     // B2B (10 أعمدة): [الخدمة، ساعات، Leads، Meetings، Proposals، Negotiation، Won، Lost، Revenue، Next]
+    // قيود قمع B2B: Meetings≤Leads، Proposals≤Meetings، Won≤Proposals، Lost≤Leads ⇒ نجعل Meetings=Proposals=Leads
+    // كي يمرّ Won؛ التأكيدات تمسّ Won/Revenue/Leads فقط (لا Meetings/Proposals) فلا تتأثّر.
     private static string[] B2bRow(string service, string hours, string leads, string won, string revenue)
-        => new[] { service, hours, leads, "0", "0", "0", won, "0", revenue, "" };
+        => new[] { service, hours, leads, leads, leads, "0", won, "0", revenue, "" };
 
     private static async Task<T> GetDashboardAsync<T>(HttpClient client, string path, string query)
         => (await (await client.GetAsync($"/api/dashboard/{path}?{query}")).ReadAsync<T>())!;

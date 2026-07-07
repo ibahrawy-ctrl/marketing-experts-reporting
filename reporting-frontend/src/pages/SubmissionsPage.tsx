@@ -6,6 +6,7 @@ import { useAuth } from '../lib/auth';
 import { useDirectoryUsers, useTeams, useDepartments } from '../lib/useDirectory';
 import { useProjects } from '../lib/useClients';
 import { useActiveCourses } from '../lib/useCourses';
+import { useActiveServices } from '../lib/useServices';
 import { Alert, Badge, Button, Card, Field, Input, Select } from '../components/ui';
 import { LoadingState, QueryError } from '../components/states';
 import { ApprovalPath, ProgressBar, type PathStep } from '../components/dashboard';
@@ -17,6 +18,7 @@ import {
   formatDate,
 } from '../lib/format';
 import { operationalWeekKey, riyadhToday } from '../lib/dashboardPeriod';
+import { normalizeDigits, sanitizeNumericInput, isNumericGridColumn } from '../lib/numericNormalizer';
 import type {
   SubmissionListItem,
   SubmissionDto,
@@ -622,6 +624,9 @@ function SubmissionDetail({ id, onBack }: { id: string; onBack: () => void }) {
   // كتالوج الدورات النشطة — يغذّي منتقي «الدورة» في شبكة قالب مبيعات B2C.
   const { data: activeCourses } = useActiveCourses();
   const courseNames = useMemo(() => (activeCourses ?? []).map((c) => c.nameAr), [activeCourses]);
+  // كتالوج خدمات B2B النشطة — يغذّي منتقي «الخدمة» في شبكة قالب مبيعات B2B حسب الخدمة.
+  const { data: activeServices } = useActiveServices();
+  const serviceNames = useMemo(() => (activeServices ?? []).map((s) => s.nameAr), [activeServices]);
   const [draft, setDraft] = useState<Record<string, FieldValueInput>>({});
   const [comment, setComment] = useState('');
   const [err, setErr] = useState<string | null>(null);
@@ -787,8 +792,14 @@ function SubmissionDetail({ id, onBack }: { id: string; onBack: () => void }) {
             columns={cfg.columns ?? []}
             rows={parseGrid(cur.valueJson)}
             onChange={(rows) => update({ valueJson: JSON.stringify(rows) })}
-            // عمود «الدورة» (فهرس 0) في قالب مبيعات B2C يصبح منتقيًا من كتالوج الدورات.
-            columnOptions={cfg.columns?.[0] === 'الدورة' && courseNames.length ? { 0: courseNames } : undefined}
+            // عمود «الدورة» (فهرس 0، B2C) أو «الخدمة» (فهرس 0، B2B) يصبح منتقيًا من الكتالوج المطابق.
+            columnOptions={
+              cfg.columns?.[0] === 'الدورة' && courseNames.length
+                ? { 0: courseNames }
+                : cfg.columns?.[0] === 'الخدمة' && serviceNames.length
+                  ? { 0: serviceNames }
+                  : undefined
+            }
           />
         ) : kind === 'longtext' ? (
           <textarea
@@ -1142,12 +1153,18 @@ export function GridEditor({
                     </td>
                   );
                 }
+                // عمود رقمي ⇒ تنقية صارمة (خانات + فاصلة عشرية + سالب) مع تحويل الخانات العربية أثناء الكتابة؛
+                // عمود نصّي حرّ ⇒ تطبيع الخانات فقط (لا يمسّ الحروف) كي لا تُخزَّن خانة عربية إطلاقًا.
+                const isNumeric = isNumericGridColumn(cols[c]);
                 return (
                   <td key={c} className="px-1 py-1">
                     <input
                       className="w-full rounded border border-transparent px-2 py-1 focus:border-navy focus:outline-none"
+                      inputMode={isNumeric ? 'decimal' : undefined}
                       value={row[c] ?? ''}
-                      onChange={(e) => setCell(r, c, e.target.value)}
+                      onChange={(e) =>
+                        setCell(r, c, isNumeric ? sanitizeNumericInput(e.target.value) : normalizeDigits(e.target.value))
+                      }
                     />
                   </td>
                 );

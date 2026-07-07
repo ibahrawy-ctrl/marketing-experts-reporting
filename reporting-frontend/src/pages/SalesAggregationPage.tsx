@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { Alert, Badge, Card, EmptyState, Field, Input, Select, StatCard } from '../components/ui';
 import { SectionTitle } from '../components/dashboard';
 import { LoadingState, QueryError } from '../components/states';
-import { useB2bAggregation, useB2cCourseGrouped, useB2cNewOld } from '../lib/useSalesAggregation';
+import { useB2bBySource, useB2cCourseGrouped, useB2cNewOld } from '../lib/useSalesAggregation';
 import { formatPeriod, formatPercent } from '../lib/format';
 import {
   dateKey,
@@ -17,6 +17,8 @@ import {
 import type {
   B2bAggregationReport,
   B2bServiceAggregateRow,
+  B2bSourceBucket,
+  B2bSourceReport,
   B2cCourseEmployeeRow,
   B2cCourseGroupedReport,
   B2cCourseGroupRow,
@@ -31,6 +33,8 @@ type SalesTab = 'b2c' | 'b2b';
 type B2cView = 'course' | 'employee';
 // تقسيم بيانات B2C: الكل (New+Old) / بيانات جديدة New Leads / بيانات CRM قديمة Old.
 type B2cBreakdown = 'all' | 'new' | 'old';
+// تقسيم بيانات B2B حسب المصدر: الكل (New+Data) / عملاء جدد New Leads / سحب البيانات Data Scraping.
+type B2bSource = 'all' | 'new' | 'data';
 
 // أنواع الفترات المدعومة في التجميع: يومي (أساس تخزين تقارير المبيعات) + تجميع أوسع.
 // عند اختيار أسبوعي/شهري/ربع سنوي يجمع الخادمُ التقاريرَ اليومية الواقعة داخل نطاق الفترة.
@@ -53,6 +57,7 @@ export default function SalesAggregationPage() {
   const [tab, setTab] = useState<SalesTab>('b2c');
   const [b2cView, setB2cView] = useState<B2cView>('course');
   const [b2cBreakdown, setB2cBreakdown] = useState<B2cBreakdown>('all');
+  const [b2bSource, setB2bSource] = useState<B2bSource>('all');
   const [periodType, setPeriodType] = useState<PeriodType>('Weekly');
 
   // قيم منتقيات الفترة الخام (لا يرى المستخدم مفتاح الفترة النهائي — يُولَّد داخليًّا).
@@ -94,8 +99,8 @@ export default function SalesAggregationPage() {
   const b2cGrouped = useB2cCourseGrouped(filter);
   const b2cGroupedPrev = useB2cCourseGrouped(prevFilter);
   const b2cNewOld = useB2cNewOld(filter);
-  const b2b = useB2bAggregation(filter);
-  const b2bPrev = useB2bAggregation(prevFilter);
+  const b2b = useB2bBySource(filter);
+  const b2bPrev = useB2bBySource(prevFilter);
   // الاستعلام النشط لعرض حالات التحميل/الخطأ: عرضا B2C (حسب الدورة/الموظّف) يشتقّان من تجميع الدورة نفسه.
   const active = tab === 'b2b' ? b2b : b2cGrouped;
 
@@ -238,7 +243,7 @@ export default function SalesAggregationPage() {
           />
         )
       ) : (
-        <B2bView data={b2b.data} prev={b2bPrev.data} />
+        <B2bView data={b2b.data} prev={b2bPrev.data} source={b2bSource} onSourceChange={setB2bSource} />
       )}
     </div>
   );
@@ -302,6 +307,72 @@ function sumCourses(courses: B2cCourseGroupRow[]) {
     }),
     { workHours: 0, leads: 0, contacted: 0, qualified: 0, sales: 0, revenue: 0 },
   );
+}
+
+// اشتقاق تجميع الدورات لمصدر واحد (New أو Old) من نفس بيانات by-course،
+// بحيث تتطابق الإجماليات تمامًا مع «تفصيل حسب الموظّف» (المصدر نفسه = دلو كل موظّف).
+// كل موظّف يأخذ دلوه المختار، وتُعاد حوسبة إجماليات الدورة ونِسبها.
+// الموظّفون/الدورات الفارغون تمامًا للمصدر المختار يُستبعَدون.
+function coursesForSource(courses: B2cCourseGroupRow[], source: 'new' | 'old'): B2cCourseGroupRow[] {
+  const out: B2cCourseGroupRow[] = [];
+  for (const c of courses) {
+    const employees: B2cCourseEmployeeRow[] = [];
+    for (const e of c.employees) {
+      const b = source === 'new' ? e.new : e.old;
+      if (bucketEmpty(b)) continue;
+      employees.push({
+        employeeId: e.employeeId,
+        employeeName: e.employeeName,
+        teamId: e.teamId,
+        departmentId: e.departmentId,
+        workHours: b.workHours,
+        leads: b.leads,
+        contacted: b.contacted,
+        qualified: b.qualified,
+        followUps: b.followUps,
+        sales: b.sales,
+        revenue: b.revenue,
+        lost: b.lost,
+        conversionRate: b.conversionRate,
+        new: e.new,
+        old: e.old,
+      });
+    }
+    if (employees.length === 0) continue;
+    const t = employees.reduce(
+      (a, e) => ({
+        workHours: a.workHours + e.workHours,
+        leads: a.leads + e.leads,
+        contacted: a.contacted + e.contacted,
+        qualified: a.qualified + e.qualified,
+        followUps: a.followUps + e.followUps,
+        sales: a.sales + e.sales,
+        revenue: a.revenue + e.revenue,
+        lost: a.lost + e.lost,
+      }),
+      { workHours: 0, leads: 0, contacted: 0, qualified: 0, followUps: 0, sales: 0, revenue: 0, lost: 0 },
+    );
+    out.push({
+      course: c.course,
+      workHours: t.workHours,
+      leads: t.leads,
+      contacted: t.contacted,
+      qualified: t.qualified,
+      followUps: t.followUps,
+      sales: t.sales,
+      revenue: t.revenue,
+      lost: t.lost,
+      conversionRate: ratio(t.sales, t.leads),
+      qualificationRate: ratio(t.qualified, t.contacted),
+      contactRate: ratio(t.contacted, t.leads),
+      revenuePerHour: t.workHours > 0 ? t.revenue / t.workHours : 0,
+      salesPerHour: t.workHours > 0 ? t.sales / t.workHours : 0,
+      lostRate: ratio(t.lost, t.leads),
+      employeeCount: employees.length,
+      employees,
+    });
+  }
+  return out.sort((a, b) => b.revenue - a.revenue || a.course.localeCompare(b.course));
 }
 
 // شارة التغيّر مقابل الفترة السابقة (↑ أخضر / ↓ أحمر / — رمادي).
@@ -733,41 +804,21 @@ function NewOldComparison({ report }: { report: B2cNewOldReport }) {
   );
 }
 
-// بطاقات مؤشّرات دلو واحد (New أو Old).
-function BucketKpiCards({ bucket, tone }: { bucket: B2cNewOldBucket; tone: 'navy' }) {
-  return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-      <StatCard label="Leads" value={num(bucket.leads)} />
-      <StatCard label="Contacted" value={num(bucket.contacted)} />
-      <StatCard label="Qualified" value={num(bucket.qualified)} />
-      <StatCard label="Sales" value={num(bucket.sales)} tone={tone} />
-      <StatCard label="Revenue" value={num(bucket.revenue)} tone={tone} />
-      <StatCard label="نسبة التحويل" value={pctText(bucket.conversionRate)} tone={tone} />
-    </div>
-  );
-}
+// جدول تجميع الدورات لمصدر واحد (New/Old) مع Drill-down لتفصيل الموظّفين — كل الأرقام للمصدر المختار.
+function SourceCourseTable({ courses, leadsLabel }: { courses: B2cCourseGroupRow[]; leadsLabel: string }) {
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const toggle = (course: string) => setExpanded((prev) => ({ ...prev, [course]: !prev[course] }));
 
-// جدول الدورات لدلو واحد (New أو Old).
-function BucketCourseTable({ courses, pick, leadsLabel }: {
-  courses: B2cNewOldCourseRow[];
-  pick: (c: B2cNewOldCourseRow) => B2cNewOldBucket;
-  leadsLabel: string;
-}) {
-  const rows = [...courses]
-    .map((c) => ({ course: c.course, b: pick(c) }))
-    .filter((r) => r.b.leads > 0 || r.b.sales > 0 || r.b.revenue > 0 || r.b.workHours > 0)
-    .sort((a, b) => b.b.revenue - a.b.revenue || a.course.localeCompare(b.course));
-  if (rows.length === 0) {
-    return <p className="py-6 text-center text-sm text-ink-2">لا توجد بيانات لهذا التقسيم في الفترة المختارة.</p>;
-  }
   return (
-    <table className="w-full min-w-[900px] text-right text-sm">
+    <table className="w-full min-w-[1100px] text-right text-sm">
       <thead className="border-b border-line bg-offwhite text-xs text-ink-2">
         <tr>
           <th className="px-3 py-2.5 font-semibold">Course</th>
+          <th className="px-3 py-2.5 font-semibold">الموظّفون</th>
           <th className="px-3 py-2.5 font-semibold">WorkHours</th>
           <th className="px-3 py-2.5 font-semibold">{leadsLabel}</th>
           <th className="px-3 py-2.5 font-semibold">Contacted</th>
+          <th className="px-3 py-2.5 font-semibold">Qualified</th>
           <th className="px-3 py-2.5 font-semibold">Sales</th>
           <th className="px-3 py-2.5 font-semibold">Revenue</th>
           <th className="px-3 py-2.5 font-semibold">نسبة التحويل</th>
@@ -775,18 +826,72 @@ function BucketCourseTable({ courses, pick, leadsLabel }: {
         </tr>
       </thead>
       <tbody>
-        {rows.map((r, i) => (
-          <tr key={`${r.course}-${i}`} className="border-b border-line last:border-0 hover:bg-offwhite">
-            <td className="px-3 py-2.5 font-medium text-navy">{r.course}</td>
-            <td className="px-3 py-2.5 text-ink-2">{num(r.b.workHours)}</td>
-            <td className="px-3 py-2.5 text-ink-2">{num(r.b.leads)}</td>
-            <td className="px-3 py-2.5 text-ink-2">{num(r.b.contacted)}</td>
-            <td className="px-3 py-2.5 font-medium text-ink">{num(r.b.sales)}</td>
-            <td className="px-3 py-2.5 font-medium text-ink">{num(r.b.revenue)}</td>
-            <td className="px-3 py-2.5 text-ink-2">{formatPercent(r.b.conversionRate)}</td>
-            <td className="px-3 py-2.5 text-ink-2">{num(r.b.revenuePerHour)}</td>
-          </tr>
-        ))}
+        {courses.map((c) => {
+          const isOpen = !!expanded[c.course];
+          return (
+            <Fragment key={c.course}>
+              <tr
+                className="cursor-pointer border-b border-line last:border-0 hover:bg-offwhite"
+                onClick={() => toggle(c.course)}
+              >
+                <td className="px-3 py-2.5 font-medium text-navy">
+                  <span className="ml-1 inline-block w-3 text-ink-2">{isOpen ? '▾' : '▸'}</span>
+                  {c.course}
+                </td>
+                <td className="px-3 py-2.5 text-ink-2">{c.employeeCount.toLocaleString('ar-EG')}</td>
+                <td className="px-3 py-2.5 text-ink-2">{num(c.workHours)}</td>
+                <td className="px-3 py-2.5 text-ink-2">{num(c.leads)}</td>
+                <td className="px-3 py-2.5 text-ink-2">{num(c.contacted)}</td>
+                <td className="px-3 py-2.5 text-ink-2">{num(c.qualified)}</td>
+                <td className="px-3 py-2.5 font-medium text-ink">{num(c.sales)}</td>
+                <td className="px-3 py-2.5 font-medium text-ink">{num(c.revenue)}</td>
+                <td className="px-3 py-2.5 text-ink-2">{formatPercent(c.conversionRate)}</td>
+                <td className="px-3 py-2.5 text-ink-2">{num(c.revenuePerHour)}</td>
+              </tr>
+              {isOpen && (
+                <tr className="border-b border-line bg-offwhite/40 last:border-0">
+                  <td colSpan={10} className="px-3 py-3">
+                    {c.employees.length === 0 ? (
+                      <p className="py-2 text-center text-xs text-ink-2">لا يوجد موظّفون لهذه الدورة.</p>
+                    ) : (
+                      <table className="w-full text-right text-sm">
+                        <thead className="border-b border-line text-[11px] text-ink-2">
+                          <tr>
+                            <th className="px-3 py-1 font-semibold">الموظف</th>
+                            <th className="px-3 py-1 font-semibold">WorkHours</th>
+                            <th className="px-3 py-1 font-semibold">{leadsLabel}</th>
+                            <th className="px-3 py-1 font-semibold">Contacted</th>
+                            <th className="px-3 py-1 font-semibold">Qualified</th>
+                            <th className="px-3 py-1 font-semibold">Sales</th>
+                            <th className="px-3 py-1 font-semibold">Revenue</th>
+                            <th className="px-3 py-1 font-semibold">نسبة التحويل</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {c.employees.map((e, i) => (
+                            <tr
+                              key={`${c.course}-${e.employeeId}-${i}`}
+                              className="border-b border-line/60 last:border-0"
+                            >
+                              <td className="px-3 py-1.5 font-medium text-navy">↳ {e.employeeName}</td>
+                              <td className="px-3 py-1.5 text-ink-2">{num(e.workHours)}</td>
+                              <td className="px-3 py-1.5 text-ink-2">{num(e.leads)}</td>
+                              <td className="px-3 py-1.5 text-ink-2">{num(e.contacted)}</td>
+                              <td className="px-3 py-1.5 text-ink-2">{num(e.qualified)}</td>
+                              <td className="px-3 py-1.5 font-medium text-ink">{num(e.sales)}</td>
+                              <td className="px-3 py-1.5 font-medium text-ink">{num(e.revenue)}</td>
+                              <td className="px-3 py-1.5 text-ink-2">{formatPercent(e.conversionRate)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </td>
+                </tr>
+              )}
+            </Fragment>
+          );
+        })}
       </tbody>
     </table>
   );
@@ -864,16 +969,21 @@ function B2cCourseGroupedView({
   const newOldCourses = newOld?.courses ?? [];
   const hasNewOld = newOldCourses.length > 0;
 
-  if (courses.length === 0 && !hasNewOld) {
-    return (
-      <Card className="p-5">
-        <EmptyState
-          title="لا توجد بيانات تجميع B2C"
-          description="لا توجد تقارير B2C معتمَدة مطابقة لهذه الفترة ضمن نطاقك."
-        />
-      </Card>
-    );
-  }
+  // تجميع الدورات لكل مصدر (New/Old) مشتقّ من نفس بيانات by-course — يضمن تطابق الإجماليات مع «تفصيل الموظّف».
+  const newCourses = useMemo(() => coursesForSource(courses, 'new'), [courses]);
+  const oldCourses = useMemo(() => coursesForSource(courses, 'old'), [courses]);
+  // فترة سابقة مُرشَّحة لنفس المصدر لتُغذّي مقارنات لوحة القيادة (Charts + KPI).
+  const newPrev = useMemo<B2cCourseGroupedReport | undefined>(
+    () => (prev ? { ...prev, courses: coursesForSource(prev.courses, 'new') } : undefined),
+    [prev],
+  );
+  const oldPrev = useMemo<B2cCourseGroupedReport | undefined>(
+    () => (prev ? { ...prev, courses: coursesForSource(prev.courses, 'old') } : undefined),
+    [prev],
+  );
+
+  // فلتر المصدر يُعرَض دائمًا (كما في «تفصيل الموظّف») حتى مع غياب البيانات — الحالة الفارغة تظهر أسفله لا بدلًا منه.
+  const isEmpty = courses.length === 0 && !hasNewOld;
 
   return (
     <div className="space-y-4">
@@ -881,7 +991,16 @@ function B2cCourseGroupedView({
         <BreakdownTabs value={breakdown} onChange={onBreakdownChange} />
       </Card>
 
-      {breakdown === 'all' && (
+      {isEmpty && (
+        <Card className="p-5">
+          <EmptyState
+            title="لا توجد بيانات تجميع B2C"
+            description="لا توجد تقارير B2C معتمَدة مطابقة لهذه الفترة ضمن نطاقك."
+          />
+        </Card>
+      )}
+
+      {!isEmpty && breakdown === 'all' && (
         <>
           {courses.length > 0 && (
             <>
@@ -911,32 +1030,57 @@ function B2cCourseGroupedView({
         </>
       )}
 
-      {breakdown === 'new' && newOld && (
+      {!isEmpty && breakdown === 'new' && (
         <>
-          <BucketKpiCards bucket={newOld.newTotals} tone="navy" />
-          <NewOldComparison report={newOld} />
-          <Card>
-            <SectionTitle title="أداء البيانات الجديدة New Leads حسب الدورة" hint="نسبة التحويل = المبيعات ÷ New Leads." />
-          </Card>
-          <Card className="overflow-x-auto p-0">
-            <BucketCourseTable courses={newOldCourses} pick={(c) => c.new} leadsLabel="New Leads" />
-          </Card>
+          {newCourses.length > 0 ? (
+            <>
+              <B2cExecutiveDashboard courses={newCourses} prev={newPrev} periodKey={data?.periodKey} />
+              {newOld && hasNewOld && <NewOldComparison report={newOld} />}
+              <Card>
+                <SectionTitle
+                  title="أداء البيانات الجديدة New Leads حسب الدورة"
+                  hint="اضغط على أي دورة لعرض مساهمات موظّفيها. نسبة التحويل = المبيعات ÷ New Leads."
+                />
+              </Card>
+              <Card className="overflow-x-auto p-0">
+                <SourceCourseTable courses={newCourses} leadsLabel="New Leads" />
+              </Card>
+            </>
+          ) : (
+            <Card className="p-5">
+              <EmptyState
+                title="لا توجد بيانات New Leads"
+                description="لا توجد بيانات جديدة New معتمَدة مطابقة لهذه الفترة ضمن نطاقك."
+              />
+            </Card>
+          )}
         </>
       )}
 
-      {breakdown === 'old' && newOld && (
+      {!isEmpty && breakdown === 'old' && (
         <>
-          <BucketKpiCards bucket={newOld.oldTotals} tone="navy" />
-          <NewOldComparison report={newOld} />
-          <Card>
-            <SectionTitle
-              title="أداء بيانات CRM القديمة Old حسب الدورة"
-              hint="نسبة التحويل هنا = معدّل الاسترجاع (المبيعات ÷ Old Leads Worked)."
-            />
-          </Card>
-          <Card className="overflow-x-auto p-0">
-            <BucketCourseTable courses={newOldCourses} pick={(c) => c.old} leadsLabel="Old Leads Worked" />
-          </Card>
+          {oldCourses.length > 0 ? (
+            <>
+              <B2cExecutiveDashboard courses={oldCourses} prev={oldPrev} periodKey={data?.periodKey} />
+              {newOld && hasNewOld && <NewOldComparison report={newOld} />}
+              <Card>
+                <SectionTitle
+                  title="أداء بيانات CRM القديمة Old حسب الدورة"
+                  hint="اضغط على أي دورة لعرض مساهمات موظّفيها. نسبة التحويل هنا = معدّل الاسترجاع (المبيعات ÷ Old Leads Worked)."
+                />
+              </Card>
+              <Card className="overflow-x-auto p-0">
+                <SourceCourseTable courses={oldCourses} leadsLabel="Old Leads Worked" />
+              </Card>
+            </>
+          ) : (
+            <Card className="p-5">
+              <EmptyState
+                title="لا توجد بيانات Old CRM"
+                description="لا توجد بيانات CRM قديمة Old معتمَدة مطابقة لهذه الفترة ضمن نطاقك."
+              />
+            </Card>
+          )}
         </>
       )}
     </div>
@@ -1536,24 +1680,111 @@ function B2bDashboard({ rows, prev, periodKey }: { rows: B2bServiceAggregateRow[
   );
 }
 
-function B2bView({ data, prev }: { data?: B2bAggregationReport; prev?: B2bAggregationReport }) {
-  const rows = data?.rows ?? [];
+// أزرار تبديل مصدر بيانات B2B (الكل / New Leads / Data Scraping) — RC-3 Task 2A.
+function B2bSourceTabs({ value, onChange }: { value: B2bSource; onChange: (v: B2bSource) => void }) {
+  const items: { key: B2bSource; label: string }[] = [
+    { key: 'all', label: 'الكل (New + Data)' },
+    { key: 'new', label: 'عملاء جدد New Leads' },
+    { key: 'data', label: 'سحب البيانات Data Scraping' },
+  ];
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-xs font-semibold text-ink-2">مصدر البيانات:</span>
+      {items.map((it) => (
+        <button
+          key={it.key}
+          type="button"
+          onClick={() => onChange(it.key)}
+          className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+            value === it.key ? 'bg-navy text-white' : 'bg-offwhite text-ink-2 hover:bg-line'
+          }`}
+        >
+          {it.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// يختار دلو المصدر المطلوب (الكل/جديد/سحب بيانات) من صفّ موظّف داخل خدمة.
+function pickB2bBucket(
+  row: { total: B2bSourceBucket; newLeads: B2bSourceBucket; dataScraping: B2bSourceBucket },
+  source: B2bSource,
+): B2bSourceBucket {
+  return source === 'new' ? row.newLeads : source === 'data' ? row.dataScraping : row.total;
+}
+
+// يحوّل تقرير B2B «حسب المصدر» إلى صفوف (خدمة، موظّف) للدلو المختار — كي تُعاد استخدام لوحة B2bDashboard كما هي.
+// Data Scraping: Leads يمثّل Scraped Leads (رأس القمع)؛ Lost/LostRate غير مُتتبَّعين في نموذج المصدر ⇒ صفر.
+function b2bSourceToRows(report: B2bSourceReport | undefined, source: B2bSource): B2bServiceAggregateRow[] {
+  if (!report) return [];
+  const rows: B2bServiceAggregateRow[] = [];
+  for (const s of report.services) {
+    for (const e of s.employees) {
+      const b = pickB2bBucket(e, source);
+      rows.push({
+        periodKey: report.periodKey ?? '',
+        employeeId: e.employeeId,
+        employeeName: e.employeeName,
+        service: s.service,
+        teamId: e.teamId,
+        departmentId: e.departmentId,
+        workHours: b.workHours,
+        leads: b.leads,
+        meetings: b.meetings,
+        proposals: b.proposals,
+        negotiation: b.negotiation,
+        won: b.won,
+        lost: 0,
+        revenue: b.revenue,
+        meetingRate: b.meetingRate,
+        proposalRate: b.proposalRate,
+        winRate: b.winRate,
+        revenuePerHour: b.revenuePerHour,
+        wonPerHour: b.wonPerHour,
+        lostRate: 0,
+      });
+    }
+  }
+  return rows;
+}
+
+function B2bView({ data, prev, source, onSourceChange }: {
+  data?: B2bSourceReport;
+  prev?: B2bSourceReport;
+  source: B2bSource;
+  onSourceChange: (v: B2bSource) => void;
+}) {
+  const rows = b2bSourceToRows(data, source);
+  const prevRows = b2bSourceToRows(prev, source);
+  const prevReport: B2bAggregationReport | undefined = prev
+    ? {
+        periodKey: prev.periodKey,
+        rowCount: prevRows.length,
+        submissionsConsidered: prev.submissionsConsidered,
+        submissionsIgnored: prev.submissionsIgnored,
+        rowsIgnored: prev.rowsIgnored,
+        viewLevel: prev.viewLevel,
+        rows: prevRows,
+      }
+    : undefined;
 
   return (
     <div className="space-y-4">
+      <B2bSourceTabs value={source} onChange={onSourceChange} />
       <div className="flex flex-wrap items-center gap-2 text-sm text-ink-2">
         <Badge tone="navy">{formatPeriod(data?.periodKey)}</Badge>
-        <span>عدد الصفوف: {(data?.rowCount ?? 0).toLocaleString('ar-EG')}</span>
+        <span>عدد الخدمات: {(data?.serviceCount ?? 0).toLocaleString('ar-EG')}</span>
       </div>
       {rows.length === 0 ? (
         <Card>
           <EmptyState
             title="لا توجد بيانات تجميع B2B"
-            description="لا توجد تقارير B2B معتمَدة مطابقة لهذه الفترة ضمن نطاقك."
+            description="لا توجد تقارير B2B معتمَدة مطابقة لهذه الفترة ومصدر البيانات ضمن نطاقك."
           />
         </Card>
       ) : (
-        <B2bDashboard rows={rows} prev={prev} periodKey={data?.periodKey} />
+        <B2bDashboard rows={rows} prev={prevReport} periodKey={data?.periodKey} />
       )}
     </div>
   );

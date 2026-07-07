@@ -24,6 +24,8 @@ export interface AuthResponse {
   roles: Role[];
   // الدورية المتوقَّعة لتقارير المستخدم (يومي لمندوبي المبيعات، أسبوعي لغيرهم).
   expectedReportCadence: PeriodType;
+  // رمز المسمّى الوظيفي (مثل SALES_B2C) — لتحديد لوحات المبيعات وعناصر التنقّل (null إن لم يُسنَد).
+  jobRoleCode?: string | null;
 }
 
 export type PeriodType = 'Daily' | 'Weekly' | 'Monthly' | 'Quarterly' | 'Yearly' | 'AdHoc';
@@ -36,6 +38,17 @@ export interface MeResponse {
   roles: Role[];
   // الدورية المتوقَّعة لتقارير المستخدم (يومي لمندوبي المبيعات، أسبوعي لغيرهم).
   expectedReportCadence: PeriodType;
+  // رمز المسمّى الوظيفي (مثل SALES_B2C) — لتحديد لوحات المبيعات وعناصر التنقّل (null إن لم يُسنَد).
+  jobRoleCode?: string | null;
+}
+
+/// سياق المبيعات الموثوق (RC-3 Task 1.1) — يُحسَب خادميًّا لتحديد الأقسام المعروضة ونوع المندوب.
+export interface SalesContextDto {
+  viewLevel: string;
+  showB2c: boolean;
+  showB2b: boolean;
+  isSalesRep: boolean;
+  repType: string | null;
 }
 
 export type SubmissionStatus =
@@ -2955,6 +2968,16 @@ export interface CourseDto {
   createdAtUtc: string;
   updatedAtUtc: string | null;
 }
+// كتالوج خدمات B2B (المصدر الرسمي لأسماء خدمات مبيعات B2B حسب الخدمة).
+export interface ServiceDto {
+  id: string;
+  nameAr: string;
+  nameEn: string | null;
+  isActive: boolean;
+  sortOrder: number;
+  createdAtUtc: string;
+  updatedAtUtc: string | null;
+}
 // صفّ تجميع «حسب الدورة»: إجماليات الدورة عبر كل الموظّفين + تفصيل الموظّفين.
 export interface B2cCourseGroupRow {
   course: string;
@@ -3050,4 +3073,54 @@ export interface B2bAggregationReport {
   rowsIgnored: number;
   viewLevel: string;
   rows: B2bServiceAggregateRow[];
+}
+// RC-3 Task 2A — دلو مؤشرات B2B واحد (Total/New Leads/Data Scraping). validLeads = 0 لمصدر New Leads.
+export interface B2bSourceBucket {
+  workHours: number;
+  leads: number;
+  validLeads: number;
+  contacted: number;
+  meetings: number;
+  proposals: number;
+  negotiation: number;
+  won: number;
+  revenue: number;
+  winRate: number;
+  meetingRate: number;
+  proposalRate: number;
+  revenuePerHour: number;
+  wonPerHour: number;
+}
+// تفصيل موظّف داخل خدمة (Drill-down) مع دلاء Total/New/Data.
+export interface B2bSourceServiceEmployeeRow {
+  employeeId: string;
+  employeeName: string;
+  teamId: string | null;
+  departmentId: string | null;
+  total: B2bSourceBucket;
+  newLeads: B2bSourceBucket;
+  dataScraping: B2bSourceBucket;
+}
+// صفّ تجميع لكل خدمة مع دلاء Total/New/Data + تفصيل الموظّفين.
+export interface B2bSourceServiceRow {
+  service: string;
+  total: B2bSourceBucket;
+  newLeads: B2bSourceBucket;
+  dataScraping: B2bSourceBucket;
+  employeeCount: number;
+  employees: B2bSourceServiceEmployeeRow[];
+}
+// نتيجة تجميع B2B بفصل المصدر (New Leads / Data Scraping / Legacy).
+export interface B2bSourceReport {
+  periodKey: string | null;
+  serviceCount: number;
+  submissionsConsidered: number;
+  submissionsIgnored: number;
+  rowsIgnored: number;
+  viewLevel: string;
+  totals: B2bSourceBucket;
+  newLeadsTotals: B2bSourceBucket;
+  dataScrapingTotals: B2bSourceBucket;
+  legacyTotals: B2bSourceBucket;
+  services: B2bSourceServiceRow[];
 }

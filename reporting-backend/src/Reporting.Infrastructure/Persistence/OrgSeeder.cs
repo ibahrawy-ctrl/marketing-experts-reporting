@@ -166,6 +166,59 @@ public static class OrgSeeder
             }
         }
 
+        // RC-3 Task 2 — إعادة بناء تقرير B2B حسب الخدمة: القالب المُهيكَل الجديد
+        // «📊 تقرير مبيعات B2B حسب الخدمة» (B2bByServiceReportSchema) يُربَط بمندوب B2B كأساسي (يظهر له وحده)،
+        // والقالب القديم أحادي «تقرير مبيعات B2B» يُنقَل إلى Legacy (يُفكّ ربطه ويُعطَّل + Archived) دون حذف
+        // (التقارير القديمة محفوظة عبر الإصدار). idempotent: التغيير عند اختلاف الحالة فقط.
+        if (Role("SALES_B2B") is { } b2bRoleId)
+        {
+            var newB2bTemplate = await db.ReportTemplates
+                .FirstOrDefaultAsync(t => t.Title == B2bByServiceReportSchema.TemplateTitle);
+            if (newB2bTemplate is not null && newB2bTemplate.JobRoleId != b2bRoleId)
+            {
+                newB2bTemplate.JobRoleId = b2bRoleId;
+                newB2bTemplate.Classification = TemplateClassification.Primary;
+                changed = true;
+            }
+
+            var legacyB2bTemplate = await db.ReportTemplates
+                .FirstOrDefaultAsync(t => t.Title == "تقرير مبيعات B2B");
+            if (legacyB2bTemplate is not null
+                && (legacyB2bTemplate.JobRoleId is not null
+                    || legacyB2bTemplate.IsActive || legacyB2bTemplate.Status != TemplateStatus.Archived))
+            {
+                legacyB2bTemplate.JobRoleId = null;
+                legacyB2bTemplate.IsActive = false;
+                legacyB2bTemplate.Status = TemplateStatus.Archived;
+                changed = true;
+            }
+
+            // RC-3 — فصل مصدر بيانات B2B: القالب المُهيكَل الجديد بجدولين «📊 تقرير مبيعات B2B — حسب مصدر البيانات»
+            // (B2bBySourceReportSchema) يُربَط بمندوب B2B كأساسي (يظهر له وحده)، والقالب أحادي الجدول السابق
+            // «حسب الخدمة» يُنقَل إلى Legacy (يُفكّ ربطه ويُعطَّل + Archived) دون حذف — التقارير القديمة محفوظة
+            // عبر الإصدار والتجميع لا يزال يقرؤها. idempotent: التغيير عند اختلاف الحالة فقط.
+            var newB2bSourceTemplate = await db.ReportTemplates
+                .FirstOrDefaultAsync(t => t.Title == B2bBySourceReportSchema.TemplateTitle);
+            if (newB2bSourceTemplate is not null && newB2bSourceTemplate.JobRoleId != b2bRoleId)
+            {
+                newB2bSourceTemplate.JobRoleId = b2bRoleId;
+                newB2bSourceTemplate.Classification = TemplateClassification.Primary;
+                changed = true;
+            }
+
+            var singleTableB2bTemplate = await db.ReportTemplates
+                .FirstOrDefaultAsync(t => t.Title == B2bByServiceReportSchema.TemplateTitle);
+            if (singleTableB2bTemplate is not null
+                && (singleTableB2bTemplate.JobRoleId is not null
+                    || singleTableB2bTemplate.IsActive || singleTableB2bTemplate.Status != TemplateStatus.Archived))
+            {
+                singleTableB2bTemplate.JobRoleId = null;
+                singleTableB2bTemplate.IsActive = false;
+                singleTableB2bTemplate.Status = TemplateStatus.Archived;
+                changed = true;
+            }
+        }
+
         // Business-1B: ربط قالب «تقرير النمو والأداء — Media Buyer» بدور مشتري الإعلانات ليظهر له فقط.
         if (Role("MEDIA_BUYER") is { } mediaBuyerRoleId)
         {
@@ -271,7 +324,8 @@ public static class OrgSeeder
             ("📞 تقرير قائد فريق مبيعات B2C", "SALES_B2C_TL"),
             ("🔍 تقرير التخطيط والجودة", "PLAN_MGR"),
             ("تقرير الحسابات", "ACCOUNTANT"),
-            ("تقرير مبيعات B2B", "SALES_B2B"),
+            // RC-3 Task 2: القالب القديم «تقرير مبيعات B2B» لم يعد يُربَط هنا —
+            // كتلة B2B أعلاه تربط القالب المُهيكَل الجديد وتنقل القديم إلى Legacy.
             ("تقرير مدير المبيعات", "SALES_MGR"),
             ("💻 تقرير فريق الويب", "WEB_DEV"),
             ("📈 تقرير النمو والأداء — مدير الأداء", "PERF_LEAD"),

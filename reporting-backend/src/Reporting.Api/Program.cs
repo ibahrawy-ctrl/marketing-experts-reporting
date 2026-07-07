@@ -189,6 +189,8 @@ using (var scope = app.Services.CreateScope())
     await EmailControlSeeder.SeedAsync(scope.ServiceProvider);
     // كتالوج الدورات (مصدر أسماء دورات مبيعات B2C) — بذر أولي قابل للتعديل (idempotent، إضافيّ بحت).
     await CourseSeeder.SeedAsync(scope.ServiceProvider);
+    // كتالوج خدمات B2B (مصدر أسماء خدمات مبيعات B2B) — بذر أولي قابل للتعديل (idempotent، إضافيّ بحت).
+    await ServiceSeeder.SeedAsync(scope.ServiceProvider);
 
     // هيكل تنظيمي تمثيلي لاختبار نطاق الرؤية — بيئة التطوير فقط (لا يُزرع في الإنتاج).
     if (app.Environment.IsDevelopment())

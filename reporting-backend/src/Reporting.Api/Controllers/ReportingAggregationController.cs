@@ -49,6 +49,19 @@ public class ReportingAggregationController : ApiControllerBase
             new AggregationFilter(periodType, periodKey, employeeId, teamId, departmentId, service), ct));
 
     /// <summary>
+    /// تجميع B2B مفصولًا حسب مصدر البيانات (RC-3 Task 2A): New Leads / Data Scraping / Legacy. يقرأ القالب أحادي
+    /// الجدول السابق «حسب الخدمة» (⇒ Legacy) وجدولَي القالب الجديد (New Leads ⇒ New، Data Scraping ⇒ Data).
+    /// النطاق محكوم بـ IScopeResolver داخل الخدمة.
+    /// </summary>
+    [HttpGet("b2b/by-source")]
+    public async Task<IActionResult> B2bBySource(
+        [FromQuery] PeriodType? periodType, [FromQuery] string? periodKey,
+        [FromQuery] Guid? employeeId, [FromQuery] Guid? teamId, [FromQuery] Guid? departmentId,
+        [FromQuery] string? service, CancellationToken ct)
+        => FromResult(await _service.AggregateB2bBySourceAsync(
+            new AggregationFilter(periodType, periodKey, employeeId, teamId, departmentId, service), ct));
+
+    /// <summary>
     /// تجميع B2C مفصولًا إلى بيانات جديدة New / بيانات CRM قديمة Old (Phase 7). يقرأ القالب القديم (⇒ New)
     /// وجدولَي القالب الجديد (New Leads ⇒ New، Old CRM Data ⇒ Old). النطاق محكوم بـ IScopeResolver داخل الخدمة.
     /// </summary>
@@ -59,4 +72,12 @@ public class ReportingAggregationController : ApiControllerBase
         [FromQuery] string? course, CancellationToken ct)
         => FromResult(await _service.AggregateB2cNewOldAsync(
             new AggregationFilter(periodType, periodKey, employeeId, teamId, departmentId, course), ct));
+
+    /// <summary>
+    /// سياق المبيعات الموثوق للمستخدم الحالي (RC-3 Task 1.1): أيّ أقسام تُعرَض (B2C/B2B) وهل هو مندوب فردي.
+    /// يُحسَب خادميًّا من المسمّى الوظيفي ومسمّيات أعضاء النطاق — لا يقرأ أيّ تسليم.
+    /// </summary>
+    [HttpGet("sales-context")]
+    public async Task<IActionResult> SalesContext(CancellationToken ct)
+        => FromResult(await _service.GetSalesContextAsync(ct));
 }

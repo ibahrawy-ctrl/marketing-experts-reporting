@@ -9,6 +9,10 @@ import type { Role } from '../types/api';
 
 const EXEC_VIEW: Role[] = ['Admin', 'CEO', 'GeneralManager', 'Manager', 'TeamLeader', 'CeoSupport', 'Viewer'];
 const ADMIN: Role[] = ['Admin'];
+// تجميع المبيعات (RC3-Task1.1A) — للمستوى الإداري فقط (Manager/GM/CEO/Admin)؛ لا لقائد الفريق ولا المندوب ولا الموظف العادي.
+const SALES_AGGREGATION: Role[] = ['Admin', 'CEO', 'GeneralManager', 'Manager'];
+// لوحة مبيعات الفريق (RC3-Task1.1A) — لقائد الفريق حصرًا؛ النطاق مفروض خادميًّا.
+const TEAM_SALES_DASHBOARD: Role[] = ['TeamLeader'];
 // إدارة فريق العمل (GOV-R1): Admin + CEO إدارة كاملة؛ CeoSupport عرض + إعادة تعيين كلمات المرور فقط.
 const USERS_PAGE: Role[] = ['Admin', 'CEO', 'CeoSupport'];
 // الحوكمة (المخاطر/القرارات) مقصورة على من يملك ViewGovernance بالخادم — تطابق RoleAccess.CanViewGovernance.
@@ -52,6 +56,9 @@ export interface NavItem {
   icon: IconName;
   roles?: Role[]; // إن غابت ظهر للجميع
   group: NavGroup;
+  // ظهور خاص بمندوب المبيعات (RC3-Task1.1): يظهر لمن هو SALES_B2C/SALES_B2B أو Admin فقط.
+  // لا يعتمد على أدوار Identity (المندوب دوره Employee) بل على jobRoleCode عبر isSalesRep.
+  salesRepOnly?: boolean;
 }
 
 const NAV: NavItem[] = [
@@ -62,7 +69,10 @@ const NAV: NavItem[] = [
   { to: '/app/workflows', label: 'مسارات الاعتماد', icon: 'workflow', roles: EXEC_VIEW, group: 'operations' },
   { to: '/app/report-calendar', label: 'تقويم التقارير', icon: 'calendar', group: 'operations' },
   { to: '/app/analytics', label: 'المقارنات والتحليلات', icon: 'analytics', roles: EXEC_VIEW, group: 'operations' },
-  { to: '/app/sales-aggregation', label: 'تجميع المبيعات', icon: 'analytics', roles: EXEC_VIEW, group: 'operations' },
+  { to: '/app/sales-aggregation', label: 'تجميع المبيعات', icon: 'analytics', roles: SALES_AGGREGATION, group: 'operations' },
+  { to: '/app/sales/team-dashboard', label: 'لوحة مبيعات الفريق', icon: 'analytics', roles: TEAM_SALES_DASHBOARD, group: 'operations' },
+  // لوحة مبيعاتي الشخصية (RC3-Task1.1A) — تظهر لمندوب المبيعات (SALES_B2C/SALES_B2B) حصرًا؛ لا للأدمن ولا للأدوار الأخرى؛ النطاق مفروض خادميًّا (يرى نفسه فقط).
+  { to: '/app/sales/my-dashboard', label: 'لوحة مبيعاتي', icon: 'analytics', group: 'operations', salesRepOnly: true },
   // ب) الفرق والعملاء
   { to: '/app/teams', label: 'فرق العمل', icon: 'teams', roles: EXEC_VIEW, group: 'clients' },
   { to: '/app/clients', label: 'العملاء', icon: 'clients', roles: EXEC_VIEW, group: 'clients' },
@@ -99,6 +109,7 @@ const NAV: NavItem[] = [
   { to: '/app/email-control', label: 'مركز التحكم بالبريد', icon: 'reports', roles: ADMIN, group: 'build' },
   { to: '/app/departments', label: 'الإدارات', icon: 'departments', roles: ADMIN, group: 'build' },
   { to: '/app/courses', label: 'إدارة الدورات', icon: 'template', roles: TEMPLATE_GOVERNANCE, group: 'build' },
+  { to: '/app/services', label: 'إدارة الخدمات', icon: 'template', roles: TEMPLATE_GOVERNANCE, group: 'build' },
   { to: '/app/settings', label: 'الإعدادات', icon: 'settings', roles: ADMIN, group: 'build' },
 ];
 
@@ -143,14 +154,18 @@ function readSavedGroups(): Record<NavGroup, boolean> {
 }
 
 export function DashboardShell({ children }: { children: ReactNode }) {
-  const { user, logout, hasAnyRole } = useAuth();
+  const { user, logout, hasAnyRole, isSalesRep } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const [openGroups, setOpenGroups] = useState<Record<NavGroup, boolean>>(readSavedGroups);
   useNotificationRealtime();
 
-  const items = NAV.filter((n) => !n.roles || hasAnyRole(...n.roles));
+  const items = NAV.filter((n) => {
+    // ظهور خاص بمندوب المبيعات (RC3-Task1.1A): للمندوب (isSalesRep) حصرًا، بصرف النظر عن roles؛ لا يظهر للأدمن.
+    if (n.salesRepOnly) return isSalesRep;
+    return !n.roles || hasAnyRole(...n.roles);
+  });
   // المجموعات الظاهرة فعلًا (كل منها بها عنصر مسموح واحد على الأقل)، بترتيب ثابت.
   const visibleGroups = GROUP_ORDER.filter((g) => items.some((n) => n.group === g));
 

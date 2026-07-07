@@ -34,12 +34,12 @@ public class ReportingAggregationService : IReportingAggregationService
     private static decimal Per(decimal num, decimal den) => den > 0 ? Math.Round(num / den, 2) : 0m;
 
     // قراءة خلية رقمية بأمان من صفّ الجدول: خارج الحدود/فارغة/غير قابلة للتحويل ⇒ 0.
+    // يمرّ عبر NumericNormalizer (RC-3 Task 2B) لتطبيع الخانات العربية-الهندية/الفارسية ⇒ حساب صحيح
+    // بصرف النظر عن لغة لوحة المفاتيح، ودفاع للبيانات القديمة المخزَّنة بخانات عربية.
     private static decimal Num(string[] row, int idx)
     {
         if (idx < 0 || idx >= row.Length) return 0m;
-        var cell = row[idx];
-        if (string.IsNullOrWhiteSpace(cell)) return 0m;
-        return decimal.TryParse(cell.Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out var d) ? d : 0m;
+        return NumericNormalizer.TryParseDecimal(row[idx], out var d) ? d : 0m;
     }
 
     // قراءة خلية نصّية بأمان (الدورة/الخدمة).
@@ -54,6 +54,68 @@ public class ReportingAggregationService : IReportingAggregationService
             "department" => "department",
             _ => "summary",
         };
+
+    // رموز المسمّيات الوظيفية لفريقَي المبيعات (مصدر اكتشاف نوع الفريق).
+    private const string SalesB2cRep = "SALES_B2C";
+    private const string SalesB2bRep = "SALES_B2B";
+    private const string SalesB2cTl = "SALES_B2C_TL";
+    private const string SalesB2bTl = "SALES_B2B_TL";
+
+    /// <summary>
+    /// يحسب سياق المبيعات الموثوق خادميًّا (RC-3 Task 1.1). الأولوية:
+    /// (1) المسمّى الوظيفي للمستخدم نفسه حاسم: قائد B2C ⇒ B2C فقط، قائد B2B ⇒ B2B فقط،
+    ///     مندوب B2C/B2B ⇒ مندوب بمتغيّره. (2) رؤية كاملة (شركة/حوكمة) ⇒ الاثنان.
+    /// (3) استنتاج من مسمّيات أعضاء النطاق (فريق/إدارة). (4) احتياط متحفّظ ⇒ الاثنان.
+    /// النطاق مفروض على مستوى البيانات في نقاط التجميع؛ هذا يحدّد فقط الأقسام المعروضة.
+    /// </summary>
+    public async Task<Result<SalesContextDto>> GetSalesContextAsync(CancellationToken ct = default)
+    {
+        var viewLevel = ViewLevel();
+        var uid = _currentUser.UserId ?? Guid.Empty;
+
+        var ownCode = await (
+            from u in _db.Users
+            where u.Id == uid && u.JobRoleId != null
+            join j in _db.JobRoles on u.JobRoleId equals j.Id
+            select j.Code).FirstOrDefaultAsync(ct);
+
+        // (1) المسمّى الوظيفي للمستخدم نفسه حاسم.
+        switch (ownCode)
+        {
+            case SalesB2cTl:
+                return Ok(viewLevel, showB2c: true, showB2b: false, isRep: false, repType: null);
+            case SalesB2bTl:
+                return Ok(viewLevel, showB2c: false, showB2b: true, isRep: false, repType: null);
+            case SalesB2cRep:
+                return Ok(viewLevel, showB2c: true, showB2b: false, isRep: true, repType: "B2C");
+            case SalesB2bRep:
+                return Ok(viewLevel, showB2c: false, showB2b: true, isRep: true, repType: "B2B");
+        }
+
+        // (2) رؤية كاملة (CEO/GM/Admin/CeoSupport) ⇒ الاثنان.
+        var scope = await _scope.ResolveAsync(ct);
+        if (scope.SeesAll)
+            return Ok(viewLevel, showB2c: true, showB2b: true, isRep: false, repType: null);
+
+        // (3) استنتاج من مسمّيات أعضاء النطاق.
+        var ids = scope.UserIds;
+        var memberCodes = await (
+            from u in _db.Users
+            where ids.Contains(u.Id) && u.JobRoleId != null
+            join j in _db.JobRoles on u.JobRoleId equals j.Id
+            select j.Code).Distinct().ToListAsync(ct);
+
+        var showB2c = memberCodes.Any(c => c == SalesB2cRep || c == SalesB2cTl);
+        var showB2b = memberCodes.Any(c => c == SalesB2bRep || c == SalesB2bTl);
+
+        // (4) احتياط متحفّظ: لا إشارة ⇒ الاثنان (لا نُخفي بيانات موجودة).
+        if (!showB2c && !showB2b) { showB2c = true; showB2b = true; }
+
+        return Ok(viewLevel, showB2c, showB2b, isRep: false, repType: null);
+
+        static Result<SalesContextDto> Ok(string level, bool showB2c, bool showB2b, bool isRep, string? repType)
+            => Result<SalesContextDto>.Success(new SalesContextDto(level, showB2c, showB2b, isRep, repType));
+    }
 
     /// <summary>
     /// يترجم فلتر الفترة إلى نطاق تواريخ [from, to] حين تكون الفترة أسبوعية/شهرية/ربع سنوية ولها مفتاح صالح.
@@ -567,6 +629,200 @@ public class ReportingAggregationService : IReportingAggregationService
             filter.PeriodKey, courses.Count, considered, ignored, rowsIgnored, viewLevel, newTotals, oldTotals, courses));
     }
 
+    public async Task<Result<B2bSourceReport>> AggregateB2bBySourceAsync(AggregationFilter filter, CancellationToken ct = default)
+    {
+        if (!_currentUser.IsAuthenticated)
+            return Result<B2bSourceReport>.Failure("غير مصرّح.", "auth.unauthenticated");
+
+        var viewLevel = ViewLevel();
+        var itemFilter = string.IsNullOrWhiteSpace(filter.Item) ? null : filter.Item.Trim();
+
+        // ثلاثة دلاء لكل (خدمة، موظّف). نصهر المصادر الثلاثة في قواميس منفصلة ثم ندمج عند البناء.
+        var newPerEmp = new Dictionary<(string Service, Guid Emp), B2bSourceAccum>();
+        var dataPerEmp = new Dictionary<(string Service, Guid Emp), B2bSourceAccum>();
+        var legacyPerEmp = new Dictionary<(string Service, Guid Emp), B2bSourceAccum>();
+        var display = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase); // أوّل تهجئة ظهرت
+        var considered = 0;
+        var ignored = 0;
+        var rowsIgnored = 0;
+
+        // (1) القالب أحادي الجدول السابق «حسب الخدمة» (Legacy) ⇒ دلو Legacy (لا Contacted ولا Valid Leads).
+        var scanLegacy = await ScanGridAsync(B2bByServiceReportSchema.TemplateTitle, B2bByServiceReportSchema.MainTableLabel, filter, ct);
+        if (scanLegacy is not null)
+        {
+            considered += scanLegacy.SubmissionsConsidered;
+            ignored += scanLegacy.SubmissionsIgnored;
+            AccumB2bSource(scanLegacy, B2bByServiceReportSchema.Columns,
+                B2bByServiceReportSchema.ColService, B2bByServiceReportSchema.ColLeads,
+                validLeadsCol: null, contactedCol: null,
+                B2bByServiceReportSchema.ColWorkHours, B2bByServiceReportSchema.ColMeetings,
+                B2bByServiceReportSchema.ColProposals, B2bByServiceReportSchema.ColNegotiation,
+                B2bByServiceReportSchema.ColWon, B2bByServiceReportSchema.ColRevenue,
+                legacyPerEmp, display, itemFilter, ref rowsIgnored);
+        }
+
+        // (2) جدول «New Leads» من القالب الجديد ⇒ دلو New Leads.
+        var scanNew = await ScanGridAsync(B2bBySourceReportSchema.TemplateTitle, B2bBySourceReportSchema.NewLeadsTableLabel, filter, ct);
+        if (scanNew is not null)
+        {
+            considered += scanNew.SubmissionsConsidered;
+            ignored += scanNew.SubmissionsIgnored;
+            AccumB2bSource(scanNew, B2bBySourceReportSchema.NewLeadsColumns,
+                B2bBySourceReportSchema.ColService, B2bBySourceReportSchema.ColNewLeads,
+                validLeadsCol: null, contactedCol: B2bBySourceReportSchema.ColContacted,
+                B2bBySourceReportSchema.ColWorkHours, B2bBySourceReportSchema.ColMeetings,
+                B2bBySourceReportSchema.ColProposals, B2bBySourceReportSchema.ColNegotiation,
+                B2bBySourceReportSchema.ColWon, B2bBySourceReportSchema.ColRevenue,
+                newPerEmp, display, itemFilter, ref rowsIgnored);
+        }
+
+        // (3) جدول «Data Scraping» من القالب الجديد ⇒ دلو Data Scraping (Leads=Scraped، مع Valid Leads).
+        var scanData = await ScanGridAsync(B2bBySourceReportSchema.TemplateTitle, B2bBySourceReportSchema.DataScrapingTableLabel, filter, ct);
+        if (scanData is not null)
+        {
+            considered += scanData.SubmissionsConsidered;
+            ignored += scanData.SubmissionsIgnored;
+            AccumB2bSource(scanData, B2bBySourceReportSchema.DataScrapingColumns,
+                B2bBySourceReportSchema.ColService, B2bBySourceReportSchema.ColScrapedLeads,
+                validLeadsCol: B2bBySourceReportSchema.ColValidLeads, contactedCol: B2bBySourceReportSchema.ColContacted,
+                B2bBySourceReportSchema.ColWorkHours, B2bBySourceReportSchema.ColMeetings,
+                B2bBySourceReportSchema.ColProposals, B2bBySourceReportSchema.ColNegotiation,
+                B2bBySourceReportSchema.ColWon, B2bBySourceReportSchema.ColRevenue,
+                dataPerEmp, display, itemFilter, ref rowsIgnored);
+        }
+
+        // مفاتيح (خدمة، موظّف) عبر الدلاء الثلاثة (قد يظهر مفتاح في أحدها فقط).
+        var allKeys = new HashSet<(string Service, Guid Emp)>(newPerEmp.Keys);
+        allKeys.UnionWith(dataPerEmp.Keys);
+        allKeys.UnionWith(legacyPerEmp.Keys);
+
+        var empIds = allKeys.Select(k => k.Emp).Distinct().ToList();
+        var names = await UserNamesAsync(empIds, ct);
+
+        var services = allKeys
+            .GroupBy(k => k.Service)
+            .Select(sg =>
+            {
+                var serviceDisplay = display.GetValueOrDefault(sg.Key, sg.Key);
+                var employees = sg
+                    .Select(k =>
+                    {
+                        var n = newPerEmp.GetValueOrDefault(k);
+                        var d = dataPerEmp.GetValueOrDefault(k);
+                        var l = legacyPerEmp.GetValueOrDefault(k);
+                        var teamId = n?.TeamId ?? d?.TeamId ?? l?.TeamId;
+                        var deptId = n?.DepartmentId ?? d?.DepartmentId ?? l?.DepartmentId;
+                        var total = SumB2bAccums(n, d, l);
+                        return new B2bSourceServiceEmployeeRow(
+                            k.Emp, names.GetValueOrDefault(k.Emp, string.Empty), teamId, deptId,
+                            B2bBucketOf(total), B2bBucketOf(n), B2bBucketOf(d));
+                    })
+                    .OrderByDescending(e => e.Total.Revenue).ThenBy(e => e.EmployeeName)
+                    .ToList();
+
+                var keys = sg.ToList();
+                var newTotalS = SumB2bAccums(keys.Select(k => newPerEmp.GetValueOrDefault(k)).ToArray());
+                var dataTotalS = SumB2bAccums(keys.Select(k => dataPerEmp.GetValueOrDefault(k)).ToArray());
+                var legacyTotalS = SumB2bAccums(keys.Select(k => legacyPerEmp.GetValueOrDefault(k)).ToArray());
+                var totalS = SumB2bAccums(newTotalS, dataTotalS, legacyTotalS);
+
+                return new B2bSourceServiceRow(
+                    serviceDisplay, B2bBucketOf(totalS), B2bBucketOf(newTotalS), B2bBucketOf(dataTotalS),
+                    employees.Count, employees);
+            })
+            .OrderByDescending(s => s.Total.Revenue).ThenBy(s => s.Service)
+            .ToList();
+
+        var newTotals = SumB2bAccums(newPerEmp.Values.ToArray());
+        var dataTotals = SumB2bAccums(dataPerEmp.Values.ToArray());
+        var legacyTotals = SumB2bAccums(legacyPerEmp.Values.ToArray());
+        var grandTotals = SumB2bAccums(newTotals, dataTotals, legacyTotals);
+
+        return Result<B2bSourceReport>.Success(new B2bSourceReport(
+            filter.PeriodKey, services.Count, considered, ignored, rowsIgnored, viewLevel,
+            B2bBucketOf(grandTotals), B2bBucketOf(newTotals), B2bBucketOf(dataTotals), B2bBucketOf(legacyTotals),
+            services));
+    }
+
+    // يصهر صفوف جدول مصدر واحد داخل قاموس دلو لكل (خدمة، موظّف). أعمدة Valid Leads/Contacted اختيارية (القالب القديم بلا Contacted).
+    private static void AccumB2bSource(GridScan scan, string[] cols, string serviceCol, string leadsCol,
+        string? validLeadsCol, string? contactedCol, string workCol, string meetingsCol, string proposalsCol,
+        string negotiationCol, string wonCol, string revenueCol,
+        Dictionary<(string Service, Guid Emp), B2bSourceAccum> bucket, Dictionary<string, string> display,
+        string? itemFilter, ref int rowsIgnored)
+    {
+        int I(string? c) => c is null ? -1 : Array.IndexOf(cols, c);
+        var iService = I(serviceCol);
+        var iWork = I(workCol);
+        var iLeads = I(leadsCol);
+        var iValid = I(validLeadsCol);
+        var iContacted = I(contactedCol);
+        var iMeetings = I(meetingsCol);
+        var iProposals = I(proposalsCol);
+        var iNegotiation = I(negotiationCol);
+        var iWon = I(wonCol);
+        var iRevenue = I(revenueCol);
+
+        foreach (var r in scan.RawRows)
+        {
+            var service = Text(r.Cells, iService);
+            if (service.Length == 0) { rowsIgnored++; continue; } // صفّ بلا خدمة ⇒ لا يمكن تجميعه.
+            if (itemFilter is not null && !string.Equals(service, itemFilter, StringComparison.OrdinalIgnoreCase)) continue;
+
+            if (!display.TryGetValue(service, out var canon)) { canon = service; display[service] = service; }
+            var key = (canon, r.SubmitterId);
+            if (!bucket.TryGetValue(key, out var a))
+            {
+                a = new B2bSourceAccum { TeamId = r.TeamId, DepartmentId = r.DepartmentId };
+                bucket[key] = a;
+            }
+            a.WorkHours += Num(r.Cells, iWork);
+            a.Leads += Num(r.Cells, iLeads);
+            a.ValidLeads += Num(r.Cells, iValid);
+            a.Contacted += Num(r.Cells, iContacted);
+            a.Meetings += Num(r.Cells, iMeetings);
+            a.Proposals += Num(r.Cells, iProposals);
+            a.Negotiation += Num(r.Cells, iNegotiation);
+            a.Won += Num(r.Cells, iWon);
+            a.Revenue += Num(r.Cells, iRevenue);
+        }
+    }
+
+    // يجمع عدّة مُجمِّعات B2B (متجاهلًا null) إلى مُجمِّع واحد.
+    private static B2bSourceAccum SumB2bAccums(params B2bSourceAccum?[] items)
+    {
+        var t = new B2bSourceAccum();
+        foreach (var a in items)
+        {
+            if (a is null) continue;
+            t.TeamId ??= a.TeamId;
+            t.DepartmentId ??= a.DepartmentId;
+            t.WorkHours += a.WorkHours;
+            t.Leads += a.Leads;
+            t.ValidLeads += a.ValidLeads;
+            t.Contacted += a.Contacted;
+            t.Meetings += a.Meetings;
+            t.Proposals += a.Proposals;
+            t.Negotiation += a.Negotiation;
+            t.Won += a.Won;
+            t.Revenue += a.Revenue;
+        }
+        return t;
+    }
+
+    // يحوّل مُجمِّع مصدر B2B (أو null) إلى حزمة مؤشرات. null ⇒ حزمة أصفار.
+    private static B2bSourceBucket B2bBucketOf(B2bSourceAccum? a)
+    {
+        if (a is null) return new B2bSourceBucket(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        return new B2bSourceBucket(
+            a.WorkHours, a.Leads, a.ValidLeads, a.Contacted, a.Meetings, a.Proposals, a.Negotiation, a.Won, a.Revenue,
+            Pct(a.Won, a.Proposals),      // Win Rate
+            Pct(a.Meetings, a.Contacted), // Meeting Rate
+            Pct(a.Proposals, a.Meetings), // Proposal Rate
+            Per(a.Revenue, a.WorkHours),  // Revenue per Hour
+            Per(a.Won, a.WorkHours));     // Won per Hour
+    }
+
     // يصهر صفوف جدول واحد داخل قاموس دلو (بمفتاح الدورة). leadsCol/qualifiedCol تختلف حسب الجدول.
     private static void AccumBucket(GridScan scan, string[] cols, string courseCol, string leadsCol, string qualifiedCol,
         Dictionary<string, B2cAccum> bucket, Dictionary<string, string> display, string? itemFilter, ref int rowsIgnored)
@@ -666,5 +922,12 @@ public class ReportingAggregationService : IReportingAggregationService
         public Guid? TeamId { get; set; }
         public Guid? DepartmentId { get; set; }
         public decimal WorkHours, Leads, Meetings, Proposals, Negotiation, Won, Lost, Revenue;
+    }
+
+    private sealed class B2bSourceAccum
+    {
+        public Guid? TeamId { get; set; }
+        public Guid? DepartmentId { get; set; }
+        public decimal WorkHours, Leads, ValidLeads, Contacted, Meetings, Proposals, Negotiation, Won, Revenue;
     }
 }

@@ -2232,9 +2232,8 @@ public class ReportingService : IReportingService
             case JsonValueKind.Number:
                 return el.TryGetDecimal(out value);
             case JsonValueKind.String:
-                var s = el.GetString();
-                return !string.IsNullOrWhiteSpace(s)
-                    && decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out value);
+                // يمرّ عبر NumericNormalizer (RC-3 Task 2B) لتطبيع الخانات العربية-الهندية/الفارسية قبل التحويل.
+                return NumericNormalizer.TryParseDecimal(el.GetString(), out value);
             default:
                 return false;
         }

@@ -80,7 +80,7 @@ public class AuthService : IAuthService
             : null;
         var cadence = ReportCadencePolicy.ExpectedCadence(jobRoleCode).ToString();
         return Result<MeResponse>.Success(new MeResponse(
-            user.Id, user.FullName, user.Email ?? string.Empty, user.IsActive, roles.ToArray(), cadence));
+            user.Id, user.FullName, user.Email ?? string.Empty, user.IsActive, roles.ToArray(), cadence, jobRoleCode));
     }
 
     public async Task<Result> ChangePasswordAsync(Guid userId, ChangePasswordRequest request, CancellationToken ct = default)
@@ -166,6 +166,6 @@ public class AuthService : IAuthService
 
         return new AuthResponse(
             access.Token, refresh.Token, access.ExpiresUtc,
-            user.Id, user.FullName, user.Email ?? string.Empty, roles.ToArray(), cadence);
+            user.Id, user.FullName, user.Email ?? string.Empty, roles.ToArray(), cadence, jobRoleCode);
     }
 }

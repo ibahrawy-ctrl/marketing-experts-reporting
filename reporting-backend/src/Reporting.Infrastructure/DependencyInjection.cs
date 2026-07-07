@@ -100,6 +100,7 @@ public static class DependencyInjection
         services.AddScoped<IPayrollImpactService, PayrollImpactService>();
         services.AddScoped<IAccountPortfolioService, AccountPortfolioService>();
         services.AddScoped<ICourseService, CourseService>();
+        services.AddScoped<Application.Services.IServiceCatalogService, ServiceCatalogService>();
 
         return services;
     }

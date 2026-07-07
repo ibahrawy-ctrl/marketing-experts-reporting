@@ -15,6 +15,7 @@ secrets.json
 **/obj/
 **/publish/
 **/publish-test/
+**/publish-rc*/
 *.user
 **/TestResults/
 

@@ -17,7 +17,9 @@ public record AuthResponse(
     string Email,
     IReadOnlyCollection<string> Roles,
     // الدورية المتوقَّعة لتقارير هذا المستخدم (يومي لمندوبي المبيعات، أسبوعي لغيرهم).
-    string ExpectedReportCadence);
+    string ExpectedReportCadence,
+    // رمز المسمّى الوظيفي (مثل SALES_B2C) — لتحديد لوحات المبيعات وعناصر التنقّل بالواجهة (null إن لم يُسنَد).
+    string? JobRoleCode = null);
 
 public record MeResponse(
     Guid UserId,
@@ -26,4 +28,6 @@ public record MeResponse(
     bool IsActive,
     IReadOnlyCollection<string> Roles,
     // الدورية المتوقَّعة لتقارير هذا المستخدم (يومي لمندوبي المبيعات، أسبوعي لغيرهم) — تُعرض كقيمة ثابتة بالواجهة.
-    string ExpectedReportCadence);
+    string ExpectedReportCadence,
+    // رمز المسمّى الوظيفي (مثل SALES_B2C) — لتحديد لوحات المبيعات وعناصر التنقّل بالواجهة (null إن لم يُسنَد).
+    string? JobRoleCode = null);

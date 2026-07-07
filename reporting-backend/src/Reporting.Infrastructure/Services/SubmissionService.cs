@@ -191,11 +191,14 @@ public class SubmissionService : ISubmissionService
                 };
                 _db.SubmissionFieldValues.Add(value);
             }
-            value.ValueText = input.ValueText;
+            // طبقة الحماية الثانية (RC-3 Task 2B): تطبيع الخانات العربية-الهندية/الفارسية إلى لاتينية قبل التخزين
+            // مهما كان مصدر الطلب (واجهة/سكربت/استيراد) ⇒ لا تُخزَّن خانة عربية في القاعدة إطلاقًا. تطبيع الخانات فقط
+            // آمن للنصوص الحرّة (لا يمسّ الحروف/العلامات) ويوحّد الأرقام داخل شبكات الجداول (ValueJson).
+            value.ValueText = NumericNormalizer.NormalizeDigits(input.ValueText);
             value.ValueNumber = input.ValueNumber;
             value.ValueDate = input.ValueDate;
             value.ValueBool = input.ValueBool;
-            value.ValueJson = input.ValueJson;
+            value.ValueJson = NumericNormalizer.NormalizeJsonDigits(input.ValueJson);
             value.UpdatedAtUtc = DateTime.UtcNow;
         }
 
@@ -247,6 +250,10 @@ public class SubmissionService : ISubmissionService
         var gridErrors = ValidateB2cByCourseGrids(submission, versionGrids);
         // Phase 7: تحقّق مماثل لجدولَي قالب «B2C — بيانات جديدة/قديمة» (New Leads + Old CRM)، مطابقة الأعمدة فقط.
         gridErrors.AddRange(ValidateB2cNewOldGrids(submission, versionGrids));
+        // RC-3 Task 2: تحقّق جدول «مبيعات B2B حسب الخدمة» (مطابقة الأعمدة فقط) — لا يمسّ أيّ TableGrid آخر.
+        gridErrors.AddRange(ValidateB2bByServiceGrids(submission, versionGrids));
+        // RC-3: تحقّق جدولَي قالب «B2B — حسب مصدر البيانات» (New Leads + Data Scraping)، مطابقة الأعمدة فقط.
+        gridErrors.AddRange(ValidateB2bBySourceGrids(submission, versionGrids));
         if (gridErrors.Count > 0)
             return Result<SubmissionDto>.Failure(string.Join("، ", gridErrors), "submission.grid_invalid");
 
@@ -1077,6 +1084,218 @@ public class SubmissionService : ISubmissionService
         return errors;
     }
 
+    // ===== تحقّق جدول قالب «مبيعات B2B حسب الخدمة» (RC-3 Task 2) =====
+    // مطابقة الأعمدة بالترتيب شرط التفعيل، فلا يمسّ أيّ TableGrid آخر. عمود «الخدمة» و«Next Step» نصّيان (لا تحقّق رقمي).
+    // القواعد الرقمية: كل مقياس غير سالب؛ Meetings ≤ Leads، Proposals ≤ Meetings، Won ≤ Proposals، Lost ≤ Leads.
+    private static List<string> ValidateB2bByServiceGrids(ReportSubmission submission, List<GridFieldInfo> grids)
+    {
+        var errors = new List<string>();
+        foreach (var grid in grids)
+        {
+            if (!grid.Columns.SequenceEqual(B2bByServiceReportSchema.Columns)) continue;
+
+            var value = submission.FieldValues.FirstOrDefault(v => v.TemplateFieldId == grid.Id);
+            var rows = ParseGridRows(value?.ValueJson);
+
+            int Col(string name) => Array.IndexOf(B2bByServiceReportSchema.Columns, name);
+            var cWorkHours = Col(B2bByServiceReportSchema.ColWorkHours);
+            var cLeads = Col(B2bByServiceReportSchema.ColLeads);
+            var cMeetings = Col(B2bByServiceReportSchema.ColMeetings);
+            var cProposals = Col(B2bByServiceReportSchema.ColProposals);
+            var cNegotiation = Col(B2bByServiceReportSchema.ColNegotiation);
+            var cWon = Col(B2bByServiceReportSchema.ColWon);
+            var cLost = Col(B2bByServiceReportSchema.ColLost);
+            var cRevenue = Col(B2bByServiceReportSchema.ColRevenue);
+
+            var numericColumns = new[]
+            {
+                (Index: cWorkHours, Name: B2bByServiceReportSchema.ColWorkHours),
+                (Index: cLeads, Name: B2bByServiceReportSchema.ColLeads),
+                (Index: cMeetings, Name: B2bByServiceReportSchema.ColMeetings),
+                (Index: cProposals, Name: B2bByServiceReportSchema.ColProposals),
+                (Index: cNegotiation, Name: B2bByServiceReportSchema.ColNegotiation),
+                (Index: cWon, Name: B2bByServiceReportSchema.ColWon),
+                (Index: cLost, Name: B2bByServiceReportSchema.ColLost),
+                (Index: cRevenue, Name: B2bByServiceReportSchema.ColRevenue),
+            };
+
+            if (!rows.Any(RowHasAnyValue))
+            {
+                errors.Add($"جدول «{grid.Label}» يجب أن يحتوي على صفّ واحد على الأقل ببيانات فعلية.");
+                continue;
+            }
+
+            for (var i = 0; i < rows.Count; i++)
+            {
+                var row = rows[i];
+                if (!RowHasAnyValue(row)) continue;
+                var rowNum = i + 1;
+
+                var parsed = new Dictionary<int, decimal>();
+                var rowValid = true;
+                foreach (var (idx, name) in numericColumns)
+                {
+                    var raw = Cell(row, idx);
+                    if (string.IsNullOrWhiteSpace(raw)) continue;
+                    if (!TryParseNumber(raw, out var num))
+                    {
+                        errors.Add($"الصف {rowNum} في جدول «{grid.Label}»: قيمة «{name}» يجب أن تكون رقمًا.");
+                        rowValid = false;
+                        continue;
+                    }
+                    if (num < 0)
+                    {
+                        errors.Add($"الصف {rowNum} في جدول «{grid.Label}»: «{name}» لا يمكن أن يكون سالبًا.");
+                        rowValid = false;
+                        continue;
+                    }
+                    parsed[idx] = num;
+                }
+                if (!rowValid) continue;
+
+                decimal? Val(int idx) => parsed.TryGetValue(idx, out var v) ? v : (decimal?)null;
+
+                var hasActivity = new[] { cLeads, cMeetings, cProposals, cNegotiation, cWon, cLost, cRevenue }
+                    .Any(idx => Val(idx) is decimal dv && dv > 0);
+                if (hasActivity && !(Val(cWorkHours) is decimal wh && wh > 0))
+                    errors.Add($"الصف {rowNum} في جدول «{grid.Label}»: يجب إدخال ساعات عمل أكبر من صفر لصفّ يحتوي على نشاط.");
+
+                void LeMax(int lo, string loName, int hi, string hiName)
+                {
+                    if (Val(lo) is decimal a && Val(hi) is decimal b && a > b)
+                        errors.Add($"الصف {rowNum} في جدول «{grid.Label}»: «{loName}» لا يمكن أن يكون أكبر من «{hiName}».");
+                }
+                LeMax(cMeetings, B2bByServiceReportSchema.ColMeetings, cLeads, B2bByServiceReportSchema.ColLeads);
+                LeMax(cProposals, B2bByServiceReportSchema.ColProposals, cMeetings, B2bByServiceReportSchema.ColMeetings);
+                LeMax(cWon, B2bByServiceReportSchema.ColWon, cProposals, B2bByServiceReportSchema.ColProposals);
+                LeMax(cLost, B2bByServiceReportSchema.ColLost, cLeads, B2bByServiceReportSchema.ColLeads);
+            }
+        }
+        return errors;
+    }
+
+    // ===== تحقّق جدولَي قالب «مبيعات B2B — حسب مصدر البيانات» (RC-3 Task 2A — فصل المصدر) =====
+    // جدولان: New Leads (عمود Leads = New Leads) و Data Scraping (Scraped Leads + Valid Leads).
+    // مطابقة الأعمدة بالترتيب شرط التفعيل، فلا يمسّ أيّ TableGrid آخر (ومن ضمنه B2B حسب الخدمة وB2C). عمود «الخدمة» نصّي.
+    // قواعد New Leads: كل مقياس غير سالب؛ Contacted ≤ New Leads، Meetings ≤ Contacted، Proposals ≤ Meetings، Won ≤ Proposals.
+    // قواعد Data Scraping: كل مقياس غير سالب؛ Valid Leads ≤ Scraped Leads، Contacted ≤ Valid Leads، Meetings ≤ Contacted، Proposals ≤ Meetings، Won ≤ Proposals.
+    private static List<string> ValidateB2bBySourceGrids(ReportSubmission submission, List<GridFieldInfo> grids)
+    {
+        var errors = new List<string>();
+        foreach (var grid in grids)
+        {
+            bool isNewLeads;
+            string[] cols;
+            if (grid.Columns.SequenceEqual(B2bBySourceReportSchema.NewLeadsColumns))
+            {
+                isNewLeads = true;
+                cols = B2bBySourceReportSchema.NewLeadsColumns;
+            }
+            else if (grid.Columns.SequenceEqual(B2bBySourceReportSchema.DataScrapingColumns))
+            {
+                isNewLeads = false;
+                cols = B2bBySourceReportSchema.DataScrapingColumns;
+            }
+            else continue;
+
+            var value = submission.FieldValues.FirstOrDefault(v => v.TemplateFieldId == grid.Id);
+            var rows = ParseGridRows(value?.ValueJson);
+
+            int Col(string name) => Array.IndexOf(cols, name);
+            var cWorkHours = Col(B2bBySourceReportSchema.ColWorkHours);
+            var cContacted = Col(B2bBySourceReportSchema.ColContacted);
+            var cMeetings = Col(B2bBySourceReportSchema.ColMeetings);
+            var cProposals = Col(B2bBySourceReportSchema.ColProposals);
+            var cNegotiation = Col(B2bBySourceReportSchema.ColNegotiation);
+            var cWon = Col(B2bBySourceReportSchema.ColWon);
+            var cRevenue = Col(B2bBySourceReportSchema.ColRevenue);
+            // خاصّان بكل جدول:
+            var cNewLeads = isNewLeads ? Col(B2bBySourceReportSchema.ColNewLeads) : -1;
+            var cScraped = isNewLeads ? -1 : Col(B2bBySourceReportSchema.ColScrapedLeads);
+            var cValid = isNewLeads ? -1 : Col(B2bBySourceReportSchema.ColValidLeads);
+
+            var numericColumns = new List<(int Index, string Name)>
+            {
+                (cWorkHours, B2bBySourceReportSchema.ColWorkHours),
+                (cContacted, B2bBySourceReportSchema.ColContacted),
+                (cMeetings, B2bBySourceReportSchema.ColMeetings),
+                (cProposals, B2bBySourceReportSchema.ColProposals),
+                (cNegotiation, B2bBySourceReportSchema.ColNegotiation),
+                (cWon, B2bBySourceReportSchema.ColWon),
+                (cRevenue, B2bBySourceReportSchema.ColRevenue),
+            };
+            if (isNewLeads)
+                numericColumns.Add((cNewLeads, B2bBySourceReportSchema.ColNewLeads));
+            else
+            {
+                numericColumns.Add((cScraped, B2bBySourceReportSchema.ColScrapedLeads));
+                numericColumns.Add((cValid, B2bBySourceReportSchema.ColValidLeads));
+            }
+
+            // الجدولان مستقلّان اختياريان: جدول فارغ تمامًا (بلا صفّ ببيانات فعلية) يُتخطّى بلا خطأ
+            // كي يستطيع المندوب إرسال مصدر واحد فقط (New Leads فقط أو Data Scraping فقط) أو كليهما.
+            if (!rows.Any(RowHasAnyValue)) continue;
+
+            for (var i = 0; i < rows.Count; i++)
+            {
+                var row = rows[i];
+                if (!RowHasAnyValue(row)) continue;
+                var rowNum = i + 1;
+
+                var parsed = new Dictionary<int, decimal>();
+                var rowValid = true;
+                foreach (var (idx, name) in numericColumns)
+                {
+                    var raw = Cell(row, idx);
+                    if (string.IsNullOrWhiteSpace(raw)) continue;
+                    if (!TryParseNumber(raw, out var num))
+                    {
+                        errors.Add($"الصف {rowNum} في جدول «{grid.Label}»: قيمة «{name}» يجب أن تكون رقمًا.");
+                        rowValid = false;
+                        continue;
+                    }
+                    if (num < 0)
+                    {
+                        errors.Add($"الصف {rowNum} في جدول «{grid.Label}»: «{name}» لا يمكن أن يكون سالبًا.");
+                        rowValid = false;
+                        continue;
+                    }
+                    parsed[idx] = num;
+                }
+                if (!rowValid) continue;
+
+                decimal? Val(int idx) => parsed.TryGetValue(idx, out var v) ? v : (decimal?)null;
+
+                var activityColumns = isNewLeads
+                    ? new[] { cNewLeads, cContacted, cMeetings, cProposals, cNegotiation, cWon, cRevenue }
+                    : new[] { cScraped, cValid, cContacted, cMeetings, cProposals, cNegotiation, cWon, cRevenue };
+                var hasActivity = activityColumns.Any(idx => Val(idx) is decimal dv && dv > 0);
+                if (hasActivity && !(Val(cWorkHours) is decimal wh && wh > 0))
+                    errors.Add($"الصف {rowNum} في جدول «{grid.Label}»: يجب إدخال ساعات عمل أكبر من صفر لصفّ يحتوي على نشاط.");
+
+                void LeMax(int lo, string loName, int hi, string hiName)
+                {
+                    if (Val(lo) is decimal a && Val(hi) is decimal b && a > b)
+                        errors.Add($"الصف {rowNum} في جدول «{grid.Label}»: «{loName}» لا يمكن أن يكون أكبر من «{hiName}».");
+                }
+
+                if (isNewLeads)
+                {
+                    LeMax(cContacted, B2bBySourceReportSchema.ColContacted, cNewLeads, B2bBySourceReportSchema.ColNewLeads);
+                }
+                else
+                {
+                    LeMax(cValid, B2bBySourceReportSchema.ColValidLeads, cScraped, B2bBySourceReportSchema.ColScrapedLeads);
+                    LeMax(cContacted, B2bBySourceReportSchema.ColContacted, cValid, B2bBySourceReportSchema.ColValidLeads);
+                }
+                LeMax(cMeetings, B2bBySourceReportSchema.ColMeetings, cContacted, B2bBySourceReportSchema.ColContacted);
+                LeMax(cProposals, B2bBySourceReportSchema.ColProposals, cMeetings, B2bBySourceReportSchema.ColMeetings);
+                LeMax(cWon, B2bBySourceReportSchema.ColWon, cProposals, B2bBySourceReportSchema.ColProposals);
+            }
+        }
+        return errors;
+    }
+
     private static string Cell(IReadOnlyList<string> row, int idx)
         => idx >= 0 && idx < row.Count ? (row[idx] ?? string.Empty) : string.Empty;
 
@@ -1103,23 +1322,7 @@ public class SubmissionService : ISubmissionService
         catch { return new List<string[]>(); }
     }
 
+    // يمرّ عبر الأداة المركزية الموحّدة (RC-3 Task 2B): تطبيع الخانات العربية/الفارسية ثم التحويل.
     private static bool TryParseNumber(string raw, out decimal value)
-    {
-        var normalized = NormalizeDigits(raw).Trim();
-        return decimal.TryParse(normalized, System.Globalization.NumberStyles.Number,
-            System.Globalization.CultureInfo.InvariantCulture, out value);
-    }
-
-    // تحويل الأرقام العربية-الهندية (٠-٩ و ۰-۹) إلى ASCII لأغراض التحقّق فقط — القيمة المخزَّنة لا تتغيّر.
-    private static string NormalizeDigits(string s)
-    {
-        var chars = s.ToCharArray();
-        for (var i = 0; i < chars.Length; i++)
-        {
-            var c = chars[i];
-            if (c >= '\u0660' && c <= '\u0669') chars[i] = (char)('0' + (c - '\u0660'));
-            else if (c >= '\u06F0' && c <= '\u06F9') chars[i] = (char)('0' + (c - '\u06F0'));
-        }
-        return new string(chars);
-    }
+        => NumericNormalizer.TryParseDecimal(raw, out value);
 }

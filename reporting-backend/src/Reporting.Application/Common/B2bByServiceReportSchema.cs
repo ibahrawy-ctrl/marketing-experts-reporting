@@ -8,7 +8,7 @@ namespace Reporting.Application.Common;
 /// </summary>
 public static class B2bByServiceReportSchema
 {
-    public const string TemplateTitle = "📈 تقرير مبيعات B2B حسب الخدمة";
+    public const string TemplateTitle = "📊 تقرير مبيعات B2B حسب الخدمة";
     public const string Description = "قالب مُهيكَل (ERDS Phase 3): جدول أداء المبيعات لكل خدمة + حقول نصية داعمة.";
 
     public const string MainTableLabel = "أداء المبيعات لكل خدمة";

@@ -163,12 +163,14 @@ public class ErdsPhase3RolloutTests
         Assert.Equal(rows, JsonSerializer.Deserialize<string[][]>(afterClose!));
     }
 
-    // صفّ نصّي: أول خلية «عنصر N» ثم بقية الخلايا أرقام بسيطة.
+    // صفّ نصّي: أول خلية «عنصر N» ثم بقية الخلايا قيمة رقمية ثابتة "1".
+    // القيمة "1" الموحّدة تُرضي حارس قمع مبيعات B2B (Meetings≤Leads، Proposals≤Meetings، Won≤Proposals، Lost≤Leads،
+    // وWorkHours>0 عند وجود نشاط) بينما بقيّة القوالب لا تُطبّق أيّ تحقّق رقمي؛ والاختبار يتحقّق round-trip فقط.
     private static string[] BuildRow(int width, string seed)
     {
         var row = new string[width];
         row[0] = $"عنصر {seed}";
-        for (var i = 1; i < width; i++) row[i] = $"{i}";
+        for (var i = 1; i < width; i++) row[i] = "1";
         return row;
     }
 

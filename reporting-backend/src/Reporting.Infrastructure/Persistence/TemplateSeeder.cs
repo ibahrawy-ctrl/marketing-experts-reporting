@@ -793,6 +793,23 @@ public static class TemplateSeeder
             Long(B2bByServiceReportSchema.Notes),
         }),
 
+        // 25-ب) تقرير مبيعات B2B — حسب مصدر البيانات (RC-3 — additive، قالب مستقلّ بعنوان جديد)
+        // جدولان مستقلّان اختياريان: New Leads (عملاء محتملون جدد) + Data Scraping (سحب بيانات) — يجوز تعبئة أحدهما فقط
+        // (مندوب عمل هذا الأسبوع على مصدر واحد) أو كليهما. القالب أحادي الجدول السابق (حسب الخدمة) يبقى Legacy كما هو
+        // (لا تحويل تلقائي). الخدمة من الكتالوج في الجدولين.
+        new(B2bBySourceReportSchema.TemplateTitle, B2bBySourceReportSchema.Description, PeriodType.Weekly, new[]
+        {
+            Sec("🆕 أداء العملاء المحتملين الجدد New Leads"),
+            Grid(B2bBySourceReportSchema.NewLeadsTableLabel, B2bBySourceReportSchema.NewLeadsColumns),
+            Sec("🧲 أداء سحب البيانات Data Scraping"),
+            Grid(B2bBySourceReportSchema.DataScrapingTableLabel, B2bBySourceReportSchema.DataScrapingColumns),
+            Sec("📝 ملخص نوعي (لا يحلّ محلّ الأرقام)"),
+            Long(B2bBySourceReportSchema.TopAchievements),
+            Long(B2bBySourceReportSchema.TopChallenges),
+            Long(B2bBySourceReportSchema.SupportNeeded),
+            Long(B2bBySourceReportSchema.Notes),
+        }),
+
         // 26) تقرير المشاريع حسب العميل/المشروع (ERDS Phase 3)
         new(ProjectsByClientReportSchema.TemplateTitle, ProjectsByClientReportSchema.Description, PeriodType.Weekly, new[]
         {

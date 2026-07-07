@@ -36,12 +36,12 @@ public class PodExecutionAggregationService : IPodExecutionAggregationService
     private static decimal Per(decimal num, decimal den) => den > 0 ? Math.Round(num / den, 2) : 0m;
 
     // قراءة خلية رقمية بأمان: خارج الحدود/فارغة/غير قابلة للتحويل ⇒ 0.
+    // يمرّ عبر NumericNormalizer (RC-3 Task 2B) لتطبيع الخانات العربية-الهندية/الفارسية ⇒ حساب صحيح
+    // بصرف النظر عن لغة لوحة المفاتيح، ودفاع للبيانات القديمة المخزَّنة بخانات عربية.
     private static decimal Num(string[] row, int idx)
     {
         if (idx < 0 || idx >= row.Length) return 0m;
-        var cell = row[idx];
-        if (string.IsNullOrWhiteSpace(cell)) return 0m;
-        return decimal.TryParse(cell.Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out var d) ? d : 0m;
+        return NumericNormalizer.TryParseDecimal(row[idx], out var d) ? d : 0m;
     }
 
     // قراءة خلية نصّية بأمان (العميل/المشروع/الخطر).
