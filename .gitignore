@@ -16,6 +16,7 @@ secrets.json
 **/publish/
 **/publish-test/
 **/publish-rc*/
+**/publish-p0p1/
 *.user
 **/TestResults/
 
@@ -38,5 +39,10 @@ Thumbs.db
 *.log
 
 # ===== Not needed for deployment (internal docs / tool config) =====
-Docs/
+# Ignore loose Docs contents by default, but track the structured
+# planning / architecture / audit folders (owner decision, 2026-07-11).
+Docs/*
+!Docs/Architecture/
+!Docs/Planning/
+!Docs/Audits/
 .claude/

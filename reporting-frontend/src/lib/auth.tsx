@@ -46,6 +46,8 @@ interface AuthContextValue {
   isSalesRep: boolean;
   // متغيّر لوحة المندوب حسب مسمّاه ('B2C' | 'B2B' | null لغير المندوب).
   salesRepType: 'B2C' | 'B2B' | null;
+  // هل المستخدم قائد فريق مبيعات B2C (دور TeamLeader + مسمّى SALES_B2C_TL) ⇒ يرى «لوحة مبيعات الفريق».
+  isSalesB2cTeamLeader: boolean;
 }
 
 // رموز مسمّيات مندوبي المبيعات الأفراد (تطابق OrgSeeder + منطق SalesContext بالخادم).
@@ -53,6 +55,9 @@ const SALES_REP_CODES: Record<string, 'B2C' | 'B2B'> = {
   SALES_B2C: 'B2C',
   SALES_B2B: 'B2B',
 };
+
+// رمز مسمّى قائد فريق مبيعات B2C — يميّز قائد فريق المبيعات عن بقية قادة الفرق.
+const SALES_B2C_TL_CODE = 'SALES_B2C_TL';
 
 // أدوار الإدارة المخوّلة بالاعتماد (مطابقة لمنطق سلسلة الاعتماد بالخادم).
 const APPROVER_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'Manager', 'TeamLeader'];
@@ -169,10 +174,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
   // هل المستخدم مندوب مبيعات فردي ⇒ يرى «لوحة مبيعاتي».
   const isSalesRep = useMemo(() => salesRepType !== null, [salesRepType]);
+  // هل المستخدم قائد فريق مبيعات B2C (دور TeamLeader + مسمّى SALES_B2C_TL) ⇒ يرى «لوحة مبيعات الفريق».
+  const isSalesB2cTeamLeader = useMemo(
+    () => !!user && user.roles.includes('TeamLeader') && user.jobRoleCode === SALES_B2C_TL_CODE,
+    [user],
+  );
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, loading, login, logout, changePassword, changeEmail, hasAnyRole, canApprove, canViewGovernance, canManageTeams, canManageTemplates, canManageClients, isSalesRep, salesRepType }),
-    [user, loading, login, logout, changePassword, changeEmail, hasAnyRole, canApprove, canViewGovernance, canManageTeams, canManageTemplates, canManageClients, isSalesRep, salesRepType],
+    () => ({ user, loading, login, logout, changePassword, changeEmail, hasAnyRole, canApprove, canViewGovernance, canManageTeams, canManageTemplates, canManageClients, isSalesRep, salesRepType, isSalesB2cTeamLeader }),
+    [user, loading, login, logout, changePassword, changeEmail, hasAnyRole, canApprove, canViewGovernance, canManageTeams, canManageTemplates, canManageClients, isSalesRep, salesRepType, isSalesB2cTeamLeader],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

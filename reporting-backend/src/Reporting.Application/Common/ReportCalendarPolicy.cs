@@ -117,6 +117,63 @@ public static class ReportCalendarPolicy
         return anchor >= from && anchor <= to;
     }
 
+    /// <summary>
+    /// مفتاح الفترة السابقة مباشرةً لمفتاحٍ معلوم (للمقارنة الدورية):
+    /// أسبوعي ⇒ مفتاح أسبوع خميسه قبل 7 أيام؛ شهري YYYY-MM ⇒ الشهر السابق؛ ربعي YYYY-Qn ⇒ الربع السابق؛
+    /// يومي YYYY-MM-DD ⇒ اليوم السابق. أيّ مفتاح غير قابل للتحليل أو خارج الحدود ⇒ null (لا مقارنة، بلا استثناء).
+    /// محروسة بـ try/catch كي لا تُسقِط مسار التجميع عند مفاتيح غير قياسية في بيانات قديمة.
+    /// </summary>
+    public static string? PreviousPeriodKey(PeriodType periodType, string? periodKey)
+    {
+        if (string.IsNullOrWhiteSpace(periodKey)) return null;
+        var key = periodKey.Trim();
+        try
+        {
+            switch (periodType)
+            {
+                case PeriodType.Weekly:
+                    if (!IsWeekKey(key)) return null;
+                    return WeekKeyFor(WeekRange(key).Start.AddDays(-7));
+
+                case PeriodType.Monthly:
+                {
+                    var parts = key.Split('-');
+                    if (parts.Length != 2) return null;
+                    var d = new DateOnly(int.Parse(parts[0], CultureInfo.InvariantCulture),
+                        int.Parse(parts[1], CultureInfo.InvariantCulture), 1).AddMonths(-1);
+                    return $"{d.Year:0000}-{d.Month:00}";
+                }
+
+                case PeriodType.Quarterly:
+                {
+                    var parts = key.Split("-Q");
+                    if (parts.Length != 2) return null;
+                    var year = int.Parse(parts[0], CultureInfo.InvariantCulture);
+                    var q = int.Parse(parts[1], CultureInfo.InvariantCulture);
+                    if (q < 1 || q > 4) return null;
+                    var prevQ = q - 1;
+                    var prevYear = year;
+                    if (prevQ == 0) { prevQ = 4; prevYear--; }
+                    return $"{prevYear:0000}-Q{prevQ}";
+                }
+
+                case PeriodType.Daily:
+                {
+                    if (!DateOnly.TryParse(key, CultureInfo.InvariantCulture, out var day)) return null;
+                    var prev = day.AddDays(-1);
+                    return prev.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+                }
+
+                default:
+                    return null;
+            }
+        }
+        catch
+        {
+            return null; // مفتاح غير قياسي (مثل رقم أسبوع > 53) ⇒ لا مقارنة بدل إسقاط الطلب.
+        }
+    }
+
     // ===== تسميات عربية مفهومة (Phase 5 §7) =====
 
     private static readonly string[] ArMonths =

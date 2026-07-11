@@ -16,6 +16,8 @@ import TeamDetailsPage from './pages/TeamDetailsPage';
 import ComparisonsPage from './pages/ComparisonsPage';
 import SalesAggregationPage from './pages/SalesAggregationPage';
 import TeamLeaderSalesDashboardPage from './pages/TeamLeaderSalesDashboardPage';
+import TeamLeaderExecutionPage from './pages/TeamLeaderExecutionPage';
+import TeamLeaderProjectExecutionPage from './pages/TeamLeaderProjectExecutionPage';
 import SalesRepDashboardPage from './pages/SalesRepDashboardPage';
 import ReportTemplatesPage from './pages/ReportTemplatesPage';
 import KpiTemplatesPage from './pages/KpiTemplatesPage';
@@ -41,6 +43,7 @@ import { DepartmentsPage } from './pages/DepartmentsPage';
 import SettingsPage from './pages/SettingsPage';
 import CourseManagementPage from './pages/CourseManagementPage';
 import ServiceManagementPage from './pages/ServiceManagementPage';
+import ExecutionTaxonomyManagementPage from './pages/ExecutionTaxonomyManagementPage';
 import ClientsPage from './pages/ClientsPage';
 import ClientDetailPage from './pages/ClientDetailPage';
 import ProjectsPage from './pages/ProjectsPage';
@@ -57,6 +60,12 @@ const EXEC_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'Manager', 'TeamLe
 const ADMIN: Role[] = ['Admin'];
 // لوحة مبيعات الفريق (RC3-Task1) — لقائد الفريق والأدوار الأعلى فقط؛ النطاق مفروض خادميًّا عبر IScopeResolver.
 const TEAM_SALES_DASHBOARD_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'Manager', 'TeamLeader'];
+// تقارير التنفيذ Project-First (RC4-Task4) — للأدوار الإدارية وقائد الفريق ومدير الحساب (AccountPortfolioReader).
+// الرؤية مفروضة خادميًّا: نطاق IScopeResolver ∪ حافظة IClientProjectAccess (مدير الحساب يرى مشاريع عملائه).
+const EXECUTION_REPORTS_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'Manager', 'TeamLeader', 'AccountPortfolioReader'];
+// لوحة تنفيذ مشاريع الفريق (RC4-Task4C) — لقائد الفريق والأدوار الأعلى فقط (التركيز على قائد الفريق)؛
+// لا تظهر للموظّف العادي ولا لمدير الحساب. النطاق مفروض خادميًّا عبر IScopeResolver (قائد الفريق يرى فريقه فقط).
+const TEAM_EXECUTION_DASHBOARD_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'Manager', 'TeamLeader'];
 // صفحة إدارة فريق العمل (GOV-R1): Admin + CEO يديران المستخدمين بالكامل؛ CeoSupport عرض + إعادة تعيين كلمات المرور فقط.
 // إنشاء/تعديل/أدوار/حذف المستخدمين = Admin + CEO (مفروضة بسياسة UserManagement بالخادم وفي الواجهة).
 const USERS_PAGE_ROLES: Role[] = ['Admin', 'CEO', 'CeoSupport'];
@@ -179,6 +188,10 @@ const APP_ROUTES: { path: string; element: ReactNode; roles?: Role[] }[] = [
   { path: '/app/sales-aggregation', element: <SalesAggregationPage />, roles: EXEC_ROLES },
   // لوحة مبيعات الفريق (RC3-Task1) — لقائد الفريق؛ يرى فريقه فقط (النطاق مفروض خادميًّا عبر IScopeResolver).
   { path: '/app/sales/team-dashboard', element: <TeamLeaderSalesDashboardPage />, roles: TEAM_SALES_DASHBOARD_ROLES },
+  // تقارير التنفيذ Project-First (RC4-Task4) — تجميع تنفيذ الفرق حسب المشروع/الموظّف مع مقارنة أسبوعية؛ النطاق مفروض خادميًّا عبر IScopeResolver.
+  { path: '/app/execution-reports', element: <TeamLeaderExecutionPage />, roles: EXECUTION_REPORTS_ROLES },
+  // لوحة تنفيذ مشاريع الفريق (RC4-Task4C) — متابعة تنفيذ المشاريع داخل الـPod مبنية على محرّك تجميع 4B؛ النطاق مفروض خادميًّا.
+  { path: '/app/execution/team-dashboard', element: <TeamLeaderProjectExecutionPage />, roles: TEAM_EXECUTION_DASHBOARD_ROLES },
   // لوحة مبيعاتي الشخصية (RC3-Task1.1) — للمندوب (SALES_B2C/SALES_B2B) والأدمن؛ الحماية داخل الصفحة عبر jobRoleCode.
   // بلا roles على المسار (المندوب دوره Employee) — النطاق مفروض خادميًّا (المندوب يرى نفسه فقط عبر تقاطع IScopeResolver).
   { path: '/app/sales/my-dashboard', element: <SalesRepDashboardPage /> },
@@ -202,6 +215,8 @@ const APP_ROUTES: { path: string; element: ReactNode; roles?: Role[] }[] = [
   { path: '/app/courses', element: <CourseManagementPage />, roles: TEMPLATE_GOVERNANCE_ROLES },
   // إدارة كتالوج خدمات B2B — تطابق سياسة TemplateGovernance بالخادم (Admin/CEO/GM).
   { path: '/app/services', element: <ServiceManagementPage />, roles: TEMPLATE_GOVERNANCE_ROLES },
+  // إدارة كتالوج تصنيفات التنفيذ (RC-4 Task 4D2) — تطابق سياسة TemplateGovernance بالخادم (Admin/CEO/GM).
+  { path: '/app/execution-taxonomy', element: <ExecutionTaxonomyManagementPage />, roles: TEMPLATE_GOVERNANCE_ROLES },
   { path: '/app/settings', element: <SettingsPage />, roles: ADMIN },
   { path: '/app/audit', element: <AuditPage />, roles: ['Admin', 'CEO', 'GeneralManager'] },
   { path: '/app/development', element: <DevelopmentPage /> },

@@ -4,7 +4,7 @@ import { SectionTitle } from '../components/dashboard';
 import { LoadingState, QueryError } from '../components/states';
 import { useAuth } from '../lib/auth';
 import {
-  useB2bAggregation,
+  useB2bBySource,
   useB2cCourseGrouped,
   useB2cNewOld,
 } from '../lib/useSalesAggregation';
@@ -30,7 +30,13 @@ import {
   sumB2b,
   sumCourses,
 } from '../components/salesDashboard';
-import type { B2cCourseGroupRow, PeriodType } from '../types/api';
+import type {
+  B2bAggregationReport,
+  B2bServiceAggregateRow,
+  B2bSourceReport,
+  B2cCourseGroupRow,
+  PeriodType,
+} from '../types/api';
 
 // لوحة مبيعاتي الشخصية (RC-3 Task 1.1): كل مندوب يرى بياناته هو فقط.
 // النطاق مفروض خادميًّا (نطاق المندوب = نفسه فقط) + نُرسل employeeId=الذات صراحةً كتأكيد إضافي.
@@ -44,6 +50,43 @@ const PERIOD_TYPE_LABEL: Record<string, string> = {
   Monthly: 'شهري',
   Quarterly: 'ربع سنوي',
 };
+
+// يسطّح تقرير B2B «حسب المصدر» إلى صفوف (خدمة، موظّف) بدلو الإجمالي (كل المصادر) — كي تُعاد استخدام
+// لوحة B2bDashboard/B2bInsights كما هي. المندوب يُسلّم قالب «حسب المصدر»، وهذه النقطة (by-source) تلتقط
+// كلا القالبين (حسب الخدمة legacy + حسب المصدر)، بخلاف نقطة «حسب الخدمة» التي تُرجِع صفرًا للمندوب.
+// Lost/LostRate غير متتبَّعين في نموذج المصدر ⇒ صفر (كما في صفحة تجميع المدير).
+function b2bSourceToTotalRows(report: B2bSourceReport | undefined): B2bServiceAggregateRow[] {
+  if (!report) return [];
+  const rows: B2bServiceAggregateRow[] = [];
+  for (const s of report.services) {
+    for (const e of s.employees) {
+      const b = e.total;
+      rows.push({
+        periodKey: report.periodKey ?? '',
+        employeeId: e.employeeId,
+        employeeName: e.employeeName,
+        service: s.service,
+        teamId: e.teamId,
+        departmentId: e.departmentId,
+        workHours: b.workHours,
+        leads: b.leads,
+        meetings: b.meetings,
+        proposals: b.proposals,
+        negotiation: b.negotiation,
+        won: b.won,
+        lost: 0,
+        revenue: b.revenue,
+        meetingRate: b.meetingRate,
+        proposalRate: b.proposalRate,
+        winRate: b.winRate,
+        revenuePerHour: b.revenuePerHour,
+        wonPerHour: b.wonPerHour,
+        lostRate: 0,
+      });
+    }
+  }
+  return rows;
+}
 
 export default function SalesRepDashboardPage() {
   const { user, isSalesRep, salesRepType, hasAnyRole } = useAuth();
@@ -95,8 +138,8 @@ export default function SalesRepDashboardPage() {
   const grouped = useB2cCourseGrouped(filter, wantB2c);
   const groupedPrev = useB2cCourseGrouped(prevFilter, wantB2c);
   const newOld = useB2cNewOld(filter, wantB2c);
-  const b2b = useB2bAggregation(filter, wantB2b);
-  const b2bPrev = useB2bAggregation(prevFilter, wantB2b);
+  const b2b = useB2bBySource(filter, wantB2b);
+  const b2bPrev = useB2bBySource(prevFilter, wantB2b);
 
   // حارس الوصول الواجهي: غير المندوب وغير الأدمن لا يرى هذه اللوحة (النطاق الخادمي حارس ثانٍ).
   if (!isSalesRep && !isAdmin) {
@@ -111,7 +154,20 @@ export default function SalesRepDashboardPage() {
   }
 
   const courses = grouped.data?.courses ?? [];
-  const b2bRows = b2b.data?.rows ?? [];
+  const b2bRows = b2bSourceToTotalRows(b2b.data);
+  // مغلّف السابق بشكل B2bAggregationReport كي تعمل مقارنة B2bDashboard كما هي.
+  const b2bPrevRows = b2bSourceToTotalRows(b2bPrev.data);
+  const b2bPrevReport: B2bAggregationReport | undefined = b2bPrev.data
+    ? {
+        periodKey: b2bPrev.data.periodKey,
+        rowCount: b2bPrevRows.length,
+        submissionsConsidered: b2bPrev.data.submissionsConsidered,
+        submissionsIgnored: b2bPrev.data.submissionsIgnored,
+        rowsIgnored: b2bPrev.data.rowsIgnored,
+        viewLevel: b2bPrev.data.viewLevel,
+        rows: b2bPrevRows,
+      }
+    : undefined;
   const hasData = wantB2c ? courses.length > 0 : b2bRows.length > 0;
 
   const isLoading = wantB2c ? grouped.isLoading : b2b.isLoading;
@@ -227,7 +283,7 @@ export default function SalesRepDashboardPage() {
             <span>عدد الصفوف: {b2bRows.length.toLocaleString('ar-EG')}</span>
           </div>
           <B2bInsights rows={b2bRows} />
-          <B2bDashboard rows={b2bRows} prev={b2bPrev.data} periodKey={b2b.data?.periodKey} showEmployees={false} />
+          <B2bDashboard rows={b2bRows} prev={b2bPrevReport} periodKey={b2b.data?.periodKey} showEmployees={false} />
         </div>
       )}
     </div>

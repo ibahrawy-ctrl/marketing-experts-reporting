@@ -33,6 +33,8 @@ import type {
   ClientStatus,
   ProjectStatus,
   ServiceType,
+  WorkstreamStatus,
+  DeliverablePriority,
   LeaveRequestType,
   LeaveRequestStatus,
   PermissionShortfallResolution,
@@ -263,6 +265,30 @@ export function clientStatusTone(s: ClientStatus): 'success' | 'gold' | 'alert' 
 }
 export function projectStatusTone(s: ProjectStatus): 'success' | 'gold' | 'alert' | 'muted' | 'navy' {
   return s === 'Active' ? 'success' : s === 'Paused' ? 'gold' : s === 'AtRisk' ? 'alert' : s === 'Completed' ? 'navy' : 'muted';
+}
+
+// ===== P1: تيّارات العمل داخل المشروع =====
+export const workstreamStatusLabel: Record<WorkstreamStatus, string> = {
+  Active: 'نشِط',
+  Paused: 'متوقّف مؤقتًا',
+  Completed: 'مكتمل',
+  Cancelled: 'ملغى',
+};
+
+export function workstreamStatusTone(s: WorkstreamStatus): 'success' | 'gold' | 'navy' | 'muted' {
+  return s === 'Active' ? 'success' : s === 'Paused' ? 'gold' : s === 'Completed' ? 'navy' : 'muted';
+}
+
+// ===== P2: مخرَجات خطّة الإنتاج داخل تيار العمل =====
+export const deliverablePriorityLabel: Record<DeliverablePriority, string> = {
+  Low: 'منخفضة',
+  Medium: 'متوسّطة',
+  High: 'عالية',
+  Urgent: 'عاجلة',
+};
+
+export function deliverablePriorityTone(p: DeliverablePriority): 'muted' | 'navy' | 'gold' | 'alert' {
+  return p === 'Low' ? 'muted' : p === 'Medium' ? 'navy' : p === 'High' ? 'gold' : 'alert';
 }
 
 // ===== V1.0.1: الإجازات والاستئذانات =====

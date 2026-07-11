@@ -1139,7 +1139,11 @@ export interface RepeatableSubField {
   // أعمدة الجدول — تُستخدم فقط عندما يكون النوع 'Grid'.
   columns?: string[];
   // خيارات القائمة المنسدلة — تُستخدم فقط عندما يكون النوع 'Select'.
+  // RC-4 Task 4D3: تبقى fallback للقوالب القديمة v3 (لقطة) وعند تعذّر جلب الكتالوج.
   options?: string[];
+  // RC-4 Task 4D3: مصدر الخيارات الديناميكيّ من كتالوج تصنيفات التنفيذ (execution_taxonomy_values).
+  // عند وجوده تُجلب القيم النشطة وقت التعبئة من /api/execution-taxonomy/options?domain=... بدل اللقطة.
+  catalogDomain?: string;
 }
 
 // إعداد قسم المشاريع المتكرر — يُخزَّن في configJson لحقل ProjectRepeatableSection.
@@ -1778,6 +1782,95 @@ export interface ProjectDto {
   updatedAtUtc: string | null;
   canHardDelete: boolean;
   deleteBlockReason: string | null;
+}
+
+// تيّار عمل داخل المشروع (P1 — منصّة التنفيذ العامة).
+export type WorkstreamStatus = 'Active' | 'Paused' | 'Completed' | 'Cancelled';
+export interface ProjectWorkstreamDto {
+  id: string;
+  projectId: string;
+  workstreamTypeCode: string;
+  workstreamTypeNameAr: string | null;
+  name: string;
+  responsibleTeamId: string;
+  responsibleTeamName: string | null;
+  responsibleManagerId: string | null;
+  responsibleManagerName: string | null;
+  status: WorkstreamStatus;
+  sortOrder: number;
+  notes: string | null;
+  isActive: boolean;
+  createdAtUtc: string;
+  updatedAtUtc: string | null;
+}
+export interface CreateProjectWorkstreamRequest {
+  workstreamTypeCode: string;
+  responsibleTeamId: string;
+  name?: string | null;
+  responsibleManagerId?: string | null;
+  sortOrder?: number;
+  notes?: string | null;
+}
+export interface UpdateProjectWorkstreamRequest {
+  responsibleTeamId: string;
+  status: WorkstreamStatus;
+  name?: string | null;
+  responsibleManagerId?: string | null;
+  sortOrder?: number;
+  notes?: string | null;
+}
+// مخرَج خطّة الإنتاج داخل تيار العمل (P2 — منصّة التنفيذ العامة). تخطيط فقط بلا تنفيذ.
+export type DeliverablePriority = 'Low' | 'Medium' | 'High' | 'Urgent';
+export interface WorkstreamDeliverableDto {
+  id: string;
+  workstreamId: string;
+  deliverableTypeCode: string;
+  deliverableTypeNameAr: string | null;
+  usageContextCode: string | null;
+  usageContextNameAr: string | null;
+  name: string;
+  plannedQuantity: number;
+  estimatedHours: number | null;
+  startDate: string | null;
+  dueDate: string | null;
+  priority: DeliverablePriority;
+  responsibleUserId: string | null;
+  responsibleUserName: string | null;
+  notes: string | null;
+  sortOrder: number;
+  isActive: boolean;
+  createdAtUtc: string;
+  updatedAtUtc: string | null;
+}
+export interface CreateWorkstreamDeliverableRequest {
+  deliverableTypeCode: string;
+  usageContextCode?: string | null;
+  name?: string | null;
+  plannedQuantity?: number;
+  estimatedHours?: number | null;
+  startDate?: string | null;
+  dueDate?: string | null;
+  priority?: DeliverablePriority;
+  responsibleUserId?: string | null;
+  notes?: string | null;
+  sortOrder?: number;
+}
+export interface UpdateWorkstreamDeliverableRequest {
+  usageContextCode?: string | null;
+  name?: string | null;
+  plannedQuantity?: number;
+  estimatedHours?: number | null;
+  startDate?: string | null;
+  dueDate?: string | null;
+  priority?: DeliverablePriority;
+  responsibleUserId?: string | null;
+  notes?: string | null;
+  sortOrder?: number;
+}
+// خيار مُفصَّل من كتالوج تصنيفات التنفيذ (Code + NameAr) للقوائم التي ترسل الرمز.
+export interface ExecutionTaxonomyOptionDto {
+  code: string;
+  nameAr: string;
 }
 export interface CreateProjectRequest {
   clientId: string;
@@ -2978,6 +3071,18 @@ export interface ServiceDto {
   createdAtUtc: string;
   updatedAtUtc: string | null;
 }
+// قيمة كتالوج تصنيفات التنفيذ (RC-4 Task 4D2) — تغذّي خيارات قوالب التنفيذ v3 (لقطة).
+export interface ExecutionTaxonomyDto {
+  id: string;
+  domain: string;
+  code: string;
+  nameAr: string;
+  nameEn: string | null;
+  isActive: boolean;
+  sortOrder: number;
+  createdAtUtc: string;
+  updatedAtUtc: string | null;
+}
 // صفّ تجميع «حسب الدورة»: إجماليات الدورة عبر كل الموظّفين + تفصيل الموظّفين.
 export interface B2cCourseGroupRow {
   course: string;
@@ -3123,4 +3228,84 @@ export interface B2bSourceReport {
   dataScrapingTotals: B2bSourceBucket;
   legacyTotals: B2bSourceBucket;
   services: B2bSourceServiceRow[];
+}
+
+// ===== RC-4 Task 4 (Path A) — تجميع تقارير التنفيذ Project-First (قراءة فقط) =====
+// كل الأرقام التشغيلية داخل كل مشروع (ProjectRepeatableSection). المعدّلات مشتقّة خادميًّا بقسمة آمنة.
+export interface ProjectExecMetrics {
+  planned: number;
+  completed: number;
+  approved: number;
+  revisions: number;
+  published: number;
+  delayed: number;
+  messagesIn: number;
+  responses: number;
+  issueComments: number;
+  escalations: number;
+  completionRate: number;
+  approvalRate: number;
+  publishRate: number;
+  responseRate: number;
+}
+// مقارنة دورية لمقياس المخرجات الرئيسي (TotalOutput = Completed + Responses) بين الفترة الحالية والسابقة.
+// trend: "up"/"down"/"stable" عند وجود فترة سابقة، و"none" حين لا توجد بيانات سابقة (hasPrevious=false).
+// changePercent = null حين previous == 0 (لا قسمة على صفر) بينما القيمة المطلقة change تبقى محسوبة.
+export interface PeriodComparison {
+  current: number;
+  previous: number;
+  change: number;
+  changePercent: number | null;
+  trend: 'up' | 'down' | 'stable' | 'none';
+  hasPrevious: boolean;
+}
+export interface ProjectFirstByProjectRow {
+  projectId: string;
+  projectName: string;
+  clientId: string | null;
+  clientName: string;
+  contributors: number;
+  metrics: ProjectExecMetrics;
+  comparison: PeriodComparison | null;
+}
+export interface ProjectFirstByEmployeeRow {
+  employeeId: string;
+  employeeName: string;
+  teamId: string | null;
+  teamName: string;
+  projectId: string;
+  projectName: string;
+  clientId: string | null;
+  clientName: string;
+  metrics: ProjectExecMetrics;
+  comparison: PeriodComparison | null;
+}
+export interface ProjectFirstByPodRow {
+  teamId: string | null;
+  teamName: string;
+  projectCount: number;
+  employeeCount: number;
+  metrics: ProjectExecMetrics;
+  comparison: PeriodComparison | null;
+}
+export interface ProjectFirstByClientRow {
+  clientId: string | null;
+  clientName: string;
+  projectCount: number;
+  activeProjectCount: number;
+  metrics: ProjectExecMetrics;
+  comparison: PeriodComparison | null;
+}
+export interface ProjectFirstExecutionReport<TRow> {
+  periodKey: string | null;
+  previousPeriodKey: string | null;
+  rowCount: number;
+  submissionsConsidered: number;
+  submissionsIgnored: number;
+  entriesIgnored: number;
+  rowsConsidered: number;
+  rowsIgnored: number;
+  ignoredReasons: Record<string, number>;
+  viewLevel: string;
+  rows: TRow[];
 }

@@ -815,6 +815,16 @@ public class SubmissionService : ISubmissionService
         _ => false
     };
 
+    // يقرأ قيمة إجابة كرقم: رقم JSON مباشر، أو نصّ يُطبَّع عبر NumericNormalizer (خانات عربية/فارسية). غير ذلك ⇒ false.
+    private static bool TryReadEntryNumber(Dictionary<string, JsonElement> answers, string key, out decimal value)
+    {
+        value = 0m;
+        if (answers is null || !answers.TryGetValue(key, out var el)) return false;
+        if (el.ValueKind == JsonValueKind.Number) return el.TryGetDecimal(out value);
+        if (el.ValueKind == JsonValueKind.String) return NumericNormalizer.TryParseDecimal(el.GetString(), out value);
+        return false;
+    }
+
     private async Task<List<string>> ValidateRepeatableSectionsAsync(ReportSubmission submission, CancellationToken ct)
     {
         var errors = new List<string>();
@@ -832,6 +842,32 @@ public class SubmissionService : ISubmissionService
             var config = ParseSectionConfig(sec.ConfigJson);
             var value = submission.FieldValues.FirstOrDefault(v => v.TemplateFieldId == sec.Id);
             var entries = ParseSectionEntries(value?.ValueJson);
+
+            // تفعيل آمن مقصور (RC-4 Task 4، Path A): تُطبَّق قواعد الأرقام التشغيلية حصرًا على أقسام التنفيذ
+            // Project-First (محتوى/تصميم/فيديو = مفاتيح planned/completed/approved، أو المديرشن = messages_in/responses)،
+            // بمطابقة مفاتيح الحقول مع الشيما القياسية. أيّ قسم مشاريع متكرّر آخر لا يتأثّر إطلاقًا.
+            var fieldKeys = new HashSet<string>(config.Fields.Select(f => f.Key), StringComparer.OrdinalIgnoreCase);
+            var isProductionExec = fieldKeys.Contains(ProjectFirstExecutionSchema.KeyPlanned)
+                                   && fieldKeys.Contains(ProjectFirstExecutionSchema.KeyCompleted)
+                                   && fieldKeys.Contains(ProjectFirstExecutionSchema.KeyApproved);
+            var isModerationExec = fieldKeys.Contains(ProjectFirstExecutionSchema.KeyMessagesIn)
+                                   && fieldKeys.Contains(ProjectFirstExecutionSchema.KeyResponses);
+            var isExec = isProductionExec || isModerationExec;
+            string LabelOf(string k) => config.Fields
+                .FirstOrDefault(f => string.Equals(f.Key, k, StringComparison.OrdinalIgnoreCase))?.Label ?? k;
+            var canonicalNumericKeys = (isProductionExec
+                ? new[]
+                {
+                    ProjectFirstExecutionSchema.KeyPlanned, ProjectFirstExecutionSchema.KeyCompleted,
+                    ProjectFirstExecutionSchema.KeyApproved, ProjectFirstExecutionSchema.KeyRevisions,
+                    ProjectFirstExecutionSchema.KeyPublished, ProjectFirstExecutionSchema.KeyDelayed
+                }
+                : new[]
+                {
+                    ProjectFirstExecutionSchema.KeyMessagesIn, ProjectFirstExecutionSchema.KeyResponses,
+                    ProjectFirstExecutionSchema.KeyIssueComments, ProjectFirstExecutionSchema.KeyEscalations,
+                    ProjectFirstExecutionSchema.KeyPublished, ProjectFirstExecutionSchema.KeyDelayed
+                }).Where(fieldKeys.Contains).ToArray();
 
             var min = sec.IsRequired ? Math.Max(config.MinProjects, 1) : Math.Max(config.MinProjects, 0);
             if (entries.Count < min)
@@ -866,6 +902,48 @@ public class SubmissionService : ISubmissionService
                     var has = entry.Answers.TryGetValue(sf.Key, out var av) && AnswerHasValue(av);
                     if (!has)
                         errors.Add($"قسم «{sec.Label}»: الحقل «{sf.Label}» مطلوب لكل مشروع.");
+                }
+
+                if (!isExec) continue;
+
+                // قواعد الأرقام التشغيلية داخل المشروع: لا سالب، والتسلسل المنطقي (مكتمل ≤ مخطّط ≤...)،
+                // ومنع صفّ مشروع فارغ (مشروع مُختار بلا أيّ رقم).
+                var nums = new Dictionary<string, decimal>();
+                var anyValue = false;
+                var entryValid = true;
+                foreach (var key in canonicalNumericKeys)
+                {
+                    if (!(entry.Answers.TryGetValue(key, out var el) && AnswerHasValue(el))) continue;
+                    anyValue = true;
+                    if (!TryReadEntryNumber(entry.Answers, key, out var num))
+                    {
+                        errors.Add($"قسم «{sec.Label}»: قيمة «{LabelOf(key)}» يجب أن تكون رقمًا.");
+                        entryValid = false;
+                        continue;
+                    }
+                    if (num < 0)
+                    {
+                        errors.Add($"قسم «{sec.Label}»: «{LabelOf(key)}» لا يمكن أن يكون سالبًا.");
+                        entryValid = false;
+                        continue;
+                    }
+                    nums[key] = num;
+                }
+
+                if (entry.ProjectId is Guid && !anyValue)
+                    errors.Add($"قسم «{sec.Label}»: لا يمكن حفظ صفّ مشروع بلا أيّ بيانات.");
+
+                if (entryValid && isProductionExec)
+                {
+                    decimal? V(string k) => nums.TryGetValue(k, out var v) ? v : (decimal?)null;
+                    void LeMax(string lo, string hi)
+                    {
+                        if (V(lo) is decimal a && V(hi) is decimal b && a > b)
+                            errors.Add($"قسم «{sec.Label}»: «{LabelOf(lo)}» لا يمكن أن يكون أكبر من «{LabelOf(hi)}».");
+                    }
+                    LeMax(ProjectFirstExecutionSchema.KeyCompleted, ProjectFirstExecutionSchema.KeyPlanned);
+                    LeMax(ProjectFirstExecutionSchema.KeyApproved, ProjectFirstExecutionSchema.KeyCompleted);
+                    LeMax(ProjectFirstExecutionSchema.KeyPublished, ProjectFirstExecutionSchema.KeyApproved);
                 }
             }
         }

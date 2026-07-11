@@ -77,6 +77,7 @@ public static class DependencyInjection
         services.AddScoped<IReportingService, ReportingService>();
         services.AddScoped<IReportingAggregationService, ReportingAggregationService>();
         services.AddScoped<IPodExecutionAggregationService, PodExecutionAggregationService>();
+        services.AddScoped<IProjectFirstExecutionAggregationService, ProjectFirstExecutionAggregationService>();
         services.AddScoped<IReportDueService, ReportDueService>();
         services.AddScoped<IReportReminderService, ReportReminderService>();
         services.AddScoped<IGovernanceService, GovernanceService>();
@@ -96,11 +97,14 @@ public static class DependencyInjection
         services.AddScoped<IClientProjectAccess, ClientProjectAccess>();
         services.AddScoped<IClientService, ClientService>();
         services.AddScoped<IProjectService, ProjectService>();
+        services.AddScoped<IProjectWorkstreamService, ProjectWorkstreamService>();
+        services.AddScoped<IWorkstreamDeliverableService, WorkstreamDeliverableService>();
         services.AddScoped<IPositionService, PositionService>();
         services.AddScoped<IPayrollImpactService, PayrollImpactService>();
         services.AddScoped<IAccountPortfolioService, AccountPortfolioService>();
         services.AddScoped<ICourseService, CourseService>();
         services.AddScoped<Application.Services.IServiceCatalogService, ServiceCatalogService>();
+        services.AddScoped<Application.ExecutionTaxonomy.IExecutionTaxonomyService, ExecutionTaxonomyService>();
 
         return services;
     }

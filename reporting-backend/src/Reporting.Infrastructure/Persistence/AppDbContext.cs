@@ -5,6 +5,7 @@ using Reporting.Domain.Entities.Clients;
 using Reporting.Domain.Entities.Courses;
 using Reporting.Domain.Entities.Development;
 using Reporting.Domain.Entities.EmployeeServices;
+using Reporting.Domain.Entities.ExecutionTaxonomy;
 using Reporting.Domain.Entities.Governance;
 using Reporting.Domain.Entities.Kpi;
 using Reporting.Domain.Entities.Leave;
@@ -36,12 +37,17 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
     // العملاء والمشاريع (Phase 6)
     public DbSet<Client> Clients => Set<Client>();
     public DbSet<Project> Projects => Set<Project>();
+    public DbSet<ProjectWorkstream> ProjectWorkstreams => Set<ProjectWorkstream>();
+    public DbSet<WorkstreamDeliverable> WorkstreamDeliverables => Set<WorkstreamDeliverable>();
 
     // كتالوج الدورات (مصدر أسماء دورات مبيعات B2C)
     public DbSet<Course> Courses => Set<Course>();
 
     // كتالوج خدمات B2B (مصدر أسماء خدمات مبيعات B2B حسب الخدمة)
     public DbSet<Service> Services => Set<Service>();
+
+    // كتالوج تصنيفات التنفيذ (مصدر قوائم SingleSelect الثابتة في قوالب التنفيذ v3)
+    public DbSet<ExecutionTaxonomyValue> ExecutionTaxonomyValues => Set<ExecutionTaxonomyValue>();
 
     // قوالب التقارير
     public DbSet<ReportTemplate> ReportTemplates => Set<ReportTemplate>();

@@ -37,6 +37,17 @@ public static class Roles
     };
 
     /// <summary>
+    /// أدوار إدارة خطّة الإنتاج (المخرَجات المخطَّطة) داخل أهداف العمل (P2):
+    /// Admin / CEO / GM / Manager فقط. عمدًا لا تشمل TeamLeader.
+    /// مدير الحسابات (Account Manager) لا يُمنَح القدرة عبر الدور بل عبر نطاق المشروع
+    /// (Project.AccountManagerId == المستخدم الحالي) داخل الخدمة — لا تفويض بالدور وحده.
+    /// </summary>
+    public static readonly string[] ProjectPlanManagers =
+    {
+        Admin, Ceo, GeneralManager, Manager
+    };
+
+    /// <summary>
     /// الأدوار المخوّلة بإدارة عضوية الفرق (تعديل الاسم/القائد، إضافة/إزالة عضو):
     /// المستوى الإداري الأعلى فقط — Admin / CEO / GM. عمدًا لا تشمل Manager أو TeamLeader.
     /// TODO: عند تعريف أدوار HR / HR Manager / HR Officer / المساعد الإداري (Administrative Assistant)

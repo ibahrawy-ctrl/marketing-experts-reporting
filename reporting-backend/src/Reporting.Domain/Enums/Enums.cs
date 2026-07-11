@@ -435,6 +435,24 @@ public enum ServiceType
     Other = 6
 }
 
+/// <summary>حالة تيار العمل (Project Workstream) — P1 منصّة التنفيذ العامة.</summary>
+public enum WorkstreamStatus
+{
+    Active = 0,
+    Paused = 1,
+    Completed = 2,
+    Cancelled = 3
+}
+
+/// <summary>أولوية مُخرَج خطّة الإنتاج داخل تيار العمل (Workstream Deliverable) — P2 منصّة التنفيذ العامة.</summary>
+public enum DeliverablePriority
+{
+    Low = 0,
+    Medium = 1,
+    High = 2,
+    Urgent = 3
+}
+
 /// <summary>نوع الملاحظة الإدارية.</summary>
 public enum ManagementNoteType
 {

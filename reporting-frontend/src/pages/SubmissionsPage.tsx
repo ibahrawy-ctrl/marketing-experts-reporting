@@ -7,6 +7,7 @@ import { useDirectoryUsers, useTeams, useDepartments } from '../lib/useDirectory
 import { useProjects } from '../lib/useClients';
 import { useActiveCourses } from '../lib/useCourses';
 import { useActiveServices } from '../lib/useServices';
+import { useTaxonomyOptions } from '../lib/useExecutionTaxonomy';
 import { Alert, Badge, Button, Card, Field, Input, Select } from '../components/ui';
 import { LoadingState, QueryError } from '../components/states';
 import { ApprovalPath, ProgressBar, type PathStep } from '../components/dashboard';
@@ -1183,6 +1184,50 @@ export function GridEditor({
   );
 }
 
+// ===== RC-4 Task 4D3 — قائمة SingleSelect داخل المشروع مع خيارات ديناميكية من الكتالوج =====
+// إذا كان الحقل يحمل catalogDomain: تُجلب القيم النشطة وقت التعبئة من الكتالوج (تعكس إضافة/تعطيل الأدمن فورًا).
+// خلاف ذلك (قوالب v3 اللقطة أو أيّ Select ثابتة): تُستخدم sf.options كما هي. عند فشل الجلب: fallback لـ options
+// أو رسالة خطأ واضحة. القيمة المحفوظة سابقًا تبقى ظاهرة/قابلة للاختيار حتى لو لم تعد ضمن النشطة (لا كسر للقديم).
+export function TaxonomySelect({
+  sf, value, onChange,
+}: {
+  sf: RepeatableSubField;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const dynamic = useTaxonomyOptions(sf.catalogDomain);
+  const fallback = sf.options ?? [];
+
+  // مصدر الخيارات النشطة: الكتالوج إن نجح الجلب، وإلا اللقطة fallback.
+  const active = sf.catalogDomain
+    ? (dynamic.data ?? (dynamic.isError ? fallback : []))
+    : fallback;
+
+  // ضمان بقاء القيمة المحفوظة قابلة للعرض حتى لو تعطّلت لاحقًا (تُلحَق كخيار «قيمة قديمة»).
+  const legacy = value && !active.includes(value) ? value : null;
+  const loading = !!sf.catalogDomain && dynamic.isLoading;
+  const usedFallback = !!sf.catalogDomain && dynamic.isError && fallback.length > 0;
+  const hardError = !!sf.catalogDomain && dynamic.isError && fallback.length === 0;
+
+  return (
+    <div>
+      <Select value={value} onChange={(e) => onChange(e.target.value)} disabled={loading}>
+        <option value="">{loading ? 'جارٍ تحميل الخيارات…' : 'اختر…'}</option>
+        {active.map((o) => (
+          <option key={o} value={o}>{o}</option>
+        ))}
+        {legacy && <option value={legacy}>{legacy} (قيمة قديمة)</option>}
+      </Select>
+      {usedFallback && (
+        <p className="mt-1 text-xs text-gold">تعذّر تحديث الخيارات من الكتالوج — عُرِضت الخيارات المحفوظة بالقالب.</p>
+      )}
+      {hardError && (
+        <p className="mt-1 text-xs text-red-600">تعذّر تحميل خيارات هذا الحقل. أعد المحاولة أو تواصل مع الإدارة.</p>
+      )}
+    </div>
+  );
+}
+
 // ===== قسم المشاريع المتكرر: محرّر التعبئة =====
 // «نشط» في هذا السياق = مشروع غير مغلق وغير مكتمل (مرتبط بعمل جارٍ). النطاق مفروض خادميًّا أصلًا.
 export function ProjectRepeatableEditor({
@@ -1264,12 +1309,7 @@ export function ProjectRepeatableEditor({
                       <option value="false">لا</option>
                     </Select>
                   ) : k === 'select' ? (
-                    <Select value={val} onChange={(e) => setAnswer(i, sf.key, e.target.value)}>
-                      <option value="">اختر…</option>
-                      {(sf.options ?? []).map((o) => (
-                        <option key={o} value={o}>{o}</option>
-                      ))}
-                    </Select>
+                    <TaxonomySelect sf={sf} value={val} onChange={(v) => setAnswer(i, sf.key, v)} />
                   ) : k === 'longtext' ? (
                     <textarea
                       className="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-navy focus:outline-none"

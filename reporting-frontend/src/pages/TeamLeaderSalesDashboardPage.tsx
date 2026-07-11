@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react';
+import { Navigate } from 'react-router-dom';
+import { useAuth } from '../lib/auth';
 import { Alert, Badge, Card, EmptyState, Field, Input, Select } from '../components/ui';
 import { SectionTitle } from '../components/dashboard';
 import { LoadingState, QueryError } from '../components/states';
@@ -44,6 +46,7 @@ const PERIOD_TYPE_LABEL: Record<string, string> = {
 };
 
 export default function TeamLeaderSalesDashboardPage() {
+  const { isSalesB2cTeamLeader } = useAuth();
   const today = useMemo(() => riyadhToday(), []);
   const [periodType, setPeriodType] = useState<PeriodType>('Weekly');
 
@@ -114,6 +117,10 @@ export default function TeamLeaderSalesDashboardPage() {
     if (showB2c && grouped.isError) void grouped.refetch();
     if (showB2b && b2b.isError) void b2b.refetch();
   };
+
+  // حارس الوصول المباشر: هذه اللوحة حصرية لقائد فريق مبيعات B2C (TeamLeader + SALES_B2C_TL).
+  // أيّ قائد فريق آخر (تنفيذ/سوشيال) يفتح الرابط مباشرة يُعاد توجيهه للرئيسية (بلا كشف أي محتوى).
+  if (!isSalesB2cTeamLeader) return <Navigate to="/app" replace />;
 
   return (
     <div className="space-y-6">

@@ -23,6 +23,14 @@ public static class TemplateSeeder
         if (ownerId is null) return;
 
         await SeedReportTemplatesAsync(db, ownerId.Value);
+        // RC-4 Task 4 (Path A): توحيد تقارير التنفيذ على ProjectRepeatableSection — نقل الأرقام داخل كل مشروع (v2).
+        await UpgradeExecutionTemplatesToProjectFirstAsync(db, ownerId.Value);
+        // RC-4 Task 4D1: قوالب التنفيذ v3 — Taxonomy (SingleSelect) بدل الأرقام المسطّحة، تُبنى خياراتها من كتالوج تصنيفات التنفيذ.
+        await UpgradeExecutionTemplatesToTaxonomyV3Async(db, ownerId.Value);
+        // RC-4 Task 4D3: قوالب التنفيذ v4 — خيارات Select ديناميكية (catalogDomain) تُقرأ وقت التعبئة من الكتالوج، مع لقطة احتياطيّة.
+        await UpgradeExecutionTemplatesToTaxonomyV4Async(db, ownerId.Value);
+        // إبقاء عائلة قوالب Production القديمة (ERDS Phase 3) كـ Legacy/Archived بلا حذف (لا تُعرَض للإسناد الجديد).
+        await ArchiveLegacyProductionTemplatesAsync(db);
         await SeedKpiTemplatesAsync(db, ownerId.Value);
     }
 
@@ -67,6 +75,400 @@ public static class TemplateSeeder
             db.ReportTemplates.Add(template);
         }
 
+        await db.SaveChangesAsync();
+    }
+
+    // ===== RC-4 Task 4 (Path A) — ترقية قوالب التنفيذ إلى «Project-First» =====
+    // تُضيف إصدارًا منشورًا جديدًا (v2) لكل قالب تنفيذيّ من العائلة المرتبطة بالمسمّى الوظيفي،
+    // حيث تنتقل كل الأرقام التشغيلية إلى داخل قسم المشاريع المتكرّر (ProjectRepeatableSection).
+    // إضافيّ بحت: التقارير القديمة تبقى على لقطة إصدارها v1 (لا حذف، لا Migration). idempotent عبر الحارس على المفتاح "delayed".
+    private static async Task UpgradeExecutionTemplatesToProjectFirstAsync(AppDbContext db, Guid ownerId)
+    {
+        foreach (var upgrade in ProjectFirstExecutionUpgrades)
+        {
+            var template = await db.ReportTemplates
+                .Include(t => t.Versions)
+                .ThenInclude(v => v.Fields)
+                .FirstOrDefaultAsync(t => t.Title == upgrade.Title);
+            if (template is null) continue; // القالب غير مبذور بعد (لن يحدث لأن الترقية بعد البذر) — تخطٍّ آمن.
+
+            // البحث عن إصدار Project-First (يحوي قسم مشاريع بمفتاح فرعيّ "delayed").
+            // مهمّ: عمود ConfigJson من نوع jsonb يُعيد التسلسل بمسافة بعد النقطتين ("key": "delayed")،
+            // لذا نُزيل المسافات قبل المطابقة كي يبقى الحارس idempotent بصرف النظر عن تنسيق jsonb.
+            bool IsProjectFirst(ReportTemplateVersion v) => v.Fields.Any(f =>
+                f.FieldType == FieldType.ProjectRepeatableSection
+                && f.ConfigJson is not null
+                && f.ConfigJson.Replace(" ", "").Contains("\"key\":\"delayed\""));
+
+            var projectFirstVersion = template.Versions.FirstOrDefault(IsProjectFirst);
+            if (projectFirstVersion is not null)
+            {
+                // إن وُجد إصدار Taxonomy v3 فهو الأحدث ويملك حالة النشر — لا نلمس شيئًا هنا كي لا نتنازع معه في كل إقلاع.
+                if (template.Versions.Any(IsTaxonomyV3)) continue;
+                // الترقية مطبَّقة سلفًا — لكن نضمن أنّ Project-First هو الإصدار المنشور الوحيد (إصلاح ذاتي idempotent).
+                foreach (var v in template.Versions)
+                {
+                    var shouldPublish = v.Id == projectFirstVersion.Id;
+                    if (v.IsPublished != shouldPublish)
+                    {
+                        v.IsPublished = shouldPublish;
+                        v.UpdatedAtUtc = DateTime.UtcNow;
+                    }
+                }
+                continue;
+            }
+
+            // إلغاء نشر الإصدارات المنشورة القديمة (v1 المسطّح): يبقى Project-First (v2) هو الإصدار المنشور الوحيد.
+            // التقارير القديمة تظلّ مقروءة عبر لقطة إصدارها (مرجع FK)، فلا يتأثّر شيء من الظاهر سابقًا.
+            foreach (var old in template.Versions.Where(v => v.IsPublished))
+            {
+                old.IsPublished = false;
+                old.UpdatedAtUtc = DateTime.UtcNow;
+            }
+
+            var nextNumber = (template.Versions.Count == 0 ? 0 : template.Versions.Max(v => v.VersionNumber)) + 1;
+            var version = new ReportTemplateVersion
+            {
+                VersionNumber = nextNumber,
+                IsPublished = true,
+                PublishedAtUtc = DateTime.UtcNow,
+                PublishedById = ownerId
+            };
+            var order = 0;
+            foreach (var f in upgrade.Fields)
+            {
+                version.Fields.Add(new TemplateField
+                {
+                    Label = f.Label,
+                    FieldType = f.Type,
+                    IsRequired = f.Required,
+                    HelpText = f.Help,
+                    ConfigJson = BuildConfigJson(f),
+                    Order = order++
+                });
+            }
+            template.Versions.Add(version);
+            // القالب مُتتبَّع سلفًا (Unchanged)، لذا الإضافة إلى مجموعة الملاحة وحدها قد يجعل EF يصنّف
+            // الإصدار الجديد Modified (فيُصدر UPDATE يطال 0 صفوف). نُضيفه صراحةً للسياق ليُصنَّف Added
+            // ويُولَّد مفتاحه، فيُدرَج إدراجًا نظيفًا هو وحقوله.
+            db.Add(version);
+        }
+
+        await db.SaveChangesAsync();
+    }
+
+    // علامة إصدار Taxonomy v3: يحوي حقلًا فرعيًّا من نوع Select داخل قسم المشاريع.
+    // مهمّ: ConfigJson (jsonb) يُعاد تسلسله بمسافة بعد النقطتين، لذا نُزيل المسافات قبل المطابقة (idempotent).
+    private static bool IsTaxonomyV3(ReportTemplateVersion v) => v.Fields.Any(f =>
+        f.FieldType == FieldType.ProjectRepeatableSection
+        && f.ConfigJson is not null
+        && f.ConfigJson.Replace(" ", "").Contains("\"type\":\"Select\""));
+
+    // علامة إصدار Taxonomy v4 (RC-4 Task 4D3): يحوي حقلًا فرعيًّا Select بمجال كتالوج غير فارغ (catalogDomain).
+    // نطابق `"catalogDomain":"` (قيمة نصّية) لا مجرّد وجود المفتاح — لأنّ لقطات v3 صارت تُسلسِل "catalogDomain":null.
+    private static bool IsTaxonomyV4(ReportTemplateVersion v) => v.Fields.Any(f =>
+        f.FieldType == FieldType.ProjectRepeatableSection
+        && f.ConfigJson is not null
+        && f.ConfigJson.Replace(" ", "").Contains("\"catalogDomain\":\""));
+
+    // ===== RC-4 Task 4D1 — ترقية قوالب التنفيذ إلى Taxonomy (الإصدار v3) =====
+    // كل صفّ داخل قسم المشاريع يمثّل تصنيف إنتاج واضح (SingleSelect) بدل الأرقام المسطّحة.
+    // الخيارات لقطة تُبنى من كتالوج تصنيفات التنفيذ (القيم النشطة مرتّبة حسب SortOrder لكل Domain).
+    // إضافيّ بحت: v1/v2 تبقى مقروءة عبر لقطات إصداراتها (لا حذف، لا Migration لتخزين القيم). idempotent عبر الحارس IsTaxonomyV3.
+    private static async Task UpgradeExecutionTemplatesToTaxonomyV3Async(AppDbContext db, Guid ownerId)
+    {
+        // خريطة الخيارات من الكتالوج (لقطة تُخزَّن داخل ConfigJson لكل قالب).
+        var catalog = (await db.ExecutionTaxonomyValues
+                .Where(v => v.IsActive)
+                .OrderBy(v => v.Domain).ThenBy(v => v.SortOrder)
+                .Select(v => new { v.Domain, v.NameAr })
+                .ToListAsync())
+            .GroupBy(v => v.Domain)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.NameAr).ToArray());
+
+        string[] Opts(string domain) => catalog.TryGetValue(domain, out var o) ? o : Array.Empty<string>();
+
+        var upgrades = new (string Title, FieldDef[] Fields)[]
+        {
+            // كاتب المحتوى — Taxonomy v3
+            ("تقرير كاتب المحتوى الأسبوعي", new[]
+            {
+                Sec("📊 ملخّص أسبوعي سريع (خارج المشاريع)"),
+                Long("ملخّص أسبوعي سريع"),
+                Long("أبرز التحديات هذا الأسبوع"),
+                Sec("📁 تفاصيل المشاريع — صفّ لكل تصنيف إنتاج"),
+                Proj("تفاصيل المشروع",
+                    SSelect("content_type", "نوع المحتوى", true, Opts("content_type")),
+                    SSelect("content_goal", "هدف المحتوى", true, Opts("content_goal")),
+                    SSelect("work_status", "حالة العمل", true, Opts("work_status")),
+                    SNum("count", "العدد", true),
+                    SLong("notes", "ملاحظات")),
+            }),
+
+            // فريق التصميم — Taxonomy v3
+            ("تقرير فريق التصميم", new[]
+            {
+                Sec("📊 ملخّص أسبوعي سريع (خارج المشاريع)"),
+                Long("ملخّص أسبوعي سريع"),
+                Long("أبرز التحديات هذا الأسبوع"),
+                Sec("📁 تفاصيل المشاريع — صفّ لكل تصنيف إنتاج"),
+                Proj("تفاصيل المشروع",
+                    SSelect("design_type", "نوع التصميم", true, Opts("design_type")),
+                    SSelect("design_status", "حالة التصميم", true, Opts("design_status")),
+                    SSelect("design_tool", "أداة التنفيذ", true, Opts("design_tool")),
+                    SNum("count", "العدد", true),
+                    SLong("notes", "ملاحظات")),
+            }),
+
+            // فريق الفيديو — Taxonomy v3
+            ("تقرير فريق الفيديو", new[]
+            {
+                Sec("📊 ملخّص أسبوعي سريع (خارج المشاريع)"),
+                Long("ملخّص أسبوعي سريع"),
+                Long("أبرز التحديات هذا الأسبوع"),
+                Sec("📁 تفاصيل المشاريع — صفّ لكل تصنيف إنتاج"),
+                Proj("تفاصيل المشروع",
+                    SSelect("video_type", "نوع الفيديو", true, Opts("video_type")),
+                    SSelect("edit_type", "نوع التنفيذ", true, Opts("edit_type")),
+                    SSelect("video_duration", "مدة الفيديو", true, Opts("video_duration")),
+                    SSelect("video_status", "حالة الفيديو", true, Opts("video_status")),
+                    SNum("count", "العدد", true),
+                    SLong("notes", "ملاحظات")),
+            }),
+
+            // المديرشن — Taxonomy v3
+            ("تقرير المديرشن الأسبوعي", new[]
+            {
+                Sec("📊 ملخّص أسبوعي سريع (خارج المشاريع)"),
+                Long("ملخّص أسبوعي سريع"),
+                Long("أبرز التحديات هذا الأسبوع"),
+                Sec("📁 تفاصيل المشاريع — صفّ لكل تصنيف إنتاج"),
+                Proj("تفاصيل المشروع",
+                    SSelect("activity_type", "نوع النشاط", true, Opts("activity_type")),
+                    SSelect("interaction_result", "نتيجة التفاعل", true, Opts("interaction_result")),
+                    SSelect("response_time", "زمن الاستجابة", true, Opts("response_time")),
+                    SNum("count", "العدد", true),
+                    SLong("notes", "ملاحظات")),
+            }),
+        };
+
+        foreach (var upgrade in upgrades)
+        {
+            var template = await db.ReportTemplates
+                .Include(t => t.Versions)
+                .ThenInclude(v => v.Fields)
+                .FirstOrDefaultAsync(t => t.Title == upgrade.Title);
+            if (template is null) continue; // القالب غير مبذور بعد — تخطٍّ آمن.
+
+            var v3Version = template.Versions.FirstOrDefault(IsTaxonomyV3);
+            if (v3Version is not null)
+            {
+                // الترقية مطبَّقة سلفًا — نضمن أنّ v3 هو الإصدار المنشور الوحيد (إصلاح ذاتي idempotent).
+                foreach (var v in template.Versions)
+                {
+                    var shouldPublish = v.Id == v3Version.Id;
+                    if (v.IsPublished != shouldPublish)
+                    {
+                        v.IsPublished = shouldPublish;
+                        v.UpdatedAtUtc = DateTime.UtcNow;
+                    }
+                }
+                continue;
+            }
+
+            // إلغاء نشر الإصدارات المنشورة (v1 المسطّح + v2 Project-First): يبقى v3 هو المنشور الوحيد.
+            // التقارير القديمة تبقى مقروءة عبر لقطة إصدارها (مرجع FK) فلا يتأثّر شيء ظاهر سابقًا.
+            foreach (var old in template.Versions.Where(v => v.IsPublished))
+            {
+                old.IsPublished = false;
+                old.UpdatedAtUtc = DateTime.UtcNow;
+            }
+
+            var nextNumber = (template.Versions.Count == 0 ? 0 : template.Versions.Max(v => v.VersionNumber)) + 1;
+            var version = new ReportTemplateVersion
+            {
+                VersionNumber = nextNumber,
+                IsPublished = true,
+                PublishedAtUtc = DateTime.UtcNow,
+                PublishedById = ownerId
+            };
+            var order = 0;
+            foreach (var f in upgrade.Fields)
+            {
+                version.Fields.Add(new TemplateField
+                {
+                    Label = f.Label,
+                    FieldType = f.Type,
+                    IsRequired = f.Required,
+                    HelpText = f.Help,
+                    ConfigJson = BuildConfigJson(f),
+                    Order = order++
+                });
+            }
+            template.Versions.Add(version);
+            // نُضيف الإصدار صراحةً للسياق ليُصنَّف Added (وإلا قد يصنّفه EF Modified فيُصدر UPDATE بلا أثر).
+            db.Add(version);
+        }
+
+        await db.SaveChangesAsync();
+    }
+
+    // ===== RC-4 Task 4D3 — ترقية قوالب التنفيذ إلى Taxonomy الديناميكيّ (الإصدار v4) =====
+    // كل حقل Select يحمل الآن catalogDomain: تُجلب خياراته النشطة وقت تعبئة التقرير من الكتالوج مباشرةً
+    // (تعديلات الأدمن في 4D2 تظهر في التقارير الجديدة بلا إصدار قالب جديد). Options تبقى لقطةً احتياطيّة (fallback).
+    // إضافيّ بحت: v1/v2/v3 تبقى مقروءة عبر لقطات إصداراتها (مرجع FK، لا حذف، لا Migration). idempotent عبر الحارس IsTaxonomyV4.
+    private static async Task UpgradeExecutionTemplatesToTaxonomyV4Async(AppDbContext db, Guid ownerId)
+    {
+        // لقطة احتياطيّة من الكتالوج (fallback فقط عند تعذّر الجلب الديناميكيّ) — نفس مصدر v3.
+        var catalog = (await db.ExecutionTaxonomyValues
+                .Where(v => v.IsActive)
+                .OrderBy(v => v.Domain).ThenBy(v => v.SortOrder)
+                .Select(v => new { v.Domain, v.NameAr })
+                .ToListAsync())
+            .GroupBy(v => v.Domain)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.NameAr).ToArray());
+
+        string[] Opts(string domain) => catalog.TryGetValue(domain, out var o) ? o : Array.Empty<string>();
+
+        var upgrades = new (string Title, FieldDef[] Fields)[]
+        {
+            // كاتب المحتوى — Taxonomy v4 (catalogDomain ديناميكيّ)
+            ("تقرير كاتب المحتوى الأسبوعي", new[]
+            {
+                Sec("📊 ملخّص أسبوعي سريع (خارج المشاريع)"),
+                Long("ملخّص أسبوعي سريع"),
+                Long("أبرز التحديات هذا الأسبوع"),
+                Sec("📁 تفاصيل المشاريع — صفّ لكل تصنيف إنتاج"),
+                Proj("تفاصيل المشروع",
+                    SSelectCat("content_type", "نوع المحتوى", true, "content_type", Opts("content_type")),
+                    SSelectCat("content_goal", "هدف المحتوى", true, "content_goal", Opts("content_goal")),
+                    SSelectCat("work_status", "حالة العمل", true, "work_status", Opts("work_status")),
+                    SNum("count", "العدد", true),
+                    SLong("notes", "ملاحظات")),
+            }),
+
+            // فريق التصميم — Taxonomy v4
+            ("تقرير فريق التصميم", new[]
+            {
+                Sec("📊 ملخّص أسبوعي سريع (خارج المشاريع)"),
+                Long("ملخّص أسبوعي سريع"),
+                Long("أبرز التحديات هذا الأسبوع"),
+                Sec("📁 تفاصيل المشاريع — صفّ لكل تصنيف إنتاج"),
+                Proj("تفاصيل المشروع",
+                    SSelectCat("design_type", "نوع التصميم", true, "design_type", Opts("design_type")),
+                    SSelectCat("design_status", "حالة التصميم", true, "design_status", Opts("design_status")),
+                    SSelectCat("design_tool", "أداة التنفيذ", true, "design_tool", Opts("design_tool")),
+                    SNum("count", "العدد", true),
+                    SLong("notes", "ملاحظات")),
+            }),
+
+            // فريق الفيديو — Taxonomy v4
+            ("تقرير فريق الفيديو", new[]
+            {
+                Sec("📊 ملخّص أسبوعي سريع (خارج المشاريع)"),
+                Long("ملخّص أسبوعي سريع"),
+                Long("أبرز التحديات هذا الأسبوع"),
+                Sec("📁 تفاصيل المشاريع — صفّ لكل تصنيف إنتاج"),
+                Proj("تفاصيل المشروع",
+                    SSelectCat("video_type", "نوع الفيديو", true, "video_type", Opts("video_type")),
+                    SSelectCat("edit_type", "نوع التنفيذ", true, "edit_type", Opts("edit_type")),
+                    SSelectCat("video_duration", "مدة الفيديو", true, "video_duration", Opts("video_duration")),
+                    SSelectCat("video_status", "حالة الفيديو", true, "video_status", Opts("video_status")),
+                    SNum("count", "العدد", true),
+                    SLong("notes", "ملاحظات")),
+            }),
+
+            // المديرشن — Taxonomy v4
+            ("تقرير المديرشن الأسبوعي", new[]
+            {
+                Sec("📊 ملخّص أسبوعي سريع (خارج المشاريع)"),
+                Long("ملخّص أسبوعي سريع"),
+                Long("أبرز التحديات هذا الأسبوع"),
+                Sec("📁 تفاصيل المشاريع — صفّ لكل تصنيف إنتاج"),
+                Proj("تفاصيل المشروع",
+                    SSelectCat("activity_type", "نوع النشاط", true, "activity_type", Opts("activity_type")),
+                    SSelectCat("interaction_result", "نتيجة التفاعل", true, "interaction_result", Opts("interaction_result")),
+                    SSelectCat("response_time", "زمن الاستجابة", true, "response_time", Opts("response_time")),
+                    SNum("count", "العدد", true),
+                    SLong("notes", "ملاحظات")),
+            }),
+        };
+
+        foreach (var upgrade in upgrades)
+        {
+            var template = await db.ReportTemplates
+                .Include(t => t.Versions)
+                .ThenInclude(v => v.Fields)
+                .FirstOrDefaultAsync(t => t.Title == upgrade.Title);
+            if (template is null) continue; // القالب غير مبذور بعد — تخطٍّ آمن.
+
+            var v4Version = template.Versions.FirstOrDefault(IsTaxonomyV4);
+            if (v4Version is not null)
+            {
+                // الترقية مطبَّقة سلفًا — نضمن أنّ v4 هو الإصدار المنشور الوحيد (إصلاح ذاتي idempotent).
+                foreach (var v in template.Versions)
+                {
+                    var shouldPublish = v.Id == v4Version.Id;
+                    if (v.IsPublished != shouldPublish)
+                    {
+                        v.IsPublished = shouldPublish;
+                        v.UpdatedAtUtc = DateTime.UtcNow;
+                    }
+                }
+                continue;
+            }
+
+            // إلغاء نشر الإصدارات المنشورة (v1/v2/v3): يبقى v4 هو المنشور الوحيد.
+            // التقارير القديمة تبقى مقروءة عبر لقطة إصدارها (مرجع FK) فلا يتأثّر شيء ظاهر سابقًا.
+            foreach (var old in template.Versions.Where(v => v.IsPublished))
+            {
+                old.IsPublished = false;
+                old.UpdatedAtUtc = DateTime.UtcNow;
+            }
+
+            var nextNumber = (template.Versions.Count == 0 ? 0 : template.Versions.Max(v => v.VersionNumber)) + 1;
+            var version = new ReportTemplateVersion
+            {
+                VersionNumber = nextNumber,
+                IsPublished = true,
+                PublishedAtUtc = DateTime.UtcNow,
+                PublishedById = ownerId
+            };
+            var order = 0;
+            foreach (var f in upgrade.Fields)
+            {
+                version.Fields.Add(new TemplateField
+                {
+                    Label = f.Label,
+                    FieldType = f.Type,
+                    IsRequired = f.Required,
+                    HelpText = f.Help,
+                    ConfigJson = BuildConfigJson(f),
+                    Order = order++
+                });
+            }
+            template.Versions.Add(version);
+            // نُضيف الإصدار صراحةً للسياق ليُصنَّف Added (وإلا قد يصنّفه EF Modified فيُصدر UPDATE بلا أثر).
+            db.Add(version);
+        }
+
+        await db.SaveChangesAsync();
+    }
+
+    // ===== RC-4 Task 4 (Path A) — أرشفة عائلة قوالب Production القديمة (ERDS Phase 3) =====
+    // إبقاؤها للقراءة الخلفية فقط (Legacy)؛ لا تُعرَض للإسناد/الإنشاء الجديد. idempotent (يعمل فقط على غير المؤرشف).
+    private static async Task ArchiveLegacyProductionTemplatesAsync(AppDbContext db)
+    {
+        var legacyTitles = LegacyProductionTemplateTitles;
+        var templates = await db.ReportTemplates
+            .Where(t => legacyTitles.Contains(t.Title) && t.Status != TemplateStatus.Archived)
+            .ToListAsync();
+        if (templates.Count == 0) return;
+        foreach (var t in templates)
+        {
+            t.Status = TemplateStatus.Archived;
+            t.IsActive = false;
+        }
         await db.SaveChangesAsync();
     }
 
@@ -127,8 +529,11 @@ public static class TemplateSeeder
         int MaxProjects = 0);
 
     // حقل فرعي داخل قسم المشاريع المتكرر. Type من مجموعة RepeatableSubFieldType بالواجهة
-    // (ShortText/LongText/Number/Decimal/Percentage/Currency/Date/Boolean/Grid). Columns للجدول (Grid) فقط.
-    private record SubFieldDef(string Key, string Label, string Type, bool Required = false, string[]? Columns = null);
+    // (ShortText/LongText/Number/Decimal/Percentage/Currency/Date/Boolean/Grid/Select). Columns للجدول (Grid) فقط.
+    // Options لقائمة SingleSelect (Select) فقط — تُبنى كلقطة من كتالوج تصنيفات التنفيذ عند البذر.
+    // RC-4 Task 4D3: CatalogDomain (v4) — عند وجوده تُجلب الخيارات النشطة ديناميكيًّا وقت التعبئة من الكتالوج
+    // بدل اللقطة الثابتة؛ يبقى Options لقطةً احتياطيّة (fallback) للقوالب القديمة وعند تعذّر الجلب.
+    private record SubFieldDef(string Key, string Label, string Type, bool Required = false, string[]? Columns = null, string[]? Options = null, string? CatalogDomain = null);
 
     private record ReportDef(string Title, string? Description, PeriodType Period, FieldDef[] Fields);
     private record MetricDef(string Name, decimal Weight, decimal? Target = null, string? Unit = null, KpiCalcMethod Calc = KpiCalcMethod.Manual);
@@ -150,6 +555,9 @@ public static class TemplateSeeder
                     type = s.Type,
                     required = s.Required,
                     columns = s.Columns,
+                    options = s.Options,
+                    // RC-4 Task 4D3: مجال الكتالوج (v4) — يُهمَل عند القيمة null فلا يظهر في لقطات v3 القديمة.
+                    catalogDomain = s.CatalogDomain,
                 }).ToArray(),
             });
         if (f.Options is { Length: > 0 })
@@ -185,6 +593,11 @@ public static class TemplateSeeder
     private static SubFieldDef SDate(string key, string label, bool req = false) => new(key, label, "Date", req);
     private static SubFieldDef SBool(string key, string label, bool req = false) => new(key, label, "Boolean", req);
     private static SubFieldDef SGrid(string key, string label, params string[] columns) => new(key, label, "Grid", false, columns);
+    // قائمة SingleSelect داخل قسم المشاريع — الخيارات لقطة ثابتة من كتالوج تصنيفات التنفيذ.
+    private static SubFieldDef SSelect(string key, string label, bool req, params string[] options) => new(key, label, "Select", req, null, options);
+    // RC-4 Task 4D3 (v4): قائمة SingleSelect بخيارات ديناميكية من الكتالوج (catalogDomain) + لقطة احتياطيّة (fallback).
+    private static SubFieldDef SSelectCat(string key, string label, bool req, string catalogDomain, string[] fallback)
+        => new(key, label, "Select", req, null, fallback, catalogDomain);
 
     // مجموعات خيارات متكرّرة
     private static readonly string[] StatusGYR = { "🟢 ممتازة", "🟡 مستقرة", "🔴 تحتاج تدخل" };
@@ -881,6 +1294,99 @@ public static class TemplateSeeder
             Long(MediaBuyerByClientReportSchema.ImprovementOrDeclineReasons),
             Long(MediaBuyerByClientReportSchema.SupportNeeded),
         }),
+    };
+
+    // ===== RC-4 Task 4 (Path A) — قوالب التنفيذ Project-First (الإصدار v2) =====
+    // كل الأرقام التشغيلية داخل قسم المشاريع المتكرّر؛ خارج المشاريع = ملخّص أسبوعي سريع + أبرز التحديات فقط.
+    // المفاتيح الرقمية الموحّدة (planned/completed/approved/revisions/published/delayed) يقرؤها محرّك التجميع Project-First.
+    private record ProjectFirstUpgrade(string Title, FieldDef[] Fields);
+
+    private static readonly ProjectFirstUpgrade[] ProjectFirstExecutionUpgrades =
+    {
+        // كاتب المحتوى — Project-First
+        new("تقرير كاتب المحتوى الأسبوعي", new[]
+        {
+            Sec("📊 ملخّص أسبوعي سريع (خارج المشاريع)"),
+            Long("ملخّص أسبوعي سريع"),
+            Long("أبرز التحديات هذا الأسبوع"),
+            Sec("📁 تفاصيل المشاريع — كل الأرقام داخل المشروع"),
+            Proj("تفاصيل المشروع",
+                SNum("planned", "عدد القطع المطلوبة"),
+                SNum("completed", "عدد القطع المُنجَزة"),
+                SNum("approved", "معتمدة من أول مرة"),
+                SNum("revisions", "عدد مرّات التعديل"),
+                SNum("published", "المنشورة/المُسلَّمة للعميل"),
+                SNum("delayed", "المتأخرة"),
+                SGrid("pieces", "قطع المحتوى للمشروع", "العنوان", "النوع", "الحالة", "تاريخ التسليم", "ملاحظة"),
+                SLong("project_notes", "ملاحظات المشروع")),
+        }),
+
+        // فريق التصميم — Project-First
+        new("تقرير فريق التصميم", new[]
+        {
+            Sec("📊 ملخّص أسبوعي سريع (خارج المشاريع)"),
+            Long("ملخّص أسبوعي سريع"),
+            Long("أبرز التحديات هذا الأسبوع"),
+            Sec("📁 تفاصيل المشاريع — كل الأرقام داخل المشروع"),
+            Proj("تفاصيل المشروع",
+                SNum("planned", "عدد الطلبات المستلمة"),
+                SNum("completed", "عدد التصاميم المُنجَزة"),
+                SNum("approved", "معتمدة من أول مرة"),
+                SNum("revisions", "أعيدت للتعديل"),
+                SNum("published", "المُسلَّمة للعميل"),
+                SNum("delayed", "المتأخرة"),
+                SPct("project_progress", "نسبة إنجاز المشروع"),
+                SGrid("designs", "تصاميم المشروع", "التصميم", "النوع", "الحالة", "ملاحظة"),
+                SLong("project_notes", "ملاحظات المشروع")),
+        }),
+
+        // فريق الفيديو — Project-First
+        new("تقرير فريق الفيديو", new[]
+        {
+            Sec("📊 ملخّص أسبوعي سريع (خارج المشاريع)"),
+            Long("ملخّص أسبوعي سريع"),
+            Long("أبرز التحديات هذا الأسبوع"),
+            Sec("📁 تفاصيل المشاريع — كل الأرقام داخل المشروع"),
+            Proj("تفاصيل المشروع",
+                SNum("planned", "عدد الطلبات المستلمة"),
+                SNum("completed", "عدد الفيديوهات المُنجَزة"),
+                SNum("approved", "معتمدة من أول مرة"),
+                SNum("revisions", "أعيدت للتعديل"),
+                SNum("published", "المُسلَّمة للعميل"),
+                SNum("delayed", "المتأخرة"),
+                SPct("project_progress", "نسبة إنجاز المشروع"),
+                SGrid("videos", "فيديوهات المشروع", "الفيديو", "النوع", "الحالة", "ملاحظة"),
+                SLong("project_notes", "ملاحظات المشروع")),
+        }),
+
+        // المديرشن — Project-First (أرقام المديرشن داخل كل مشروع)
+        new("تقرير المديرشن الأسبوعي", new[]
+        {
+            Sec("📊 ملخّص أسبوعي سريع (خارج المشاريع)"),
+            Long("ملخّص أسبوعي سريع"),
+            Long("أبرز التحديات هذا الأسبوع"),
+            Sec("📁 تفاصيل المشاريع — كل الأرقام داخل المشروع"),
+            Proj("تفاصيل المشروع",
+                SNum("messages_in", "عدد الرسائل الواردة"),
+                SNum("responses", "عدد الرسائل المُجاب عليها"),
+                SNum("issue_comments_count", "عدد التعليقات الإشكالية"),
+                SNum("escalations", "عدد الحالات المصعّدة"),
+                SNum("published", "عدد المنشورات المنشورة"),
+                SNum("delayed", "المتأخر"),
+                SGrid("publishing", "متابعة النشر", "المنصّة", "عدد المنشورات", "الحالة"),
+                SLong("project_notes", "ملاحظات المشروع")),
+        }),
+    };
+
+    // عناوين عائلة Production القديمة (ERDS Phase 3) للأرشفة — تبقى للقراءة الخلفية فقط.
+    private static readonly string[] LegacyProductionTemplateTitles =
+    {
+        ContentProductionReportSchema.TemplateTitle,
+        DesignProductionReportSchema.TemplateTitle,
+        VideoProductionReportSchema.TemplateTitle,
+        SocialPublishingReportSchema.TemplateTitle,
+        MediaBuyerByClientReportSchema.TemplateTitle,
+        ProjectsByClientReportSchema.TemplateTitle,
     };
 
     private static readonly KpiDef[] KpiDefs =

@@ -184,6 +184,8 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await db.Database.MigrateAsync();
     await IdentitySeeder.SeedAsync(scope.ServiceProvider);
+    // كتالوج تصنيفات التنفيذ — يجب أن يعمل قبل TemplateSeeder كي تتوفّر القيم عند بناء قوالب v3 (idempotent، إضافيّ بحت).
+    await ExecutionTaxonomySeeder.SeedAsync(scope.ServiceProvider);
     await TemplateSeeder.SeedAsync(scope.ServiceProvider);
     // مركز التحكم بالبريد (EMAIL-CONTROL-CENTER-R1) — بذر قوالب/قواعد أساسية (idempotent، DryRun، إضافيّ بحت).
     await EmailControlSeeder.SeedAsync(scope.ServiceProvider);

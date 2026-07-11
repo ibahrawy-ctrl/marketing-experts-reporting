@@ -1,7 +1,9 @@
 import { Fragment, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Alert, Badge, Card, EmptyState, Field, Input, Select, StatCard } from '../components/ui';
-import { SectionTitle } from '../components/dashboard';
+import { Tabs } from '../components/Tabs';
+import { Collapsible } from '../components/Collapsible';
+import { ShowMoreButton, useShowMore } from '../components/ShowMore';
 import { LoadingState, QueryError } from '../components/states';
 import { useB2bBySource, useB2cCourseGrouped, useB2cNewOld } from '../lib/useSalesAggregation';
 import { formatPeriod, formatPercent } from '../lib/format';
@@ -101,8 +103,68 @@ export default function SalesAggregationPage() {
   const b2cNewOld = useB2cNewOld(filter);
   const b2b = useB2bBySource(filter);
   const b2bPrev = useB2bBySource(prevFilter);
-  // الاستعلام النشط لعرض حالات التحميل/الخطأ: عرضا B2C (حسب الدورة/الموظّف) يشتقّان من تجميع الدورة نفسه.
-  const active = tab === 'b2b' ? b2b : b2cGrouped;
+  // محتوى تبويب B2C: مفتاح العرض الفرعي (حسب الدورة/الموظّف) دائم الظهور، ثم حالات التحميل/الخطأ ثم العرض.
+  // عرضا B2C (حسب الدورة/الموظّف) يشتقّان من تجميع الدورة نفسه، لذا يعتمدان على حالة b2cGrouped.
+  const b2cPanel = (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-semibold text-ink-2">طريقة العرض:</span>
+        <button
+          type="button"
+          onClick={() => setB2cView('course')}
+          className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+            b2cView === 'course' ? 'bg-navy text-white' : 'bg-offwhite text-ink-2 hover:bg-line'
+          }`}
+        >
+          تجميع حسب الدورة
+        </button>
+        <button
+          type="button"
+          onClick={() => setB2cView('employee')}
+          className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+            b2cView === 'employee' ? 'bg-navy text-white' : 'bg-offwhite text-ink-2 hover:bg-line'
+          }`}
+        >
+          تفصيل حسب الموظّف
+        </button>
+      </div>
+
+      {b2cGrouped.isLoading ? (
+        <LoadingState label="يتم تحميل التجميع…" />
+      ) : b2cGrouped.isError ? (
+        <QueryError
+          onRetry={() => b2cGrouped.refetch()}
+          description="حدث خطأ أثناء جلب بيانات التجميع. أعد المحاولة."
+        />
+      ) : b2cView === 'course' ? (
+        <B2cCourseGroupedView
+          data={b2cGrouped.data}
+          prev={b2cGroupedPrev.data}
+          newOld={b2cNewOld.data}
+          breakdown={b2cBreakdown}
+          onBreakdownChange={setB2cBreakdown}
+        />
+      ) : (
+        <B2cEmployeeView
+          data={b2cGrouped.data}
+          breakdown={b2cBreakdown}
+          onBreakdownChange={setB2cBreakdown}
+        />
+      )}
+    </div>
+  );
+
+  // محتوى تبويب B2B: حالات التحميل/الخطأ ثم عرض التجميع حسب الخدمة/المصدر.
+  const b2bPanel = b2b.isLoading ? (
+    <LoadingState label="يتم تحميل التجميع…" />
+  ) : b2b.isError ? (
+    <QueryError
+      onRetry={() => b2b.refetch()}
+      description="حدث خطأ أثناء جلب بيانات التجميع. أعد المحاولة."
+    />
+  ) : (
+    <B2bView data={b2b.data} prev={b2bPrev.data} source={b2bSource} onSourceChange={setB2bSource} />
+  );
 
   return (
     <div className="space-y-6">
@@ -119,55 +181,9 @@ export default function SalesAggregationPage() {
         الأرقام مأخوذة مباشرة من مدخلات الموظّفين في تقاريرهم المعتمَدة — لا حساب أو صرف لأي مستحقات.
       </Alert>
 
-      {/* التبويبات + الفلاتر */}
+      {/* الفلاتر المشتركة بين تبويبَي B2C و B2B (نوع الفترة + منتقي الفترة حسب النوع). */}
       <Card>
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setTab('b2c')}
-            className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
-              tab === 'b2c' ? 'bg-navy text-white' : 'bg-offwhite text-ink-2 hover:bg-line'
-            }`}
-          >
-            مبيعات B2C حسب الدورة
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab('b2b')}
-            className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
-              tab === 'b2b' ? 'bg-navy text-white' : 'bg-offwhite text-ink-2 hover:bg-line'
-            }`}
-          >
-            مبيعات B2B حسب الخدمة
-          </button>
-        </div>
-
-        {/* مفتاح فرعي داخل B2C: العرض حسب الدورة (افتراضي المدير) أو التفصيل حسب الموظّف. */}
-        {tab === 'b2c' && (
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold text-ink-2">طريقة العرض:</span>
-            <button
-              type="button"
-              onClick={() => setB2cView('course')}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                b2cView === 'course' ? 'bg-navy text-white' : 'bg-offwhite text-ink-2 hover:bg-line'
-              }`}
-            >
-              تجميع حسب الدورة
-            </button>
-            <button
-              type="button"
-              onClick={() => setB2cView('employee')}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                b2cView === 'employee' ? 'bg-navy text-white' : 'bg-offwhite text-ink-2 hover:bg-line'
-              }`}
-            >
-              تفصيل حسب الموظّف
-            </button>
-          </div>
-        )}
-
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-3">
           <Field label="نوع الفترة">
             <Select value={periodType} onChange={(e) => setPeriodType(e.target.value as PeriodType)}>
               {PERIOD_TYPES.map((p) => (
@@ -219,32 +235,16 @@ export default function SalesAggregationPage() {
         </div>
       </Card>
 
-      {active.isLoading ? (
-        <LoadingState label="يتم تحميل التجميع…" />
-      ) : active.isError ? (
-        <QueryError
-          onRetry={() => active.refetch()}
-          description="حدث خطأ أثناء جلب بيانات التجميع. أعد المحاولة."
-        />
-      ) : tab === 'b2c' ? (
-        b2cView === 'course' ? (
-          <B2cCourseGroupedView
-            data={b2cGrouped.data}
-            prev={b2cGroupedPrev.data}
-            newOld={b2cNewOld.data}
-            breakdown={b2cBreakdown}
-            onBreakdownChange={setB2cBreakdown}
-          />
-        ) : (
-          <B2cEmployeeView
-            data={b2cGrouped.data}
-            breakdown={b2cBreakdown}
-            onBreakdownChange={setB2cBreakdown}
-          />
-        )
-      ) : (
-        <B2bView data={b2b.data} prev={b2bPrev.data} source={b2bSource} onSourceChange={setB2bSource} />
-      )}
+      {/* تبويبا B2C / B2B عبر مكوّن Tabs الموحّد (UX-PRIMITIVES). الافتراضي = B2C حسب الدورة. */}
+      <Tabs
+        ariaLabel="نوع تجميع المبيعات"
+        value={tab}
+        onChange={(id) => setTab(id as SalesTab)}
+        items={[
+          { id: 'b2c', label: 'مبيعات B2C حسب الدورة', content: b2cPanel },
+          { id: 'b2b', label: 'مبيعات B2B حسب الخدمة', content: b2bPanel },
+        ]}
+      />
     </div>
   );
 }
@@ -634,74 +634,81 @@ function B2cExecutiveDashboard({
         <StatCard label="متوسّط نسبة التحويل" value={pctText(avgConversion)} tone="navy" />
       </div>
 
-      {/* مقارنة الفترة السابقة */}
-      <Card>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-bold text-navy">مقارنة مع الفترة السابقة</h3>
-          <Badge tone="navy">
-            {hasPrev ? `مقابل ${formatPeriod(prev?.periodKey)}` : 'لا توجد بيانات فترة سابقة'}
-          </Badge>
+      {/* الرسوم البيانية وتحليل التحويل (قابل للطيّ — مطويّ افتراضيًّا لتقصير العرض) */}
+      <Collapsible title="الرسوم البيانية وتحليل التحويل">
+        <div className="space-y-4">
+          {/* مقارنة الفترة السابقة */}
+          <Card>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-sm font-bold text-navy">مقارنة مع الفترة السابقة</h3>
+              <Badge tone="navy">
+                {hasPrev ? `مقابل ${formatPeriod(prev?.periodKey)}` : 'لا توجد بيانات فترة سابقة'}
+              </Badge>
+            </div>
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="rounded-lg border border-line p-3">
+                <div className="text-xs text-ink-2">Revenue</div>
+                <div className="mt-0.5 text-lg font-bold text-ink">{num(t.revenue)}</div>
+                <DeltaBadge current={t.revenue} previous={pt?.revenue} />
+              </div>
+              <div className="rounded-lg border border-line p-3">
+                <div className="text-xs text-ink-2">Sales</div>
+                <div className="mt-0.5 text-lg font-bold text-ink">{num(t.sales)}</div>
+                <DeltaBadge current={t.sales} previous={pt?.sales} />
+              </div>
+              <div className="rounded-lg border border-line p-3">
+                <div className="text-xs text-ink-2">نسبة التحويل</div>
+                <div className="mt-0.5 text-lg font-bold text-ink">{pctText(avgConversion)}</div>
+                <DeltaBadge current={avgConversion} previous={prevConversion} kind="percentPoints" />
+              </div>
+            </div>
+          </Card>
+
+          {/* القمع + التوزيع الدائري */}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <Panel title="قمع التحويل" hint={`للفترة ${formatPeriod(periodKey)} — Lead ← Contacted ← Qualified ← Sales`}>
+              <Funnel leads={t.leads} contacted={t.contacted} qualified={t.qualified} sales={t.sales} />
+            </Panel>
+            <Panel title="توزيع المبيعات حسب الدورة">
+              <PieChart slices={salesByCourse} />
+            </Panel>
+          </div>
+
+          {/* أعمدة الإيراد + المبيعات لكل دورة */}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <Panel title="الإيراد لكل دورة">
+              <BarChart rows={revenueByCourse} format={num} />
+            </Panel>
+            <Panel title="عدد المبيعات لكل دورة">
+              <BarChart rows={salesCountByCourse} format={num} />
+            </Panel>
+          </div>
         </div>
-        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div className="rounded-lg border border-line p-3">
-            <div className="text-xs text-ink-2">Revenue</div>
-            <div className="mt-0.5 text-lg font-bold text-ink">{num(t.revenue)}</div>
-            <DeltaBadge current={t.revenue} previous={pt?.revenue} />
-          </div>
-          <div className="rounded-lg border border-line p-3">
-            <div className="text-xs text-ink-2">Sales</div>
-            <div className="mt-0.5 text-lg font-bold text-ink">{num(t.sales)}</div>
-            <DeltaBadge current={t.sales} previous={pt?.sales} />
-          </div>
-          <div className="rounded-lg border border-line p-3">
-            <div className="text-xs text-ink-2">نسبة التحويل</div>
-            <div className="mt-0.5 text-lg font-bold text-ink">{pctText(avgConversion)}</div>
-            <DeltaBadge current={avgConversion} previous={prevConversion} kind="percentPoints" />
-          </div>
+      </Collapsible>
+
+      {/* أعلى الدورات والموظّفون (قابل للطيّ) */}
+      <Collapsible title="أعلى الدورات والموظّفون">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
+          <Panel title="أعلى 5 دورات — الإيراد">
+            <RankList rows={top5Revenue} format={num} />
+          </Panel>
+          <Panel title="أعلى 5 دورات — المبيعات">
+            <RankList rows={top5Sales} format={num} />
+          </Panel>
+          <Panel title="أعلى 5 دورات — نسبة التحويل">
+            <RankList rows={top5Conversion} format={pctText} />
+          </Panel>
+          <Panel title="أضعف الدورات — نسبة التحويل">
+            <RankList rows={worstCourses} format={pctText} />
+          </Panel>
+          <Panel title="أعلى الموظّفين — الإيراد" hint="ضمن الفترة المختارة">
+            <RankList rows={topEmployees} format={num} />
+          </Panel>
         </div>
-      </Card>
+      </Collapsible>
 
-      {/* القمع + التوزيع الدائري */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Panel title="قمع التحويل" hint={`للفترة ${formatPeriod(periodKey)} — Lead ← Contacted ← Qualified ← Sales`}>
-          <Funnel leads={t.leads} contacted={t.contacted} qualified={t.qualified} sales={t.sales} />
-        </Panel>
-        <Panel title="توزيع المبيعات حسب الدورة">
-          <PieChart slices={salesByCourse} />
-        </Panel>
-      </div>
-
-      {/* أعمدة الإيراد + المبيعات لكل دورة */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Panel title="الإيراد لكل دورة">
-          <BarChart rows={revenueByCourse} format={num} />
-        </Panel>
-        <Panel title="عدد المبيعات لكل دورة">
-          <BarChart rows={salesCountByCourse} format={num} />
-        </Panel>
-      </div>
-
-      {/* أعلى الدورات + أسوأها + أعلى الموظّفين */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
-        <Panel title="أعلى 5 دورات — الإيراد">
-          <RankList rows={top5Revenue} format={num} />
-        </Panel>
-        <Panel title="أعلى 5 دورات — المبيعات">
-          <RankList rows={top5Sales} format={num} />
-        </Panel>
-        <Panel title="أعلى 5 دورات — نسبة التحويل">
-          <RankList rows={top5Conversion} format={pctText} />
-        </Panel>
-        <Panel title="أضعف الدورات — نسبة التحويل">
-          <RankList rows={worstCourses} format={pctText} />
-        </Panel>
-        <Panel title="أعلى الموظّفين — الإيراد" hint="ضمن الفترة المختارة">
-          <RankList rows={topEmployees} format={num} />
-        </Panel>
-      </div>
-
-      {/* جدول حرارة التحويل لكل دورة */}
-      <Panel title="خريطة حرارة التحويل حسب الدورة" hint="كلّما اخضرّت الخلية زادت النسبة">
+      {/* جدول حرارة التحويل لكل دورة (قابل للطيّ) */}
+      <Collapsible title="خريطة حرارة التحويل حسب الدورة" badge="كلّما اخضرّت الخلية زادت النسبة">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[520px] text-right text-sm">
             <thead className="border-b border-line bg-offwhite text-xs text-ink-2">
@@ -724,7 +731,7 @@ function B2cExecutiveDashboard({
             </tbody>
           </table>
         </div>
-      </Panel>
+      </Collapsible>
     </div>
   );
 }
@@ -784,9 +791,8 @@ function NewOldComparison({ report }: { report: B2cNewOldReport }) {
   const n = report.newTotals;
   const o = report.oldTotals;
   return (
-    <Card>
-      <h3 className="text-sm font-bold text-navy">مقارنة البيانات الجديدة New مقابل بيانات CRM القديمة Old</h3>
-      <p className="mt-0.5 text-xs text-ink-2">
+    <div>
+      <p className="text-xs text-ink-2">
         «نسبة التحويل» للبيانات الجديدة = المبيعات ÷ New Leads، وللبيانات القديمة = معدّل الاسترجاع (المبيعات ÷ Old Leads Worked).
       </p>
       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -800,7 +806,7 @@ function NewOldComparison({ report }: { report: B2cNewOldReport }) {
           format={pctText}
         />
       </div>
-    </Card>
+    </div>
   );
 }
 
@@ -808,6 +814,7 @@ function NewOldComparison({ report }: { report: B2cNewOldReport }) {
 function SourceCourseTable({ courses, leadsLabel }: { courses: B2cCourseGroupRow[]; leadsLabel: string }) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const toggle = (course: string) => setExpanded((prev) => ({ ...prev, [course]: !prev[course] }));
+  const showMore = useShowMore(courses, 8);
 
   return (
     <table className="w-full min-w-[1100px] text-right text-sm">
@@ -826,7 +833,7 @@ function SourceCourseTable({ courses, leadsLabel }: { courses: B2cCourseGroupRow
         </tr>
       </thead>
       <tbody>
-        {courses.map((c) => {
+        {showMore.visible.map((c) => {
           const isOpen = !!expanded[c.course];
           return (
             <Fragment key={c.course}>
@@ -893,6 +900,19 @@ function SourceCourseTable({ courses, leadsLabel }: { courses: B2cCourseGroupRow
           );
         })}
       </tbody>
+      {showMore.hiddenCount > 0 && (
+        <tfoot>
+          <tr>
+            <td colSpan={10} className="px-3 py-2 text-center">
+              <ShowMoreButton
+                expanded={showMore.expanded}
+                onToggle={showMore.toggle}
+                hiddenCount={showMore.hiddenCount}
+              />
+            </td>
+          </tr>
+        </tfoot>
+      )}
     </table>
   );
 }
@@ -908,6 +928,7 @@ function AllBreakdownCourseTable({ courses }: { courses: B2cNewOldCourseRow[] })
       totalRevenue: c.new.revenue + c.old.revenue,
     }))
     .sort((a, b) => b.totalRevenue - a.totalRevenue || a.course.localeCompare(b.course));
+  const showMore = useShowMore(rows, 8);
   if (rows.length === 0) {
     return <p className="py-6 text-center text-sm text-ink-2">لا توجد بيانات للفترة المختارة.</p>;
   }
@@ -932,7 +953,7 @@ function AllBreakdownCourseTable({ courses }: { courses: B2cNewOldCourseRow[] })
         </tr>
       </thead>
       <tbody>
-        {rows.map((r, i) => (
+        {showMore.visible.map((r, i) => (
           <tr key={`${r.course}-${i}`} className="border-b border-line last:border-0 hover:bg-offwhite">
             <td className="px-3 py-2.5 font-medium text-navy">{r.course}</td>
             <td className="px-3 py-2.5 font-medium text-ink">{num(r.totalSales)}</td>
@@ -946,6 +967,19 @@ function AllBreakdownCourseTable({ courses }: { courses: B2cNewOldCourseRow[] })
           </tr>
         ))}
       </tbody>
+      {showMore.hiddenCount > 0 && (
+        <tfoot>
+          <tr>
+            <td colSpan={9} className="px-3 py-2 text-center">
+              <ShowMoreButton
+                expanded={showMore.expanded}
+                onToggle={showMore.toggle}
+                hiddenCount={showMore.hiddenCount}
+              />
+            </td>
+          </tr>
+        </tfoot>
+      )}
     </table>
   );
 }
@@ -1005,26 +1039,27 @@ function B2cCourseGroupedView({
           {courses.length > 0 && (
             <>
               <B2cExecutiveDashboard courses={courses} prev={prev} periodKey={data?.periodKey} />
-              <Card>
-                <SectionTitle title="تفصيل الدورات" hint="اضغط على أي دورة لعرض مساهمات موظّفيها." />
-              </Card>
-              <Card className="overflow-x-auto p-0">
-                <B2cCourseGroupedTable courses={courses} />
-              </Card>
+              <Collapsible title="تفصيل الدورات">
+                <p className="mb-3 text-xs text-ink-2">اضغط على أي دورة لعرض مساهمات موظّفيها.</p>
+                <div className="overflow-x-auto">
+                  <B2cCourseGroupedTable courses={courses} />
+                </div>
+              </Collapsible>
             </>
           )}
           {newOld && hasNewOld && (
             <>
-              <NewOldComparison report={newOld} />
-              <Card>
-                <SectionTitle
-                  title="تفصيل الدورات — جديد مقابل قديم"
-                  hint="لكل دورة الإجمالي (جديد + قديم) ثم البيانات الجديدة New والبيانات القديمة Old جنبًا إلى جنب."
-                />
-              </Card>
-              <Card className="overflow-x-auto p-0">
-                <AllBreakdownCourseTable courses={newOldCourses} />
-              </Card>
+              <Collapsible title="مقارنة البيانات الجديدة New مقابل بيانات CRM القديمة Old">
+                <NewOldComparison report={newOld} />
+              </Collapsible>
+              <Collapsible title="تفصيل الدورات — جديد مقابل قديم">
+                <p className="mb-3 text-xs text-ink-2">
+                  لكل دورة الإجمالي (جديد + قديم) ثم البيانات الجديدة New والبيانات القديمة Old جنبًا إلى جنب.
+                </p>
+                <div className="overflow-x-auto">
+                  <AllBreakdownCourseTable courses={newOldCourses} />
+                </div>
+              </Collapsible>
             </>
           )}
         </>
@@ -1035,16 +1070,19 @@ function B2cCourseGroupedView({
           {newCourses.length > 0 ? (
             <>
               <B2cExecutiveDashboard courses={newCourses} prev={newPrev} periodKey={data?.periodKey} />
-              {newOld && hasNewOld && <NewOldComparison report={newOld} />}
-              <Card>
-                <SectionTitle
-                  title="أداء البيانات الجديدة New Leads حسب الدورة"
-                  hint="اضغط على أي دورة لعرض مساهمات موظّفيها. نسبة التحويل = المبيعات ÷ New Leads."
-                />
-              </Card>
-              <Card className="overflow-x-auto p-0">
-                <SourceCourseTable courses={newCourses} leadsLabel="New Leads" />
-              </Card>
+              {newOld && hasNewOld && (
+                <Collapsible title="مقارنة البيانات الجديدة New مقابل بيانات CRM القديمة Old">
+                  <NewOldComparison report={newOld} />
+                </Collapsible>
+              )}
+              <Collapsible title="أداء البيانات الجديدة New Leads حسب الدورة" defaultOpen>
+                <p className="mb-3 text-xs text-ink-2">
+                  اضغط على أي دورة لعرض مساهمات موظّفيها. نسبة التحويل = المبيعات ÷ New Leads.
+                </p>
+                <div className="overflow-x-auto">
+                  <SourceCourseTable courses={newCourses} leadsLabel="New Leads" />
+                </div>
+              </Collapsible>
             </>
           ) : (
             <Card className="p-5">
@@ -1062,16 +1100,19 @@ function B2cCourseGroupedView({
           {oldCourses.length > 0 ? (
             <>
               <B2cExecutiveDashboard courses={oldCourses} prev={oldPrev} periodKey={data?.periodKey} />
-              {newOld && hasNewOld && <NewOldComparison report={newOld} />}
-              <Card>
-                <SectionTitle
-                  title="أداء بيانات CRM القديمة Old حسب الدورة"
-                  hint="اضغط على أي دورة لعرض مساهمات موظّفيها. نسبة التحويل هنا = معدّل الاسترجاع (المبيعات ÷ Old Leads Worked)."
-                />
-              </Card>
-              <Card className="overflow-x-auto p-0">
-                <SourceCourseTable courses={oldCourses} leadsLabel="Old Leads Worked" />
-              </Card>
+              {newOld && hasNewOld && (
+                <Collapsible title="مقارنة البيانات الجديدة New مقابل بيانات CRM القديمة Old">
+                  <NewOldComparison report={newOld} />
+                </Collapsible>
+              )}
+              <Collapsible title="أداء بيانات CRM القديمة Old حسب الدورة" defaultOpen>
+                <p className="mb-3 text-xs text-ink-2">
+                  اضغط على أي دورة لعرض مساهمات موظّفيها. نسبة التحويل هنا = معدّل الاسترجاع (المبيعات ÷ Old Leads Worked).
+                </p>
+                <div className="overflow-x-auto">
+                  <SourceCourseTable courses={oldCourses} leadsLabel="Old Leads Worked" />
+                </div>
+              </Collapsible>
             </>
           ) : (
             <Card className="p-5">
@@ -1090,6 +1131,7 @@ function B2cCourseGroupedView({
 function B2cCourseGroupedTable({ courses }: { courses: B2cCourseGroupRow[] }) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const toggle = (course: string) => setExpanded((prev) => ({ ...prev, [course]: !prev[course] }));
+  const showMore = useShowMore(courses, 8);
 
   return (
     <table className="w-full min-w-[1100px] text-right text-sm">
@@ -1108,7 +1150,7 @@ function B2cCourseGroupedTable({ courses }: { courses: B2cCourseGroupRow[] }) {
         </tr>
       </thead>
       <tbody>
-        {courses.map((c) => {
+        {showMore.visible.map((c) => {
           const isOpen = !!expanded[c.course];
           return (
             <Fragment key={c.course}>
@@ -1149,6 +1191,19 @@ function B2cCourseGroupedTable({ courses }: { courses: B2cCourseGroupRow[] }) {
           );
         })}
       </tbody>
+      {showMore.hiddenCount > 0 && (
+        <tfoot>
+          <tr>
+            <td colSpan={10} className="px-3 py-2 text-center">
+              <ShowMoreButton
+                expanded={showMore.expanded}
+                onToggle={showMore.toggle}
+                hiddenCount={showMore.hiddenCount}
+              />
+            </td>
+          </tr>
+        </tfoot>
+      )}
     </table>
   );
 }
