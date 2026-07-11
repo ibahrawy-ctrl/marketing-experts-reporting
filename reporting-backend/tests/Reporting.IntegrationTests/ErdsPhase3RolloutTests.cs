@@ -10,10 +10,11 @@ using Xunit;
 namespace Reporting.IntegrationTests;
 
 /// <summary>
-/// ERDS Phase 3 — تعميم التقارير الرقمية على كل الإدارات (7 قوالب جديدة متوازية، مُهيكَلة، additive).
-/// يتحقّق من: بذر كل قالب بالأعمدة والحقول النصية المتوقّعة، دورة حياة الإرسال مع تخزين قيم الجدول
-/// (string[][] في ValueJson) واعتمادها عبر المسار الحالي، وبقاء القوالب القديمة + قالب B2C حسب الدورة قابلة للقراءة.
-/// نطاق تحقّق الخلايا لـ B2C (Phase 2A) محصور بمطابقة أعمدته تمامًا؛ لذا هذه القوالب السبعة خارج نطاقه ولا تتأثّر به.
+/// ERDS Phase 3 — تعميم التقارير الرقمية المُهيكَلة (additive). بعد تحويل التنفيذ إلى Project-First (RC-4 Task 4)
+/// أُرشِفت عائلة الإنتاج المسطّحة الستة (محتوى/تصميم/فيديو/نشر/ميديا باير/مشاريع) بوصفها Legacy، وبقي قالب المبيعات
+/// المُهيكَل الحيّ الوحيد من هذه الدفعة = B2B حسب الخدمة. تتحقّق هذه الاختبارات من بذره منشورًا بجدوله وحقوله النصية،
+/// دورة حياة إرساله مع تخزين قيم الجدول (string[][] في ValueJson) واعتماده عبر المسار الحالي، وبقاء القوالب القديمة
+/// (المالي) + قالب B2C حسب الدورة قابلة للقراءة. القوالب المُرشَفة لها تغطية جديدة عبر محرّك Project-First.
 /// </summary>
 [Collection("Integration")]
 public class ErdsPhase3RolloutTests
@@ -24,7 +25,10 @@ public class ErdsPhase3RolloutTests
 
     private record GridConfig(string[] Columns);
 
-    /// <summary>القوالب السبعة الجديدة: (العنوان، اسم الجدول الرئيسي، الأعمدة، عناوين الحقول النصية الأربعة).</summary>
+    /// <summary>
+    /// القالب المُهيكَل الحيّ الوحيد المتبقّي من دفعة Phase 3: (العنوان، اسم الجدول الرئيسي، الأعمدة، عناوين الحقول النصية الأربعة).
+    /// عائلة الإنتاج المسطّحة الستة أُرشِفت بعد تحويل التنفيذ إلى Project-First (RC-4 Task 4).
+    /// </summary>
     public static IEnumerable<object[]> Phase3Templates()
     {
         yield return new object[]
@@ -33,48 +37,6 @@ public class ErdsPhase3RolloutTests
             B2bByServiceReportSchema.Columns,
             new[] { B2bByServiceReportSchema.TopAchievements, B2bByServiceReportSchema.TopChallenges,
                     B2bByServiceReportSchema.SupportNeeded, B2bByServiceReportSchema.Notes },
-        };
-        yield return new object[]
-        {
-            ProjectsByClientReportSchema.TemplateTitle, ProjectsByClientReportSchema.MainTableLabel,
-            ProjectsByClientReportSchema.Columns,
-            new[] { ProjectsByClientReportSchema.TopAchievements, ProjectsByClientReportSchema.TopObstacles,
-                    ProjectsByClientReportSchema.DecisionsNeeded, ProjectsByClientReportSchema.Notes },
-        };
-        yield return new object[]
-        {
-            ContentProductionReportSchema.TemplateTitle, ContentProductionReportSchema.MainTableLabel,
-            ContentProductionReportSchema.Columns,
-            new[] { ContentProductionReportSchema.BestContent, ContentProductionReportSchema.TopChallenges,
-                    ContentProductionReportSchema.SupportNeeded, ContentProductionReportSchema.Notes },
-        };
-        yield return new object[]
-        {
-            DesignProductionReportSchema.TemplateTitle, DesignProductionReportSchema.MainTableLabel,
-            DesignProductionReportSchema.Columns,
-            new[] { DesignProductionReportSchema.BestDesigns, DesignProductionReportSchema.TopChallenges,
-                    DesignProductionReportSchema.SupportNeeded, DesignProductionReportSchema.Notes },
-        };
-        yield return new object[]
-        {
-            VideoProductionReportSchema.TemplateTitle, VideoProductionReportSchema.MainTableLabel,
-            VideoProductionReportSchema.Columns,
-            new[] { VideoProductionReportSchema.BestVideos, VideoProductionReportSchema.TopChallenges,
-                    VideoProductionReportSchema.SupportNeeded, VideoProductionReportSchema.Notes },
-        };
-        yield return new object[]
-        {
-            SocialPublishingReportSchema.TemplateTitle, SocialPublishingReportSchema.MainTableLabel,
-            SocialPublishingReportSchema.Columns,
-            new[] { SocialPublishingReportSchema.PublishingConsistency, SocialPublishingReportSchema.TopPublishingIssues,
-                    SocialPublishingReportSchema.SupportNeeded, SocialPublishingReportSchema.Notes },
-        };
-        yield return new object[]
-        {
-            MediaBuyerByClientReportSchema.TemplateTitle, MediaBuyerByClientReportSchema.MainTableLabel,
-            MediaBuyerByClientReportSchema.Columns,
-            new[] { MediaBuyerByClientReportSchema.BestCampaign, MediaBuyerByClientReportSchema.WeakestCampaign,
-                    MediaBuyerByClientReportSchema.ImprovementOrDeclineReasons, MediaBuyerByClientReportSchema.SupportNeeded },
         };
     }
 
@@ -199,9 +161,9 @@ public class ErdsPhase3RolloutTests
         Assert.Equal(B2cByCourseReportSchema.Columns, b2cCols);
     }
 
-    // ===== (4) القوالب السبعة جميعها مسرودة (نمت قائمة القوالب) =====
+    // ===== (4) قالب المبيعات المُهيكَل الحيّ مسرود ضمن القوالب =====
     [Fact]
-    public async Task All_Seven_Templates_Are_Listed()
+    public async Task LiveRolloutTemplate_Is_Listed()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var list = await (await admin.GetAsync("/api/report-templates"))

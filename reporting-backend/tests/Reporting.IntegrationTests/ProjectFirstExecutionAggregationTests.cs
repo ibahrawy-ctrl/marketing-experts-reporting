@@ -743,4 +743,36 @@ public class ProjectFirstExecutionAggregationTests
 
         Assert.Empty(report.Rows);
     }
+
+    // ===== 22: بلا مشروع ⇒ فشل التحقّق (repeatable_section_invalid) ⇒ يبقى Draft ⇒ لا يدخل التجميع =====
+    // اختبار سلبيّ يثبت أنّ حارس الحدّ الأدنى (minProjects=1، القسم إلزاميّ) لم يُضعَّف: إرسال قالب
+    // Project-First بقسم مشاريع فارغ يُرفَض بالكود الرسميّ ويبقى التسليم مسودّةً فلا يُحتسَب في أيّ تجميع.
+    [Fact]
+    public async Task NoProject_SubmitRejected_StaysDraft_NotAggregated()
+    {
+        var admin = await TestAuth.LoginAsAdminAsync(_factory);
+        var tpl = await GetTemplateByTitleAsync(admin, ProjectFirstExecutionSchema.ContentTitle);
+        var fieldId = PrsFieldId(tpl);
+        var (emp, _, _) = await NewEmployeeInTeamAsync();
+        const string period = "2026-W80";
+
+        // مسودّة بقسم مشاريع فارغ (لا مشروع) — القالب Project-First يفرض على الأقلّ مشروعًا واحدًا.
+        var draftId = (await (await emp.PostAsJsonAsync("/api/submissions",
+            new CreateSubmissionRequest(tpl.Id, PeriodType.Weekly, period))).ReadAsync<SubmissionDto>())!.Id;
+        await emp.PutAsJsonAsync($"/api/submissions/{draftId}/values",
+            new SaveFieldValuesRequest(new[] { new FieldValueInput(fieldId, null, null, null, null, "[]") }));
+
+        // الإرسال يُرفَض بكود التحقّق الرسميّ (لا إضعاف لـ minProjects=1).
+        var submit = await emp.PostAsync($"/api/submissions/{draftId}/submit", null);
+        Assert.Equal(HttpStatusCode.BadRequest, submit.StatusCode);
+        Assert.Contains("repeatable_section_invalid", await submit.Content.ReadAsStringAsync());
+
+        // يبقى مسودّة (لم يتحوّل إلى Submitted).
+        var after = (await (await emp.GetAsync($"/api/submissions/{draftId}")).ReadAsync<SubmissionDto>())!;
+        Assert.Equal(SubmissionStatus.Draft, after.Status);
+
+        // لا يظهر في التجميع Project-First لتلك الفترة (المسودّة مُستبعَدة).
+        var report = await ByProjectAsync(admin, $"periodKey={period}");
+        Assert.Empty(report.Rows);
+    }
 }

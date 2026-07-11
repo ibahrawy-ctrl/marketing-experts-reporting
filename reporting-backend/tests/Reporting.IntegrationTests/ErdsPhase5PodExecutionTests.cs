@@ -11,11 +11,18 @@ using Xunit;
 namespace Reporting.IntegrationTests;
 
 /// <summary>
-/// ERDS Phase 5 — محرّك تجميع التنفيذ (قراءة فقط). يجمّع القوالب التنفيذية الرقمية الستة
-/// (محتوى/تصميم/فيديو/نشر/ميديا باير/مشاريع) بقراءة جدول TableGrid (string[][] في ValueJson)
-/// ومطابقة الأعمدة بالفهرس، حسب (الفترة، الفريق/Pod، الموظّف، العميل، المشروع)، مع قسمة آمنة ونطاق محكوم.
-/// كل اختبار يُنشئ موظّفين جددًا (GUID فريد) وفترات فريدة (2026-W20…) ويصفّي على معرّفاتهم لعزل قاعدة الاختبار المشتركة.
-/// لا يمسّ أيّ تسليم/قالب/مسار اعتماد قائم، ولا يمسّ Phase 4 (B2C/B2B).
+/// ERDS Phase 5 — محرّك تجميع التنفيذ (قراءة فقط) على القوالب الإنتاجية القديمة الستة.
+///
+/// بعد RC-4 أصبحت هذه القوالب الستة <b>مؤرشفة</b> (Status=Archived, IsActive=false) فلا تسمح
+/// بإنشاء تسليم جديد عبر الـAPI (الحارس المركزي يعيد <c>report.template_not_assigned</c> / HTTP 403).
+/// لذا يفصل هذا الملف بين ثلاث فئات اختبار (حسب توجيه المالك — المسار الثاني):
+///   (أ) <b>رفض الإنشاء الجديد</b> عبر الـAPI: القالب مؤرشف/غير نشط ⇒ 403 <c>report.template_not_assigned</c>.
+///   (ب) <b>القراءة التاريخية</b>: تُزرَع تسليمات Legacy (قبل الأرشفة) مباشرةً في قاعدة الاختبار المعزولة
+///       عبر <see cref="LegacyExecutionFixture"/>، ويُثبَت أن محرّك التجميع لا يزال يقرؤها ويجمّعها بنفس الحسابات.
+///   (ج) <b>عدم التأثّر</b>: Phase 4 (B2C/B2B) تعمل عبر الـAPI الطبيعي (قوالبها نشطة).
+///
+/// كل اختبار يُنشئ موظّفين جددًا (GUID فريد) وفترات فريدة (2026-W20…) ويصفّي على معرّفاتهم
+/// لعزل قاعدة الاختبار المشتركة. لا يمسّ أيّ تسليم/قالب/مسار اعتماد إنتاجيّ.
 /// </summary>
 [Collection("Integration")]
 public class ErdsPhase5PodExecutionTests
@@ -38,7 +45,7 @@ public class ErdsPhase5PodExecutionTests
     private static TemplateFieldDto GridField(ReportTemplateDetailDto t)
         => PublishedVersion(t).Fields.Single(f => f.FieldType == FieldType.TableGrid);
 
-    /// <summary>يُنشئ مسودّة، يعبّئ الجدول بالصفوف المعطاة، ثم يُرسِلها (Submitted كافٍ للتجميع).</summary>
+    /// <summary>يُنشئ مسودّة، يعبّئ الجدول، ثم يُرسِلها — يُستخدم لقوالب <b>نشطة</b> فقط (Phase 4 B2C/B2B).</summary>
     private static async Task SubmitGridAsync(HttpClient employee, Guid templateId, Guid gridFieldId,
         string periodKey, string[][] rows)
     {
@@ -64,7 +71,7 @@ public class ErdsPhase5PodExecutionTests
     private static async Task<ProjectExecutionReport> AggProjectsAsync(HttpClient client, string query)
         => (await (await client.GetAsync($"/api/reporting/aggregation/projects?{query}")).ReadAsync<ProjectExecutionReport>())!;
 
-    // ===== بُناة صفوف بترتيب أعمدة كل Schema (حرفيًّا) =====
+    // ===== بُناة صفوف Legacy بترتيب أعمدة كل Schema (حرفيًّا) — تمثّل بيانات تاريخية قبل الأرشفة =====
 
     // المحتوى: [العميل، قطع مطلوبة، أفكار، كابشنات، سكربتات، Reels، معتمد، متأخر، سبب التأخير]
     private static string[] ContentRow(string client, string required, string approved, string late)
@@ -91,19 +98,56 @@ public class ErdsPhase5PodExecutionTests
         string late, string blocked, string progress, string risk)
         => new[] { client, project, hours, planned, done, late, blocked, progress, risk, "" };
 
-    // ===== (1) المحتوى حسب الفريق/العميل =====
-    [Fact]
-    public async Task Content_ByTeamAndClient_AggregatesAndComputesDelayRate()
+    // ============================================================================
+    //  (أ) رفض الإنشاء الجديد عبر الـAPI — القوالب الستة مؤرشفة/غير نشطة
+    // ============================================================================
+
+    /// <summary>
+    /// كل قالب من القوالب الإنتاجية القديمة الستة: (1) حالته Archived و IsActive=false،
+    /// (2) لا يقبل إنشاء تسليم جديد عبر الـAPI ⇒ HTTP 403 بكود الرفض الرسمي <c>report.template_not_assigned</c>.
+    /// </summary>
+    [Theory]
+    [InlineData(ContentProductionReportSchema.TemplateTitle)]
+    [InlineData(DesignProductionReportSchema.TemplateTitle)]
+    [InlineData(VideoProductionReportSchema.TemplateTitle)]
+    [InlineData(SocialPublishingReportSchema.TemplateTitle)]
+    [InlineData(MediaBuyerByClientReportSchema.TemplateTitle)]
+    [InlineData(ProjectsByClientReportSchema.TemplateTitle)]
+    public async Task LegacyTemplate_IsArchived_AndRejectsNewSubmission_WithOfficialCode(string title)
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
-        var tpl = await GetTemplateByTitleAsync(admin, ContentProductionReportSchema.TemplateTitle);
-        var grid = GridField(tpl);
-        var (leader, leaderId) = await TestAuth.CreateUserAsync(_factory, "TeamLeader");
-        var (emp, empId) = await TestAuth.CreateUserAsync(_factory, "Employee");
+
+        // (1) القالب مؤرشف وغير نشط.
+        var (status, isActive) = await LegacyExecutionFixture.GetTemplateStatusAsync(_factory, title);
+        Assert.Equal(TemplateStatus.Archived, status);
+        Assert.False(isActive);
+
+        // (2) محاولة إنشاء تسليم جديد عبر الـAPI ⇒ 403 بكود الرفض الرسمي (لا إعفاء لأي دور).
+        var tpl = await GetTemplateByTitleAsync(admin, title);
+        var (emp, _) = await TestAuth.CreateUserAsync(_factory, "Employee");
+        var resp = await emp.PostAsJsonAsync("/api/submissions",
+            new CreateSubmissionRequest(tpl.Id, PeriodType.Weekly, "2026-W40"));
+        Assert.Equal(HttpStatusCode.Forbidden, resp.StatusCode);
+        var raw = await resp.Content.ReadAsStringAsync();
+        Assert.Contains("report.template_not_assigned", raw);
+    }
+
+    // ============================================================================
+    //  (ب) القراءة التاريخية — تُزرَع بيانات Legacy ويُثبَت أن محرّك التجميع يقرؤها
+    // ============================================================================
+
+    // ===== (1) المحتوى حسب الفريق/العميل =====
+    [Fact]
+    public async Task Content_HistoricalRead_AggregatesAndComputesDelayRate()
+    {
+        var admin = await TestAuth.LoginAsAdminAsync(_factory);
+        var (_, leaderId) = await TestAuth.CreateUserAsync(_factory, "TeamLeader");
+        var (_, empId) = await TestAuth.CreateUserAsync(_factory, "Employee");
         var teamId = await TestAuth.CreateTeamWithLeaderAsync(_factory, leaderId, empId);
 
-        await SubmitGridAsync(emp, tpl.Id, grid.Id, "2026-W20",
-            new[] { ContentRow("عميل ألفا", "25", "20", "5") });
+        await LegacyExecutionFixture.SeedLegacyHistoricalGridAsync(_factory,
+            ContentProductionReportSchema.TemplateTitle, ContentProductionReportSchema.MainTableLabel,
+            empId, teamId, "2026-W20", new[] { ContentRow("عميل ألفا", "25", "20", "5") });
 
         var report = await AggPodsAsync(admin, $"periodKey=2026-W20&employeeId={empId}");
         var row = Assert.Single(report.Rows);
@@ -118,17 +162,16 @@ public class ErdsPhase5PodExecutionTests
 
     // ===== (2) التصميم حسب الفريق/العميل =====
     [Fact]
-    public async Task Design_ByTeamAndClient_Aggregates()
+    public async Task Design_HistoricalRead_Aggregates()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
-        var tpl = await GetTemplateByTitleAsync(admin, DesignProductionReportSchema.TemplateTitle);
-        var grid = GridField(tpl);
-        var (leader, leaderId) = await TestAuth.CreateUserAsync(_factory, "TeamLeader");
-        var (emp, empId) = await TestAuth.CreateUserAsync(_factory, "Employee");
+        var (_, leaderId) = await TestAuth.CreateUserAsync(_factory, "TeamLeader");
+        var (_, empId) = await TestAuth.CreateUserAsync(_factory, "Employee");
         var teamId = await TestAuth.CreateTeamWithLeaderAsync(_factory, leaderId, empId);
 
-        await SubmitGridAsync(emp, tpl.Id, grid.Id, "2026-W21",
-            new[] { DesignRow("عميل بيتا", "30", "24", "6") });
+        await LegacyExecutionFixture.SeedLegacyHistoricalGridAsync(_factory,
+            DesignProductionReportSchema.TemplateTitle, DesignProductionReportSchema.MainTableLabel,
+            empId, teamId, "2026-W21", new[] { DesignRow("عميل بيتا", "30", "24", "6") });
 
         var report = await AggPodsAsync(admin, $"periodKey=2026-W21&employeeId={empId}");
         var row = Assert.Single(report.Rows);
@@ -141,15 +184,14 @@ public class ErdsPhase5PodExecutionTests
 
     // ===== (3) الفيديو حسب الفريق/العميل =====
     [Fact]
-    public async Task Video_ByTeamAndClient_Aggregates()
+    public async Task Video_HistoricalRead_Aggregates()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
-        var tpl = await GetTemplateByTitleAsync(admin, VideoProductionReportSchema.TemplateTitle);
-        var grid = GridField(tpl);
-        var (emp, empId) = await TestAuth.CreateUserAsync(_factory, "Employee");
+        var (_, empId) = await TestAuth.CreateUserAsync(_factory, "Employee");
 
-        await SubmitGridAsync(emp, tpl.Id, grid.Id, "2026-W22",
-            new[] { VideoRow("عميل جاما", "10", "8", "2") });
+        await LegacyExecutionFixture.SeedLegacyHistoricalGridAsync(_factory,
+            VideoProductionReportSchema.TemplateTitle, VideoProductionReportSchema.MainTableLabel,
+            empId, null, "2026-W22", new[] { VideoRow("عميل جاما", "10", "8", "2") });
 
         var report = await AggPodsAsync(admin, $"periodKey=2026-W22&employeeId={empId}");
         var row = Assert.Single(report.Rows);
@@ -161,15 +203,14 @@ public class ErdsPhase5PodExecutionTests
 
     // ===== (4) النشر حسب الفريق/العميل + Missed Posting Rate =====
     [Fact]
-    public async Task Publishing_ByTeamAndClient_ComputesMissedPostingRate()
+    public async Task Publishing_HistoricalRead_ComputesMissedPostingRate()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
-        var tpl = await GetTemplateByTitleAsync(admin, SocialPublishingReportSchema.TemplateTitle);
-        var grid = GridField(tpl);
-        var (emp, empId) = await TestAuth.CreateUserAsync(_factory, "Employee");
+        var (_, empId) = await TestAuth.CreateUserAsync(_factory, "Employee");
 
-        await SubmitGridAsync(emp, tpl.Id, grid.Id, "2026-W23",
-            new[] { SocialRow("عميل دلتا", "50", "40", "5") });
+        await LegacyExecutionFixture.SeedLegacyHistoricalGridAsync(_factory,
+            SocialPublishingReportSchema.TemplateTitle, SocialPublishingReportSchema.MainTableLabel,
+            empId, null, "2026-W23", new[] { SocialRow("عميل دلتا", "50", "40", "5") });
 
         var report = await AggPodsAsync(admin, $"periodKey=2026-W23&employeeId={empId}");
         var row = Assert.Single(report.Rows);
@@ -182,20 +223,20 @@ public class ErdsPhase5PodExecutionTests
 
     // ===== (5) Media Buyer — CPL/CPA/ROAS محسوبة من المجاميع لا مجموعة =====
     [Fact]
-    public async Task MediaBuyer_CplCpaRoas_ComputedFromTotals_NotSummed()
+    public async Task MediaBuyer_HistoricalRead_CplCpaRoas_ComputedFromTotals_NotSummed()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
-        var tpl = await GetTemplateByTitleAsync(admin, MediaBuyerByClientReportSchema.TemplateTitle);
-        var grid = GridField(tpl);
-        var (emp, empId) = await TestAuth.CreateUserAsync(_factory, "Employee");
+        var (_, empId) = await TestAuth.CreateUserAsync(_factory, "Employee");
 
         // منصّتان لنفس العميل: المجاميع Spend=200, Leads=40, Purchases=10, Revenue=2000.
         // CPL من المجاميع = 200/40 = 5 (لو جُمِعت النِسب لكانت 10+3.33). CPA=200/10=20، ROAS=2000/200=10.
-        await SubmitGridAsync(emp, tpl.Id, grid.Id, "2026-W24", new[]
-        {
-            MediaRow("عميل إبسيلون", "Meta", "100", "10", "5", "500"),
-            MediaRow("عميل إبسيلون", "Google", "100", "30", "5", "1500"),
-        });
+        await LegacyExecutionFixture.SeedLegacyHistoricalGridAsync(_factory,
+            MediaBuyerByClientReportSchema.TemplateTitle, MediaBuyerByClientReportSchema.MainTableLabel,
+            empId, null, "2026-W24", new[]
+            {
+                MediaRow("عميل إبسيلون", "Meta", "100", "10", "5", "500"),
+                MediaRow("عميل إبسيلون", "Google", "100", "30", "5", "1500"),
+            });
 
         var report = await AggClientsAsync(admin, $"periodKey=2026-W24&employeeId={empId}&client=عميل إبسيلون");
         var row = Assert.Single(report.Rows);
@@ -209,14 +250,14 @@ public class ErdsPhase5PodExecutionTests
 
     // ===== (6) المشاريع حسب العميل/المشروع =====
     [Fact]
-    public async Task Projects_ByClientAndProject_ComputesCompletionAndProgress()
+    public async Task Projects_HistoricalRead_ComputesCompletionAndProgress()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
-        var tpl = await GetTemplateByTitleAsync(admin, ProjectsByClientReportSchema.TemplateTitle);
-        var grid = GridField(tpl);
-        var (emp, empId) = await TestAuth.CreateUserAsync(_factory, "Employee");
+        var (_, empId) = await TestAuth.CreateUserAsync(_factory, "Employee");
 
-        await SubmitGridAsync(emp, tpl.Id, grid.Id, "2026-W25",
+        await LegacyExecutionFixture.SeedLegacyHistoricalGridAsync(_factory,
+            ProjectsByClientReportSchema.TemplateTitle, ProjectsByClientReportSchema.MainTableLabel,
+            empId, null, "2026-W25",
             new[] { ProjectRow("عميل زيتا", "موقع إلكتروني", "40", "10", "6", "2", "1", "50", "مرتفع") });
 
         var report = await AggProjectsAsync(admin, $"periodKey=2026-W25&employeeId={empId}");
@@ -234,18 +275,20 @@ public class ErdsPhase5PodExecutionTests
 
     // ===== (7) عدّة موظّفين في نفس الـPod =====
     [Fact]
-    public async Task MultipleEmployees_SamePod_ShareTeam()
+    public async Task MultipleEmployees_HistoricalRead_SamePod_ShareTeam()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
-        var tpl = await GetTemplateByTitleAsync(admin, ContentProductionReportSchema.TemplateTitle);
-        var grid = GridField(tpl);
-        var (leader, leaderId) = await TestAuth.CreateUserAsync(_factory, "TeamLeader");
-        var (emp1, emp1Id) = await TestAuth.CreateUserAsync(_factory, "Employee");
-        var (emp2, emp2Id) = await TestAuth.CreateUserAsync(_factory, "Employee");
+        var (_, leaderId) = await TestAuth.CreateUserAsync(_factory, "TeamLeader");
+        var (_, emp1Id) = await TestAuth.CreateUserAsync(_factory, "Employee");
+        var (_, emp2Id) = await TestAuth.CreateUserAsync(_factory, "Employee");
         var teamId = await TestAuth.CreateTeamWithLeaderAsync(_factory, leaderId, emp1Id, emp2Id);
 
-        await SubmitGridAsync(emp1, tpl.Id, grid.Id, "2026-W26", new[] { ContentRow("عميل مشترك", "10", "8", "1") });
-        await SubmitGridAsync(emp2, tpl.Id, grid.Id, "2026-W26", new[] { ContentRow("عميل مشترك", "20", "15", "3") });
+        await LegacyExecutionFixture.SeedLegacyHistoricalGridAsync(_factory,
+            ContentProductionReportSchema.TemplateTitle, ContentProductionReportSchema.MainTableLabel,
+            emp1Id, teamId, "2026-W26", new[] { ContentRow("عميل مشترك", "10", "8", "1") });
+        await LegacyExecutionFixture.SeedLegacyHistoricalGridAsync(_factory,
+            ContentProductionReportSchema.TemplateTitle, ContentProductionReportSchema.MainTableLabel,
+            emp2Id, teamId, "2026-W26", new[] { ContentRow("عميل مشترك", "20", "15", "3") });
 
         var report = await AggPodsAsync(admin, $"periodKey=2026-W26&teamId={teamId}");
         var rows = report.Rows.Where(r => r.TeamId == teamId).ToList();
@@ -257,20 +300,20 @@ public class ErdsPhase5PodExecutionTests
 
     // ===== (8) عدّة عملاء في نفس الـPod =====
     [Fact]
-    public async Task MultipleClients_SamePod_GroupsByClient()
+    public async Task MultipleClients_HistoricalRead_SamePod_GroupsByClient()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
-        var tpl = await GetTemplateByTitleAsync(admin, ContentProductionReportSchema.TemplateTitle);
-        var grid = GridField(tpl);
-        var (leader, leaderId) = await TestAuth.CreateUserAsync(_factory, "TeamLeader");
-        var (emp, empId) = await TestAuth.CreateUserAsync(_factory, "Employee");
+        var (_, leaderId) = await TestAuth.CreateUserAsync(_factory, "TeamLeader");
+        var (_, empId) = await TestAuth.CreateUserAsync(_factory, "Employee");
         var teamId = await TestAuth.CreateTeamWithLeaderAsync(_factory, leaderId, empId);
 
-        await SubmitGridAsync(emp, tpl.Id, grid.Id, "2026-W27", new[]
-        {
-            ContentRow("عميل واحد", "10", "9", "1"),
-            ContentRow("عميل اثنان", "20", "18", "2"),
-        });
+        await LegacyExecutionFixture.SeedLegacyHistoricalGridAsync(_factory,
+            ContentProductionReportSchema.TemplateTitle, ContentProductionReportSchema.MainTableLabel,
+            empId, teamId, "2026-W27", new[]
+            {
+                ContentRow("عميل واحد", "10", "9", "1"),
+                ContentRow("عميل اثنان", "20", "18", "2"),
+            });
 
         var report = await AggPodsAsync(admin, $"periodKey=2026-W27&employeeId={empId}");
         var rows = report.Rows.OrderBy(r => r.Client).ToList();
@@ -281,7 +324,7 @@ public class ErdsPhase5PodExecutionTests
         Assert.Equal(9m, rows[1].ContentPieces);
     }
 
-    // ===== (9) تجاهُل تقرير غير مطابق بلا فشل =====
+    // ===== (9) تجاهُل تقرير غير مطابق بلا فشل (قالب نشط غير تنفيذيّ) =====
     [Fact]
     public async Task IgnoresNonMatchingReport_WithoutFailure()
     {
@@ -304,15 +347,15 @@ public class ErdsPhase5PodExecutionTests
         Assert.Empty(projects.Rows);
     }
 
-    // ===== (10) احترام النطاق/الصلاحيات =====
+    // ===== (10) احترام النطاق/الصلاحيات على القراءة التاريخية =====
     [Fact]
-    public async Task Scope_UnrelatedUser_DoesNotSeeOthersData_AndUnauthenticated401()
+    public async Task Scope_HistoricalRead_UnrelatedUser_DoesNotSeeOthersData_AndUnauthenticated401()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
-        var tpl = await GetTemplateByTitleAsync(admin, ContentProductionReportSchema.TemplateTitle);
-        var grid = GridField(tpl);
-        var (emp, empId) = await TestAuth.CreateUserAsync(_factory, "Employee");
-        await SubmitGridAsync(emp, tpl.Id, grid.Id, "2026-W29", new[] { ContentRow("عميل نطاق", "10", "8", "1") });
+        var (_, empId) = await TestAuth.CreateUserAsync(_factory, "Employee");
+        await LegacyExecutionFixture.SeedLegacyHistoricalGridAsync(_factory,
+            ContentProductionReportSchema.TemplateTitle, ContentProductionReportSchema.MainTableLabel,
+            empId, null, "2026-W29", new[] { ContentRow("عميل نطاق", "10", "8", "1") });
 
         // الأدمن (governance ⇒ SeesAll) يرى الصفّ.
         var asAdmin = await AggPodsAsync(admin, $"periodKey=2026-W29&employeeId={empId}");
@@ -330,7 +373,7 @@ public class ErdsPhase5PodExecutionTests
         Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
     }
 
-    // ===== (11) Phase 4 (B2C/B2B) غير متأثّرة =====
+    // ===== (11) Phase 4 (B2C/B2B) غير متأثّرة — عبر الـAPI الطبيعي (قوالب نشطة) =====
     [Fact]
     public async Task Phase4_B2cB2b_Unaffected()
     {
@@ -354,29 +397,19 @@ public class ErdsPhase5PodExecutionTests
         Assert.Empty(pods.Rows);
     }
 
-    // ===== (12) دورة حياة التسليم/المراجعة/الاعتماد غير متأثّرة =====
+    // ===== (12) القراءة التاريخية تشمل التسليمات المُغلَقة (Closed) =====
     [Fact]
-    public async Task CurrentWorkflow_SubmitApprove_Unaffected()
+    public async Task HistoricalRead_IncludesClosedSubmissions()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
-        var tpl = await GetTemplateByTitleAsync(admin, ContentProductionReportSchema.TemplateTitle);
-        var grid = GridField(tpl);
-        var (ceo, ceoId) = await TestAuth.CreateUserAsync(_factory, "CEO");
-        var (emp, empId) = await TestAuth.CreateUserAsync(_factory, "Employee", ceoId);
+        var (_, empId) = await TestAuth.CreateUserAsync(_factory, "Employee");
 
-        var draft = await (await emp.PostAsJsonAsync("/api/submissions",
-            new CreateSubmissionRequest(tpl.Id, PeriodType.Weekly, "2026-W31"))).ReadAsync<SubmissionDto>();
-        var gridJson = JsonSerializer.Serialize(new[] { ContentRow("عميل اعتماد", "10", "8", "1") });
-        await emp.PutAsJsonAsync($"/api/submissions/{draft!.Id}/values",
-            new SaveFieldValuesRequest(new[] { new FieldValueInput(grid.Id, null, null, null, null, gridJson) }));
-        var submitted = await (await emp.PostAsync($"/api/submissions/{draft.Id}/submit", null)).ReadAsync<SubmissionDto>();
-        Assert.Equal(SubmissionStatus.Submitted, submitted!.Status);
+        // تسليم تاريخيّ اكتمل مساره سابقًا (Closed) — يقرؤه المحرّك (المُستبعَد هو Draft فقط).
+        await LegacyExecutionFixture.SeedLegacyHistoricalGridAsync(_factory,
+            ContentProductionReportSchema.TemplateTitle, ContentProductionReportSchema.MainTableLabel,
+            empId, null, "2026-W31", new[] { ContentRow("عميل اعتماد", "10", "8", "1") },
+            status: SubmissionStatus.Closed);
 
-        var approved = await (await ceo.PostAsJsonAsync($"/api/submissions/{draft.Id}/approve",
-            new ApprovalActionRequest("معتمد"))).ReadAsync<SubmissionDto>();
-        Assert.Equal(SubmissionStatus.Closed, approved!.Status);
-
-        // التجميع يقرأ التسليم المُغلَق أيضًا (Status != Draft).
         var pods = await AggPodsAsync(admin, $"periodKey=2026-W31&employeeId={empId}");
         Assert.Single(pods.Rows);
         Assert.Equal(8m, pods.Rows[0].ContentPieces);
