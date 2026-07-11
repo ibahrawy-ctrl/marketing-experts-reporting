@@ -460,6 +460,13 @@ public class ProjectRepeatableGridTests
         SetNum(SeoReportSchema.ImprovedKeywords, 10m);
         SetNum(SeoReportSchema.DeclinedKeywords, 4m);
 
+        // القالب المبذور «🔍 تقرير فريق SEO» يفرض قسم مشاريع (minProjects=1)؛ نوفّر عنصرًا صالحًا كي يمرّ
+        // التسليم دون أن يتغيّر أيّ من أرقام التجميع العليا محلّ الاختبار.
+        var seoProject = await CreateProjectAsync(admin, "مشروع تجميع SEO");
+        var prsId = version.Fields.First(f => f.FieldType == FieldType.ProjectRepeatableSection).Id;
+        values.RemoveAll(v => v.TemplateFieldId == prsId);
+        values.Add(new FieldValueInput(prsId, null, null, null, null, SectionValue((seoProject.Id, new()))));
+
         var draftId = await CreateDraftAsync(admin, seo.Id, "2099-W14");
         await SaveValuesAsync(admin, draftId, values.ToArray());
         await admin.PostAsync($"/api/submissions/{draftId}/submit", null);

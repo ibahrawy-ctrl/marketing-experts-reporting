@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Reporting.Application.Clients;
 using Reporting.Application.Common;
 using Reporting.Application.Reports;
 using Reporting.Application.Submissions;
@@ -18,6 +19,29 @@ public class ReportsTests
     private readonly CustomWebApplicationFactory _factory;
 
     public ReportsTests(CustomWebApplicationFactory factory) => _factory = factory;
+
+    // ===== أدوات قسم المشاريع المتكرّر (Project-First) للقوالب المبذورة =====
+    // قوالب Media Buyer/SEO المبذورة تحوي قسم مشاريع متكرّر مطلوب (projectRequired=true, minProjects=1).
+    // لذا يجب أن يحمل كل تسليم عنصر مشروع صالحًا واحدًا على الأقل بمشروع ضمن نطاق رؤية المُسلِّم،
+    // وإلا يرفض الخادم الإرسال بـ submission.repeatable_section_invalid فيبقى التقرير Draft (مُستبعَد من التجميع).
+
+    /// <summary>
+    /// ينشئ (بالمسؤول) عميلًا ومشروعًا يكون <paramref name="accountManagerId"/> مدير حسابه،
+    /// فيصبح المشروع ضمن نطاق رؤية ذلك المُسلِّم (own scope) لاختياره داخل قسم PRS. يعيد معرّف المشروع.
+    /// </summary>
+    private async Task<Guid> CreateOwnedProjectAsync(HttpClient admin, Guid accountManagerId)
+    {
+        var client = (await (await admin.PostAsJsonAsync("/api/clients",
+            new CreateClientRequest($"عميل {Guid.NewGuid():N}", null))).ReadAsync<ClientDto>())!;
+        var project = (await (await admin.PostAsJsonAsync("/api/projects",
+            new CreateProjectRequest(client.Id, $"مشروع {Guid.NewGuid():N}", ServiceType.MediaBuying,
+                AccountManagerId: accountManagerId))).ReadAsync<ProjectDto>())!;
+        return project.Id;
+    }
+
+    /// <summary>عنصر PRS صالح واحد بمشروع مُختار (بلا حقول فرعية — لأن الحقول الفرعية لقوالب Media Buyer/SEO غير مطلوبة).</summary>
+    private static string ProjectSectionValue(Guid projectId)
+        => $"[{{\"projectId\":\"{projectId}\",\"answers\":{{}}}}]";
 
     private static async Task<(Guid TemplateId, Guid FieldId)> PublishTemplateAsync(HttpClient admin)
     {
@@ -325,8 +349,8 @@ public class ReportsTests
 
     // ===== Business-1B — تجميع أداء الإعلانات (Media Buyer) =====
 
-    /// <summary>يجد القالب المبذور «تقرير النمو والأداء — Media Buyer» ويعيد معرّفات حقول الأرقام.</summary>
-    private static async Task<(Guid TemplateId, Guid SpendFieldId, Guid LeadsFieldId, Guid CtrFieldId, Guid ConversionFieldId)>
+    /// <summary>يجد القالب المبذور «تقرير النمو والأداء — Media Buyer» ويعيد معرّفات حقول الأرقام + قسم المشاريع المتكرّر.</summary>
+    private static async Task<(Guid TemplateId, Guid SpendFieldId, Guid LeadsFieldId, Guid CtrFieldId, Guid ConversionFieldId, Guid ProjectSectionFieldId)>
         ResolveMediaBuyerTemplateAsync(HttpClient admin)
     {
         var list = await (await admin.GetAsync("/api/report-templates")).ReadAsync<List<ReportTemplateDto>>();
@@ -337,10 +361,16 @@ public class ReportsTests
         var leads = version.Fields.Single(f => f.Label == MediaBuyerReportSchema.Leads).Id;
         var ctr = version.Fields.Single(f => f.Label == MediaBuyerReportSchema.Ctr).Id;
         var conversion = version.Fields.Single(f => f.Label == MediaBuyerReportSchema.ConversionRate).Id;
-        return (mb.Id, spend, leads, ctr, conversion);
+        var projectSection = version.Fields.Single(f => f.FieldType == FieldType.ProjectRepeatableSection).Id;
+        return (mb.Id, spend, leads, ctr, conversion, projectSection);
     }
 
+    /// <summary>
+    /// يُسلّم تقرير Media Buyer صالحًا: القيم المسطّحة + عنصر قسم مشاريع صالح (مشروع ضمن نطاق المُسلِّم)،
+    /// ثم يتحقّق أن الإرسال نجح وأن التقرير لم يعُد مسودّة (يُحتسَب في التجميع).
+    /// </summary>
     private async Task SubmitMediaBuyerAsync(HttpClient c, Guid templateId, Guid spendF, Guid leadsF, Guid ctrF, Guid convF,
+        Guid projectSectionF, Guid projectId,
         string period, decimal spend, decimal leads, decimal ctr, decimal conversion)
     {
         var d = await (await c.PostAsJsonAsync("/api/submissions",
@@ -352,19 +382,23 @@ public class ReportsTests
                 new FieldValueInput(leadsF, null, leads, null, null, null),
                 new FieldValueInput(ctrF, null, ctr, null, null, null),
                 new FieldValueInput(convF, null, conversion, null, null, null),
+                new FieldValueInput(projectSectionF, null, null, null, null, ProjectSectionValue(projectId)),
             }));
-        await c.PostAsync($"/api/submissions/{d.Id}/submit", null);
+        var submitted = await (await c.PostAsync($"/api/submissions/{d.Id}/submit", null)).ReadAsync<SubmissionDto>();
+        Assert.NotNull(submitted);
+        Assert.NotEqual(SubmissionStatus.Draft, submitted!.Status);
     }
 
     [Fact]
     public async Task MediaBuyerRollup_Employee_SeesOwnNumbersWithAutoCpl()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
-        var (templateId, spendF, leadsF, ctrF, convF) = await ResolveMediaBuyerTemplateAsync(admin);
+        var (templateId, spendF, leadsF, ctrF, convF, prsF) = await ResolveMediaBuyerTemplateAsync(admin);
 
-        var (buyer, _) = await TestAuth.CreateUserAsync(_factory, "Employee");
+        var (buyer, buyerId) = await TestAuth.CreateUserAsync(_factory, "Employee");
+        var buyerProject = await CreateOwnedProjectAsync(admin, buyerId);
         const string period = "2026-W81";
-        await SubmitMediaBuyerAsync(buyer, templateId, spendF, leadsF, ctrF, convF, period, 5000m, 200m, 2.5m, 20m);
+        await SubmitMediaBuyerAsync(buyer, templateId, spendF, leadsF, ctrF, convF, prsF, buyerProject, period, 5000m, 200m, 2.5m, 20m);
 
         var mine = await (await buyer.GetAsync($"/api/reports/media-buyer-rollup?periodType=Weekly&periodKey={period}"))
             .ReadAsync<MediaBuyerRollupReport>();
@@ -390,16 +424,18 @@ public class ReportsTests
     public async Task MediaBuyerRollup_Manager_AggregatesReportsBestWorst()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
-        var (templateId, spendF, leadsF, ctrF, convF) = await ResolveMediaBuyerTemplateAsync(admin);
+        var (templateId, spendF, leadsF, ctrF, convF, prsF) = await ResolveMediaBuyerTemplateAsync(admin);
 
         var (mgr, mgrId) = await TestAuth.CreateUserAsync(_factory, "Manager");
-        var (b1, _) = await TestAuth.CreateUserAsync(_factory, "Employee", mgrId);
-        var (b2, _) = await TestAuth.CreateUserAsync(_factory, "Employee", mgrId);
+        var (b1, b1Id) = await TestAuth.CreateUserAsync(_factory, "Employee", mgrId);
+        var (b2, b2Id) = await TestAuth.CreateUserAsync(_factory, "Employee", mgrId);
+        var p1 = await CreateOwnedProjectAsync(admin, b1Id);
+        var p2 = await CreateOwnedProjectAsync(admin, b2Id);
         const string period = "2026-W82";
 
         // b1 أكفأ (CPL=20)، b2 أضعف (CPL=50).
-        await SubmitMediaBuyerAsync(b1, templateId, spendF, leadsF, ctrF, convF, period, 2000m, 100m, 3m, 25m);
-        await SubmitMediaBuyerAsync(b2, templateId, spendF, leadsF, ctrF, convF, period, 5000m, 100m, 1m, 10m);
+        await SubmitMediaBuyerAsync(b1, templateId, spendF, leadsF, ctrF, convF, prsF, p1, period, 2000m, 100m, 3m, 25m);
+        await SubmitMediaBuyerAsync(b2, templateId, spendF, leadsF, ctrF, convF, prsF, p2, period, 5000m, 100m, 1m, 10m);
 
         var rollup = await (await mgr.GetAsync($"/api/reports/media-buyer-rollup?periodType=Weekly&periodKey={period}"))
             .ReadAsync<MediaBuyerRollupReport>();
@@ -421,10 +457,11 @@ public class ReportsTests
     public async Task MediaBuyerRollup_Ceo_ReturnsExecutiveSummaryWithoutRows()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
-        var (templateId, spendF, leadsF, ctrF, convF) = await ResolveMediaBuyerTemplateAsync(admin);
+        var (templateId, spendF, leadsF, ctrF, convF, prsF) = await ResolveMediaBuyerTemplateAsync(admin);
         const string period = "2026-W83";
-        var (buyer, _) = await TestAuth.CreateUserAsync(_factory, "Employee");
-        await SubmitMediaBuyerAsync(buyer, templateId, spendF, leadsF, ctrF, convF, period, 4000m, 100m, 2m, 15m);
+        var (buyer, buyerId) = await TestAuth.CreateUserAsync(_factory, "Employee");
+        var buyerProject = await CreateOwnedProjectAsync(admin, buyerId);
+        await SubmitMediaBuyerAsync(buyer, templateId, spendF, leadsF, ctrF, convF, prsF, buyerProject, period, 4000m, 100m, 2m, 15m);
 
         var (ceo, _) = await TestAuth.CreateUserAsync(_factory, "CEO");
         var rollup = await (await ceo.GetAsync($"/api/reports/media-buyer-rollup?periodType=Weekly&periodKey={period}"))
@@ -446,10 +483,11 @@ public class ReportsTests
     public async Task MediaBuyerRollup_GeneralManager_ReturnsSummaryWithoutRows()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
-        var (templateId, spendF, leadsF, ctrF, convF) = await ResolveMediaBuyerTemplateAsync(admin);
+        var (templateId, spendF, leadsF, ctrF, convF, prsF) = await ResolveMediaBuyerTemplateAsync(admin);
         const string period = "2026-W84";
-        var (buyer, _) = await TestAuth.CreateUserAsync(_factory, "Employee");
-        await SubmitMediaBuyerAsync(buyer, templateId, spendF, leadsF, ctrF, convF, period, 3000m, 60m, 2m, 12m);
+        var (buyer, buyerId) = await TestAuth.CreateUserAsync(_factory, "Employee");
+        var buyerProject = await CreateOwnedProjectAsync(admin, buyerId);
+        await SubmitMediaBuyerAsync(buyer, templateId, spendF, leadsF, ctrF, convF, prsF, buyerProject, period, 3000m, 60m, 2m, 12m);
 
         var (gm, _) = await TestAuth.CreateUserAsync(_factory, "GeneralManager");
         var rollup = await (await gm.GetAsync($"/api/reports/media-buyer-rollup?periodType=Weekly&periodKey={period}"))
@@ -469,10 +507,11 @@ public class ReportsTests
     public async Task MediaBuyerRollup_OutOfScopeUser_SeesNoAdData()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
-        var (templateId, spendF, leadsF, ctrF, convF) = await ResolveMediaBuyerTemplateAsync(admin);
+        var (templateId, spendF, leadsF, ctrF, convF, prsF) = await ResolveMediaBuyerTemplateAsync(admin);
         const string period = "2026-W85";
-        var (buyer, _) = await TestAuth.CreateUserAsync(_factory, "Employee");
-        await SubmitMediaBuyerAsync(buyer, templateId, spendF, leadsF, ctrF, convF, period, 9000m, 300m, 2m, 18m);
+        var (buyer, buyerId) = await TestAuth.CreateUserAsync(_factory, "Employee");
+        var buyerProject = await CreateOwnedProjectAsync(admin, buyerId);
+        await SubmitMediaBuyerAsync(buyer, templateId, spendF, leadsF, ctrF, convF, prsF, buyerProject, period, 9000m, 300m, 2m, 18m);
 
         // موظف غير مرتبط (نطاق own، بلا تسليم) لا يرى أي بيانات إعلانات.
         var (stranger, _) = await TestAuth.CreateUserAsync(_factory, "Employee");
@@ -485,9 +524,12 @@ public class ReportsTests
 
     // ===== Business-1C — تجميع أداء SEO (دمج قالبَي الفريق + المقالات) =====
 
-    /// <summary>يجد القالبين المبذورين «🔍 تقرير فريق SEO» و«متابعة مقالات SEO» ويعيد معرّفات الحقول المطلوبة للتجميع.</summary>
-    private static async Task<(Guid TeamTemplateId, Guid ImprovedF, Guid DeclinedF, Guid TasksF, Guid IssuesF,
-        Guid ArticlesTemplateId, Guid PlannedF, Guid PublishedF, Guid LateF)>
+    /// <summary>
+    /// يجد القالبين المبذورين «🔍 تقرير فريق SEO» و«متابعة مقالات SEO» ويعيد معرّفات الحقول المطلوبة للتجميع
+    /// + معرّف قسم المشاريع المتكرّر في كلٍّ منهما (لأن كليهما يشترط عنصر مشروع صالحًا عند الإرسال).
+    /// </summary>
+    private static async Task<(Guid TeamTemplateId, Guid ImprovedF, Guid DeclinedF, Guid TasksF, Guid IssuesF, Guid TeamProjectSectionF,
+        Guid ArticlesTemplateId, Guid PlannedF, Guid PublishedF, Guid LateF, Guid ArticlesProjectSectionF)>
         ResolveSeoTemplatesAsync(HttpClient admin)
     {
         var list = await (await admin.GetAsync("/api/report-templates")).ReadAsync<List<ReportTemplateDto>>();
@@ -499,19 +541,30 @@ public class ReportsTests
         var declined = teamVersion.Fields.Single(f => f.Label == SeoReportSchema.DeclinedKeywords).Id;
         var tasks = teamVersion.Fields.Single(f => f.Label == SeoReportSchema.TasksDone).Id;
         var issues = teamVersion.Fields.Single(f => f.Label == SeoReportSchema.TechnicalIssues).Id;
+        var teamProjectSection = teamVersion.Fields.Single(f => f.FieldType == FieldType.ProjectRepeatableSection).Id;
 
         var articles = list!.Single(t => t.Title == SeoReportSchema.ArticlesTemplateTitle);
         var articlesDetail = await (await admin.GetAsync($"/api/report-templates/{articles.Id}")).ReadAsync<ReportTemplateDetailDto>();
+        // «تقرير متابعة مقالات SEO» قالب تكميلي فعليًّا في الإنتاج (صنّفه TemplateBinder Supplementary)،
+        // فيُسمح للموظّف بتسليمه إلى جانب تقرير فريق SEO الأساسي لنفس الفترة. نضبطه هنا عبر واجهة الأدمن
+        // المعتمَدة كي يتطابق الاختبار مع السلوك الإنتاجي — بلا مساس بالـSeeder ولا تعديل قاعدة يدويّ.
+        if (articlesDetail!.Classification != TemplateClassification.Supplementary)
+            await admin.PutAsJsonAsync($"/api/report-templates/{articles.Id}",
+                new UpdateTemplateRequest(articlesDetail.Title, articlesDetail.Description,
+                    articlesDetail.JobRoleId, articlesDetail.DefaultPeriodType, TemplateClassification.Supplementary));
         var articlesVersion = articlesDetail!.Versions.Single(v => v.IsPublished);
         var planned = articlesVersion.Fields.Single(f => f.Label == SeoReportSchema.ArticlesPlanned).Id;
         var published = articlesVersion.Fields.Single(f => f.Label == SeoReportSchema.ArticlesPublished).Id;
         var late = articlesVersion.Fields.Single(f => f.Label == SeoReportSchema.ArticlesLate).Id;
+        var articlesProjectSection = articlesVersion.Fields.Single(f => f.FieldType == FieldType.ProjectRepeatableSection).Id;
 
-        return (team.Id, improved, declined, tasks, issues, articles.Id, planned, published, late);
+        return (team.Id, improved, declined, tasks, issues, teamProjectSection,
+            articles.Id, planned, published, late, articlesProjectSection);
     }
 
-    /// <summary>يُسلّم تقرير فريق SEO (كلمات/مهام/مشاكل) لعضوٍ ما في فترة معطاة.</summary>
+    /// <summary>يُسلّم تقرير فريق SEO (كلمات/مهام/مشاكل) صالحًا مع عنصر قسم مشاريع، ويتحقّق أنه لم يعُد مسودّة.</summary>
     private async Task SubmitSeoTeamAsync(HttpClient c, Guid templateId, Guid improvedF, Guid declinedF, Guid tasksF, Guid issuesF,
+        Guid projectSectionF, Guid projectId,
         string period, decimal improved, decimal declined, decimal tasks, decimal issues)
     {
         var d = await (await c.PostAsJsonAsync("/api/submissions",
@@ -523,12 +576,16 @@ public class ReportsTests
                 new FieldValueInput(declinedF, null, declined, null, null, null),
                 new FieldValueInput(tasksF, null, tasks, null, null, null),
                 new FieldValueInput(issuesF, null, issues, null, null, null),
+                new FieldValueInput(projectSectionF, null, null, null, null, ProjectSectionValue(projectId)),
             }));
-        await c.PostAsync($"/api/submissions/{d.Id}/submit", null);
+        var submitted = await (await c.PostAsync($"/api/submissions/{d.Id}/submit", null)).ReadAsync<SubmissionDto>();
+        Assert.NotNull(submitted);
+        Assert.NotEqual(SubmissionStatus.Draft, submitted!.Status);
     }
 
-    /// <summary>يُسلّم تقرير متابعة مقالات SEO (مخطّط/منشور/متأخر) لعضوٍ ما في فترة معطاة.</summary>
+    /// <summary>يُسلّم تقرير متابعة مقالات SEO (مخطّط/منشور/متأخر) صالحًا مع عنصر قسم مشاريع، ويتحقّق أنه لم يعُد مسودّة.</summary>
     private async Task SubmitSeoArticlesAsync(HttpClient c, Guid templateId, Guid plannedF, Guid publishedF, Guid lateF,
+        Guid projectSectionF, Guid projectId,
         string period, decimal planned, decimal published, decimal late)
     {
         var d = await (await c.PostAsJsonAsync("/api/submissions",
@@ -539,21 +596,25 @@ public class ReportsTests
                 new FieldValueInput(plannedF, null, planned, null, null, null),
                 new FieldValueInput(publishedF, null, published, null, null, null),
                 new FieldValueInput(lateF, null, late, null, null, null),
+                new FieldValueInput(projectSectionF, null, null, null, null, ProjectSectionValue(projectId)),
             }));
-        await c.PostAsync($"/api/submissions/{d.Id}/submit", null);
+        var submitted = await (await c.PostAsync($"/api/submissions/{d.Id}/submit", null)).ReadAsync<SubmissionDto>();
+        Assert.NotNull(submitted);
+        Assert.NotEqual(SubmissionStatus.Draft, submitted!.Status);
     }
 
     [Fact]
     public async Task SeoRollup_Employee_MergesTwoTemplatesWithAutoNetKeywords()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
-        var (teamId, improvedF, declinedF, tasksF, issuesF, articlesId, plannedF, publishedF, lateF)
+        var (teamId, improvedF, declinedF, tasksF, issuesF, teamPrsF, articlesId, plannedF, publishedF, lateF, articlesPrsF)
             = await ResolveSeoTemplatesAsync(admin);
 
-        var (spec, _) = await TestAuth.CreateUserAsync(_factory, "Employee");
+        var (spec, specId) = await TestAuth.CreateUserAsync(_factory, "Employee");
+        var specProject = await CreateOwnedProjectAsync(admin, specId);
         const string period = "2026-W91";
-        await SubmitSeoTeamAsync(spec, teamId, improvedF, declinedF, tasksF, issuesF, period, 50m, 10m, 12m, 3m);
-        await SubmitSeoArticlesAsync(spec, articlesId, plannedF, publishedF, lateF, period, 8m, 6m, 1m);
+        await SubmitSeoTeamAsync(spec, teamId, improvedF, declinedF, tasksF, issuesF, teamPrsF, specProject, period, 50m, 10m, 12m, 3m);
+        await SubmitSeoArticlesAsync(spec, articlesId, plannedF, publishedF, lateF, articlesPrsF, specProject, period, 8m, 6m, 1m);
 
         var mine = await (await spec.GetAsync($"/api/reports/seo-rollup?periodType=Weekly&periodKey={period}"))
             .ReadAsync<SeoRollupReport>();
@@ -586,17 +647,19 @@ public class ReportsTests
     public async Task SeoRollup_TeamLeader_AggregatesBestWorstAndFollowup()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
-        var (teamId, improvedF, declinedF, tasksF, issuesF, _, _, _, _)
+        var (teamId, improvedF, declinedF, tasksF, issuesF, teamPrsF, _, _, _, _, _)
             = await ResolveSeoTemplatesAsync(admin);
 
         var (tl, tlId) = await TestAuth.CreateUserAsync(_factory, "TeamLeader");
-        var (s1, _) = await TestAuth.CreateUserAsync(_factory, "Employee", tlId);
-        var (s2, _) = await TestAuth.CreateUserAsync(_factory, "Employee", tlId);
+        var (s1, s1Id) = await TestAuth.CreateUserAsync(_factory, "Employee", tlId);
+        var (s2, s2Id) = await TestAuth.CreateUserAsync(_factory, "Employee", tlId);
+        var p1 = await CreateOwnedProjectAsync(admin, s1Id);
+        var p2 = await CreateOwnedProjectAsync(admin, s2Id);
         const string period = "2026-W92";
 
         // s1 صافي موجب (+30)؛ s2 صافي سالب (−15) → يحتاج متابعة.
-        await SubmitSeoTeamAsync(s1, teamId, improvedF, declinedF, tasksF, issuesF, period, 40m, 10m, 15m, 2m);
-        await SubmitSeoTeamAsync(s2, teamId, improvedF, declinedF, tasksF, issuesF, period, 5m, 20m, 8m, 6m);
+        await SubmitSeoTeamAsync(s1, teamId, improvedF, declinedF, tasksF, issuesF, teamPrsF, p1, period, 40m, 10m, 15m, 2m);
+        await SubmitSeoTeamAsync(s2, teamId, improvedF, declinedF, tasksF, issuesF, teamPrsF, p2, period, 5m, 20m, 8m, 6m);
 
         var rollup = await (await tl.GetAsync($"/api/reports/seo-rollup?periodType=Weekly&periodKey={period}"))
             .ReadAsync<SeoRollupReport>();
@@ -618,11 +681,12 @@ public class ReportsTests
     public async Task SeoRollup_Ceo_ReturnsExecutiveSummaryWithoutRows()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
-        var (teamId, improvedF, declinedF, tasksF, issuesF, _, _, _, _)
+        var (teamId, improvedF, declinedF, tasksF, issuesF, teamPrsF, _, _, _, _, _)
             = await ResolveSeoTemplatesAsync(admin);
         const string period = "2026-W93";
-        var (spec, _) = await TestAuth.CreateUserAsync(_factory, "Employee");
-        await SubmitSeoTeamAsync(spec, teamId, improvedF, declinedF, tasksF, issuesF, period, 30m, 5m, 10m, 2m);
+        var (spec, specId) = await TestAuth.CreateUserAsync(_factory, "Employee");
+        var specProject = await CreateOwnedProjectAsync(admin, specId);
+        await SubmitSeoTeamAsync(spec, teamId, improvedF, declinedF, tasksF, issuesF, teamPrsF, specProject, period, 30m, 5m, 10m, 2m);
 
         var (ceo, _) = await TestAuth.CreateUserAsync(_factory, "CEO");
         var rollup = await (await ceo.GetAsync($"/api/reports/seo-rollup?periodType=Weekly&periodKey={period}"))
@@ -643,11 +707,12 @@ public class ReportsTests
     public async Task SeoRollup_GeneralManager_ReturnsSummaryWithoutRows()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
-        var (teamId, improvedF, declinedF, tasksF, issuesF, _, _, _, _)
+        var (teamId, improvedF, declinedF, tasksF, issuesF, teamPrsF, _, _, _, _, _)
             = await ResolveSeoTemplatesAsync(admin);
         const string period = "2026-W94";
-        var (spec, _) = await TestAuth.CreateUserAsync(_factory, "Employee");
-        await SubmitSeoTeamAsync(spec, teamId, improvedF, declinedF, tasksF, issuesF, period, 20m, 4m, 9m, 1m);
+        var (spec, specId) = await TestAuth.CreateUserAsync(_factory, "Employee");
+        var specProject = await CreateOwnedProjectAsync(admin, specId);
+        await SubmitSeoTeamAsync(spec, teamId, improvedF, declinedF, tasksF, issuesF, teamPrsF, specProject, period, 20m, 4m, 9m, 1m);
 
         var (gm, _) = await TestAuth.CreateUserAsync(_factory, "GeneralManager");
         var rollup = await (await gm.GetAsync($"/api/reports/seo-rollup?periodType=Weekly&periodKey={period}"))
@@ -666,11 +731,12 @@ public class ReportsTests
     public async Task SeoRollup_OutOfScopeUser_SeesNoSeoData()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
-        var (teamId, improvedF, declinedF, tasksF, issuesF, _, _, _, _)
+        var (teamId, improvedF, declinedF, tasksF, issuesF, teamPrsF, _, _, _, _, _)
             = await ResolveSeoTemplatesAsync(admin);
         const string period = "2026-W95";
-        var (spec, _) = await TestAuth.CreateUserAsync(_factory, "Employee");
-        await SubmitSeoTeamAsync(spec, teamId, improvedF, declinedF, tasksF, issuesF, period, 60m, 5m, 14m, 2m);
+        var (spec, specId) = await TestAuth.CreateUserAsync(_factory, "Employee");
+        var specProject = await CreateOwnedProjectAsync(admin, specId);
+        await SubmitSeoTeamAsync(spec, teamId, improvedF, declinedF, tasksF, issuesF, teamPrsF, specProject, period, 60m, 5m, 14m, 2m);
 
         // موظف غير مرتبط (نطاق own، بلا تسليم SEO) لا يرى أي بيانات SEO.
         var (stranger, _) = await TestAuth.CreateUserAsync(_factory, "Employee");
@@ -680,6 +746,84 @@ public class ReportsTests
         Assert.Empty(rollup.Rows);
         Assert.Equal(0m, rollup.TotalImprovedKeywords);
         Assert.Equal(0m, rollup.NetKeywordMovement);
+    }
+
+    // ===== اختبارات سلبيّة لكل عائلة: بلا عنصر مشروع ⇒ رفض الإرسال ⇒ يبقى Draft ⇒ مُستبعَد من التجميع =====
+    // تُثبت أنّ حارس قسم المشاريع الإلزاميّ (projectRequired=true, minProjects=1) لم يُضعَّف: تسليم بلا عنصر مشروع
+    // يُرفَض بالكود الرسميّ submission.repeatable_section_invalid ويبقى مسودّةً فلا يدخل تجميع Media Buyer/SEO.
+
+    [Fact]
+    public async Task MediaBuyerRollup_SubmitWithoutProjectSection_StaysDraft_NotAggregated()
+    {
+        var admin = await TestAuth.LoginAsAdminAsync(_factory);
+        var (templateId, spendF, leadsF, ctrF, convF, _) = await ResolveMediaBuyerTemplateAsync(admin);
+
+        var (buyer, _) = await TestAuth.CreateUserAsync(_factory, "Employee");
+        const string period = "2026-W86";
+
+        // مسودّة بالقيم المسطّحة فقط دون أيّ عنصر مشروع في القسم الإلزاميّ.
+        var draft = await (await buyer.PostAsJsonAsync("/api/submissions",
+            new CreateSubmissionRequest(templateId, PeriodType.Weekly, period))).ReadAsync<SubmissionDto>();
+        await buyer.PutAsJsonAsync($"/api/submissions/{draft!.Id}/values",
+            new SaveFieldValuesRequest(new[]
+            {
+                new FieldValueInput(spendF, null, 4000m, null, null, null),
+                new FieldValueInput(leadsF, null, 100m, null, null, null),
+                new FieldValueInput(ctrF, null, 2m, null, null, null),
+                new FieldValueInput(convF, null, 15m, null, null, null),
+            }));
+
+        // الإرسال يُرفَض بالكود الرسميّ (لا إضعاف لـ minProjects=1).
+        var submit = await buyer.PostAsync($"/api/submissions/{draft.Id}/submit", null);
+        Assert.Equal(HttpStatusCode.BadRequest, submit.StatusCode);
+        Assert.Contains("repeatable_section_invalid", await submit.Content.ReadAsStringAsync());
+
+        // يبقى مسودّة (لم يتحوّل إلى Submitted).
+        var after = await (await buyer.GetAsync($"/api/submissions/{draft.Id}")).ReadAsync<SubmissionDto>();
+        Assert.Equal(SubmissionStatus.Draft, after!.Status);
+
+        // مُستبعَد من تجميع Media Buyer لتلك الفترة.
+        var rollup = await (await buyer.GetAsync($"/api/reports/media-buyer-rollup?periodType=Weekly&periodKey={period}"))
+            .ReadAsync<MediaBuyerRollupReport>();
+        Assert.Equal(0, rollup!.Reporters);
+        Assert.Empty(rollup.Rows);
+        Assert.Equal(0m, rollup.TotalSpend);
+    }
+
+    [Fact]
+    public async Task SeoRollup_SubmitWithoutProjectSection_StaysDraft_NotAggregated()
+    {
+        var admin = await TestAuth.LoginAsAdminAsync(_factory);
+        var (teamId, improvedF, declinedF, tasksF, issuesF, _, _, _, _, _, _)
+            = await ResolveSeoTemplatesAsync(admin);
+
+        var (spec, _) = await TestAuth.CreateUserAsync(_factory, "Employee");
+        const string period = "2026-W96";
+
+        // مسودّة تقرير فريق SEO بالقيم المسطّحة فقط دون أيّ عنصر مشروع في القسم الإلزاميّ.
+        var draft = await (await spec.PostAsJsonAsync("/api/submissions",
+            new CreateSubmissionRequest(teamId, PeriodType.Weekly, period))).ReadAsync<SubmissionDto>();
+        await spec.PutAsJsonAsync($"/api/submissions/{draft!.Id}/values",
+            new SaveFieldValuesRequest(new[]
+            {
+                new FieldValueInput(improvedF, null, 30m, null, null, null),
+                new FieldValueInput(declinedF, null, 5m, null, null, null),
+                new FieldValueInput(tasksF, null, 10m, null, null, null),
+                new FieldValueInput(issuesF, null, 2m, null, null, null),
+            }));
+
+        var submit = await spec.PostAsync($"/api/submissions/{draft.Id}/submit", null);
+        Assert.Equal(HttpStatusCode.BadRequest, submit.StatusCode);
+        Assert.Contains("repeatable_section_invalid", await submit.Content.ReadAsStringAsync());
+
+        var after = await (await spec.GetAsync($"/api/submissions/{draft.Id}")).ReadAsync<SubmissionDto>();
+        Assert.Equal(SubmissionStatus.Draft, after!.Status);
+
+        var rollup = await (await spec.GetAsync($"/api/reports/seo-rollup?periodType=Weekly&periodKey={period}"))
+            .ReadAsync<SeoRollupReport>();
+        Assert.Equal(0, rollup!.Reporters);
+        Assert.Empty(rollup.Rows);
+        Assert.Equal(0m, rollup.TotalImprovedKeywords);
     }
 
 }
