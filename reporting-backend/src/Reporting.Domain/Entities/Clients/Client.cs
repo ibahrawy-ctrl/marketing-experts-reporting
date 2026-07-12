@@ -9,6 +9,7 @@ namespace Reporting.Domain.Entities.Clients;
 /// </summary>
 public class Client : BaseEntity
 {
+    /// <summary>الاسم التجاري/المعروض للعميل بالعربية (المصدر الأوحد للاسم العربي).</summary>
     public string Name { get; set; } = string.Empty;
     public ClientStatus Status { get; set; } = ClientStatus.Active;
 
@@ -19,5 +20,43 @@ public class Client : BaseEntity
     public string? MainContactInfo { get; set; }
     public string? Notes { get; set; }
 
+    // === Client 360 Foundation (CPW-R1B) — حقول ملف العميل الموسَّع (كلها اختيارية) ===
+
+    /// <summary>الاسم التجاري بالإنجليزية (اختياريّ).</summary>
+    public string? TradeNameEn { get; set; }
+
+    /// <summary>الاسم القانونيّ الرسميّ للكيان (اختياريّ).</summary>
+    public string? LegalName { get; set; }
+
+    /// <summary>رمز نوع العميل من ثوابت الرموز المعتمدة (نصّ فقط — بلا FK).</summary>
+    public string? ClientTypeCode { get; set; }
+
+    /// <summary>رمز القطاع/الصناعة من ثوابت الرموز المعتمدة (نصّ فقط — بلا FK).</summary>
+    public string? SectorCode { get; set; }
+
+    /// <summary>الدولة (اختياريّة).</summary>
+    public string? Country { get; set; }
+
+    /// <summary>المدينة (اختياريّة).</summary>
+    public string? City { get; set; }
+
+    /// <summary>الموقع الإلكترونيّ الرسميّ (اختياريّ — يُتحقَّق من صحّة الرابط).</summary>
+    public string? Website { get; set; }
+
+    /// <summary>رمز مصدر العلاقة/الاكتساب من ثوابت الرموز المعتمدة (نصّ فقط — بلا FK).</summary>
+    public string? SourceCode { get; set; }
+
+    /// <summary>تاريخ بدء العلاقة مع العميل (اختياريّ).</summary>
+    public DateOnly? RelationshipStartDate { get; set; }
+
     public ICollection<Project> Projects { get; set; } = new List<Project>();
+
+    /// <summary>جهات الاتصال لدى العميل (1:N).</summary>
+    public ICollection<ClientContact> Contacts { get; set; } = new List<ClientContact>();
+
+    /// <summary>القنوات الرقمية للعميل (1:N).</summary>
+    public ICollection<ClientDigitalChannel> DigitalChannels { get; set; } = new List<ClientDigitalChannel>();
+
+    /// <summary>ملفّ البراند (1:0..1).</summary>
+    public ClientBrandProfile? BrandProfile { get; set; }
 }

@@ -40,6 +40,11 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
     public DbSet<ProjectWorkstream> ProjectWorkstreams => Set<ProjectWorkstream>();
     public DbSet<WorkstreamDeliverable> WorkstreamDeliverables => Set<WorkstreamDeliverable>();
 
+    // Client 360 Foundation (CPW-R1B)
+    public DbSet<ClientContact> ClientContacts => Set<ClientContact>();
+    public DbSet<ClientDigitalChannel> ClientDigitalChannels => Set<ClientDigitalChannel>();
+    public DbSet<ClientBrandProfile> ClientBrandProfiles => Set<ClientBrandProfile>();
+
     // كتالوج الدورات (مصدر أسماء دورات مبيعات B2C)
     public DbSet<Course> Courses => Set<Course>();
 
