@@ -68,6 +68,8 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy(Policies.AdminOnly, p => p.RequireRole(Roles.Admin));
     options.AddPolicy(Policies.ExecutiveOnly, p => p.RequireRole(Roles.Admin, Roles.Ceo, Roles.GeneralManager));
     options.AddPolicy(Policies.ManagementOnly, p => p.RequireRole(Roles.Management));
+    // إدارة نواة العميل (Client 360 — CPW-R1B): Admin/CEO/GM/Manager فقط (يستثني TeamLeader).
+    options.AddPolicy(Policies.ClientCoreManagement, p => p.RequireRole(Roles.ClientCoreManagers));
     options.AddPolicy(Policies.TeamManagement, p => p.RequireRole(Roles.TeamManagement));
     options.AddPolicy(Policies.TemplateGovernance, p => p.RequireRole(Roles.TemplateGovernance));
     // الاعتماد النهائي لطلبات الإجازة/الاستئذان (V1.0.1-A) — قدرة الموارد البشرية HR (+ تدخّل Admin/CEO/GM).
