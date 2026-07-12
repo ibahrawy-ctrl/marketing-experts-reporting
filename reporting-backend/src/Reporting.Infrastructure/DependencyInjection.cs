@@ -96,6 +96,9 @@ public static class DependencyInjection
         services.AddScoped<IReportCalendarService, ReportCalendarService>();
         services.AddScoped<IClientProjectAccess, ClientProjectAccess>();
         services.AddScoped<IClientService, ClientService>();
+        services.AddScoped<IClientContactService, ClientContactService>();
+        services.AddScoped<IClientDigitalChannelService, ClientDigitalChannelService>();
+        services.AddScoped<IClientBrandService, ClientBrandService>();
         services.AddScoped<IProjectService, ProjectService>();
         services.AddScoped<IProjectWorkstreamService, ProjectWorkstreamService>();
         services.AddScoped<IWorkstreamDeliverableService, WorkstreamDeliverableService>();

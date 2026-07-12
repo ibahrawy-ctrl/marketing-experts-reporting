@@ -13,13 +13,15 @@ public class ClientService : IClientService
     private readonly AppDbContext _db;
     private readonly ICurrentUser _currentUser;
     private readonly IClientProjectAccess _access;
+    private readonly IScopeResolver _scope;
     private readonly IAuditService _audit;
 
-    public ClientService(AppDbContext db, ICurrentUser currentUser, IClientProjectAccess access, IAuditService audit)
+    public ClientService(AppDbContext db, ICurrentUser currentUser, IClientProjectAccess access, IScopeResolver scope, IAuditService audit)
     {
         _db = db;
         _currentUser = currentUser;
         _access = access;
+        _scope = scope;
         _audit = audit;
     }
 
@@ -56,10 +58,16 @@ public class ClientService : IClientService
         if (_currentUser.UserId is not Guid uid) return Result<ClientDto>.Failure("غير مصرّح.", "auth.unauthenticated");
         if (string.IsNullOrWhiteSpace(request.Name)) return Result<ClientDto>.Failure("اسم العميل مطلوب.", "client.name_required");
 
-        var vis = await _access.ResolveAsync(ct);
-        // غير ذوي الرؤية الكاملة: لا يُنشئون عميلًا إلا إذا وضعوا أنفسهم مديري حساب له.
-        if (!vis.SeesAll && request.AccountManagerId != uid)
-            return Result<ClientDto>.Failure("لا يمكنك إنشاء عميل خارج نطاق صلاحيتك.", "auth.forbidden");
+        var validation = ValidateClientProfile(
+            request.ClientTypeCode, request.SectorCode, request.SourceCode, request.Website,
+            request.Notes, request.MainContactName, request.MainContactInfo, request.LegalName, request.TradeNameEn);
+        if (validation is not null) return Result<ClientDto>.Failure(validation.Value.message, validation.Value.code);
+
+        // النطاق: Admin/CEO/GM (رؤية كاملة) يُسنِدون بحرّية؛ المدير يُنشئ ضمن نطاقه فقط
+        // وأيّ AccountManagerId مُسنَد يجب أن يكون داخل نطاقه.
+        var scope = await _scope.ResolveAsync(ct);
+        if (!scope.SeesAll && request.AccountManagerId is Guid amId && !scope.Contains(amId))
+            return Result<ClientDto>.Failure("مدير الحساب المُسنَد خارج نطاق صلاحيتك.", "auth.forbidden");
 
         var client = new Client
         {
@@ -68,7 +76,16 @@ public class ClientService : IClientService
             AccountManagerId = request.AccountManagerId,
             MainContactName = request.MainContactName,
             MainContactInfo = request.MainContactInfo,
-            Notes = request.Notes
+            Notes = request.Notes,
+            TradeNameEn = Trim(request.TradeNameEn),
+            LegalName = Trim(request.LegalName),
+            ClientTypeCode = Trim(request.ClientTypeCode),
+            SectorCode = Trim(request.SectorCode),
+            Country = Trim(request.Country),
+            City = Trim(request.City),
+            Website = Trim(request.Website),
+            SourceCode = Trim(request.SourceCode),
+            RelationshipStartDate = request.RelationshipStartDate
         };
         _db.Clients.Add(client);
         await _db.SaveChangesAsync(ct);
@@ -88,12 +105,31 @@ public class ClientService : IClientService
         var vis = await _access.ResolveAsync(ct);
         if (!vis.CanViewClient(id)) return Result<ClientDto>.Failure("هذا العميل خارج نطاق صلاحيتك.", "auth.forbidden");
 
+        var validation = ValidateClientProfile(
+            request.ClientTypeCode, request.SectorCode, request.SourceCode, request.Website,
+            request.Notes, request.MainContactName, request.MainContactInfo, request.LegalName, request.TradeNameEn);
+        if (validation is not null) return Result<ClientDto>.Failure(validation.Value.message, validation.Value.code);
+
+        // النطاق: أيّ AccountManagerId مُسنَد يجب أن يكون داخل نطاق المستخدم (ما لم تكن له رؤية كاملة).
+        var scope = await _scope.ResolveAsync(ct);
+        if (!scope.SeesAll && request.AccountManagerId is Guid amId && !scope.Contains(amId))
+            return Result<ClientDto>.Failure("مدير الحساب المُسنَد خارج نطاق صلاحيتك.", "auth.forbidden");
+
         client.Name = request.Name.Trim();
         client.Status = request.Status;
         client.AccountManagerId = request.AccountManagerId;
         client.MainContactName = request.MainContactName;
         client.MainContactInfo = request.MainContactInfo;
         client.Notes = request.Notes;
+        client.TradeNameEn = Trim(request.TradeNameEn);
+        client.LegalName = Trim(request.LegalName);
+        client.ClientTypeCode = Trim(request.ClientTypeCode);
+        client.SectorCode = Trim(request.SectorCode);
+        client.Country = Trim(request.Country);
+        client.City = Trim(request.City);
+        client.Website = Trim(request.Website);
+        client.SourceCode = Trim(request.SourceCode);
+        client.RelationshipStartDate = request.RelationshipStartDate;
         client.UpdatedAtUtc = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct);
         await _audit.LogAsync(uid, "client.updated", nameof(Client), client.Id, ct: ct);
@@ -264,6 +300,29 @@ public class ClientService : IClientService
     }
 
     // ===== helpers =====
+    // قصّ نصّ اختياري: يُرجِع null للفارغ/الفراغات، وإلا النصّ مقصوصًا.
+    private static string? Trim(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    // تحقّق موحّد لملف العميل: صحّة الرموز المعتمدة + صحّة الرابط + منع تخزين أيّ أسرار.
+    // يُرجِع null عند الصلاحية، وإلا (رسالة، كود خطأ).
+    private static (string message, string code)? ValidateClientProfile(
+        string? clientTypeCode, string? sectorCode, string? sourceCode, string? website,
+        params string?[] freeTextFields)
+    {
+        if (!ClientCodeConstants.IsValidClientType(clientTypeCode))
+            return ("نوع العميل غير معتمَد.", "client.client_type_invalid");
+        if (!ClientCodeConstants.IsValidSector(sectorCode))
+            return ("قطاع العميل غير معتمَد.", "client.sector_invalid");
+        if (!ClientCodeConstants.IsValidSource(sourceCode))
+            return ("مصدر العلاقة غير معتمَد.", "client.source_invalid");
+        if (!ClientFieldGuards.IsValidUrl(website))
+            return ("رابط الموقع غير صالح (يجب أن يكون http/https).", "client.website_invalid");
+        if (ClientFieldGuards.AnyContainsSecret(freeTextFields))
+            return ("لا يجوز تخزين كلمات مرور أو رموز وصول في حقول العميل.", "client.secret_forbidden");
+        return null;
+    }
+
     // يبني سبب منع الحذف النهائي لعميل واحد (يُستخدم في DeleteAsync). يُرجع null عند السماح.
     private async Task<string?> DeleteBlockReasonAsync(Guid clientId, CancellationToken ct)
     {
@@ -324,7 +383,18 @@ public class ClientService : IClientService
                 cps.Count,
                 cps.Count(p => p.Status == ProjectStatus.Active),
                 cps.Count(p => p.Status == ProjectStatus.AtRisk),
-                c.CreatedAtUtc, c.UpdatedAtUtc, canHardDelete, reason);
+                c.CreatedAtUtc, c.UpdatedAtUtc,
+                TradeNameEn: c.TradeNameEn,
+                LegalName: c.LegalName,
+                ClientTypeCode: c.ClientTypeCode,
+                SectorCode: c.SectorCode,
+                Country: c.Country,
+                City: c.City,
+                Website: c.Website,
+                SourceCode: c.SourceCode,
+                RelationshipStartDate: c.RelationshipStartDate,
+                CanHardDelete: canHardDelete,
+                DeleteBlockReason: reason);
         }).ToList();
     }
 
