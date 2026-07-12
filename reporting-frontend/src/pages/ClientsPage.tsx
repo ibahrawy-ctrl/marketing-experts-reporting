@@ -1,7 +1,7 @@
 // صفحة العملاء — قائمة العملاء + لوحة صحّة الحساب (Account Health) + إنشاء عميل جديد.
-// النطاق ومستوى الرؤية مفروضان من الخادم؛ أزرار الإدارة تظهر فقط لمن يملك canManageClients.
+// النطاق ومستوى الرؤية مفروضان من الخادم؛ أزرار الإدارة تظهر فقط لمن يملك canEditClientCore.
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   useClients,
   useClientHealth,
@@ -22,7 +22,8 @@ import type { ClientDto, ClientStatus, CreateClientRequest } from '../types/api'
 type ClientView = 'active' | 'archived' | 'all';
 
 export default function ClientsPage() {
-  const { canManageClients } = useAuth();
+  // canEditClientCore يطابق سياسة ClientCoreManagement بالخادم (تستثني قائد الفريق) — تحكم إنشاء/أرشفة/تفعيل/حذف العميل.
+  const { canEditClientCore } = useAuth();
   const [view, setView] = useState<ClientView>('active');
   const [statusFilter, setStatusFilter] = useState<ClientStatus | ''>('');
   const [showCreate, setShowCreate] = useState(false);
@@ -57,7 +58,7 @@ export default function ClientsPage() {
             إدارة العملاء ومشاريعهم وربط التقارير بهم. تظهر هنا العملاء ضمن نطاق صلاحيتك فقط.
           </p>
         </div>
-        {canManageClients && (
+        {canEditClientCore && (
           <Button variant={showCreate ? 'ghost' : 'primary'} onClick={() => setShowCreate((v) => !v)}>
             {showCreate ? 'إغلاق' : '+ إضافة عميل'}
           </Button>
@@ -71,7 +72,7 @@ export default function ClientsPage() {
         <StatCard label="إجمالي المشاريع" value={totalProjects} />
       </div>
 
-      {canManageClients && showCreate && <CreateClientForm onDone={() => setShowCreate(false)} />}
+      {canEditClientCore && showCreate && <CreateClientForm onDone={() => setShowCreate(false)} />}
 
       <ClientHealthPanel
         report={health.data}
@@ -125,12 +126,12 @@ export default function ClientsPage() {
                 <th className="px-3 py-2.5 font-semibold">في خطر</th>
                 <th className="px-3 py-2.5 font-semibold">جهة الاتصال</th>
                 <th className="px-3 py-2.5 font-semibold"></th>
-                {canManageClients && <th className="px-3 py-2.5 font-semibold">إجراءات</th>}
+                {canEditClientCore && <th className="px-3 py-2.5 font-semibold">إجراءات</th>}
               </tr>
             </thead>
             <tbody>
               {rows.map((c) => (
-                <ClientRow key={c.id} client={c} canManage={canManageClients} />
+                <ClientRow key={c.id} client={c} canManage={canEditClientCore} />
               ))}
             </tbody>
           </table>
@@ -341,6 +342,7 @@ function ClientHealthPanel({
 }
 
 function CreateClientForm({ onDone }: { onDone: () => void }) {
+  const navigate = useNavigate();
   const create = useCreateClient();
   const users = useDirectoryUsers();
   const [name, setName] = useState('');
@@ -364,8 +366,10 @@ function CreateClientForm({ onDone }: { onDone: () => void }) {
       notes: notes.trim() || null,
     };
     try {
-      await create.mutateAsync(req);
+      const created = await create.mutateAsync(req);
       onDone();
+      // فتح صفحة تفاصيل العميل الجديد مباشرةً لاستكمال بيانات Client 360.
+      navigate(`/app/clients/${created.id}`);
     } catch (e) {
       setErr(apiErrorMessage(e, 'تعذّر إنشاء العميل.'));
     }

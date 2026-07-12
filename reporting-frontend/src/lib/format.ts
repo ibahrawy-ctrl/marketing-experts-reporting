@@ -259,6 +259,96 @@ export const serviceTypeLabel: Record<ServiceType, string> = {
   Other: 'أخرى',
 };
 
+// ===== Client 360 (CPW-R1B) — رموز الملف الموسَّع (تطابق ClientCodeConstants بالخادم) =====
+export const clientTypeLabel: Record<string, string> = {
+  Company: 'شركة',
+  Individual: 'فرد',
+  Government: 'جهة حكومية',
+  NonProfit: 'منظمة غير ربحية',
+  Startup: 'شركة ناشئة',
+  Agency: 'وكالة',
+  Other: 'أخرى',
+};
+export const CLIENT_TYPE_CODES = Object.keys(clientTypeLabel);
+
+export const sectorLabel: Record<string, string> = {
+  Retail: 'تجزئة',
+  Ecommerce: 'تجارة إلكترونية',
+  Realestate: 'عقارات',
+  Healthcare: 'رعاية صحية',
+  Education: 'تعليم',
+  Food: 'أغذية ومطاعم',
+  Technology: 'تقنية',
+  Finance: 'مالية',
+  Travel: 'سفر وسياحة',
+  Automotive: 'سيارات',
+  Beauty: 'تجميل',
+  Fashion: 'أزياء',
+  Sports: 'رياضة',
+  Entertainment: 'ترفيه',
+  Industrial: 'صناعي',
+  Services: 'خدمات',
+  Other: 'أخرى',
+};
+export const SECTOR_CODES = Object.keys(sectorLabel);
+
+export const clientSourceLabel: Record<string, string> = {
+  Referral: 'ترشيح',
+  Website: 'الموقع الإلكتروني',
+  SocialMedia: 'وسائل التواصل',
+  ColdOutreach: 'تواصل مباشر',
+  Event: 'فعالية',
+  Partner: 'شريك',
+  Advertisement: 'إعلان',
+  Existing: 'عميل حالي',
+  Other: 'أخرى',
+};
+export const CLIENT_SOURCE_CODES = Object.keys(clientSourceLabel);
+
+export const contactMethodLabel: Record<string, string> = {
+  Email: 'البريد الإلكتروني',
+  Phone: 'الهاتف',
+  WhatsApp: 'واتساب',
+  InPerson: 'مقابلة شخصية',
+  Other: 'أخرى',
+};
+export const CONTACT_METHOD_CODES = Object.keys(contactMethodLabel);
+
+export const platformLabel: Record<string, string> = {
+  Facebook: 'فيسبوك',
+  Instagram: 'إنستغرام',
+  X: 'إكس (تويتر)',
+  LinkedIn: 'لينكدإن',
+  TikTok: 'تيك توك',
+  Snapchat: 'سناب شات',
+  YouTube: 'يوتيوب',
+  GoogleAds: 'إعلانات جوجل',
+  GoogleAnalytics: 'تحليلات جوجل',
+  GoogleTagManager: 'مدير وسوم جوجل',
+  MetaBusiness: 'ميتا بزنس',
+  Website: 'الموقع الإلكتروني',
+  WhatsApp: 'واتساب',
+  Pinterest: 'بنترست',
+  Other: 'أخرى',
+};
+export const PLATFORM_CODES = Object.keys(platformLabel);
+
+export const accessStatusLabel: Record<string, string> = {
+  FullAccess: 'وصول كامل',
+  PartialAccess: 'وصول جزئي',
+  Requested: 'مطلوب',
+  Pending: 'قيد الانتظار',
+  NoAccess: 'لا يوجد وصول',
+  Revoked: 'مسحوب',
+};
+export const ACCESS_STATUS_CODES = Object.keys(accessStatusLabel);
+
+// عرض رمز اختياري بالاسم العربي إن عُرِف، وإلّا الرمز نفسه أو شرطة.
+export function codeLabel(map: Record<string, string>, code: string | null | undefined): string {
+  if (!code) return '—';
+  return map[code] ?? code;
+}
+
 // لون شارة حالة العميل/المشروع (يتوافق مع نغمات الهوية).
 export function clientStatusTone(s: ClientStatus): 'success' | 'gold' | 'alert' | 'muted' {
   return s === 'Active' ? 'success' : s === 'Paused' ? 'gold' : s === 'AtRisk' ? 'alert' : 'muted';

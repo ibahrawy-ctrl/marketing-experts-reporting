@@ -42,6 +42,9 @@ interface AuthContextValue {
   canManageTemplates: boolean;
   // صلاحية إدارة العملاء والمشاريع (إنشاء/تعديل/أرشفة) — تطابق سياسة Policies.ManagementOnly بالخادم.
   canManageClients: boolean;
+  // صلاحية إدارة بيانات العميل الأساسية (Client 360 — إنشاء/تعديل/أرشفة/تفعيل/حذف) — تطابق سياسة
+  // Policies.ClientCoreManagement بالخادم (Admin/CEO/GM/Manager؛ تستثني قائد الفريق).
+  canEditClientCore: boolean;
   // هل المستخدم مندوب مبيعات فردي (SALES_B2C/SALES_B2B) ⇒ يرى لوحة «مبيعاتي».
   isSalesRep: boolean;
   // متغيّر لوحة المندوب حسب مسمّاه ('B2C' | 'B2B' | null لغير المندوب).
@@ -71,6 +74,9 @@ const TEAM_MANAGEMENT_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager'];
 const TEMPLATE_MANAGEMENT_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager'];
 // أدوار إدارة العملاء والمشاريع (مطابقة لسياسة Policies.ManagementOnly بالخادم).
 const CLIENT_MANAGEMENT_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'Manager', 'TeamLeader'];
+// أدوار إدارة بيانات العميل الأساسية Client 360 (مطابقة لسياسة Policies.ClientCoreManagement بالخادم:
+// Admin/CEO/GM/Manager؛ تستثني قائد الفريق TeamLeader). القرار #2 في CPW-R1B.
+const CLIENT_CORE_MANAGEMENT_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'Manager'];
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
@@ -167,6 +173,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => !!user && user.roles.some((r) => CLIENT_MANAGEMENT_ROLES.includes(r)),
     [user],
   );
+  const canEditClientCore = useMemo(
+    () => !!user && user.roles.some((r) => CLIENT_CORE_MANAGEMENT_ROLES.includes(r)),
+    [user],
+  );
   // متغيّر لوحة المندوب حسب مسمّاه ('B2C' | 'B2B' | null لغير المندوب) — يُشتَقّ من JobRoleCode.
   const salesRepType = useMemo<'B2C' | 'B2B' | null>(
     () => (user?.jobRoleCode ? SALES_REP_CODES[user.jobRoleCode] ?? null : null),
@@ -181,8 +191,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, loading, login, logout, changePassword, changeEmail, hasAnyRole, canApprove, canViewGovernance, canManageTeams, canManageTemplates, canManageClients, isSalesRep, salesRepType, isSalesB2cTeamLeader }),
-    [user, loading, login, logout, changePassword, changeEmail, hasAnyRole, canApprove, canViewGovernance, canManageTeams, canManageTemplates, canManageClients, isSalesRep, salesRepType, isSalesB2cTeamLeader],
+    () => ({ user, loading, login, logout, changePassword, changeEmail, hasAnyRole, canApprove, canViewGovernance, canManageTeams, canManageTemplates, canManageClients, canEditClientCore, isSalesRep, salesRepType, isSalesB2cTeamLeader }),
+    [user, loading, login, logout, changePassword, changeEmail, hasAnyRole, canApprove, canViewGovernance, canManageTeams, canManageTemplates, canManageClients, canEditClientCore, isSalesRep, salesRepType, isSalesB2cTeamLeader],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

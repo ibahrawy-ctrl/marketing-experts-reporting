@@ -1744,6 +1744,16 @@ export interface ClientDto {
   atRiskProjectCount: number;
   createdAtUtc: string;
   updatedAtUtc: string | null;
+  // Client 360 Foundation (CPW-R1B) — حقول موسَّعة اختيارية
+  tradeNameEn: string | null;
+  legalName: string | null;
+  clientTypeCode: string | null;
+  sectorCode: string | null;
+  country: string | null;
+  city: string | null;
+  website: string | null;
+  sourceCode: string | null;
+  relationshipStartDate: string | null;
   canHardDelete: boolean;
   deleteBlockReason: string | null;
 }
@@ -1754,6 +1764,16 @@ export interface CreateClientRequest {
   mainContactInfo?: string | null;
   notes?: string | null;
   status?: ClientStatus;
+  // Client 360 Foundation (CPW-R1B)
+  tradeNameEn?: string | null;
+  legalName?: string | null;
+  clientTypeCode?: string | null;
+  sectorCode?: string | null;
+  country?: string | null;
+  city?: string | null;
+  website?: string | null;
+  sourceCode?: string | null;
+  relationshipStartDate?: string | null;
 }
 export interface UpdateClientRequest {
   name: string;
@@ -1761,6 +1781,117 @@ export interface UpdateClientRequest {
   accountManagerId?: string | null;
   mainContactName?: string | null;
   mainContactInfo?: string | null;
+  notes?: string | null;
+  // Client 360 Foundation (CPW-R1B)
+  tradeNameEn?: string | null;
+  legalName?: string | null;
+  clientTypeCode?: string | null;
+  sectorCode?: string | null;
+  country?: string | null;
+  city?: string | null;
+  website?: string | null;
+  sourceCode?: string | null;
+  relationshipStartDate?: string | null;
+}
+
+// ===== Client 360 — Contacts / Digital Channels / Brand (CPW-R1B) =====
+export interface ClientContactDto {
+  id: string;
+  clientId: string;
+  name: string;
+  jobTitle: string | null;
+  department: string | null;
+  email: string | null;
+  phone: string | null;
+  whatsApp: string | null;
+  preferredContactMethodCode: string | null;
+  isPrimary: boolean;
+  isFinancialContact: boolean;
+  notes: string | null;
+  isActive: boolean;
+  sortOrder: number;
+  createdAtUtc: string;
+  updatedAtUtc: string | null;
+}
+export interface CreateClientContactRequest {
+  name: string;
+  jobTitle?: string | null;
+  department?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  whatsApp?: string | null;
+  preferredContactMethodCode?: string | null;
+  isPrimary?: boolean;
+  isFinancialContact?: boolean;
+  notes?: string | null;
+  sortOrder?: number;
+}
+export type UpdateClientContactRequest = CreateClientContactRequest;
+
+export interface ClientDigitalChannelDto {
+  id: string;
+  clientId: string;
+  platformCode: string;
+  displayName: string | null;
+  usernameOrHandle: string | null;
+  profileUrl: string | null;
+  isActive: boolean;
+  accessStatusCode: string | null;
+  businessManagerId: string | null;
+  adAccountId: string | null;
+  pixelId: string | null;
+  ga4PropertyId: string | null;
+  gtmContainerId: string | null;
+  notes: string | null;
+  sortOrder: number;
+  createdAtUtc: string;
+  updatedAtUtc: string | null;
+}
+export interface CreateClientDigitalChannelRequest {
+  platformCode: string;
+  displayName?: string | null;
+  usernameOrHandle?: string | null;
+  profileUrl?: string | null;
+  accessStatusCode?: string | null;
+  businessManagerId?: string | null;
+  adAccountId?: string | null;
+  pixelId?: string | null;
+  ga4PropertyId?: string | null;
+  gtmContainerId?: string | null;
+  notes?: string | null;
+  sortOrder?: number;
+}
+export type UpdateClientDigitalChannelRequest = CreateClientDigitalChannelRequest;
+
+export interface ClientBrandProfileDto {
+  clientId: string;
+  businessOverview: string | null;
+  productsAndServices: string | null;
+  targetAudience: string | null;
+  targetLocations: string | null;
+  uniqueSellingProposition: string | null;
+  strengths: string | null;
+  competitors: string | null;
+  toneOfVoice: string | null;
+  preferredMessages: string | null;
+  prohibitedMessages: string | null;
+  brandGuidelinesUrl: string | null;
+  notes: string | null;
+  createdAtUtc: string;
+  updatedAtUtc: string | null;
+}
+export interface UpsertClientBrandProfileRequest {
+  businessOverview?: string | null;
+  productsAndServices?: string | null;
+  targetAudience?: string | null;
+  targetLocations?: string | null;
+  uniqueSellingProposition?: string | null;
+  strengths?: string | null;
+  competitors?: string | null;
+  toneOfVoice?: string | null;
+  preferredMessages?: string | null;
+  prohibitedMessages?: string | null;
+  brandGuidelinesUrl?: string | null;
   notes?: string | null;
 }
 

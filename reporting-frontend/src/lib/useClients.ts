@@ -13,6 +13,14 @@ import type {
   ClientStatus,
   ProjectStatus,
   ServiceType,
+  ClientContactDto,
+  CreateClientContactRequest,
+  UpdateClientContactRequest,
+  ClientDigitalChannelDto,
+  CreateClientDigitalChannelRequest,
+  UpdateClientDigitalChannelRequest,
+  ClientBrandProfileDto,
+  UpsertClientBrandProfileRequest,
 } from '../types/api';
 
 // ===== فلاتر القوائم =====
@@ -190,5 +198,115 @@ export function useDeleteProject() {
   return useMutation({
     mutationFn: async (id: string) => (await api.delete(`/projects/${id}`)).data,
     onSuccess: () => invalidateProjects(qc),
+  });
+}
+
+// ===== Client 360 — جهات الاتصال (CPW-R1B) =====
+export function useClientContacts(clientId: string | undefined, includeInactive = false) {
+  return useQuery({
+    queryKey: ['client-contacts', clientId, includeInactive],
+    queryFn: async () =>
+      (await api.get<ClientContactDto[]>(`/clients/${clientId}/contacts`, {
+        params: { includeInactive },
+      })).data,
+    enabled: !!clientId,
+  });
+}
+
+function invalidateContacts(qc: ReturnType<typeof useQueryClient>, clientId: string) {
+  qc.invalidateQueries({ queryKey: ['client-contacts', clientId] });
+}
+
+export function useCreateClientContact(clientId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (req: CreateClientContactRequest) =>
+      (await api.post<ClientContactDto>(`/clients/${clientId}/contacts`, req)).data,
+    onSuccess: () => invalidateContacts(qc, clientId),
+  });
+}
+
+export function useUpdateClientContact(clientId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, req }: { id: string; req: UpdateClientContactRequest }) =>
+      (await api.put<ClientContactDto>(`/clients/${clientId}/contacts/${id}`, req)).data,
+    onSuccess: () => invalidateContacts(qc, clientId),
+  });
+}
+
+export function useSetClientContactActive(clientId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, active }: { id: string; active: boolean }) =>
+      (await api.patch<ClientContactDto>(
+        `/clients/${clientId}/contacts/${id}/${active ? 'activate' : 'deactivate'}`,
+      )).data,
+    onSuccess: () => invalidateContacts(qc, clientId),
+  });
+}
+
+// ===== Client 360 — القنوات الرقمية (CPW-R1B) =====
+export function useClientDigitalChannels(clientId: string | undefined, includeInactive = false) {
+  return useQuery({
+    queryKey: ['client-channels', clientId, includeInactive],
+    queryFn: async () =>
+      (await api.get<ClientDigitalChannelDto[]>(`/clients/${clientId}/digital-channels`, {
+        params: { includeInactive },
+      })).data,
+    enabled: !!clientId,
+  });
+}
+
+function invalidateChannels(qc: ReturnType<typeof useQueryClient>, clientId: string) {
+  qc.invalidateQueries({ queryKey: ['client-channels', clientId] });
+}
+
+export function useCreateClientDigitalChannel(clientId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (req: CreateClientDigitalChannelRequest) =>
+      (await api.post<ClientDigitalChannelDto>(`/clients/${clientId}/digital-channels`, req)).data,
+    onSuccess: () => invalidateChannels(qc, clientId),
+  });
+}
+
+export function useUpdateClientDigitalChannel(clientId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, req }: { id: string; req: UpdateClientDigitalChannelRequest }) =>
+      (await api.put<ClientDigitalChannelDto>(`/clients/${clientId}/digital-channels/${id}`, req))
+        .data,
+    onSuccess: () => invalidateChannels(qc, clientId),
+  });
+}
+
+export function useSetClientDigitalChannelActive(clientId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, active }: { id: string; active: boolean }) =>
+      (await api.patch<ClientDigitalChannelDto>(
+        `/clients/${clientId}/digital-channels/${id}/${active ? 'activate' : 'deactivate'}`,
+      )).data,
+    onSuccess: () => invalidateChannels(qc, clientId),
+  });
+}
+
+// ===== Client 360 — ملفّ البراند (CPW-R1B) — علاقة 1:0..1 =====
+export function useClientBrand(clientId: string | undefined) {
+  return useQuery({
+    queryKey: ['client-brand', clientId],
+    queryFn: async () =>
+      (await api.get<ClientBrandProfileDto | null>(`/clients/${clientId}/brand`)).data,
+    enabled: !!clientId,
+  });
+}
+
+export function useUpsertClientBrand(clientId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (req: UpsertClientBrandProfileRequest) =>
+      (await api.put<ClientBrandProfileDto>(`/clients/${clientId}/brand`, req)).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['client-brand', clientId] }),
   });
 }
