@@ -48,6 +48,18 @@ public static class Roles
     };
 
     /// <summary>
+    /// أدوار الإدارة الأساسية للعميل (Client 360 — CPW-R1B): إنشاء/تعديل الملفّ الأساسيّ/أرشفة/إعادة تفعيل/حذف.
+    /// Admin / CEO / GM / Manager فقط. عمدًا لا تشمل TeamLeader.
+    /// المدير (Manager) لا يُمنَح رؤية شاملة تلقائيًّا — الإنشاء ضمن نطاقه فقط، وأيّ AccountManagerId مُسنَد
+    /// يجب أن يكون داخل نطاقه (يُفرَض في الخدمة). Admin/CEO/GM وحدهم يتجاوزون قيد النطاق.
+    /// كتابة الأبناء (جهات الاتصال/القنوات/البراند) لا تعتمد على هذه المجموعة وحدها بل على تفويض بالمورد داخل الخدمة.
+    /// </summary>
+    public static readonly string[] ClientCoreManagers =
+    {
+        Admin, Ceo, GeneralManager, Manager
+    };
+
+    /// <summary>
     /// الأدوار المخوّلة بإدارة عضوية الفرق (تعديل الاسم/القائد، إضافة/إزالة عضو):
     /// المستوى الإداري الأعلى فقط — Admin / CEO / GM. عمدًا لا تشمل Manager أو TeamLeader.
     /// TODO: عند تعريف أدوار HR / HR Manager / HR Officer / المساعد الإداري (Administrative Assistant)
@@ -355,6 +367,10 @@ public static class Roles
 public static class Policies
 {
     public const string ManagementOnly = "ManagementOnly";
+
+    /// <summary>الإدارة الأساسية للعميل (Client 360 — CPW-R1B): Admin/CEO/GM/Manager — بلا TeamLeader.</summary>
+    public const string ClientCoreManagement = "ClientCoreManagement";
+
     public const string AdminOnly = "AdminOnly";
     public const string ExecutiveOnly = "ExecutiveOnly"; // Admin + CEO + GM
     public const string TeamManagement = "TeamManagement"; // إدارة عضوية الفرق — Admin/CEO/GM (+ HR لاحقًا)

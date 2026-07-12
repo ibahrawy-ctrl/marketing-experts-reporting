@@ -17,6 +17,16 @@ public record ClientDto(
     int AtRiskProjectCount,
     DateTime CreatedAtUtc,
     DateTime? UpdatedAtUtc,
+    // Client 360 Foundation (CPW-R1B) — حقول موسَّعة اختيارية
+    string? TradeNameEn = null,
+    string? LegalName = null,
+    string? ClientTypeCode = null,
+    string? SectorCode = null,
+    string? Country = null,
+    string? City = null,
+    string? Website = null,
+    string? SourceCode = null,
+    DateOnly? RelationshipStartDate = null,
     bool CanHardDelete = false,
     string? DeleteBlockReason = null);
 
@@ -26,7 +36,17 @@ public record CreateClientRequest(
     string? MainContactName = null,
     string? MainContactInfo = null,
     string? Notes = null,
-    ClientStatus Status = ClientStatus.Active);
+    ClientStatus Status = ClientStatus.Active,
+    // Client 360 Foundation (CPW-R1B)
+    string? TradeNameEn = null,
+    string? LegalName = null,
+    string? ClientTypeCode = null,
+    string? SectorCode = null,
+    string? Country = null,
+    string? City = null,
+    string? Website = null,
+    string? SourceCode = null,
+    DateOnly? RelationshipStartDate = null);
 
 public record UpdateClientRequest(
     string Name,
@@ -34,7 +54,17 @@ public record UpdateClientRequest(
     Guid? AccountManagerId = null,
     string? MainContactName = null,
     string? MainContactInfo = null,
-    string? Notes = null);
+    string? Notes = null,
+    // Client 360 Foundation (CPW-R1B)
+    string? TradeNameEn = null,
+    string? LegalName = null,
+    string? ClientTypeCode = null,
+    string? SectorCode = null,
+    string? Country = null,
+    string? City = null,
+    string? Website = null,
+    string? SourceCode = null,
+    DateOnly? RelationshipStartDate = null);
 
 public record ClientFilter(
     ClientStatus? Status = null,
