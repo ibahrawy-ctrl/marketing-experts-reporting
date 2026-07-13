@@ -18,7 +18,6 @@ using Reporting.Application.Kpi;
 using Reporting.Application.Leave;
 using Reporting.Application.Notifications;
 using Reporting.Application.Payroll;
-using Reporting.Application.Positions;
 using Reporting.Application.Reports;
 using Reporting.Application.Submissions;
 using Reporting.Application.Templates;
@@ -96,7 +95,6 @@ public static class DependencyInjection
         services.AddScoped<IClientProjectAccess, ClientProjectAccess>();
         services.AddScoped<IClientService, ClientService>();
         services.AddScoped<IProjectService, ProjectService>();
-        services.AddScoped<IPositionService, PositionService>();
         services.AddScoped<IPayrollImpactService, PayrollImpactService>();
         services.AddScoped<IAccountPortfolioService, AccountPortfolioService>();
         services.AddScoped<ICourseService, CourseService>();

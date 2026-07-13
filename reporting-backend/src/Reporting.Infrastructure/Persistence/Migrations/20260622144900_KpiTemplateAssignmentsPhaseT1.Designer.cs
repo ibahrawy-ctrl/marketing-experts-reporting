@@ -12,7 +12,7 @@ using Reporting.Infrastructure.Persistence;
 namespace Reporting.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260622140138_KpiTemplateAssignmentsPhaseT1")]
+    [Migration("20260622144900_KpiTemplateAssignmentsPhaseT1")]
     partial class KpiTemplateAssignmentsPhaseT1
     {
         /// <inheritdoc />
@@ -1353,138 +1353,6 @@ namespace Reporting.Infrastructure.Persistence.Migrations
                     b.ToTable("teams", (string)null);
                 });
 
-            modelBuilder.Entity("Reporting.Domain.Entities.Positions.Position", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<DateTime?>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Code")
-                        .IsUnique();
-
-                    b.ToTable("positions", (string)null);
-                });
-
-            modelBuilder.Entity("Reporting.Domain.Entities.Positions.PositionPermission", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("PermissionKey")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<Guid>("PositionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PositionId", "PermissionKey")
-                        .IsUnique();
-
-                    b.ToTable("position_permissions", (string)null);
-                });
-
-            modelBuilder.Entity("Reporting.Domain.Entities.Positions.PositionScope", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("DepartmentId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Kind")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<Guid>("PositionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("TargetUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("TeamId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PositionId");
-
-                    b.ToTable("position_scopes", (string)null);
-                });
-
-            modelBuilder.Entity("Reporting.Domain.Entities.Positions.UserPosition", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("AssignedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("PositionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PositionId");
-
-                    b.HasIndex("UserId", "PositionId")
-                        .IsUnique();
-
-                    b.ToTable("user_positions", (string)null);
-                });
-
             modelBuilder.Entity("Reporting.Domain.Entities.Submissions.ApprovalStep", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2243,39 +2111,6 @@ namespace Reporting.Infrastructure.Persistence.Migrations
                     b.Navigation("Department");
                 });
 
-            modelBuilder.Entity("Reporting.Domain.Entities.Positions.PositionPermission", b =>
-                {
-                    b.HasOne("Reporting.Domain.Entities.Positions.Position", "Position")
-                        .WithMany("Permissions")
-                        .HasForeignKey("PositionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Position");
-                });
-
-            modelBuilder.Entity("Reporting.Domain.Entities.Positions.PositionScope", b =>
-                {
-                    b.HasOne("Reporting.Domain.Entities.Positions.Position", "Position")
-                        .WithMany("Scopes")
-                        .HasForeignKey("PositionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Position");
-                });
-
-            modelBuilder.Entity("Reporting.Domain.Entities.Positions.UserPosition", b =>
-                {
-                    b.HasOne("Reporting.Domain.Entities.Positions.Position", "Position")
-                        .WithMany("Assignments")
-                        .HasForeignKey("PositionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Position");
-                });
-
             modelBuilder.Entity("Reporting.Domain.Entities.Submissions.ApprovalStep", b =>
                 {
                     b.HasOne("Reporting.Domain.Entities.Submissions.ReportSubmission", "ReportSubmission")
@@ -2354,15 +2189,6 @@ namespace Reporting.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Reporting.Domain.Entities.Org.Department", b =>
                 {
                     b.Navigation("Teams");
-                });
-
-            modelBuilder.Entity("Reporting.Domain.Entities.Positions.Position", b =>
-                {
-                    b.Navigation("Assignments");
-
-                    b.Navigation("Permissions");
-
-                    b.Navigation("Scopes");
                 });
 
             modelBuilder.Entity("Reporting.Domain.Entities.Submissions.ReportSubmission", b =>

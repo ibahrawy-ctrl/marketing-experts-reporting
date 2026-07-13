@@ -12,8 +12,8 @@ using Reporting.Infrastructure.Persistence;
 namespace Reporting.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260620001156_FlexiblePositionsPhase1A")]
-    partial class FlexiblePositionsPhase1A
+    [Migration("20260626135944_AddReportViewGrants")]
+    partial class AddReportViewGrants
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -453,9 +453,26 @@ namespace Reporting.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<string>("HrAttachmentContentType")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("HrAttachmentOriginalFileName")
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)");
+
                     b.Property<string>("HrAttachmentPath")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
+
+                    b.Property<long?>("HrAttachmentSizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("HrAttachmentUploadedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("HrAttachmentUploadedByUserId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("HrComment")
                         .HasMaxLength(2000)
@@ -1007,6 +1024,57 @@ namespace Reporting.Infrastructure.Persistence.Migrations
                     b.ToTable("kpi_templates", (string)null);
                 });
 
+            modelBuilder.Entity("Reporting.Domain.Entities.Kpi.KpiTemplateAssignment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<Guid>("KpiTemplateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ScopeType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("KpiTemplateId");
+
+                    b.HasIndex("KpiTemplateId", "ScopeType", "ScopeId", "Kind")
+                        .IsUnique();
+
+                    b.ToTable("kpi_template_assignments", (string)null);
+                });
+
             modelBuilder.Entity("Reporting.Domain.Entities.Kpi.KpiTemplateVersion", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1048,6 +1116,10 @@ namespace Reporting.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<decimal?>("BalanceAtRequest")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<DateTime?>("CancelledAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -1058,6 +1130,12 @@ namespace Reporting.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime?>("EmployeeAcknowledgedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("EmployeeAcknowledgedUnpaidDeduction")
+                        .HasColumnType("boolean");
 
                     b.Property<DateOnly>("EndDate")
                         .HasColumnType("date");
@@ -1074,6 +1152,9 @@ namespace Reporting.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsHrRequest")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsPotentialUnpaidLeave")
+                        .HasColumnType("boolean");
+
                     b.Property<DateTime?>("ManagerDecisionAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -1084,6 +1165,9 @@ namespace Reporting.Infrastructure.Persistence.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
 
+                    b.Property<int>("PermissionShortfallResolution")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Reason")
                         .IsRequired()
                         .HasMaxLength(1000)
@@ -1092,6 +1176,9 @@ namespace Reporting.Infrastructure.Persistence.Migrations
                     b.Property<string>("RejectionReason")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
+
+                    b.Property<int?>("RequestedLeaveDays")
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("RequesterUserId")
                         .HasColumnType("uuid");
@@ -1121,6 +1208,10 @@ namespace Reporting.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
+
+                    b.Property<decimal?>("UncoveredLeaveDays")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<DateTime?>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone");
@@ -1302,120 +1393,37 @@ namespace Reporting.Infrastructure.Persistence.Migrations
                     b.ToTable("teams", (string)null);
                 });
 
-            modelBuilder.Entity("Reporting.Domain.Entities.Positions.Position", b =>
+            modelBuilder.Entity("Reporting.Domain.Entities.Org.UserTeamMembership", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("Description")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("EndDateUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
-                    b.Property<string>("Name")
+                    b.Property<string>("MembershipType")
                         .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
 
-                    b.Property<DateTime?>("UpdatedAtUtc")
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime?>("StartDateUtc")
                         .HasColumnType("timestamp with time zone");
 
-                    b.HasKey("Id");
-
-                    b.HasIndex("Code")
-                        .IsUnique();
-
-                    b.ToTable("positions", (string)null);
-                });
-
-            modelBuilder.Entity("Reporting.Domain.Entities.Positions.PositionPermission", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("PermissionKey")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<Guid>("PositionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PositionId", "PermissionKey")
-                        .IsUnique();
-
-                    b.ToTable("position_permissions", (string)null);
-                });
-
-            modelBuilder.Entity("Reporting.Domain.Entities.Positions.PositionScope", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("DepartmentId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Kind")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<Guid>("PositionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("TargetUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("TeamId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PositionId");
-
-                    b.ToTable("position_scopes", (string)null);
-                });
-
-            modelBuilder.Entity("Reporting.Domain.Entities.Positions.UserPosition", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("AssignedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("PositionId")
+                    b.Property<Guid>("TeamId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTime?>("UpdatedAtUtc")
@@ -1426,12 +1434,52 @@ namespace Reporting.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("PositionId");
+                    b.HasIndex("TeamId");
 
-                    b.HasIndex("UserId", "PositionId")
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("UserId", "TeamId")
                         .IsUnique();
 
-                    b.ToTable("user_positions", (string)null);
+                    b.ToTable("user_team_memberships", (string)null);
+                });
+
+            modelBuilder.Entity("Reporting.Domain.Entities.Payroll.PayrollImpactReview", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FinanceNote")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<Guid>("LeaveRequestId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ReviewedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ReviewedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LeaveRequestId")
+                        .IsUnique();
+
+                    b.ToTable("payroll_impact_reviews", (string)null);
                 });
 
             modelBuilder.Entity("Reporting.Domain.Entities.Submissions.ApprovalStep", b =>
@@ -1545,6 +1593,70 @@ namespace Reporting.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("report_submissions", (string)null);
+                });
+
+            modelBuilder.Entity("Reporting.Domain.Entities.Submissions.ReportViewGrant", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("GranteeUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime?>("RevokedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("RevokedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ScopeKind")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("TargetTeamId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TargetUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GranteeUserId");
+
+                    b.HasIndex("IsActive");
+
+                    b.HasIndex("TargetTeamId");
+
+                    b.HasIndex("TargetUserId");
+
+                    b.HasIndex("GranteeUserId", "TargetTeamId")
+                        .IsUnique()
+                        .HasFilter("\"IsActive\" AND \"ScopeKind\" = 1");
+
+                    b.HasIndex("GranteeUserId", "TargetUserId")
+                        .IsUnique()
+                        .HasFilter("\"IsActive\" AND \"ScopeKind\" = 0");
+
+                    b.ToTable("report_view_grants", (string)null);
                 });
 
             modelBuilder.Entity("Reporting.Domain.Entities.Submissions.SubmissionFieldValue", b =>
@@ -2159,6 +2271,17 @@ namespace Reporting.Infrastructure.Persistence.Migrations
                     b.Navigation("KpiEvaluation");
                 });
 
+            modelBuilder.Entity("Reporting.Domain.Entities.Kpi.KpiTemplateAssignment", b =>
+                {
+                    b.HasOne("Reporting.Domain.Entities.Kpi.KpiTemplate", "KpiTemplate")
+                        .WithMany()
+                        .HasForeignKey("KpiTemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("KpiTemplate");
+                });
+
             modelBuilder.Entity("Reporting.Domain.Entities.Kpi.KpiTemplateVersion", b =>
                 {
                     b.HasOne("Reporting.Domain.Entities.Kpi.KpiTemplate", "KpiTemplate")
@@ -2181,37 +2304,30 @@ namespace Reporting.Infrastructure.Persistence.Migrations
                     b.Navigation("Department");
                 });
 
-            modelBuilder.Entity("Reporting.Domain.Entities.Positions.PositionPermission", b =>
+            modelBuilder.Entity("Reporting.Domain.Entities.Org.UserTeamMembership", b =>
                 {
-                    b.HasOne("Reporting.Domain.Entities.Positions.Position", "Position")
-                        .WithMany("Permissions")
-                        .HasForeignKey("PositionId")
+                    b.HasOne("Reporting.Domain.Entities.Org.Team", "Team")
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Reporting.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Position");
+                    b.Navigation("Team");
                 });
 
-            modelBuilder.Entity("Reporting.Domain.Entities.Positions.PositionScope", b =>
+            modelBuilder.Entity("Reporting.Domain.Entities.Payroll.PayrollImpactReview", b =>
                 {
-                    b.HasOne("Reporting.Domain.Entities.Positions.Position", "Position")
-                        .WithMany("Scopes")
-                        .HasForeignKey("PositionId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                    b.HasOne("Reporting.Domain.Entities.Leave.LeaveRequest", null)
+                        .WithMany()
+                        .HasForeignKey("LeaveRequestId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.Navigation("Position");
-                });
-
-            modelBuilder.Entity("Reporting.Domain.Entities.Positions.UserPosition", b =>
-                {
-                    b.HasOne("Reporting.Domain.Entities.Positions.Position", "Position")
-                        .WithMany("Assignments")
-                        .HasForeignKey("PositionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Position");
                 });
 
             modelBuilder.Entity("Reporting.Domain.Entities.Submissions.ApprovalStep", b =>
@@ -2292,15 +2408,6 @@ namespace Reporting.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Reporting.Domain.Entities.Org.Department", b =>
                 {
                     b.Navigation("Teams");
-                });
-
-            modelBuilder.Entity("Reporting.Domain.Entities.Positions.Position", b =>
-                {
-                    b.Navigation("Assignments");
-
-                    b.Navigation("Permissions");
-
-                    b.Navigation("Scopes");
                 });
 
             modelBuilder.Entity("Reporting.Domain.Entities.Submissions.ReportSubmission", b =>

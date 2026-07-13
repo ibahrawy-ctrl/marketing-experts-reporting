@@ -591,18 +591,6 @@ public enum ReportViewGrantScopeKind
 }
 
 /// <summary>
-/// نوع نطاق المنصب المرن (Phase 1A — رؤية فقط). يحدّد كيف يُترجَم نطاق المنصب إلى مجموعة مستخدمين:
-/// Department/Team عبر مرجع كيان، SpecificUsers عبر معرّف مستخدم واحد لكل سطر، AllCompany = كل الشركة.
-/// </summary>
-public enum PositionScopeKind
-{
-    Department = 0,
-    Team = 1,
-    SpecificUsers = 2,
-    AllCompany = 3
-}
-
-/// <summary>
 /// حالة المراجعة المالية لطلب إجازة/استئذان مؤثّر على الراتب (FIN-L1 — عرض التأثير على الرواتب).
 /// مراجعة إعلامية بحتة: لا تغيّر حالة الطلب الأصلي ولا تُجري أيّ خصم آليّ. الطلب بلا صفّ مراجعة = Pending ضمنيًّا.
 /// </summary>

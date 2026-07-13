@@ -376,10 +376,6 @@ public static class Policies
     // معالجة طلبات الموارد البشرية العامة (V1.1) — HR/Admin/CEO/GM/CeoSupport (Roles.HrRequestManagers).
     public const string HrRequestManagement = "HrRequestManagement";
 
-    // إدارة المناصب المرنة (Phase 1A — رؤية فقط) — Admin فقط (عمدًا لا CEO/GM).
-    // المناصب توسّع نطاق الرؤية فقط ولا تمنح أي قدرة اعتماد؛ تُدار حصرًا من مدير النظام.
-    public const string PositionManagement = "PositionManagement";
-
     // تعديل البيانات الأساسية غير الحسّاسة للموظف (الاسم فقط) — Admin/CeoSupport/HR (Roles.UserBasicManagers).
     // لا تمسّ الأدوار/الصلاحيات/كلمة المرور/التفعيل/البريد/الإنشاء/الحذف؛ منفصلة عن AdminOnly وUserPasswordReset.
     public const string UserBasicManagement = "UserBasicManagement";

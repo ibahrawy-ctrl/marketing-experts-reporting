@@ -10,7 +10,6 @@ using Reporting.Domain.Entities.Kpi;
 using Reporting.Domain.Entities.Leave;
 using Reporting.Domain.Entities.Org;
 using Reporting.Domain.Entities.Payroll;
-using Reporting.Domain.Entities.Positions;
 using Reporting.Domain.Entities.Services;
 using Reporting.Domain.Entities.Submissions;
 using Reporting.Domain.Entities.System;
@@ -95,12 +94,6 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
 
     // المراجعة المالية لطلبات الإجازة/الاستئذان المؤثّرة على الراتب (FIN-L1 — عرض فقط، إعلامي)
     public DbSet<PayrollImpactReview> PayrollImpactReviews => Set<PayrollImpactReview>();
-
-    // المناصب المرنة (Phase 1A — رؤية فقط)
-    public DbSet<Position> Positions => Set<Position>();
-    public DbSet<PositionPermission> PositionPermissions => Set<PositionPermission>();
-    public DbSet<PositionScope> PositionScopes => Set<PositionScope>();
-    public DbSet<UserPosition> UserPositions => Set<UserPosition>();
 
     // النظام
     public DbSet<Notification> Notifications => Set<Notification>();

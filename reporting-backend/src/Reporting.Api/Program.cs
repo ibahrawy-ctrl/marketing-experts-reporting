@@ -84,8 +84,6 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy(Policies.BalanceManagement, p => p.RequireRole(Roles.BalanceManagers));
     // معالجة طلبات الموارد البشرية العامة (V1.1 — خدمات الموظف) — HR/Admin/CEO/GM/CeoSupport.
     options.AddPolicy(Policies.HrRequestManagement, p => p.RequireRole(Roles.HrRequestManagers));
-    // إدارة المناصب المرنة (Phase 1A — رؤية فقط) — Admin فقط (عمدًا لا CEO/GM).
-    options.AddPolicy(Policies.PositionManagement, p => p.RequireRole(Roles.Admin));
     // تعديل البيانات الأساسية غير الحسّاسة للموظف (الاسم فقط) — Admin/CeoSupport/HR.
     options.AddPolicy(Policies.UserBasicManagement, p => p.RequireRole(Roles.UserBasicManagers));
     // تعديل الانتماء التنظيمي للموظف (الإدارة/الفريق/المدير) — Admin/CeoSupport/HR/GM/CEO. القيود في طبقة الخدمة.
