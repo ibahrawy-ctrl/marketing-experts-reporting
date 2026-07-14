@@ -583,6 +583,49 @@ public class SubmissionService : ISubmissionService
         return Result<SubmissionDto>.Success(await BuildDtoAsync(submissionId, ct));
     }
 
+    public async Task<Result<SubmissionDto>> AdminDeleteAsync(Guid submissionId, AdminDeleteRequest request, CancellationToken ct = default)
+    {
+        if (_currentUser.UserId is not Guid userId)
+            return Result<SubmissionDto>.Failure("غير مصرّح.", "auth.unauthenticated");
+        if (!_currentUser.IsInAnyRole(Roles.AdminReportKpiDeleters))
+            return Result<SubmissionDto>.Failure("الحذف الإداريّ من صلاحية مدير النظام أو الرئيس التنفيذي أو المدير العام فقط.", "auth.forbidden");
+
+        var reason = request.Reason?.Trim();
+        if (string.IsNullOrWhiteSpace(reason))
+            return Result<SubmissionDto>.Failure("سبب الحذف الإداريّ إلزاميّ.", "submission.delete_reason_required");
+
+        var submission = await _db.ReportSubmissions.Include(s => s.ApprovalSteps)
+            .FirstOrDefaultAsync(s => s.Id == submissionId, ct);
+        if (submission is null) return Result<SubmissionDto>.Failure("التسليم غير موجود.", "submission.not_found");
+        if (submission.IsDeleted)
+            return Result<SubmissionDto>.Failure("التسليم محذوف إداريًّا بالفعل.", "submission.already_deleted.conflict");
+
+        var now = DateTime.UtcNow;
+        // حذف إداريّ ناعم: لا حذف صفوف — يُعلَّم IsDeleted فيختفي من كل القوائم/التجميعات (Global Query Filter) ومن «بانتظار اعتمادي».
+        submission.IsDeleted = true;
+        submission.DeletedAtUtc = now;
+        submission.DeletedByUserId = userId;
+        submission.DeletionReason = reason;
+        submission.UpdatedAtUtc = now;
+
+        // خطوات الاعتماد المعلّقة تُحوَّل إلى CancelledByAdministrativeDeletion (لا حذف)، وتصفير المعتمِد الحالي
+        // كي لا يبقى التقرير معلّقًا في «بانتظار اعتماد» أيّ مستخدم.
+        foreach (var step in submission.ApprovalSteps.Where(a => a.Status == ApprovalStatus.Pending))
+        {
+            step.Status = ApprovalStatus.CancelledByAdministrativeDeletion;
+            step.DecidedAtUtc = now;
+        }
+        submission.CurrentApproverId = null;
+
+        await _db.SaveChangesAsync(ct);
+
+        await _audit.LogAsync(userId, "submission.admin_deleted", nameof(ReportSubmission), submission.Id,
+            JsonSerializer.Serialize(new { reason, submitterId = submission.SubmitterId, periodKey = submission.PeriodKey }), ct: ct);
+
+        var dto = await BuildDtoAsync(submissionId, ct);
+        return Result<SubmissionDto>.Success(dto);
+    }
+
     public async Task<Result<IReadOnlyList<SubmissionListItemDto>>> ListAsync(SubmissionFilter filter, CancellationToken ct = default)
     {
         if (_currentUser.UserId is not Guid userId)
@@ -688,7 +731,9 @@ public class SubmissionService : ISubmissionService
 
     private async Task<SubmissionDto> BuildDtoAsync(Guid id, CancellationToken ct)
     {
-        var s = await _db.ReportSubmissions.AsNoTracking()
+        // IgnoreQueryFilters كي تُبنى الحمولة حتى بعد الحذف الإداريّ الناعم (IsDeleted=true) في AdminDeleteAsync؛
+        // الجلب بالمعرّف فلا يُدخِل صفوفًا محذوفة في المسارات العادية.
+        var s = await _db.ReportSubmissions.IgnoreQueryFilters().AsNoTracking()
             .Include(x => x.FieldValues)
             .Include(x => x.ApprovalSteps)
             .FirstAsync(x => x.Id == id, ct);

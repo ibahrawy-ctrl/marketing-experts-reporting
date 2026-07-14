@@ -13,8 +13,11 @@ public class ReportSubmissionConfiguration : IEntityTypeConfiguration<ReportSubm
         b.Property(x => x.PeriodKey).IsRequired().HasMaxLength(30);
         b.Property(x => x.PeriodType).HasConversion<string>().HasMaxLength(30);
         b.Property(x => x.Status).HasConversion<string>().HasMaxLength(40);
+        b.Property(x => x.DeletionReason).HasMaxLength(1000);
         // عدم تكرار التسليم لنفس الفترة من نفس المُرسِل لنفس إصدار القالب (BR).
-        b.HasIndex(x => new { x.ReportTemplateVersionId, x.SubmitterId, x.PeriodKey }).IsUnique();
+        // فهرس فريد جزئيّ يستثني المحذوف إداريًّا (IsDeleted=true) كي تُتاح إعادة التسليم لنفس الفترة بعد الحذف الناعم (ADMIN-GOVERNANCE-R1).
+        b.HasIndex(x => new { x.ReportTemplateVersionId, x.SubmitterId, x.PeriodKey })
+            .IsUnique().HasFilter("\"IsDeleted\" = false");
         b.HasIndex(x => x.SubmitterId);
         b.HasIndex(x => x.Status);
         b.HasIndex(x => x.CurrentApproverId);
@@ -24,6 +27,8 @@ public class ReportSubmissionConfiguration : IEntityTypeConfiguration<ReportSubm
             .HasForeignKey(x => x.ReportSubmissionId).OnDelete(DeleteBehavior.Cascade);
         b.HasMany(x => x.ApprovalSteps).WithOne(x => x.ReportSubmission!)
             .HasForeignKey(x => x.ReportSubmissionId).OnDelete(DeleteBehavior.Cascade);
+        // الحذف الإداريّ الناعم — Global Query Filter يستبعد المحذوف من كل الاستعلامات (IgnoreQueryFilters في الحوكمة فقط).
+        b.HasQueryFilter(x => !x.IsDeleted);
     }
 }
 
@@ -44,7 +49,8 @@ public class ApprovalStepConfiguration : IEntityTypeConfiguration<ApprovalStep>
     {
         b.ToTable("approval_steps");
         b.HasKey(x => x.Id);
-        b.Property(x => x.Status).HasConversion<string>().HasMaxLength(30);
+        // 40 لاستيعاب CancelledByAdministrativeDeletion (33 حرفًا) — ADMIN-GOVERNANCE-R1.
+        b.Property(x => x.Status).HasConversion<string>().HasMaxLength(40);
         b.HasIndex(x => x.ReportSubmissionId);
         b.HasIndex(x => x.ApproverId);
     }

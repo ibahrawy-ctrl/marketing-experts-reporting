@@ -72,6 +72,9 @@ public record SaveFieldValuesRequest(IReadOnlyList<FieldValueInput> Values);
 
 public record ApprovalActionRequest(string? Comment);
 
+/// <summary>طلب حذف إداريّ ناعم لتقرير مُسلَّم (ADMIN-GOVERNANCE-R1): السبب إلزاميّ ويُحفَظ في الأثر التدقيقيّ.</summary>
+public record AdminDeleteRequest(string? Reason);
+
 public record SubmissionFilter(
     SubmissionStatus? Status = null,
     string? PeriodKey = null,

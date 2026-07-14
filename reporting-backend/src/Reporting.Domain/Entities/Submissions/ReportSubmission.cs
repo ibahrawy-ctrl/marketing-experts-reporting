@@ -25,6 +25,13 @@ public class ReportSubmission : BaseEntity
     public DateTime? ClosedAtUtc { get; set; }
     public Guid? CurrentApproverId { get; set; }
 
+    // الحذف الإداريّ الناعم (ADMIN-GOVERNANCE-R1) — لا حذف صفوف؛ يُستبعَد عبر Global Query Filter.
+    // الأثر التدقيقيّ يبقى كاملًا؛ إعادة الرفع لنفس الفترة مُتاحة عبر الفهرس الفريد الجزئي.
+    public bool IsDeleted { get; set; }
+    public DateTime? DeletedAtUtc { get; set; }
+    public Guid? DeletedByUserId { get; set; }
+    public string? DeletionReason { get; set; }
+
     public ICollection<SubmissionFieldValue> FieldValues { get; set; } = new List<SubmissionFieldValue>();
     public ICollection<ApprovalStep> ApprovalSteps { get; set; } = new List<ApprovalStep>();
 }

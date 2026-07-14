@@ -21,5 +21,17 @@ public class KpiEvaluation : BaseEntity
     public KpiTrend Trend { get; set; } = KpiTrend.Unknown;
     public DateTime? SubmittedAtUtc { get; set; }
 
+    // المراجعة الحوكميّة (ADMIN-GOVERNANCE-R1) — المُراجِع المعيَّن عند الإرسال وقراره.
+    public Guid? ReviewerId { get; set; }
+    public DateTime? ReviewedAtUtc { get; set; }
+    public string? ReviewNote { get; set; }
+
+    // الحذف الإداريّ الناعم — لا حذف صفوف؛ يُستبعَد عبر Global Query Filter، والأثر التدقيقيّ يبقى كاملًا.
+    public bool IsDeleted { get; set; }
+    public DateTime? DeletedAtUtc { get; set; }
+    public Guid? DeletedByUserId { get; set; }
+    public string? DeletionReason { get; set; }
+
     public ICollection<KpiResult> Results { get; set; } = new List<KpiResult>();
+    public ICollection<KpiEvaluationReviewEvent> ReviewEvents { get; set; } = new List<KpiEvaluationReviewEvent>();
 }

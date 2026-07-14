@@ -18,6 +18,7 @@ import type {
   KpiCalcMethod,
   KpiEvaluationDto,
   KpiEvaluationListItemDto,
+  KpiEvaluationReviewEventDto,
   KpiTemplateDto,
   KpiResultDto,
   PeriodType,
@@ -32,6 +33,19 @@ const calcMethodHint: Record<KpiCalcMethod, string> = {
   Auto: 'تلقائي — أدخل القيمة الفعلية، وسيحسب النظام الدرجة من المستهدف.',
   Manual: 'يدوي — أدخل الدرجة مباشرة من 0 إلى 100.',
   Hybrid: 'مزيج — إن أدخلت الدرجة اليدوية فهي المعتمدة، وإلا تُحتسب من القيمة الفعلية.',
+};
+
+// عناوين عربية لأحداث سجلّ المراجعة (ADMIN-GOVERNANCE-R1).
+const reviewActionLabel: Record<string, string> = {
+  Submitted: 'إرسال للمراجعة',
+  Approved: 'اعتماد',
+  RequestRevision: 'طلب تعديل',
+  Reject: 'رفض نهائيّ',
+  Comment: 'تعليق مراجعة',
+  Flag: 'إشارة للمراجعة',
+  RequestReopen: 'طلب إعادة فتح',
+  Reopen: 'إعادة فتح',
+  AdminDeleted: 'حذف إداريّ',
 };
 
 export default function KpiPage() {
@@ -54,7 +68,7 @@ export default function KpiPage() {
   };
   const [tab, setTab] = useState<'overview' | 'evaluations'>(isManagement ? 'overview' : 'evaluations');
 
-  if (openId) return <KpiDetail id={openId} isManagement={isManagement} onBack={closeDetail} />;
+  if (openId) return <KpiDetail id={openId} onBack={closeDetail} />;
 
   // عرض مخصّص لموظّف واحد: لا يعرض تقييمات كل الشركة، بل تقييمات هذا الموظّف فقط ضمن نطاق المستخدم.
   if (isManagement && subject)
@@ -287,7 +301,7 @@ function KpiList({ isManagement, onOpen, hideTitle, subjectFilter }: { isManagem
   );
 }
 
-function KpiDetail({ id, isManagement, onBack }: { id: string; isManagement: boolean; onBack: () => void }) {
+function KpiDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const qc = useQueryClient();
   const { data: ev, isLoading, isError, refetch } = useQuery({
     queryKey: ['kpi-evaluation', id],
@@ -347,6 +361,31 @@ function KpiDetail({ id, isManagement, onBack }: { id: string; isManagement: boo
       void qc.invalidateQueries({ queryKey: ['kpi-evaluations'] });
     },
     onError: (e) => setErr(apiErrorMessage(e)),
+  });
+
+  // إجراءات المراجعة والحوكمة (ADMIN-GOVERNANCE-R1). كلها POST بجسم {reason} — بعضها يتطلّب سببًا إلزاميًّا.
+  const reviewAction = useMutation({
+    mutationFn: ({ action, reason }: { action: string; reason?: string }) =>
+      api.post(`/kpi-evaluations/${id}/${action}`, { reason }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['kpi-evaluation', id] });
+      void qc.invalidateQueries({ queryKey: ['kpi-evaluations'] });
+      void qc.invalidateQueries({ queryKey: ['kpi-review-events', id] });
+    },
+    onError: (e) => setErr(apiErrorMessage(e)),
+  });
+
+  // تشغيل إجراء يتطلّب سببًا إلزاميًّا عبر نافذة إدخال بسيطة. يُلغى بلا فعل عند غياب السبب.
+  const runWithReason = (action: string, promptLabel: string) => {
+    setErr(null);
+    const reason = window.prompt(promptLabel)?.trim();
+    if (!reason) return;
+    reviewAction.mutate({ action, reason });
+  };
+
+  const { data: reviewEvents } = useQuery({
+    queryKey: ['kpi-review-events', id],
+    queryFn: async () => (await api.get<KpiEvaluationReviewEventDto[]>(`/kpi-evaluations/${id}/review-events`)).data,
   });
 
   if (isLoading) return <LoadingState label="يتم تحميل التقييم…" />;
@@ -453,12 +492,72 @@ function KpiDetail({ id, isManagement, onBack }: { id: string; isManagement: boo
             <span className="text-xs text-ink-3">عند الإرسال يُحفظ ما لم يُحفظ تلقائيًا أولًا.</span>
           </div>
         )}
-        {isManagement && ev.status === 'Submitted' && (
-          <div className="mt-4">
-            <Button disabled={approve.isPending} onClick={() => { setErr(null); approve.mutate(); }}>اعتماد</Button>
+        {/* مسار المراجعة والحوكمة (ADMIN-GOVERNANCE-R1): تُعرَض الأزرار حسب الأعلام المحسوبة خادميًّا. */}
+        {(ev.canReview || ev.canFlag || ev.canReopen || ev.canAdminDelete) && (
+          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-4">
+            {ev.canReview && (ev.status === 'UnderReview' || ev.status === 'Submitted') && (
+              <>
+                <Button disabled={reviewAction.isPending} onClick={() => { setErr(null); approve.mutate(); }}>اعتماد</Button>
+                <Button variant="ghost" disabled={reviewAction.isPending}
+                  onClick={() => runWithReason('request-revision', 'سبب طلب التعديل (إلزاميّ):')}>طلب تعديل</Button>
+                <Button variant="ghost" disabled={reviewAction.isPending}
+                  onClick={() => runWithReason('reject', 'سبب الرفض النهائيّ (إلزاميّ):')}>رفض نهائيّ</Button>
+              </>
+            )}
+            {ev.canFlag && (
+              <>
+                <Button variant="ghost" disabled={reviewAction.isPending}
+                  onClick={() => runWithReason('flag', 'سبب الإشارة للمراجعة (إلزاميّ):')}>إشارة للمراجعة</Button>
+                <Button variant="ghost" disabled={reviewAction.isPending}
+                  onClick={() => runWithReason('request-reopen', 'سبب طلب إعادة الفتح (إلزاميّ):')}>طلب إعادة فتح</Button>
+              </>
+            )}
+            <Button variant="ghost" disabled={reviewAction.isPending}
+              onClick={() => runWithReason('comment', 'التعليق (إلزاميّ):')}>تعليق مراجعة</Button>
+            {ev.canReopen && (
+              <Button variant="ghost" disabled={reviewAction.isPending}
+                onClick={() => runWithReason('reopen', 'سبب إعادة الفتح للتعديل (إلزاميّ):')}>إعادة فتح</Button>
+            )}
+            {ev.canAdminDelete && (
+              <Button variant="ghost" disabled={reviewAction.isPending}
+                onClick={() => runWithReason('admin-delete', 'سبب الحذف الإداريّ (إلزاميّ):')}>حذف إداريّ</Button>
+            )}
           </div>
         )}
       </Card>
+
+      {/* معلومات المراجع الحاليّ ونتيجة المراجعة إن وُجدت. */}
+      {(ev.reviewerName || ev.reviewNote) && (
+        <Card>
+          <h3 className="mb-2 text-sm font-bold text-navy">المراجعة</h3>
+          {ev.reviewerName && (
+            <p className="text-sm text-ink-2">
+              المراجع: <span className="font-medium text-navy">{ev.reviewerName}</span>
+              {ev.reviewedAtUtc ? ` · ${new Date(ev.reviewedAtUtc).toLocaleString('ar')}` : ''}
+            </p>
+          )}
+          {ev.reviewNote && <p className="mt-1 text-sm text-ink-2">ملاحظة المراجعة: {ev.reviewNote}</p>}
+        </Card>
+      )}
+
+      {/* الخطّ الزمنيّ لأحداث المراجعة (Timeline). */}
+      {reviewEvents && reviewEvents.length > 0 && (
+        <Card>
+          <h3 className="mb-3 text-sm font-bold text-navy">سجلّ المراجعة</h3>
+          <ul className="space-y-2">
+            {reviewEvents.map((rev) => (
+              <li key={rev.id} className="border-r-2 border-line pr-3 text-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge tone="navy">{reviewActionLabel[rev.action] ?? rev.action}</Badge>
+                  <span className="text-ink-2">{rev.actorName ?? '—'}</span>
+                  <span className="text-xs text-ink-3">{new Date(rev.createdAtUtc).toLocaleString('ar')}</span>
+                </div>
+                {rev.reason && <p className="mt-1 text-ink-2">{rev.reason}</p>}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       {/* الملاحظات الإدارية المرتبطة بهذا التقييم (طبقة سياقية). */}
       <ManagementNotesPanel

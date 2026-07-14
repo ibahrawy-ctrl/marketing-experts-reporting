@@ -61,6 +61,8 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
     public DbSet<KpiEvaluation> KpiEvaluations => Set<KpiEvaluation>();
     public DbSet<KpiResult> KpiResults => Set<KpiResult>();
     public DbSet<KpiTemplateAssignment> KpiTemplateAssignments => Set<KpiTemplateAssignment>();
+    // سجلّ حوكمة مراجعة تقييمات KPI (ADMIN-GOVERNANCE-R1)
+    public DbSet<KpiEvaluationReviewEvent> KpiEvaluationReviewEvents => Set<KpiEvaluationReviewEvent>();
 
     // التطوير
     public DbSet<TrainingNeed> TrainingNeeds => Set<TrainingNeed>();

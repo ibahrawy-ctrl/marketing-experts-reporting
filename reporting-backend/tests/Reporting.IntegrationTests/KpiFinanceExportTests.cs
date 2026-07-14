@@ -95,9 +95,19 @@ public class KpiFinanceExportTests
         return (created.Id, manual!.Id, auto!.Id);
     }
 
-    /// <summary>ينشئ تقييمًا أسبوعيًّا (manual=auto=score)، يحفظ، يُرسل، ثم يعتمد ⇒ Status=Approved، TotalScore=score.</summary>
-    private static async Task<Guid> ApproveWeeklyAsync(
+    /// <summary>
+    /// ينشئ تقييمًا أسبوعيًّا (manual=auto=score)، يحفظ، يُرسل (⇒ UnderReview + إسناد مُراجِع)،
+    /// ثم يعتمد عبر مُراجِع مُصعَّد (CEO؛ Admin/CEO/GM) ليس المُدخِل ولا الموضوع ⇒ Status=Approved.
+    /// </summary>
+    private async Task<Guid> ApproveWeeklyAsync(
         HttpClient evaluator, Guid templateId, Guid subjectId, Guid manualId, Guid autoId, string weekKey, decimal score)
+    {
+        var (approver, _) = await TestAuth.CreateUserAsync(_factory, Roles.Ceo);
+        return await ApproveWeeklyAsync(evaluator, approver, templateId, subjectId, manualId, autoId, weekKey, score);
+    }
+
+    private static async Task<Guid> ApproveWeeklyAsync(
+        HttpClient evaluator, HttpClient approver, Guid templateId, Guid subjectId, Guid manualId, Guid autoId, string weekKey, decimal score)
     {
         var ev = await (await evaluator.PostAsJsonAsync("/api/kpi-evaluations",
             new CreateKpiEvaluationRequest(templateId, subjectId, PeriodType.Weekly, weekKey)))
@@ -109,7 +119,7 @@ public class KpiFinanceExportTests
                 new KpiResultInput(autoId, score, null, null)
             }));
         await evaluator.PostAsync($"/api/kpi-evaluations/{ev.Id}/submit", null);
-        var approved = await (await evaluator.PostAsync($"/api/kpi-evaluations/{ev.Id}/approve", null))
+        var approved = await (await approver.PostAsync($"/api/kpi-evaluations/{ev.Id}/approve", null))
             .ReadAsync<KpiEvaluationDto>();
         Assert.Equal(KpiEvaluationStatus.Approved, approved!.Status);
         return ev.Id;

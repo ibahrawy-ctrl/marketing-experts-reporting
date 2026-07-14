@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Reporting.Application.Common;
 using Reporting.Application.Submissions;
 using Reporting.Domain.Enums;
 
@@ -71,4 +72,13 @@ public class SubmissionsController : ApiControllerBase
     [HttpPost("{id:guid}/escalate")]
     public async Task<IActionResult> Escalate(Guid id, ApprovalActionRequest request, CancellationToken ct)
         => FromResult(await _service.EscalateAsync(id, request, ct));
+
+    /// <summary>
+    /// حذف إداريّ ناعم لتقرير مُسلَّم (ADMIN-GOVERNANCE-R1، Admin/CEO/GM فقط): سبب إلزاميّ + تدقيق.
+    /// POST بجسم بدل DELETE-with-body. يحوّل خطوات الاعتماد المعلّقة إلى CancelledByAdministrativeDeletion.
+    /// </summary>
+    [HttpPost("{id:guid}/admin-delete")]
+    [Authorize(Policy = Policies.AdminReportDelete)]
+    public async Task<IActionResult> AdminDelete(Guid id, AdminDeleteRequest request, CancellationToken ct)
+        => FromResult(await _service.AdminDeleteAsync(id, request, ct));
 }

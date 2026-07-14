@@ -135,7 +135,12 @@ public enum ApprovalStatus
     Pending = 0,
     Approved = 1,
     Returned = 2,
-    Escalated = 3
+    Escalated = 3,
+    /// <summary>
+    /// أُلغيت لأن التقرير حُذف إداريًّا (ADMIN-GOVERNANCE-R1). التاريخ محفوظ (لا حذف صفوف)،
+    /// والخطوة تُستبعَد من قوائم الاعتماد المعلّقة. القيمة النصّية تتّسع بعد توسيع العمود إلى 40.
+    /// </summary>
+    CancelledByAdministrativeDeletion = 4
 }
 
 /// <summary>دورية مؤشرات الأداء.</summary>
@@ -153,14 +158,25 @@ public enum KpiCalcMethod
     Hybrid = 2
 }
 
-/// <summary>حالة تقييم الـKPI.</summary>
+/// <summary>
+/// حالة تقييم الـKPI. Draft→InProgress→(Submit)→UnderReview→(Approved|NeedsRevision|Rejected)
+/// (ADMIN-GOVERNANCE-R1). عند الإرسال ينتقل مباشرةً إلى UnderReview ويُعيَّن مُراجِع تلقائيًّا؛
+/// تبقى Submitted للتوافق مع سجلّات قديمة فقط (ليست مرحلة معلّقة جديدة). Closed حالة تاريخية بلا مُنتِج.
+/// يدخل النتائج النهائية فقط عند Approved.
+/// </summary>
 public enum KpiEvaluationStatus
 {
     Draft = 0,
     InProgress = 1,
     Submitted = 2,
     Approved = 3,
-    Closed = 4
+    Closed = 4,
+    /// <summary>قيد المراجعة لدى المُراجِع المعيَّن (ReviewerId). ليست نهائية ولا تدخل التجميعات.</summary>
+    UnderReview = 5,
+    /// <summary>أُعيدت للمُدخِل لتصحيحها (بسبب من المُراجِع أو إعادة فتح إداريّة). غير نهائية.</summary>
+    NeedsRevision = 6,
+    /// <summary>مرفوضة نهائيًّا من المُراجِع. غير نهائية ولا تدخل التجميعات.</summary>
+    Rejected = 7
 }
 
 /// <summary>اتجاه المؤشر مقارنة بالفترة السابقة.</summary>

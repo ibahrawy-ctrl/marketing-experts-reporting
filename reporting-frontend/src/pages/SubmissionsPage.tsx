@@ -612,7 +612,8 @@ export function subFieldInputKind(t: RepeatableSubField['type']): 'number' | 'lo
 
 function SubmissionDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const qc = useQueryClient();
-  const { user } = useAuth();
+  const { user, hasAnyRole } = useAuth();
+  const canAdminDelete = hasAnyRole('Admin', 'CEO', 'GeneralManager');
   const { data: sub, isLoading, isError, refetch } = useQuery({
     queryKey: ['submission', id],
     queryFn: async () => (await api.get<SubmissionDto>(`/submissions/${id}`)).data,
@@ -662,6 +663,13 @@ function SubmissionDetail({ id, onBack }: { id: string; onBack: () => void }) {
     mutationFn: (kind: 'approve' | 'return' | 'escalate') =>
       api.post(`/submissions/${id}/${kind}`, { comment: comment || null }),
     onSuccess: () => { setComment(''); invalidateAll(); },
+    onError: (e) => setErr(apiErrorMessage(e)),
+  });
+
+  // حذف إداريّ ناعم للتقرير (ADMIN-GOVERNANCE-R1): Admin/CEO/GM فقط، سبب إلزاميّ + تدقيق.
+  const adminDelete = useMutation({
+    mutationFn: (reason: string) => api.post(`/submissions/${id}/admin-delete`, { reason }),
+    onSuccess: () => { invalidateAll(); onBack(); },
     onError: (e) => setErr(apiErrorMessage(e)),
   });
 
@@ -999,6 +1007,28 @@ function SubmissionDetail({ id, onBack }: { id: string; onBack: () => void }) {
           {!comment.trim() && (
             <p className="mt-2 text-xs text-ink-2">الاعتماد لا يتطلّب سببًا، لكن الإعادة والتصعيد يتطلّبان كتابة السبب.</p>
           )}
+        </Card>
+      )}
+
+      {/* الحذف الإداريّ الناعم (ADMIN-GOVERNANCE-R1): Admin/CEO/GM فقط، سبب إلزاميّ. */}
+      {canAdminDelete && (
+        <Card>
+          <h2 className="mb-2 font-semibold text-navy">حذف إداريّ</h2>
+          <p className="mb-3 text-sm text-ink-2">
+            حذف ناعم للتقرير مع حفظ السبب في سجلّ التدقيق. يُلغي خطوات الاعتماد المعلّقة ويُخفي التقرير من التجميعات.
+          </p>
+          <Button
+            variant="danger"
+            disabled={adminDelete.isPending}
+            onClick={() => {
+              setErr(null);
+              const reason = window.prompt('سبب الحذف الإداريّ (إلزاميّ):')?.trim();
+              if (!reason) return;
+              adminDelete.mutate(reason);
+            }}
+          >
+            حذف إداريّ للتقرير
+          </Button>
         </Card>
       )}
 

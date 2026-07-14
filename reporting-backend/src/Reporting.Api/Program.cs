@@ -113,6 +113,15 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy(Policies.EmailNotificationLog, p => p.RequireRole(Roles.EmailNotificationLogViewers));
     // مركز التحكم بالبريد (EMAIL-CONTROL-CENTER-R1) — كتابة قوالب/قواعد + تذكير يدويّ DryRun: Admin حصرًا.
     options.AddPolicy(Policies.EmailControlManage, p => p.RequireRole(Roles.EmailControlManagers));
+    // ===== ADMIN-GOVERNANCE-R1 — التصحيح الإداريّ ومراجعة التقارير/الـKPI =====
+    // الحذف الإداريّ الناعم للتقرير المُسلَّم (POST /admin-delete بسبب إلزاميّ) — Admin/CEO/GM فقط.
+    options.AddPolicy(Policies.AdminReportDelete, p => p.RequireRole(Roles.AdminReportKpiDeleters));
+    // الحوكمة الإداريّة لتقييم KPI (حذف ناعم/إعادة فتح للتعديل) — Admin/CEO/GM فقط.
+    options.AddPolicy(Policies.AdminKpiGovernance, p => p.RequireRole(Roles.AdminReportKpiDeleters));
+    // معالجة مراجعة تقييم KPI (اعتماد/طلب تعديل/رفض/تعليق) — Admin/CEO/GM/Manager/TeamLeader (الفرض النهائي في الخدمة).
+    options.AddPolicy(Policies.KpiReview, p => p.RequireRole(Roles.KpiReviewers));
+    // الإشارة/التعليق/طلب إعادة الفتح على تقييم KPI (بلا اعتماد/رفض/حذف) — HR + Admin/CEO/GM.
+    options.AddPolicy(Policies.KpiReviewFlag, p => p.RequireRole(Roles.KpiReviewFlaggers));
 });
 
 // ===== Rate limiting لمنع التخمين على المصادقة =====

@@ -67,6 +67,55 @@ public class KpiEvaluationsController : ApiControllerBase
     public async Task<IActionResult> Approve(Guid id, CancellationToken ct)
         => FromResult(await _service.ApproveAsync(id, ct));
 
+    // ===== ADMIN-GOVERNANCE-R1: مسار مراجعة/اعتماد وحوكمة تقييمات KPI =====
+    // القرار (اعتماد/طلب تعديل/رفض) من المراجع المختصّ فقط؛ التحقّق النهائيّ داخل الخدمة (المراجع ليس المُقيَّم/المُقيّم).
+
+    /// <summary>طلب مراجعة (NeedsRevision): من UnderReview إلى NeedsRevision بسبب إلزاميّ. صلاحية المراجع (KpiReview).</summary>
+    [HttpPost("{id:guid}/request-revision")]
+    [Authorize(Policy = Policies.KpiReview)]
+    public async Task<IActionResult> RequestRevision(Guid id, KpiReviewActionRequest request, CancellationToken ct)
+        => FromResult(await _service.RequestRevisionAsync(id, request, ct));
+
+    /// <summary>رفض نهائيّ (Rejected): من UnderReview إلى Rejected بسبب إلزاميّ. صلاحية المراجع (KpiReview).</summary>
+    [HttpPost("{id:guid}/reject")]
+    [Authorize(Policy = Policies.KpiReview)]
+    public async Task<IActionResult> Reject(Guid id, KpiReviewActionRequest request, CancellationToken ct)
+        => FromResult(await _service.RejectAsync(id, request, ct));
+
+    /// <summary>تعليق مراجعة (لا يُغيّر الحالة): للمراجع أو HR (KpiReviewFlag). التحقّق النهائيّ داخل الخدمة.</summary>
+    [HttpPost("{id:guid}/comment")]
+    public async Task<IActionResult> Comment(Guid id, KpiReviewActionRequest request, CancellationToken ct)
+        => FromResult(await _service.CommentAsync(id, request, ct));
+
+    /// <summary>تمييز للمراجعة (Flag) من HR: لا يُغيّر الحالة، يُخطر Admin/GM/CEO. صلاحية (KpiReviewFlag).</summary>
+    [HttpPost("{id:guid}/flag")]
+    [Authorize(Policy = Policies.KpiReviewFlag)]
+    public async Task<IActionResult> Flag(Guid id, KpiReviewActionRequest request, CancellationToken ct)
+        => FromResult(await _service.FlagForReviewAsync(id, request, ct));
+
+    /// <summary>طلب إعادة فتح من HR (لا يمنح صلاحية إعادة الفتح الفعليّة): سبب إلزاميّ، يُخطر Admin/GM/CEO. (KpiReviewFlag).</summary>
+    [HttpPost("{id:guid}/request-reopen")]
+    [Authorize(Policy = Policies.KpiReviewFlag)]
+    public async Task<IActionResult> RequestReopen(Guid id, KpiReviewActionRequest request, CancellationToken ct)
+        => FromResult(await _service.RequestReopenAsync(id, request, ct));
+
+    /// <summary>إعادة فتح للتعديل (Reopen): إلى UnderReview بصلاحية Admin/CEO/GM (AdminKpiGovernance)، سبب إلزاميّ.</summary>
+    [HttpPost("{id:guid}/reopen")]
+    [Authorize(Policy = Policies.AdminKpiGovernance)]
+    public async Task<IActionResult> Reopen(Guid id, KpiReviewActionRequest request, CancellationToken ct)
+        => FromResult(await _service.ReopenForRevisionAsync(id, request, ct));
+
+    /// <summary>حذف إداريّ ناعم لتقييم KPI (Admin/CEO/GM فقط، AdminKpiGovernance): سبب إلزاميّ + تدقيق، بلا حذف فيزيائيّ.</summary>
+    [HttpPost("{id:guid}/admin-delete")]
+    [Authorize(Policy = Policies.AdminKpiGovernance)]
+    public async Task<IActionResult> AdminDelete(Guid id, KpiReviewActionRequest request, CancellationToken ct)
+        => FromResult(await _service.AdminDeleteAsync(id, request, ct));
+
+    /// <summary>سجلّ أحداث المراجعة لتقييم KPI (Timeline)، حسب صلاحية العرض (التحقّق داخل الخدمة).</summary>
+    [HttpGet("{id:guid}/review-events")]
+    public async Task<IActionResult> ReviewEvents(Guid id, CancellationToken ct)
+        => FromResult(await _service.ListReviewEventsAsync(id, ct));
+
     // ===== تصدير KPI للمالية (KPI-FIN1) — قراءة/تصدير فقط على مستوى الشركة، لا يحسب/يصرف مستحقات =====
     // النطاق مفروض بالسياسة (Admin/CEO/GM/HR/CeoSupport) بلا ScopeResolver. لا يغيّر أيّ تقييم.
 

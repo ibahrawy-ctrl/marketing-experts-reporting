@@ -847,8 +847,9 @@ export type FieldType =
   | 'ProjectRepeatableSection';
 
 export type TemplateStatus = 'Draft' | 'Published' | 'Archived';
-export type ApprovalStatus = 'Pending' | 'Approved' | 'Returned' | 'Escalated';
-export type KpiEvaluationStatus = 'Draft' | 'InProgress' | 'Submitted' | 'Approved' | 'Closed';
+export type ApprovalStatus = 'Pending' | 'Approved' | 'Returned' | 'Escalated' | 'CancelledByAdministrativeDeletion';
+// ADMIN-GOVERNANCE-R1: حالات مراجعة KPI الجديدة (UnderReview/NeedsRevision/Rejected). Submitted يبقى للتوافق مع القديم.
+export type KpiEvaluationStatus = 'Draft' | 'InProgress' | 'Submitted' | 'Approved' | 'Closed' | 'UnderReview' | 'NeedsRevision' | 'Rejected';
 export type KpiCadence = 'WeeklyPulse' | 'Quarterly';
 export type KpiCalcMethod = 'Manual' | 'Auto' | 'Hybrid';
 
@@ -1188,6 +1189,11 @@ export interface SubmissionDto {
   projectName: string | null;
 }
 
+// ADMIN-GOVERNANCE-R1: جسم طلب الحذف الإداريّ الناعم لتقرير مُسلَّم (السبب إلزاميّ).
+export interface AdminDeleteRequest {
+  reason?: string;
+}
+
 export interface FieldValueInput {
   templateFieldId: string;
   valueText?: string | null;
@@ -1230,6 +1236,32 @@ export interface KpiEvaluationDto {
   submittedAtUtc: string | null;
   canEdit: boolean;
   results: KpiResultDto[];
+  // ADMIN-GOVERNANCE-R1: مسار المراجعة/الاعتماد
+  reviewerId: string | null;
+  reviewerName: string | null;
+  reviewedAtUtc: string | null;
+  reviewNote: string | null;
+  canReview: boolean;
+  canFlag: boolean;
+  canAdminDelete: boolean;
+  canReopen: boolean;
+}
+
+// ADMIN-GOVERNANCE-R1: جسم إجراء المراجعة (السبب إلزاميّ في الإجراءات التي تتطلّبه).
+export interface KpiReviewActionRequest {
+  reason?: string;
+}
+
+// ADMIN-GOVERNANCE-R1: حدث في سجلّ مراجعة تقييم KPI (Timeline).
+export interface KpiEvaluationReviewEventDto {
+  id: string;
+  action: string;
+  actorId: string;
+  actorName: string | null;
+  fromStatus: string | null;
+  toStatus: string | null;
+  reason: string | null;
+  createdAtUtc: string;
 }
 
 export interface KpiTemplateDto {

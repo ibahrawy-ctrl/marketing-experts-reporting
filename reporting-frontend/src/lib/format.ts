@@ -171,6 +171,9 @@ export const kpiEvaluationStatusLabel: Record<KpiEvaluationStatus, string> = {
   Submitted: 'مُرسَل',
   Approved: 'معتمد',
   Closed: 'مُغلق',
+  UnderReview: 'قيد المراجعة',
+  NeedsRevision: 'يحتاج تعديلًا',
+  Rejected: 'مرفوض',
 };
 
 export const approvalStatusLabel: Record<ApprovalStatus, string> = {
@@ -178,6 +181,7 @@ export const approvalStatusLabel: Record<ApprovalStatus, string> = {
   Approved: 'معتمد',
   Returned: 'مُعاد',
   Escalated: 'مُصعّد',
+  CancelledByAdministrativeDeletion: 'أُلغِيت بالحذف الإداريّ',
 };
 
 export const fieldTypeLabel: Record<FieldType, string> = {

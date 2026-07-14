@@ -309,6 +309,38 @@ public static class Roles
         Admin
     };
 
+    // ===== التصحيح الإداريّ ومراجعة التقارير/الـKPI (ADMIN-GOVERNANCE-R1) =====
+
+    /// <summary>
+    /// الأدوار المخوّلة بالحذف الإداريّ الناعم للتقارير المُسلَّمة وتقييمات KPI (بسبب إلزاميّ + أثر تدقيقيّ كامل):
+    /// Admin / CEO / GM فقط. عمدًا لا تشمل Manager / TeamLeader / HR / CeoSupport / Employee / Viewer.
+    /// الحذف ناعم (IsDeleted) لا حذف صفوف؛ يُستبعَد من كل الاستعلامات والتجميعات ويبقى مرئيًّا في شاشات الحوكمة فقط.
+    /// </summary>
+    public static readonly string[] AdminReportKpiDeleters =
+    {
+        Admin, Ceo, GeneralManager
+    };
+
+    /// <summary>
+    /// الأدوار المخوّلة بمعالجة مراجعة تقييم KPI (اعتماد/طلب تعديل/رفض/تعليق): Admin / CEO / GM / Manager / TeamLeader.
+    /// طبقة دفاع أولى عند نقطة النهاية؛ الفرض الفعليّ في الخدمة = المُراجِع المعيَّن (ReviewerId) أو تصعيد أعلى (GM/CEO/Admin)،
+    /// ولا يجوز أن يكون المُراجِع هو المُدخِل/الموضوع/المُقيِّم الحاليّ. Employee / Viewer / HR / CeoSupport ممنوعون من الاعتماد.
+    /// </summary>
+    public static readonly string[] KpiReviewers =
+    {
+        Admin, Ceo, GeneralManager, Manager, TeamLeader
+    };
+
+    /// <summary>
+    /// الأدوار المخوّلة بالإشارة للمراجعة/التعليق/طلب إعادة الفتح على تقييم KPI (بلا اعتماد/رفض نهائيّ/حذف/إعادة فتح فعليّة):
+    /// HR + Admin / CEO / GM. عمدًا لا تُمنَح CeoSupport أيّ قدرة جديدة هنا. HR لا يعتمد ولا يرفض ولا يحذف ولا يعيد الفتح فعليًّا؛
+    /// طلب إعادة الفتح يُنشئ حدث مراجعة + تدقيق ويُشعِر Admin/GM/CEO فقط دون تغيير الحالة.
+    /// </summary>
+    public static readonly string[] KpiReviewFlaggers =
+    {
+        Hr, Admin, Ceo, GeneralManager
+    };
+
     public const string DisplayAr_Admin = "مدير النظام";
     public const string DisplayAr_Ceo = "الرئيس التنفيذي";
     public const string DisplayAr_GeneralManager = "المدير العام";
@@ -431,4 +463,18 @@ public static class Policies
     // مركز التحكم بالبريد (EMAIL-CONTROL-CENTER-R1): Roles.EmailControlManagers (Admin حصرًا).
     // كتابة قوالب/قواعد + تذكير يدويّ DryRun. مستقلّ تمامًا ولا يمسّ أي سير عمل. R1: DryRun فقط.
     public const string EmailControlManage = "EmailControlManage";
+
+    // الحذف الإداريّ الناعم للتقرير المُسلَّم (ADMIN-GOVERNANCE-R1) — Admin/CEO/GM (Roles.AdminReportKpiDeleters).
+    // POST /admin-delete بسبب إلزاميّ؛ لا حذف صفوف، أثر تدقيقيّ كامل، إلغاء خطوات الاعتماد المعلّقة إداريًّا.
+    public const string AdminReportDelete = "AdminReportDelete";
+
+    // الحوكمة الإداريّة لتقييم KPI (ADMIN-GOVERNANCE-R1) — الحذف الناعم/إعادة الفتح للتعديل — Admin/CEO/GM (Roles.AdminReportKpiDeleters).
+    public const string AdminKpiGovernance = "AdminKpiGovernance";
+
+    // معالجة مراجعة تقييم KPI (اعتماد/طلب تعديل/رفض/تعليق) — Admin/CEO/GM/Manager/TeamLeader (Roles.KpiReviewers).
+    // الفرض النهائي (المُراجِع المعيَّن أو تصعيد) في طبقة الخدمة؛ هذه طبقة دفاع أولى عند نقطة النهاية.
+    public const string KpiReview = "KpiReview";
+
+    // الإشارة/التعليق/طلب إعادة الفتح على تقييم KPI (بلا اعتماد/رفض/حذف) — HR + Admin/CEO/GM (Roles.KpiReviewFlaggers).
+    public const string KpiReviewFlag = "KpiReviewFlag";
 }
