@@ -89,6 +89,19 @@ public class SubmissionService : ISubmissionService
                     : "دورية هذا التقرير أسبوعية في المرحلة الحالية.",
                 "submission.cadence_invalid");
 
+        // ROLE-AWARE-REPORTING-CALENDAR — التحقّق الخادميّ من مفتاح الدورة الأسبوعي (Phase 2.4):
+        // لا نثق بمفتاح الفترة القادم من الواجهة. للتقارير الأسبوعية يجب أن يكون المفتاح دورةً صالحة بنيويًّا
+        // (Sat→Fri عبر ReportingCalendarPolicy) وألّا يكون دورةً مستقبلية لم تبدأ بعد. لا يُطبَّق على اليومي
+        // (مفتاح المبيعات تاريخ YYYY-MM-DD لا دورة). لا تصحيح بيانات ولا تغيير مفتاح مخزَّن — منعُ إنشاءٍ فقط.
+        if (expectedCadence == PeriodType.Weekly)
+        {
+            if (!ReportingCalendarPolicy.IsValidCycleKey(periodKey))
+                return Result<SubmissionDto>.Failure("مفتاح الدورة غير صالح.", "report.cycle_key_invalid");
+            var cycleStart = ReportingCalendarPolicy.CycleRange(periodKey).Start;
+            if (cycleStart > ReportingCalendarPolicy.RiyadhToday())
+                return Result<SubmissionDto>.Failure("لا يمكن إنشاء تقرير لدورة لم تبدأ بعد.", "calendar.cycle_not_open");
+        }
+
         // منع ازدواج التقرير الأساسي (Phase 4 §4): لكل موظف تقرير أساسي واحد مطلوب لكل فترة.
         // قسم النبض يكون مضمَّنًا داخل التقرير الأساسي، أو قالبًا تكميليًا (Supplementary) لا يُحتسب
         // تقريرًا أساسيًا ثانيًا. القوالب التكميلية لا يطبّق عليها هذا الحارس.

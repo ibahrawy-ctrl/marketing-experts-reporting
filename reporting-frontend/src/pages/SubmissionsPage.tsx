@@ -17,7 +17,8 @@ import {
   approvalStatusLabel,
   formatDate,
 } from '../lib/format';
-import { operationalWeekKey, riyadhToday } from '../lib/dashboardPeriod';
+import { riyadhToday } from '../lib/dashboardPeriod';
+import { WeeklyCycleCalendarPicker } from '../components/WeeklyCycleCalendarPicker';
 import { normalizeDigits, sanitizeNumericInput, isNumericGridColumn } from '../lib/numericNormalizer';
 import type {
   SubmissionListItem,
@@ -401,12 +402,11 @@ function MineTab({ onOpen }: { onOpen: (id: string) => void }) {
   const periodType: PeriodType = user?.expectedReportCadence ?? 'Weekly';
   const isDaily = periodType === 'Daily';
 
-  // مفتاح الفترة الافتراضي = الفترة الحالية المطابقة لمنطق الخادم (يومي: تاريخ اليوم، أسبوعي: الأسبوع التشغيلي)،
-  // فلا يحتاج المستخدم لكتابة الصيغة يدويًّا. النص الإرشادي الأحمر يبقى توضيحًا للصيغة فقط عند تعديلها بقيمة خاطئة.
+  // مفتاح الفترة الافتراضي: اليوميّ (مندوب مبيعات) = تاريخ اليوم؛ الأسبوعيّ = فارغ يملؤه منتقي التقويم
+  // بالدورة الحالية المحسوبة خادميًّا (لا حساب محليّ لمفتاح الأسبوع، ولا إدخال نصّيّ حرّ).
   const defaultPeriodKey = () => {
-    const today = riyadhToday();
-    if (isDaily) return today.toISOString().slice(0, 10); // YYYY-MM-DD (تاريخ تقويميّ UTC)
-    return operationalWeekKey(today);
+    if (isDaily) return riyadhToday().toISOString().slice(0, 10); // YYYY-MM-DD (تاريخ تقويميّ UTC)
+    return '';
   };
 
   const [reportTemplateId, setReportTemplateId] = useState('');
@@ -467,35 +467,59 @@ function MineTab({ onOpen }: { onOpen: (id: string) => void }) {
             </Alert>
           </div>
         )}
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="w-72">
-            <Field label="القالب">
-              <Select value={reportTemplateId} onChange={(e) => setReportTemplateId(e.target.value)}>
-                <option value="">اختر قالبًا…</option>
-                {templates?.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.title}{t.classification === 'Supplementary' ? ' — اختياري (استبيان/متابعة)' : ' — مطلوب'}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <div className="mt-1 text-xs text-navy/60">تظهر هنا القوالب المناسبة لدور صاحب التقرير فقط.</div>
-          </div>
-          <div className="w-40">
-            <Field label="الدورية">
-              <div className="flex h-10 items-center">
-                <Badge tone="navy">{periodTypeLabel[periodType]}</Badge>
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="w-72">
+              <Field label="القالب">
+                <Select value={reportTemplateId} onChange={(e) => setReportTemplateId(e.target.value)}>
+                  <option value="">اختر قالبًا…</option>
+                  {templates?.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.title}{t.classification === 'Supplementary' ? ' — اختياري (استبيان/متابعة)' : ' — مطلوب'}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <div className="mt-1 text-xs text-navy/60">تظهر هنا القوالب المناسبة لدور صاحب التقرير فقط.</div>
+            </div>
+            <div className="w-40">
+              <Field label="الدورية">
+                <div className="flex h-10 items-center">
+                  <Badge tone="navy">{periodTypeLabel[periodType]}</Badge>
+                </div>
+              </Field>
+            </div>
+            {isDaily && (
+              <div className="w-44">
+                <Field label="الفترة (يوم)">
+                  <Input type="date" value={periodKey} onChange={(e) => setPeriodKey(e.target.value)} />
+                </Field>
               </div>
-            </Field>
+            )}
+            {isDaily && (
+              <Button disabled={!reportTemplateId || !periodKey || create.isPending} onClick={() => { setErr(null); create.mutate(); }}>
+                إنشاء تقرير
+              </Button>
+            )}
           </div>
-          <div className="w-40">
-            <Field label={isDaily ? 'الفترة (يوم)' : 'الفترة (أسبوع)'}>
-              <Input value={periodKey} onChange={(e) => setPeriodKey(e.target.value)} placeholder={isDaily ? '2026-06-15' : '2026-W25'} />
-            </Field>
-          </div>
-          <Button disabled={!reportTemplateId || !periodKey || create.isPending} onClick={() => { setErr(null); create.mutate(); }}>
-            إنشاء تقرير
-          </Button>
+
+          {/* أسبوعيّ: منتقي دورة التقارير المُدرِك للدور (يحسب الدورة الحالية وتاريخ الاستحقاق خادميًّا). */}
+          {!isDaily && (
+            <div className="max-w-md">
+              <Field label="الفترة (أسبوع)">
+                <WeeklyCycleCalendarPicker
+                  context="Report"
+                  value={periodKey || null}
+                  onChange={(key) => { setErr(null); setPeriodKey(key); }}
+                />
+              </Field>
+              <div className="mt-3">
+                <Button disabled={!reportTemplateId || !periodKey || create.isPending} onClick={() => { setErr(null); create.mutate(); }}>
+                  إنشاء تقرير
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </Card>
       <Card>

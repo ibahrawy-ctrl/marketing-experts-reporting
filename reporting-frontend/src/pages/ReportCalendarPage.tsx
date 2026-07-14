@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { Alert, Badge, Card, Field, Input, Select, StatCard } from '../components/ui';
+import { WeeklyCycleCalendarPicker } from '../components/WeeklyCycleCalendarPicker';
 import { LoadingState, QueryError } from '../components/states';
 import {
   formatDate,
@@ -24,9 +25,6 @@ import type {
   SalesDailyComplianceReport,
 } from '../types/api';
 
-const WEEK_KEY = /^\d{4}-W\d{2}$/;
-const isWeekKey = (k: string) => WEEK_KEY.test(k.trim());
-
 // السنوات المتاحة في المرشّحات — السنة الحالية وما حولها.
 const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = [CURRENT_YEAR + 1, CURRENT_YEAR, CURRENT_YEAR - 1, CURRENT_YEAR - 2];
@@ -37,8 +35,8 @@ export default function ReportCalendarPage() {
       <div>
         <h1 className="text-2xl font-bold text-navy">تقويم التقارير والتجميع الدوري</h1>
         <p className="mt-1 text-sm text-ink-2">
-          الأسبوع التشغيلي من الخميس إلى الأربعاء. تابع هنا التقارير الناقصة، وتأخّر الاعتماد، والتزام
-          المبيعات اليومي، ومتوسط مؤشرات الأداء عبر الفترات — كلّها ضمن نطاقك فقط.
+          دورة التقارير من السبت إلى الجمعة، وتاريخ الاستحقاق يختلف بحسب دورك. تابع هنا التقارير الناقصة،
+          وتأخّر الاعتماد، والتزام المبيعات اليومي، ومتوسط مؤشرات الأداء عبر الفترات — كلّها ضمن نطاقك فقط.
         </p>
       </div>
       <Alert tone="navy">
@@ -54,9 +52,8 @@ export default function ReportCalendarPage() {
 
 // ===== القسم الأسبوعي: تقارير ناقصة + تأخّر اعتماد + التزام مبيعات يومي =====
 function WeeklyCalendarSection() {
-  const [weekInput, setWeekInput] = useState('');
-  const weekKey = isWeekKey(weekInput) ? weekInput.trim() : undefined;
-  const weekValid = weekInput.trim() === '' || isWeekKey(weekInput);
+  // الأسبوع المختار = مفتاح الدورة المحسوب خادميًّا عبر المنتقي (لا إدخال نصّي، لا حساب محليّ).
+  const [weekKey, setWeekKey] = useState<string | null>(null);
 
   const missing = useQuery({
     queryKey: ['report-calendar', 'missing', weekKey ?? 'current'],
@@ -64,7 +61,6 @@ function WeeklyCalendarSection() {
       (await api.get<MissingReportsReport>('/report-calendar/missing-reports', {
         params: weekKey ? { weekKey } : undefined,
       })).data,
-    enabled: weekValid,
   });
   const delays = useQuery({
     queryKey: ['report-calendar', 'approval-delays'],
@@ -76,7 +72,6 @@ function WeeklyCalendarSection() {
       (await api.get<SalesDailyComplianceReport>('/report-calendar/sales-daily-compliance', {
         params: weekKey ? { weekKey } : undefined,
       })).data,
-    enabled: weekValid,
   });
 
   return (
@@ -91,14 +86,14 @@ function WeeklyCalendarSection() {
             </p>
           )}
         </div>
-        <div className="w-44">
-          <Field label="أسبوع محدّد (اختياري)">
-            <Input value={weekInput} onChange={(e) => setWeekInput(e.target.value)} placeholder="2026-W25" />
+        <div className="w-full max-w-sm">
+          <Field label="أسبوع محدّد">
+            <WeeklyCycleCalendarPicker
+              context="Report"
+              value={weekKey}
+              onChange={(key) => setWeekKey(key)}
+            />
           </Field>
-          {!weekValid && <p className="mt-1 text-xs text-alert">استخدم صيغة YYYY-Www مثل 2026-W25.</p>}
-          {weekValid && weekInput.trim() === '' && (
-            <p className="mt-1 text-xs text-ink-3">اتركه فارغًا للأسبوع الحالي.</p>
-          )}
         </div>
       </div>
 

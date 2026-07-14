@@ -23,10 +23,7 @@ import type {
   KpiResultDto,
   PeriodType,
 } from '../types/api';
-import { operationalWeekKey, riyadhToday } from '../lib/dashboardPeriod';
-
-// صيغة الفترة الأسبوعية المعتمدة YYYY-Www (مثل 2026-W25) — تمنع إدخال قيَم حرّة غير مفهومة.
-const isValidWeekKey = (key: string) => /^\d{4}-W\d{2}$/.test(key.trim());
+import { WeeklyCycleCalendarPicker } from '../components/WeeklyCycleCalendarPicker';
 
 // توضيح طريقة الإدخال لكل نوع مؤشّر داخل شاشة التقييم — يحدّد للمستخدم الحقل المعتمد في الحساب.
 const calcMethodHint: Record<KpiCalcMethod, string> = {
@@ -119,7 +116,8 @@ function KpiList({ isManagement, onOpen, hideTitle, subjectFilter }: { isManagem
   // حارس الدورية: تقييم KPI أسبوعي فقط في المرحلة الحالية — لا يُتاح اختيار دورية أخرى.
   const periodType: PeriodType = 'Weekly';
   // افتراضيًّا الأسبوع التشغيلي الحالي (الخميس→الأربعاء) المطابق لمنطق الخادم، فلا يُضطر المستخدم لنسخ الصيغة يدويًّا.
-  const [periodKey, setPeriodKey] = useState(() => operationalWeekKey(riyadhToday()));
+  // فارغ في البداية — منتقي التقويم يملؤه بالدورة الحالية المحسوبة خادميًّا (بلا حساب محليّ للأسبوع).
+  const [periodKey, setPeriodKey] = useState('');
   const [err, setErr] = useState<string | null>(null);
 
   // نطاق إنشاء التقييم أضيق من نطاق العرض: لا تظهر إلا أسماء المرؤوسين المباشرين
@@ -160,7 +158,7 @@ function KpiList({ isManagement, onOpen, hideTitle, subjectFilter }: { isManagem
     onSuccess: (res) => {
       setSubjectUserId('');
       setKpiTemplateId('');
-      setPeriodKey(operationalWeekKey(riyadhToday()));
+      setPeriodKey('');
       void qc.invalidateQueries({ queryKey: ['kpi-evaluations'] });
       onOpen(res.data.id);
     },
@@ -199,49 +197,58 @@ function KpiList({ isManagement, onOpen, hideTitle, subjectFilter }: { isManagem
           {subjects.length === 0 ? (
             <Alert tone="navy">لا يوجد موظفون ضمن نطاق تقييمك المباشر.</Alert>
           ) : (
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="w-56">
-              <Field label="الموظف المراد تقييمه">
-                <Select value={subjectUserId} onChange={(e) => onSubjectChange(e.target.value)}>
-                  <option value="">اختر الموظف…</option>
-                  {subjects.map((s) => (
-                    <option key={s.id} value={s.id}>{s.fullName}</option>
-                  ))}
-                </Select>
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="w-56">
+                <Field label="الموظف المراد تقييمه">
+                  <Select value={subjectUserId} onChange={(e) => onSubjectChange(e.target.value)}>
+                    <option value="">اختر الموظف…</option>
+                    {subjects.map((s) => (
+                      <option key={s.id} value={s.id}>{s.fullName}</option>
+                    ))}
+                  </Select>
+                </Field>
+                <p className="mt-1 text-xs text-ink-3">تظهر هنا فقط الأسماء التي يحق لك تقييمها حسب الهيكل الإداري.</p>
+              </div>
+              <div className="w-56">
+                <Field label="قالب التقييم">
+                  <Select value={effectiveTemplateId} onChange={(e) => setKpiTemplateId(e.target.value)} disabled={!subjectUserId}>
+                    <option value="">{subjectUserId ? 'اختر قالبًا…' : 'اختر الموظف أولًا'}</option>
+                    {templates?.map((t) => (
+                      <option key={t.id} value={t.id}>{t.title}</option>
+                    ))}
+                  </Select>
+                </Field>
+                <p className="mt-1 text-xs text-ink-3">تظهر هنا قوالب KPI المناسبة لدور الموظف فقط.</p>
+              </div>
+              <div className="w-40">
+                <Field label="الدورية">
+                  <div className="flex h-10 items-center rounded-lg border border-line bg-offwhite px-3">
+                    <Badge tone="navy">{periodTypeLabel[periodType]}</Badge>
+                  </div>
+                </Field>
+                <p className="mt-1 text-xs text-ink-3">تقييم KPI الحالي أسبوعي. التجميع الشهري والربع سنوي والسنوي سيُدعم لاحقًا.</p>
+              </div>
+            </div>
+
+            {/* منتقي دورة التقييم المُدرِك للدور (نفس نافذة السبت→الجمعة، وتاريخ الاستحقاق بحسب دور المُقيّم خادميًّا). */}
+            <div className="max-w-md">
+              <Field label="الفترة (أسبوع)">
+                <WeeklyCycleCalendarPicker
+                  context="Kpi"
+                  value={periodKey || null}
+                  onChange={(key) => { setErr(null); setPeriodKey(key); }}
+                />
               </Field>
-              <p className="mt-1 text-xs text-ink-3">تظهر هنا فقط الأسماء التي يحق لك تقييمها حسب الهيكل الإداري.</p>
+              <div className="mt-3">
+                <Button
+                  disabled={!effectiveTemplateId || !subjectUserId || !periodKey || create.isPending}
+                  onClick={() => { setErr(null); create.mutate(); }}
+                >
+                  إنشاء تقييم
+                </Button>
+              </div>
             </div>
-            <div className="w-56">
-              <Field label="قالب التقييم">
-                <Select value={effectiveTemplateId} onChange={(e) => setKpiTemplateId(e.target.value)} disabled={!subjectUserId}>
-                  <option value="">{subjectUserId ? 'اختر قالبًا…' : 'اختر الموظف أولًا'}</option>
-                  {templates?.map((t) => (
-                    <option key={t.id} value={t.id}>{t.title}</option>
-                  ))}
-                </Select>
-              </Field>
-              <p className="mt-1 text-xs text-ink-3">تظهر هنا قوالب KPI المناسبة لدور الموظف فقط.</p>
-            </div>
-            <div className="w-40">
-              <Field label="الدورية">
-                <div className="flex h-10 items-center rounded-lg border border-line bg-offwhite px-3">
-                  <Badge tone="navy">{periodTypeLabel[periodType]}</Badge>
-                </div>
-              </Field>
-              <p className="mt-1 text-xs text-ink-3">تقييم KPI الحالي أسبوعي. التجميع الشهري والربع سنوي والسنوي سيُدعم لاحقًا.</p>
-            </div>
-            <div className="w-40">
-              <Field label="الفترة (أسبوع)"><Input value={periodKey} onChange={(e) => setPeriodKey(e.target.value)} placeholder="2026-W25" /></Field>
-              {periodKey.trim() !== '' && !isValidWeekKey(periodKey) && (
-                <p className="mt-1 text-xs text-alert">استخدم صيغة الأسبوع YYYY-Www مثل 2026-W25.</p>
-              )}
-            </div>
-            <Button
-              disabled={!effectiveTemplateId || !subjectUserId || !isValidWeekKey(periodKey) || create.isPending}
-              onClick={() => { setErr(null); create.mutate(); }}
-            >
-              إنشاء تقييم
-            </Button>
           </div>
           )}
           {subjectUserId && templates && templates.length === 0 && (

@@ -3156,3 +3156,48 @@ export interface B2bSourceReport {
   legacyTotals: B2bSourceBucket;
   services: B2bSourceServiceRow[];
 }
+
+// ===== ROLE-AWARE-REPORTING-CALENDAR — Phase 2.3/2.5 =====
+// دورة تقارير مُدرِكة للدور: النافذة السبت→الجمعة موحّدة لكل المستويات، وتاريخ الاستحقاق يختلف بحسب
+// الدور الأساسيّ الخادميّ فقط. كل الحقول محسوبة على الخادم — الواجهة لا تعيد حساب أيّ مفتاح دورة.
+export type ReportingCalendarContext = 'Report' | 'Kpi';
+
+export interface ReportingCycleDto {
+  cycleKey: string;
+  cycleNumber: number;
+  cycleYear: number;
+  cycleStart: string; // DateOnly (السبت)
+  cycleEnd: string; // DateOnly (الجمعة)
+  tuesdayReference: string;
+  cycleLabel: string;
+  shortLabel: string;
+  dataCoverageStart: string;
+  dataCoverageEnd: string;
+  role: string;
+  roleLabel: string;
+  roleDueOffset: number;
+  roleDueDate: string; // DateOnly — تاريخ استحقاق الدور
+  roleDueDateLabel: string;
+  offset: number; // 0=الحالية، سالب=ماضية، موجب=مستقبلية
+  isCurrent: boolean;
+  isPast: boolean;
+  isFuture: boolean;
+  status: string; // current | past | locked
+  isOpen: boolean;
+  isLocked: boolean;
+  lockReason: string | null;
+  isOverdue: boolean;
+  requiresReason: boolean;
+  today: string;
+  context: ReportingCalendarContext;
+}
+
+export interface MyCyclesDto {
+  context: ReportingCalendarContext;
+  templateId: string | null;
+  role: string;
+  roleLabel: string;
+  currentCycleKey: string;
+  today: string;
+  cycles: ReportingCycleDto[];
+}

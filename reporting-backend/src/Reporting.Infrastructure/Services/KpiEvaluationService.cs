@@ -58,6 +58,14 @@ public class KpiEvaluationService : IKpiEvaluationService
                 "صيغة الفترة غير صحيحة؛ استخدم صيغة الأسبوع YYYY-Www مثل 2026-W25.",
                 "kpi_eval.period_format_invalid");
 
+        // ROLE-AWARE-REPORTING-CALENDAR — التحقّق الخادميّ من مفتاح الدورة (Phase 2.4):
+        // فوق فحص الصيغة، يجب أن يكون المفتاح دورةً صالحة بنيويًّا وقابلة للعكس (Sat→Fri عبر
+        // ReportingCalendarPolicy) وألّا يكون دورةً مستقبلية لم تبدأ بعد. لا تصحيح بيانات ولا تغيير مفتاح مخزَّن.
+        if (!ReportingCalendarPolicy.IsValidCycleKey(request.PeriodKey.Trim()))
+            return Result<KpiEvaluationDto>.Failure("مفتاح الدورة غير صالح.", "kpi.cycle_key_invalid");
+        if (ReportingCalendarPolicy.CycleRange(request.PeriodKey.Trim()).Start > ReportingCalendarPolicy.RiyadhToday())
+            return Result<KpiEvaluationDto>.Failure("لا يمكن إنشاء تقييم لدورة لم تبدأ بعد.", "calendar.cycle_not_open");
+
         // نطاق إنشاء التقييم أضيق من نطاق العرض: المرؤوسون المباشرون فقط (أو كل الموظّفين للأدمن).
         // لا يكفي أن يكون الموظّف ضمن نطاق رؤية المدير الواسع (القسم) — يجب أن يكون مرؤوسًا مباشرًا.
         var (isAdmin, evaluatableIds) = await EvaluatableSubjectScopeAsync(evaluatorId, ct);

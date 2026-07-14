@@ -1,6 +1,6 @@
 // RPT-ROLE-HOME-REPORT-CARDS-R1 — أدوات الفلتر الزمني للصفحة الرئيسية (Frontend-only).
-// تحسب مفاتيح الأسبوع التشغيلي (الخميس → الأربعاء) المطابقة تمامًا لـ ReportCalendarPolicy في الخادم:
-// WeekStart = الخميس على/قبل التاريخ، ورقم الأسبوع = ISO week لذلك الخميس، والسنة = سنته.
+// ROLE-AWARE-REPORTING-CALENDAR — Phase 2.6: مواءمة مع مرساة السبت المعتمدة في ReportingCalendarPolicy الخادمية.
+// دورة التقارير تبدأ السبت (على/قبل التاريخ) وتنتهي الجمعة (+6). رقم/سنة الدورة = ISO week لمرجع الثلاثاء (السبت+3).
 // لا تستدعي أي endpoint جديد؛ تُستهلك فقط من compliance-summary القائم عبر weekKey.
 
 import type { PeriodType } from '../types/api';
@@ -37,26 +37,30 @@ export function riyadhToday(): Date {
   return utcDate(shifted.getUTCFullYear(), shifted.getUTCMonth(), shifted.getUTCDate());
 }
 
-// الخميس الذي يبدأ به الأسبوع التشغيلي المحتوي للتاريخ (مطابق WeekStart الخادمي).
-function operationalThursday(date: Date): Date {
+// السبت الذي تبدأ به دورة التقارير المحتوية للتاريخ (مطابق CycleStart الخادمي).
+function saturdayOnOrBefore(date: Date): Date {
   const d = utcDate(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
-  const diff = (d.getUTCDay() - 4 + 7) % 7; // DayOfWeek.Thursday = 4
+  const diff = (d.getUTCDay() - 6 + 7) % 7; // DayOfWeek.Saturday = 6
   return addDays(d, -diff);
 }
 
-// ISO week لخميس معيّن — السنة هي سنته التقويمية (للخميس تتطابق سنة ISO مع التقويمية).
-function isoWeekOfThursday(thursday: Date): { year: number; week: number } {
+// ISO week لأي تاريخ عبر خميس أسبوع ISO المحتوي له (أسابيع ISO تبدأ الإثنين، الأسبوع 1 يحوي أول خميس).
+function isoWeek(date: Date): { year: number; week: number } {
+  const d = utcDate(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+  const dayNr = (d.getUTCDay() + 6) % 7; // الإثنين = 0 … الأحد = 6
+  const thursday = addDays(d, 3 - dayNr); // خميس أسبوع ISO المحتوي للتاريخ
   const year = thursday.getUTCFullYear();
   let firstThursday = utcDate(year, 0, 4); // 4 يناير دائمًا في الأسبوع 1
-  const ft = (firstThursday.getUTCDay() - 4 + 7) % 7;
-  firstThursday = addDays(firstThursday, -ft); // خميس الأسبوع 1
+  const ft = (firstThursday.getUTCDay() + 6) % 7;
+  firstThursday = addDays(firstThursday, 3 - ft); // خميس الأسبوع 1
   const week = 1 + Math.round((thursday.getTime() - firstThursday.getTime()) / WEEK_MS);
   return { year, week };
 }
 
-// مفتاح الأسبوع التشغيلي YYYY-Www لتاريخ معيّن.
+// مفتاح دورة التقارير YYYY-Www لتاريخ معيّن (رقم/سنة الدورة = ISO week لمرجع الثلاثاء = السبت+3).
 export function operationalWeekKey(date: Date): string {
-  const { year, week } = isoWeekOfThursday(operationalThursday(date));
+  const tuesdayReference = addDays(saturdayOnOrBefore(date), 3);
+  const { year, week } = isoWeek(tuesdayReference);
   return `${year}-W${String(week).padStart(2, '0')}`;
 }
 
@@ -72,16 +76,16 @@ export function periodRange(p: DashboardPeriod): { from: Date; to: Date } {
   const today = riyadhToday();
   switch (p.preset) {
     case 'current_week': {
-      const s = operationalThursday(today);
+      const s = saturdayOnOrBefore(today);
       return { from: s, to: addDays(s, 6) };
     }
     case 'last_week': {
-      const s = operationalThursday(addDays(today, -7));
+      const s = saturdayOnOrBefore(addDays(today, -7));
       return { from: s, to: addDays(s, 6) };
     }
     case 'last_2_weeks': {
-      const s = operationalThursday(addDays(today, -7));
-      return { from: s, to: addDays(operationalThursday(today), 6) };
+      const s = saturdayOnOrBefore(addDays(today, -7));
+      return { from: s, to: addDays(saturdayOnOrBefore(today), 6) };
     }
     case 'last_30_days':
       return { from: addDays(today, -29), to: today };
@@ -95,12 +99,12 @@ export function periodRange(p: DashboardPeriod): { from: Date; to: Date } {
   }
 }
 
-// مفاتيح الأسابيع التشغيلية المتداخلة مع الفترة (الأقدم → الأحدث، بلا تكرار).
+// مفاتيح دورات التقارير المتداخلة مع الفترة (الأقدم → الأحدث، بلا تكرار).
 export function weekKeysForPeriod(p: DashboardPeriod): string[] {
   const { from, to } = periodRange(p);
   const keys: string[] = [];
-  let cur = operationalThursday(from);
-  const end = operationalThursday(to);
+  let cur = saturdayOnOrBefore(from);
+  const end = saturdayOnOrBefore(to);
   while (cur.getTime() <= end.getTime()) {
     const k = operationalWeekKey(cur);
     if (!keys.includes(k)) keys.push(k);
@@ -162,16 +166,19 @@ export function parseDateKey(s: string): Date | null {
   return parseDate(s);
 }
 
-// خميس أسبوع ISO معيّن (السنة + رقم الأسبوع) — عكس isoWeekOfThursday.
-function thursdayOfIsoWeek(year: number, week: number): Date {
-  let firstThursday = utcDate(year, 0, 4); // 4 يناير دائمًا في الأسبوع 1
-  const ft = (firstThursday.getUTCDay() - 4 + 7) % 7;
-  firstThursday = addDays(firstThursday, -ft); // خميس الأسبوع 1
-  return addDays(firstThursday, (week - 1) * 7);
+// سبت بداية الدورة لمفتاح دورة معيّن (السنة + رقم الأسبوع) — عكس operationalWeekKey.
+// نُعيّن ثلاثاء أسبوع ISO المطلوب (السبت+3) ثم نطرح 3 أيام للوصول للسبت.
+function saturdayOfCycleKey(year: number, week: number): Date {
+  let firstMonday = utcDate(year, 0, 4); // 4 يناير دائمًا في الأسبوع 1
+  const fm = (firstMonday.getUTCDay() + 6) % 7; // الإثنين = 0
+  firstMonday = addDays(firstMonday, -fm); // إثنين الأسبوع 1
+  const monday = addDays(firstMonday, (week - 1) * 7); // إثنين الأسبوع المطلوب
+  const tuesday = addDays(monday, 1); // مرجع الثلاثاء
+  return addDays(tuesday, -3); // السبت الذي تبدأ به الدورة
 }
 
 // مفتاح الفترة السابقة لنفس النوع (إضافيّة — للمقارنة مع الفترة السابقة في لوحة القيادة).
-// يومي ⇐ اليوم السابق؛ أسبوعي ⇐ الأسبوع التشغيلي السابق؛ شهري ⇐ الشهر السابق؛ ربع سنوي ⇐ الربع السابق (يلتف على السنة).
+// يومي ⇐ اليوم السابق؛ أسبوعي ⇐ الدورة السابقة (سبت − 7)؛ شهري ⇐ الشهر السابق؛ ربع سنوي ⇐ الربع السابق (يلتف على السنة).
 export function previousPeriodKey(
   periodType: PeriodType,
   periodKey: string | null | undefined,
@@ -185,8 +192,8 @@ export function previousPeriodKey(
     case 'Weekly': {
       const m = /^(\d{4})-W(\d{2})$/.exec(periodKey.trim());
       if (!m) return undefined;
-      const thursday = thursdayOfIsoWeek(Number(m[1]), Number(m[2]));
-      return operationalWeekKey(addDays(thursday, -7));
+      const saturday = saturdayOfCycleKey(Number(m[1]), Number(m[2]));
+      return operationalWeekKey(addDays(saturday, -7));
     }
     case 'Monthly': {
       const m = /^(\d{4})-(\d{2})$/.exec(periodKey.trim());
