@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, apiErrorMessage } from '../lib/api';
+import { api, apiErrorMessage, approvalErrorMessage } from '../lib/api';
+import { useToast, POST_SUCCESS_NAV_DELAY_MS } from '../components/ActionResultToast';
 import { useAuth } from '../lib/auth';
 import { Alert, Badge, Button, Card, Field, Input, Select } from '../components/ui';
 import { LoadingState, QueryError } from '../components/states';
@@ -310,13 +311,13 @@ function KpiList({ isManagement, onOpen, hideTitle, subjectFilter }: { isManagem
 
 function KpiDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const qc = useQueryClient();
+  const toast = useToast();
   const { data: ev, isLoading, isError, refetch } = useQuery({
     queryKey: ['kpi-evaluation', id],
     queryFn: async () => (await api.get<KpiEvaluationDto>(`/kpi-evaluations/${id}`)).data,
   });
   const [draft, setDraft] = useState<Record<string, { rawValue: string; score: string; note: string }>>({});
   const [dirty, setDirty] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
 
   // تحويل المسودة الحالية إلى حمولة الحفظ. الحقل الفارغ يُرسَل null (مسح متعمَّد) بدل تجاهله.
   const buildPayload = (results: KpiResultDto[]) => ({
@@ -333,10 +334,19 @@ function KpiDetail({ id, onBack }: { id: string; onBack: () => void }) {
     }),
   });
 
+  // APPROVAL ACTION UX R1: يُرجِع Promise حتى يُنتظَر تحديث القوائم/العدّادات قبل إظهار Toast والرجوع للقائمة.
+  const invalidateAll = () =>
+    Promise.all([
+      qc.invalidateQueries({ queryKey: ['kpi-evaluation', id] }),
+      qc.invalidateQueries({ queryKey: ['kpi-evaluations'] }),
+      qc.invalidateQueries({ queryKey: ['kpi-review-events', id] }),
+    ]);
+
+  // APPROVAL ACTION UX R1: أخطاء الطلبات عبر Toast فقط. الحفظ/الإرسال صامتان في onSuccess (الـToast يظهر في المُعالِج).
   const save = useMutation({
     mutationFn: (results: KpiResultDto[]) => api.put(`/kpi-evaluations/${id}/results`, buildPayload(results)),
     onSuccess: () => { setDirty(false); void qc.invalidateQueries({ queryKey: ['kpi-evaluation', id] }); },
-    onError: (e) => setErr(apiErrorMessage(e)),
+    onError: (e) => toast.error(approvalErrorMessage(e)),
   });
 
   const submit = useMutation({
@@ -346,45 +356,60 @@ function KpiDetail({ id, onBack }: { id: string; onBack: () => void }) {
       void qc.invalidateQueries({ queryKey: ['kpi-evaluation', id] });
       void qc.invalidateQueries({ queryKey: ['kpi-evaluations'] });
     },
-    onError: (e) => setErr(apiErrorMessage(e)),
+    onError: (e) => toast.error(approvalErrorMessage(e)),
   });
 
   // إصلاح بَغ النتيجة صفر: عند الإرسال نحفظ المسودة أولًا إن وُجدت تغييرات غير محفوظة،
   // فلا يُحتسب التقييم على نتائج فارغة. إن فشل الحفظ لا نُرسِل (يبقى قابلًا للتحرير).
   const saveThenSubmit = async (results: KpiResultDto[]) => {
-    setErr(null);
+    if (save.isPending || submit.isPending) return;
     try {
       if (dirty) await save.mutateAsync(results);
       await submit.mutateAsync();
+      toast.success('✅ تم إرسال التقييم');
     } catch {
-      /* الخطأ مُعالَج في onError للطلب الفاشل؛ لا نتابع الإرسال */
+      /* الخطأ يظهر عبر Toast من onError؛ لا نتابع الإرسال */
     }
   };
 
+  // اعتماد نهائيّ للتقييم: Toast نجاح ⟵ تحديث القوائم ⟵ رجوع للقائمة.
   const approve = useMutation({
     mutationFn: () => api.post(`/kpi-evaluations/${id}/approve`),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['kpi-evaluation', id] });
-      void qc.invalidateQueries({ queryKey: ['kpi-evaluations'] });
+    onSuccess: async () => {
+      await invalidateAll();
+      toast.success('✅ تم اعتماد تقييم KPI بنجاح');
+      setTimeout(onBack, POST_SUCCESS_NAV_DELAY_MS);
     },
-    onError: (e) => setErr(apiErrorMessage(e)),
+    onError: (e) => toast.error(approvalErrorMessage(e)),
   });
+
+  // القرارات النهائية (رفض/طلب تعديل/إعادة فتح) ترجع للقائمة؛ البقية (إشارة/طلب فتح/تعليق) تبقى في الصفحة.
+  const reviewSuccessLabels: Record<string, string> = {
+    'request-revision': '✅ تم إرسال طلب التعديل',
+    reject: '✅ تم رفض التقييم',
+    flag: '✅ تم وضع إشارة للمراجعة',
+    'request-reopen': '✅ تم إرسال طلب إعادة الفتح',
+    comment: '✅ تم حفظ تعليق المراجعة',
+    reopen: '✅ تم إعادة فتح التقييم',
+    'admin-delete': '✅ تم حذف التقييم',
+  };
+  const reviewTerminalActions = ['request-revision', 'reject', 'reopen', 'admin-delete'];
 
   // إجراءات المراجعة والحوكمة (ADMIN-GOVERNANCE-R1). كلها POST بجسم {reason} — بعضها يتطلّب سببًا إلزاميًّا.
   const reviewAction = useMutation({
     mutationFn: ({ action, reason }: { action: string; reason?: string }) =>
       api.post(`/kpi-evaluations/${id}/${action}`, { reason }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['kpi-evaluation', id] });
-      void qc.invalidateQueries({ queryKey: ['kpi-evaluations'] });
-      void qc.invalidateQueries({ queryKey: ['kpi-review-events', id] });
+    onSuccess: async (_data, vars) => {
+      await invalidateAll();
+      toast.success(reviewSuccessLabels[vars.action] ?? '✅ تم تنفيذ الإجراء');
+      if (reviewTerminalActions.includes(vars.action)) setTimeout(onBack, POST_SUCCESS_NAV_DELAY_MS);
     },
-    onError: (e) => setErr(apiErrorMessage(e)),
+    onError: (e) => toast.error(approvalErrorMessage(e)),
   });
 
   // تشغيل إجراء يتطلّب سببًا إلزاميًّا عبر نافذة إدخال بسيطة. يُلغى بلا فعل عند غياب السبب.
   const runWithReason = (action: string, promptLabel: string) => {
-    setErr(null);
+    if (reviewAction.isPending) return;
     const reason = window.prompt(promptLabel)?.trim();
     if (!reason) return;
     reviewAction.mutate({ action, reason });
@@ -409,7 +434,6 @@ function KpiDetail({ id, onBack }: { id: string; onBack: () => void }) {
       <p className="text-ink-2">
         {ev.subjectName} · {periodTypeLabel[ev.periodType]} · {formatPeriod(ev.periodKey)} · النتيجة: {ev.totalScore ?? '—'}
       </p>
-      {err && <Alert tone="alert">{err}</Alert>}
       {ev.canEdit && (
         <Alert tone="navy">
           <span className="font-semibold">كيف تُحتسب النتيجة:</span> درجة كل مؤشّر (من 0 إلى 100) × وزنه، ثم مجموع
@@ -483,10 +507,20 @@ function KpiDetail({ id, onBack }: { id: string; onBack: () => void }) {
         </table>
         {ev.canEdit && (
           <div className="mt-4 flex flex-wrap items-center gap-2">
-            <Button disabled={save.isPending || submit.isPending} onClick={() => { setErr(null); save.mutate(ev.results); }}>
+            <Button
+              loading={save.isPending}
+              disabled={save.isPending || submit.isPending}
+              onClick={async () => {
+                if (save.isPending || submit.isPending) return;
+                try {
+                  await save.mutateAsync(ev.results);
+                  toast.success('✅ تم حفظ التقييم');
+                } catch { /* الخطأ يظهر عبر Toast من onError */ }
+              }}
+            >
               حفظ النتائج
             </Button>
-            <Button variant="ghost" disabled={save.isPending || submit.isPending} onClick={() => saveThenSubmit(ev.results)}>
+            <Button variant="ghost" loading={submit.isPending} disabled={save.isPending || submit.isPending} onClick={() => saveThenSubmit(ev.results)}>
               إرسال
             </Button>
             {save.isPending ? (
@@ -504,29 +538,30 @@ function KpiDetail({ id, onBack }: { id: string; onBack: () => void }) {
           <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-4">
             {ev.canReview && (ev.status === 'UnderReview' || ev.status === 'Submitted') && (
               <>
-                <Button disabled={reviewAction.isPending} onClick={() => { setErr(null); approve.mutate(); }}>اعتماد</Button>
-                <Button variant="ghost" disabled={reviewAction.isPending}
+                <Button loading={approve.isPending} disabled={approve.isPending || reviewAction.isPending}
+                  onClick={() => { if (approve.isPending || reviewAction.isPending) return; approve.mutate(); }}>اعتماد</Button>
+                <Button variant="ghost" loading={reviewAction.isPending} disabled={approve.isPending || reviewAction.isPending}
                   onClick={() => runWithReason('request-revision', 'سبب طلب التعديل (إلزاميّ):')}>طلب تعديل</Button>
-                <Button variant="ghost" disabled={reviewAction.isPending}
+                <Button variant="ghost" loading={reviewAction.isPending} disabled={approve.isPending || reviewAction.isPending}
                   onClick={() => runWithReason('reject', 'سبب الرفض النهائيّ (إلزاميّ):')}>رفض نهائيّ</Button>
               </>
             )}
             {ev.canFlag && (
               <>
-                <Button variant="ghost" disabled={reviewAction.isPending}
+                <Button variant="ghost" loading={reviewAction.isPending} disabled={approve.isPending || reviewAction.isPending}
                   onClick={() => runWithReason('flag', 'سبب الإشارة للمراجعة (إلزاميّ):')}>إشارة للمراجعة</Button>
-                <Button variant="ghost" disabled={reviewAction.isPending}
+                <Button variant="ghost" loading={reviewAction.isPending} disabled={approve.isPending || reviewAction.isPending}
                   onClick={() => runWithReason('request-reopen', 'سبب طلب إعادة الفتح (إلزاميّ):')}>طلب إعادة فتح</Button>
               </>
             )}
-            <Button variant="ghost" disabled={reviewAction.isPending}
+            <Button variant="ghost" loading={reviewAction.isPending} disabled={approve.isPending || reviewAction.isPending}
               onClick={() => runWithReason('comment', 'التعليق (إلزاميّ):')}>تعليق مراجعة</Button>
             {ev.canReopen && (
-              <Button variant="ghost" disabled={reviewAction.isPending}
+              <Button variant="ghost" loading={reviewAction.isPending} disabled={approve.isPending || reviewAction.isPending}
                 onClick={() => runWithReason('reopen', 'سبب إعادة الفتح للتعديل (إلزاميّ):')}>إعادة فتح</Button>
             )}
             {ev.canAdminDelete && (
-              <Button variant="ghost" disabled={reviewAction.isPending}
+              <Button variant="ghost" loading={reviewAction.isPending} disabled={approve.isPending || reviewAction.isPending}
                 onClick={() => runWithReason('admin-delete', 'سبب الحذف الإداريّ (إلزاميّ):')}>حذف إداريّ</Button>
             )}
           </div>

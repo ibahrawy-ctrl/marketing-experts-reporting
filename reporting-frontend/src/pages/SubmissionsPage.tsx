@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, apiErrorMessage } from '../lib/api';
+import { api, apiErrorMessage, approvalErrorMessage } from '../lib/api';
+import { useToast, POST_SUCCESS_NAV_DELAY_MS } from '../components/ActionResultToast';
 import { useAuth } from '../lib/auth';
 import { useDirectoryUsers, useTeams, useDepartments } from '../lib/useDirectory';
 import { useProjects } from '../lib/useClients';
@@ -663,42 +664,59 @@ function SubmissionDetail({ id, onBack }: { id: string; onBack: () => void }) {
   // كتالوج خدمات B2B النشطة — يغذّي منتقي «الخدمة» في شبكة قالب مبيعات B2B حسب الخدمة.
   const { data: activeServices } = useActiveServices();
   const serviceNames = useMemo(() => (activeServices ?? []).map((s) => s.nameAr), [activeServices]);
+  const toast = useToast();
+  // حالة خطأ سطريّة مقصورة على «الحذف الإداريّ» (ADMIN-GOVERNANCE-R1، خارج نطاق Approval UX R1) — تطابق سلوك الأصل.
+  const [err, setErr] = useState<string | null>(null);
   const [draft, setDraft] = useState<Record<string, FieldValueInput>>({});
   const [comment, setComment] = useState('');
-  const [err, setErr] = useState<string | null>(null);
 
-  const invalidateAll = () => {
-    void qc.invalidateQueries({ queryKey: ['submission', id] });
-    void qc.invalidateQueries({ queryKey: ['submissions-mine'] });
-    void qc.invalidateQueries({ queryKey: ['submissions-pending'] });
-  };
+  // يُعيد Promise حتى ننتظر تحديث الكاش قبل Toast/الرجوع (لا رجوع قبل تحديث البيانات).
+  const invalidateAll = () =>
+    Promise.all([
+      qc.invalidateQueries({ queryKey: ['submission', id] }),
+      qc.invalidateQueries({ queryKey: ['submissions-mine'] }),
+      qc.invalidateQueries({ queryKey: ['submissions-pending'] }),
+    ]);
 
+  // APPROVAL ACTION UX R1: أخطاء الطلبات (mutations) عبر Toast فقط؛ التحقّق السطريّ يبقى Alert.
+  // الحفظ/الإرسال يبقيان في الصفحة؛ الـToast يُطلَق في مُعالِج الزر بعد اكتمال mutateAsync (أي بعد إبطال الكاش).
   const save = useMutation({
     mutationFn: (fields: SubmissionFieldValueDto[]) =>
       api.put(`/submissions/${id}/values`, {
         values: fields.map((f) => draft[f.templateFieldId] ?? toInput(f)),
       }),
     onSuccess: () => invalidateAll(),
-    onError: (e) => setErr(apiErrorMessage(e)),
+    onError: (e) => toast.error(approvalErrorMessage(e)),
   });
 
   const submit = useMutation({
     mutationFn: () => api.post(`/submissions/${id}/submit`),
     onSuccess: () => invalidateAll(),
-    onError: (e) => setErr(apiErrorMessage(e)),
+    onError: (e) => toast.error(approvalErrorMessage(e)),
   });
 
   const deleteDraft = useMutation({
     mutationFn: () => api.delete(`/submissions/${id}`),
-    onSuccess: () => { invalidateAll(); onBack(); },
-    onError: (e) => setErr(apiErrorMessage(e)),
+    // قرار نهائيّ: تحديث الكاش ⇒ Toast ⇒ رجوع تلقائيّ بعد ~700ms.
+    onSuccess: async () => { await invalidateAll(); toast.success('✅ تم حذف المسودة'); setTimeout(onBack, POST_SUCCESS_NAV_DELAY_MS); },
+    onError: (e) => toast.error(approvalErrorMessage(e)),
   });
 
+  // قرار نهائيّ (اعتماد/إعادة/تصعيد): تحديث القوائم أولًا ⟵ Toast نجاح ⟵ رجوع تلقائيّ للقائمة بعد ~700ms.
   const action = useMutation({
     mutationFn: (kind: 'approve' | 'return' | 'escalate') =>
       api.post(`/submissions/${id}/${kind}`, { comment: comment || null }),
-    onSuccess: () => { setComment(''); invalidateAll(); },
-    onError: (e) => setErr(apiErrorMessage(e)),
+    onSuccess: async (_data, kind) => {
+      const msg =
+        kind === 'approve' ? '✅ تم اعتماد التقرير بنجاح'
+        : kind === 'return' ? '✅ تم إرجاع التقرير للتعديل'
+        : '✅ تم تصعيد التقرير';
+      setComment('');
+      await invalidateAll();
+      toast.success(msg);
+      setTimeout(onBack, POST_SUCCESS_NAV_DELAY_MS);
+    },
+    onError: (e) => toast.error(approvalErrorMessage(e)),
   });
 
   // حذف إداريّ ناعم للتقرير (ADMIN-GOVERNANCE-R1): Admin/CEO/GM فقط، سبب إلزاميّ + تدقيق.
@@ -873,14 +891,32 @@ function SubmissionDetail({ id, onBack }: { id: string; onBack: () => void }) {
   // شريط إجراءات الحفظ/الإرسال/الحذف — يظهر مرة واحدة أسفل الحقول.
   const actionBar = sub.canEdit ? (
     <div className="flex flex-wrap items-center gap-2">
-      <Button disabled={save.isPending} onClick={() => { setErr(null); save.mutate(sub.fieldValues); }}>
+      <Button
+        loading={save.isPending}
+        disabled={save.isPending || submit.isPending}
+        onClick={async () => {
+          if (save.isPending || submit.isPending) return;
+          try {
+            await save.mutateAsync(sub.fieldValues);
+            toast.success('✅ تم حفظ البيانات بنجاح');
+          } catch { /* الخطأ يظهر عبر Toast من onError */ }
+        }}
+      >
         حفظ
       </Button>
       <Button
         variant="ghost"
-        disabled={submit.isPending || missingCount > 0}
+        loading={submit.isPending || save.isPending}
+        disabled={save.isPending || submit.isPending || missingCount > 0}
         title={missingCount > 0 ? 'أكمل الحقول المطلوبة أولًا' : undefined}
-        onClick={() => { setErr(null); save.mutate(sub.fieldValues); submit.mutate(); }}
+        onClick={async () => {
+          if (save.isPending || submit.isPending) return;
+          try {
+            await save.mutateAsync(sub.fieldValues);
+            await submit.mutateAsync();
+            toast.success('✅ تم إرسال التقرير للاعتماد');
+          } catch { /* الخطأ يظهر عبر Toast من onError */ }
+        }}
       >
         إرسال للاعتماد
       </Button>
@@ -890,9 +926,10 @@ function SubmissionDetail({ id, onBack }: { id: string; onBack: () => void }) {
       {sub.status === 'Draft' && (
         <Button
           variant="danger"
+          loading={deleteDraft.isPending}
           disabled={deleteDraft.isPending}
           onClick={() => {
-            setErr(null);
+            if (deleteDraft.isPending) return;
             if (window.confirm('هل تريد حذف هذه المسودة؟ لا يمكن التراجع عن هذا الإجراء.')) deleteDraft.mutate();
           }}
         >
@@ -1021,20 +1058,28 @@ function SubmissionDetail({ id, onBack }: { id: string; onBack: () => void }) {
             </Field>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button disabled={action.isPending} onClick={() => { setErr(null); action.mutate('approve'); }}>اعتماد</Button>
+            <Button
+              loading={action.isPending}
+              disabled={action.isPending}
+              onClick={() => { if (action.isPending) return; action.mutate('approve'); }}
+            >
+              اعتماد
+            </Button>
             <Button
               variant="ghost"
+              loading={action.isPending}
               disabled={action.isPending || !comment.trim()}
               title={!comment.trim() ? 'اكتب سبب الإعادة أولًا' : undefined}
-              onClick={() => { setErr(null); action.mutate('return'); }}
+              onClick={() => { if (action.isPending) return; action.mutate('return'); }}
             >
               إعادة للتعديل
             </Button>
             <Button
               variant="danger"
+              loading={action.isPending}
               disabled={action.isPending || !comment.trim()}
               title={!comment.trim() ? 'اكتب سبب التصعيد أولًا' : undefined}
-              onClick={() => { setErr(null); action.mutate('escalate'); }}
+              onClick={() => { if (action.isPending) return; action.mutate('escalate'); }}
             >
               تصعيد
             </Button>

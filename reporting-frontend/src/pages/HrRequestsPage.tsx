@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, apiErrorMessage, downloadFile } from '../lib/api';
+import { api, apiErrorMessage, approvalErrorMessage, downloadFile } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { useToast, POST_SUCCESS_NAV_DELAY_MS } from '../components/ActionResultToast';
 import { Alert, Badge, Button, Card, EmptyState, Field, Input, Select } from '../components/ui';
 import { LoadingState, QueryError } from '../components/states';
 import {
@@ -140,12 +141,12 @@ function MineTab({ onOpen }: { onOpen: (id: string) => void }) {
 
 function CreateRequestForm({ onCreated }: { onCreated: (id: string) => void }) {
   const qc = useQueryClient();
+  const toast = useToast();
   const [requestType, setRequestType] = useState<EmployeeServiceRequestType>('HrLetter');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [preferredLanguage, setPreferredLanguage] = useState<PreferredLanguage>('Arabic');
   const [destinationEntity, setDestinationEntity] = useState('');
-  const [err, setErr] = useState<string | null>(null);
 
   const reset = () => { setTitle(''); setDescription(''); setDestinationEntity(''); };
 
@@ -160,12 +161,14 @@ function CreateRequestForm({ onCreated }: { onCreated: (id: string) => void }) {
       };
       return api.post<EmployeeServiceRequestDto>('/employee-service-requests', body);
     },
-    onSuccess: (res) => {
+    onSuccess: async (res) => {
       reset();
-      void qc.invalidateQueries({ queryKey: ['hr-requests-mine'] });
-      onCreated(res.data.id);
+      // تحديث الكاش وانتظاره أولًا ⇒ Toast ⇒ بعد ~700ms انتقال لتفاصيل الطلب الجديد.
+      await qc.invalidateQueries({ queryKey: ['hr-requests-mine'] });
+      toast.success('✅ تم تقديم الطلب');
+      setTimeout(() => onCreated(res.data.id), POST_SUCCESS_NAV_DELAY_MS);
     },
-    onError: (e) => setErr(apiErrorMessage(e)),
+    onError: (e) => toast.error(apiErrorMessage(e)),
   });
 
   const canSubmit = !!title.trim();
@@ -178,12 +181,11 @@ function CreateRequestForm({ onCreated }: { onCreated: (id: string) => void }) {
           اختر نوع الطلب واكتب عنوانًا واضحًا. أضف الجهة المستفيدة إن كان المستند موجّهًا لجهة محددة.
         </div>
       </div>
-      {err && <div className="mb-3"><Alert tone="alert">{err}</Alert></div>}
       <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
         <Field label="نوع الطلب">
           <Select
             value={requestType}
-            onChange={(e) => { setRequestType(e.target.value as EmployeeServiceRequestType); setErr(null); }}
+            onChange={(e) => setRequestType(e.target.value as EmployeeServiceRequestType)}
           >
             {REQUEST_TYPES.map((t) => (
               <option key={t} value={t}>{employeeServiceRequestTypeLabel[t]}</option>
@@ -216,7 +218,7 @@ function CreateRequestForm({ onCreated }: { onCreated: (id: string) => void }) {
         </Field>
       </div>
       <div className="mt-4">
-        <Button disabled={!canSubmit || create.isPending} onClick={() => { setErr(null); create.mutate(); }}>
+        <Button loading={create.isPending} disabled={create.isPending || !canSubmit} onClick={() => { if (create.isPending) return; create.mutate(); }}>
           إرسال الطلب
         </Button>
       </div>
@@ -338,12 +340,12 @@ function RequestTable({
 // ===== تفاصيل الطلب + الإجراءات (المالك: إلغاء؛ الموارد البشرية: معالجة) =====
 function RequestDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const qc = useQueryClient();
+  const toast = useToast();
   const { user, hasAnyRole } = useAuth();
   const canManage = hasAnyRole(...HR_ROLES);
   const [comment, setComment] = useState('');
   const [hrComment, setHrComment] = useState('');
   const [rejectReason, setRejectReason] = useState('');
-  const [err, setErr] = useState<string | null>(null);
   const [uploadErr, setUploadErr] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -352,28 +354,32 @@ function RequestDetail({ id, onBack }: { id: string; onBack: () => void }) {
     queryFn: async () => (await api.get<EmployeeServiceRequestDto>(`/employee-service-requests/${id}`)).data,
   });
 
-  const invalidate = () => {
-    void qc.invalidateQueries({ queryKey: ['hr-request', id] });
-    void qc.invalidateQueries({ queryKey: ['hr-requests-mine'] });
-    void qc.invalidateQueries({ queryKey: ['hr-requests-manage'] });
-  };
+  // يُعيد Promise حتى ننتظر تحديث الكاش قبل الرجوع للقائمة (لا رجوع قبل تحديث البيانات).
+  const invalidate = () =>
+    Promise.all([
+      qc.invalidateQueries({ queryKey: ['hr-request', id] }),
+      qc.invalidateQueries({ queryKey: ['hr-requests-mine'] }),
+      qc.invalidateQueries({ queryKey: ['hr-requests-manage'] }),
+    ]);
 
+  // الإلغاء/الإكمال/الرفض قرارات نهائية ⇒ تحديث الكاش ⇒ Toast ⇒ رجوع تلقائيّ بعد ~700ms.
   const cancel = useMutation({
     mutationFn: () => api.post(`/employee-service-requests/${id}/cancel`),
-    onSuccess: () => invalidate(),
-    onError: (e) => setErr(apiErrorMessage(e)),
+    onSuccess: async () => { await invalidate(); toast.success('✅ تم إلغاء الطلب'); setTimeout(onBack, POST_SUCCESS_NAV_DELAY_MS); },
+    onError: (e) => toast.error(approvalErrorMessage(e)),
   });
 
+  // بدء المعالجة/التعليق/الرفع تبقى في الصفحة (تحديث الكاش ⇒ Toast فقط، بلا رجوع).
   const startReview = useMutation({
     mutationFn: () => api.post(`/employee-service-requests/${id}/start-review`),
-    onSuccess: () => invalidate(),
-    onError: (e) => setErr(apiErrorMessage(e)),
+    onSuccess: async () => { await invalidate(); toast.success('✅ تم بدء المعالجة'); },
+    onError: (e) => toast.error(approvalErrorMessage(e)),
   });
 
   const addComment = useMutation({
     mutationFn: () => api.post(`/employee-service-requests/${id}/comment`, { comment: comment.trim() }),
-    onSuccess: () => { setComment(''); invalidate(); },
-    onError: (e) => setErr(apiErrorMessage(e)),
+    onSuccess: async () => { setComment(''); await invalidate(); toast.success('✅ تم حفظ التعليق'); },
+    onError: (e) => toast.error(apiErrorMessage(e)),
   });
 
   const complete = useMutation({
@@ -381,8 +387,8 @@ function RequestDetail({ id, onBack }: { id: string; onBack: () => void }) {
       api.post(`/employee-service-requests/${id}/complete`, {
         hrComment: hrComment.trim() || null,
       }),
-    onSuccess: () => { setHrComment(''); invalidate(); },
-    onError: (e) => setErr(apiErrorMessage(e)),
+    onSuccess: async () => { setHrComment(''); await invalidate(); toast.success('✅ تم إكمال الطلب'); setTimeout(onBack, POST_SUCCESS_NAV_DELAY_MS); },
+    onError: (e) => toast.error(approvalErrorMessage(e)),
   });
 
   // رفع الخطاب النهائي (PDF فقط، ≤ 10MB) — يُخزَّن خادميًّا بلا كشف للمسار الداخلي.
@@ -394,8 +400,8 @@ function RequestDetail({ id, onBack }: { id: string; onBack: () => void }) {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
     },
-    onSuccess: () => { setUploadErr(null); if (fileInputRef.current) fileInputRef.current.value = ''; invalidate(); },
-    onError: (e) => setUploadErr(apiErrorMessage(e)),
+    onSuccess: async () => { setUploadErr(null); if (fileInputRef.current) fileInputRef.current.value = ''; await invalidate(); toast.success('✅ تم رفع الخطاب النهائي'); },
+    onError: (e) => toast.error(apiErrorMessage(e)),
   });
 
   const onPickFile = (file: File | undefined) => {
@@ -409,18 +415,17 @@ function RequestDetail({ id, onBack }: { id: string; onBack: () => void }) {
   };
 
   const downloadFinal = async () => {
-    setErr(null);
     try {
       await downloadFile(`/employee-service-requests/${id}/final-document`, r?.finalDocumentFileName || 'final-document.pdf');
     } catch (e) {
-      setErr(apiErrorMessage(e));
+      toast.error(apiErrorMessage(e));
     }
   };
 
   const reject = useMutation({
     mutationFn: () => api.post(`/employee-service-requests/${id}/reject`, { reason: rejectReason.trim() }),
-    onSuccess: () => { setRejectReason(''); invalidate(); },
-    onError: (e) => setErr(apiErrorMessage(e)),
+    onSuccess: async () => { setRejectReason(''); await invalidate(); toast.success('✅ تم رفض الطلب'); setTimeout(onBack, POST_SUCCESS_NAV_DELAY_MS); },
+    onError: (e) => toast.error(approvalErrorMessage(e)),
   });
 
   if (isLoading) return <LoadingState label="يتم تحميل الطلب…" />;
@@ -448,8 +453,6 @@ function RequestDetail({ id, onBack }: { id: string; onBack: () => void }) {
         {' · '}
         قُدّم {formatDate(r.createdAtUtc)}
       </p>
-
-      {err && <Alert tone="alert">{err}</Alert>}
 
       <Card>
         <h2 className="mb-3 font-semibold text-navy">تفاصيل الطلب</h2>
@@ -488,7 +491,7 @@ function RequestDetail({ id, onBack }: { id: string; onBack: () => void }) {
         <Card>
           <h2 className="mb-2 font-semibold text-navy">إلغاء الطلب</h2>
           <p className="mb-3 text-sm text-ink-2">يمكنك إلغاء طلبك ما دام لم يكتمل أو يُرفض.</p>
-          <Button variant="danger" disabled={cancel.isPending} onClick={() => { setErr(null); cancel.mutate(); }}>
+          <Button variant="danger" loading={cancel.isPending} disabled={cancel.isPending} onClick={() => { if (cancel.isPending) return; cancel.mutate(); }}>
             إلغاء الطلب
           </Button>
         </Card>
@@ -501,7 +504,7 @@ function RequestDetail({ id, onBack }: { id: string; onBack: () => void }) {
           {r.status === 'Submitted' && (
             <div className="mb-4">
               <p className="mb-2 text-sm text-ink-2">ابدأ المعالجة لتسجيل أنّك تتولّى هذا الطلب.</p>
-              <Button disabled={startReview.isPending} onClick={() => { setErr(null); startReview.mutate(); }}>
+              <Button loading={startReview.isPending} disabled={startReview.isPending} onClick={() => { if (startReview.isPending) return; startReview.mutate(); }}>
                 بدء المعالجة
               </Button>
             </div>
@@ -514,8 +517,9 @@ function RequestDetail({ id, onBack }: { id: string; onBack: () => void }) {
             <div className="mt-2">
               <Button
                 variant="ghost"
+                loading={addComment.isPending}
                 disabled={addComment.isPending || !comment.trim()}
-                onClick={() => { setErr(null); addComment.mutate(); }}
+                onClick={() => { if (addComment.isPending) return; addComment.mutate(); }}
               >
                 إضافة تعليق
               </Button>
@@ -556,7 +560,7 @@ function RequestDetail({ id, onBack }: { id: string; onBack: () => void }) {
               <Input value={hrComment} onChange={(e) => setHrComment(e.target.value)} placeholder="ملاحظة نهائية…" />
             </Field>
             <div className="mt-2">
-              <Button disabled={complete.isPending} onClick={() => { setErr(null); complete.mutate(); }}>
+              <Button loading={complete.isPending} disabled={complete.isPending} onClick={() => { if (complete.isPending) return; complete.mutate(); }}>
                 إكمال الطلب
               </Button>
             </div>
@@ -570,9 +574,10 @@ function RequestDetail({ id, onBack }: { id: string; onBack: () => void }) {
             <div className="mt-2">
               <Button
                 variant="danger"
+                loading={reject.isPending}
                 disabled={reject.isPending || !rejectReason.trim()}
                 title={!rejectReason.trim() ? 'اكتب سبب الرفض أولًا' : undefined}
-                onClick={() => { setErr(null); reject.mutate(); }}
+                onClick={() => { if (reject.isPending) return; reject.mutate(); }}
               >
                 رفض الطلب
               </Button>

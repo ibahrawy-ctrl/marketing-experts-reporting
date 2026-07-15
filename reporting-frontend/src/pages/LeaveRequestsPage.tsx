@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, apiErrorMessage } from '../lib/api';
+import { api, apiErrorMessage, approvalErrorMessage } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { useToast, POST_SUCCESS_NAV_DELAY_MS } from '../components/ActionResultToast';
 import { Alert, Badge, Button, Card, EmptyState, Field, Input, Select } from '../components/ui';
 import { LoadingState, QueryError } from '../components/states';
 import {
@@ -129,6 +130,7 @@ function permissionMinutes(start: string, end: string): number {
 
 function CreateLeaveForm({ onCreated }: { onCreated: (id: string) => void }) {
   const qc = useQueryClient();
+  const toast = useToast();
   const [type, setType] = useState<LeaveRequestType>('Leave');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -163,16 +165,25 @@ function CreateLeaveForm({ onCreated }: { onCreated: (id: string) => void }) {
           : { type, startDate, startTime: t(startTime), endTime: t(endTime), reason, notes: notes || null, permissionShortfallResolution: vars.resolution ?? 'None' };
       return api.post<LeaveRequestDto>('/leave-requests', body);
     },
-    onSuccess: (res) => {
+    onSuccess: async (res) => {
       reset();
       setConfirmUnpaid(false);
       setConfirmPermission(false);
       setPermResolution('None');
-      void qc.invalidateQueries({ queryKey: ['leave-requests-mine'] });
-      void qc.invalidateQueries({ queryKey: ['my-balances'] });
-      onCreated(res.data.id);
+      // التسلسل: إبطال الكاش وانتظار تحديثه أولًا ⇒ Toast نجاح ⇒ بعد ~700ms انتقال لتفاصيل الطلب الجديد.
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['leave-requests-mine'] }),
+        qc.invalidateQueries({ queryKey: ['my-balances'] }),
+      ]);
+      toast.success('✅ تم تقديم الطلب');
+      setTimeout(() => onCreated(res.data.id), POST_SUCCESS_NAV_DELAY_MS);
     },
-    onError: (e) => { setErr(apiErrorMessage(e)); },
+    onError: (e) => {
+      // فشل استدعاء الـAPI ⇒ Toast (رسائل التحقّق المحلّية تبقى Alert سطريًّا).
+      setConfirmUnpaid(false);
+      setConfirmPermission(false);
+      toast.error(apiErrorMessage(e));
+    },
   });
 
   const isLeave = type === 'Leave';
@@ -277,7 +288,7 @@ function CreateLeaveForm({ onCreated }: { onCreated: (id: string) => void }) {
         </div>
       )}
       <div className="mt-4">
-        <Button disabled={!canSubmit || create.isPending} onClick={handleSubmit}>
+        <Button loading={create.isPending} disabled={create.isPending || !canSubmit} onClick={() => { if (create.isPending) return; handleSubmit(); }}>
           إرسال الطلب
         </Button>
       </div>
@@ -299,7 +310,7 @@ function CreateLeaveForm({ onCreated }: { onCreated: (id: string) => void }) {
               <Button variant="ghost" disabled={create.isPending} onClick={() => setConfirmUnpaid(false)}>
                 إلغاء
               </Button>
-              <Button variant="danger" disabled={create.isPending} onClick={() => create.mutate({ acknowledged: true })}>
+              <Button variant="danger" loading={create.isPending} disabled={create.isPending} onClick={() => { if (create.isPending) return; create.mutate({ acknowledged: true }); }}>
                 الاستمرار مع الإقرار
               </Button>
             </div>
@@ -347,9 +358,10 @@ function CreateLeaveForm({ onCreated }: { onCreated: (id: string) => void }) {
                 إلغاء
               </Button>
               <Button
+                loading={create.isPending}
                 disabled={create.isPending || permResolution === 'None'}
                 title={permResolution === 'None' ? 'اختر أحد الخيارين أولًا' : undefined}
-                onClick={() => create.mutate({ resolution: permResolution })}
+                onClick={() => { if (create.isPending) return; create.mutate({ resolution: permResolution }); }}
               >
                 {permResolution === 'AdminOrPayrollReview'
                   ? 'إرسال الطلب مع إقرار الخصم المالي'
@@ -452,34 +464,48 @@ function formatTime(t: string | null): string {
 // ===== تفاصيل الطلب + الإجراءات حسب الخطوة الحالية =====
 function LeaveDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const qc = useQueryClient();
+  const toast = useToast();
   const { user, hasAnyRole } = useAuth();
   const canReview = hasAnyRole(...REVIEW_ROLES);
   const [comment, setComment] = useState('');
-  const [err, setErr] = useState<string | null>(null);
 
   const { data: r, isLoading, isError, refetch } = useQuery({
     queryKey: ['leave-request', id],
     queryFn: async () => (await api.get<LeaveRequestDto>(`/leave-requests/${id}`)).data,
   });
 
-  const invalidate = () => {
-    void qc.invalidateQueries({ queryKey: ['leave-request', id] });
-    void qc.invalidateQueries({ queryKey: ['leave-requests-mine'] });
-    void qc.invalidateQueries({ queryKey: ['leave-requests-pending'] });
-  };
+  // يُعيد Promise حتى ننتظر اكتمال تحديث الكاش قبل الرجوع للقائمة (لا رجوع قبل تحديث البيانات).
+  const invalidate = () =>
+    Promise.all([
+      qc.invalidateQueries({ queryKey: ['leave-request', id] }),
+      qc.invalidateQueries({ queryKey: ['leave-requests-mine'] }),
+      qc.invalidateQueries({ queryKey: ['leave-requests-pending'] }),
+    ]);
 
   const cancel = useMutation({
     mutationFn: () => api.post(`/leave-requests/${id}/cancel`),
-    onSuccess: () => invalidate(),
-    onError: (e) => setErr(apiErrorMessage(e)),
+    // قرار نهائيّ: إبطال الكاش وانتظاره ⇒ Toast ⇒ بعد ~700ms رجوع تلقائيّ للقائمة.
+    onSuccess: async () => { await invalidate(); toast.success('✅ تم إلغاء الطلب'); setTimeout(onBack, POST_SUCCESS_NAV_DELAY_MS); },
+    onError: (e) => toast.error(approvalErrorMessage(e)),
   });
 
   // الإجراءات: path نسبي تحت /leave-requests/{id}/… ؛ الرفض/الإعادة يتطلّبان سببًا.
   const decide = useMutation({
     mutationFn: (vars: { path: string; needsReason: boolean }) =>
       api.post(`/leave-requests/${id}/${vars.path}`, vars.needsReason ? { reason: comment } : { comment: comment || null }),
-    onSuccess: () => { setComment(''); invalidate(); },
-    onError: (e) => setErr(apiErrorMessage(e)),
+    onSuccess: async (_data, vars) => {
+      const msg = vars.path === 'return'
+        ? '✅ تم إرجاع الطلب للتعديل'
+        : vars.path.endsWith('reject')
+          ? '✅ تم رفض الطلب'
+          : '✅ تم اعتماد الطلب';
+      setComment('');
+      // قرار نهائيّ: تحديث الكاش أولًا ⇒ Toast ⇒ رجوع تلقائيّ بعد ~700ms.
+      await invalidate();
+      toast.success(msg);
+      setTimeout(onBack, POST_SUCCESS_NAV_DELAY_MS);
+    },
+    onError: (e) => toast.error(approvalErrorMessage(e)),
   });
 
   if (isLoading) return <LoadingState label="يتم تحميل الطلب…" />;
@@ -520,8 +546,6 @@ function LeaveDetail({ id, onBack }: { id: string; onBack: () => void }) {
         {' · '}
         قُدّم {formatDate(r.createdAtUtc)}
       </p>
-
-      {err && <Alert tone="alert">{err}</Alert>}
 
       <Card>
         <h2 className="mb-3 font-semibold text-navy">تفاصيل الطلب</h2>
@@ -621,7 +645,7 @@ function LeaveDetail({ id, onBack }: { id: string; onBack: () => void }) {
         <Card>
           <h2 className="mb-2 font-semibold text-navy">إلغاء الطلب</h2>
           <p className="mb-3 text-sm text-ink-2">يمكنك إلغاء طلبك ما دام لم يُعتمَد نهائيًّا.</p>
-          <Button variant="danger" disabled={cancel.isPending} onClick={() => { setErr(null); cancel.mutate(); }}>
+          <Button variant="danger" loading={cancel.isPending} disabled={cancel.isPending} onClick={() => { if (cancel.isPending) return; cancel.mutate(); }}>
             إلغاء الطلب
           </Button>
         </Card>
@@ -640,16 +664,18 @@ function LeaveDetail({ id, onBack }: { id: string; onBack: () => void }) {
             {showReview && reviewStep && (
               <>
                 <Button
+                  loading={decide.isPending}
                   disabled={decide.isPending}
-                  onClick={() => { setErr(null); decide.mutate({ path: reviewStep.approve, needsReason: false }); }}
+                  onClick={() => { if (decide.isPending) return; decide.mutate({ path: reviewStep.approve, needsReason: false }); }}
                 >
                   اعتماد
                 </Button>
                 <Button
                   variant="danger"
+                  loading={decide.isPending}
                   disabled={decide.isPending || !comment.trim()}
                   title={!comment.trim() ? 'اكتب سبب الرفض أولًا' : undefined}
-                  onClick={() => { setErr(null); decide.mutate({ path: reviewStep.reject, needsReason: true }); }}
+                  onClick={() => { if (decide.isPending) return; decide.mutate({ path: reviewStep.reject, needsReason: true }); }}
                 >
                   رفض
                 </Button>
@@ -658,9 +684,10 @@ function LeaveDetail({ id, onBack }: { id: string; onBack: () => void }) {
             {canReturn && (
               <Button
                 variant="ghost"
+                loading={decide.isPending}
                 disabled={decide.isPending || !comment.trim()}
                 title={!comment.trim() ? 'اكتب سبب الإعادة أولًا' : undefined}
-                onClick={() => { setErr(null); decide.mutate({ path: 'return', needsReason: true }); }}
+                onClick={() => { if (decide.isPending) return; decide.mutate({ path: 'return', needsReason: true }); }}
               >
                 إعادة للتعديل
               </Button>

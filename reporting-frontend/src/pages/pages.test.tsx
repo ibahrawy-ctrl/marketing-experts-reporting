@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { ReactElement } from 'react';
 import { AuthProvider } from '../lib/auth';
+import { ToastProvider } from '../components/ActionResultToast';
 import { tokenStore } from '../lib/tokenStore';
 import { api } from '../lib/api';
 import AuditPage from './AuditPage';
@@ -253,7 +254,9 @@ function renderPage(el: ReactElement) {
   return render(
     <QueryClientProvider client={qc}>
       <AuthProvider>
-        <MemoryRouter>{el}</MemoryRouter>
+        <ToastProvider>
+          <MemoryRouter>{el}</MemoryRouter>
+        </ToastProvider>
       </AuthProvider>
     </QueryClientProvider>,
   );
