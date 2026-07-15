@@ -29,4 +29,17 @@ public interface IReportingCalendarCycleService
         string cycleKey,
         ReportingCalendarContext context,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// نافذة الأيام اليومية للمستخدم الحاليّ (ماضٍ قريب + اليوم + مستقبل مسموح) مُدرِكة لحالة تسليماته.
+    /// <paramref name="anchorDate"/> نقطة ارتكاز اختيارية (YYYY-MM-DD) للتنقّل، وإلّا اليوم بتوقيت الرياض.
+    /// <paramref name="previousCount"/>/<paramref name="nextCount"/> مُقيَّدان بحدود آمنة.
+    /// حالة كل يوم تُقرأ من قاعدة البيانات (قراءة فقط) لا من الواجهة.
+    /// </summary>
+    Task<Result<MyDaysDto>> GetMyDaysAsync(
+        string? anchorDate,
+        int? previousCount,
+        int? nextCount,
+        Guid? templateId,
+        CancellationToken ct = default);
 }

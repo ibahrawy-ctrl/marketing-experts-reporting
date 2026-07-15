@@ -17,8 +17,8 @@ import {
   approvalStatusLabel,
   formatDate,
 } from '../lib/format';
-import { riyadhToday } from '../lib/dashboardPeriod';
 import { WeeklyCycleCalendarPicker } from '../components/WeeklyCycleCalendarPicker';
+import { DailyCalendarPicker } from '../components/DailyCalendarPicker';
 import { normalizeDigits, sanitizeNumericInput, isNumericGridColumn } from '../lib/numericNormalizer';
 import type {
   SubmissionListItem,
@@ -34,6 +34,7 @@ import type {
   ProjectRepeatableConfig,
   ProjectRepeatableEntry,
   RepeatableSubField,
+  ReportingDayDto,
 } from '../types/api';
 
 type Tab = 'all' | 'mine' | 'pending';
@@ -402,15 +403,14 @@ function MineTab({ onOpen }: { onOpen: (id: string) => void }) {
   const periodType: PeriodType = user?.expectedReportCadence ?? 'Weekly';
   const isDaily = periodType === 'Daily';
 
-  // مفتاح الفترة الافتراضي: اليوميّ (مندوب مبيعات) = تاريخ اليوم؛ الأسبوعيّ = فارغ يملؤه منتقي التقويم
-  // بالدورة الحالية المحسوبة خادميًّا (لا حساب محليّ لمفتاح الأسبوع، ولا إدخال نصّيّ حرّ).
-  const defaultPeriodKey = () => {
-    if (isDaily) return riyadhToday().toISOString().slice(0, 10); // YYYY-MM-DD (تاريخ تقويميّ UTC)
-    return '';
-  };
+  // مفتاح الفترة الافتراضي فارغ في الوضعين: يملؤه منتقي التقويم الخادميّ (يوميّ my-days أو أسبوعيّ my-cycles)
+  // باليوم الحاليّ/الدورة الحالية المحسوبة خادميًّا. لا حساب محليّ لأيّ مفتاح، ولا إدخال نصّيّ/تاريخ حرّ.
+  const defaultPeriodKey = () => '';
 
   const [reportTemplateId, setReportTemplateId] = useState('');
   const [periodKey, setPeriodKey] = useState(defaultPeriodKey);
+  // اليوميّ: هل اليوم المختار مفتوح للإنشاء؟ (يُقفَل للعطلة/المستقبل عبر الخادم). الأسبوعيّ يعتمد وجود المفتاح.
+  const [dayOpenForDraft, setDayOpenForDraft] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   // البند 9 — منع ازدواج التقارير الأسبوعية الإلزامية: نوضّح أيّ قالب «أساسي مطلوب» وأيّها «تكميلي اختياري».
@@ -421,6 +421,7 @@ function MineTab({ onOpen }: { onOpen: (id: string) => void }) {
     mutationFn: () => api.post<SubmissionDto>('/submissions', { reportTemplateId, periodType, periodKey }),
     onSuccess: (res) => {
       setPeriodKey(defaultPeriodKey());
+      setDayOpenForDraft(false); // يُعاد ضبطه تلقائيًّا عند إعادة اختيار اليوم الحاليّ من المنتقي
       void qc.invalidateQueries({ queryKey: ['submissions-mine'] });
       onOpen(res.data.id);
     },
@@ -489,19 +490,29 @@ function MineTab({ onOpen }: { onOpen: (id: string) => void }) {
                 </div>
               </Field>
             </div>
-            {isDaily && (
-              <div className="w-44">
-                <Field label="الفترة (يوم)">
-                  <Input type="date" value={periodKey} onChange={(e) => setPeriodKey(e.target.value)} />
-                </Field>
-              </div>
-            )}
-            {isDaily && (
-              <Button disabled={!reportTemplateId || !periodKey || create.isPending} onClick={() => { setErr(null); create.mutate(); }}>
-                إنشاء تقرير
-              </Button>
-            )}
           </div>
+
+          {/* يوميّ: منتقي اليوم التقريريّ المُدرِك للدور والحالة (يحسب اليوم الحاليّ ومفتاحه خادميًّا). */}
+          {isDaily && (
+            <div className="max-w-md">
+              <Field label="الفترة (يوم)">
+                <DailyCalendarPicker
+                  templateId={reportTemplateId || null}
+                  value={periodKey || null}
+                  onChange={(key: string, day: ReportingDayDto) => {
+                    setErr(null);
+                    setPeriodKey(key);
+                    setDayOpenForDraft(day.isOpenForDraft);
+                  }}
+                />
+              </Field>
+              <div className="mt-3">
+                <Button disabled={!reportTemplateId || !periodKey || !dayOpenForDraft || create.isPending} onClick={() => { setErr(null); create.mutate(); }}>
+                  إنشاء تقرير
+                </Button>
+              </div>
+            </div>
+          )}
 
           {/* أسبوعيّ: منتقي دورة التقارير المُدرِك للدور (يحسب الدورة الحالية وتاريخ الاستحقاق خادميًّا). */}
           {!isDaily && (

@@ -3201,3 +3201,46 @@ export interface MyCyclesDto {
   today: string;
   cycles: ReportingCycleDto[];
 }
+
+// ROLE-AWARE-REPORTING-CALENDAR — الوضع اليوميّ (Daily). صفّ يوم واحد + غلاف my-days.
+// كل الحقول محسوبة خادميًّا (مفتاح اليوم YYYY-MM-DD بتوقيت الرياض، والحالة من قاعدة البيانات).
+export type ReportingDayStatus =
+  | 'Available'
+  | 'Draft'
+  | 'Submitted'
+  | 'Overdue'
+  | 'Holiday'
+  | 'FutureLocked'
+  | 'Returned'
+  | 'Reopened';
+
+export interface ReportingDayDto {
+  dayKey: string; // YYYY-MM-DD
+  date: string; // DateOnly
+  dayNameAr: string; // «الثلاثاء»
+  fullDateLabel: string; // «الثلاثاء 14 يوليو 2026»
+  isToday: boolean;
+  isPast: boolean;
+  isFuture: boolean;
+  isHoliday: boolean; // الجمعة وحدها (السبت يوم عمل)
+  isSelectable: boolean;
+  isOpenForDraft: boolean;
+  isDueToday: boolean;
+  isOverdue: boolean;
+  isSubmitted: boolean;
+  hasDraft: boolean;
+  status: ReportingDayStatus;
+  statusLabel: string;
+  lockReason: string | null;
+  previousDayKey: string;
+  nextDayKey: string;
+}
+
+export interface MyDaysDto {
+  templateId: string | null;
+  role: string;
+  roleLabel: string;
+  currentDayKey: string;
+  today: string;
+  days: ReportingDayDto[];
+}

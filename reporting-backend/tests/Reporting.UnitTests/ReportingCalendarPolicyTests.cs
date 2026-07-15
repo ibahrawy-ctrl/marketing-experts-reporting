@@ -170,4 +170,99 @@ public class ReportingCalendarPolicyTests
             Assert.Equal("2026-W27", ReportingCalendarPolicy.CycleKeyFor(day));
         }
     }
+
+    // ===== الوضع اليوميّ (Daily) — DAILY REPORTING CALENDAR — PHASE 2 EXTENSION =====
+
+    // (D1) توليد مفتاح اليوم YYYY-MM-DD (Invariant، لا يتأثّر بالثقافة).
+    [Theory]
+    [InlineData(2026, 7, 14, "2026-07-14")]
+    [InlineData(2026, 1, 5, "2026-01-05")]
+    [InlineData(2028, 2, 29, "2028-02-29")] // يوم كبيس
+    [InlineData(2026, 12, 31, "2026-12-31")]
+    public void DayKey_Formats_YyyyMmDd(int y, int m, int d, string expected)
+    {
+        Assert.Equal(expected, ReportingCalendarPolicy.DayKey(new DateOnly(y, m, d)));
+    }
+
+    // (D2) صلاحية مفتاح اليوم بنيويًّا + رفض القيم غير الصالحة (round-trip يرفض 30 فبراير/الشهر 13).
+    [Theory]
+    [InlineData("2026-07-14", true)]
+    [InlineData("2028-02-29", true)]  // كبيسة صالحة
+    [InlineData("2026-02-30", false)] // لا يوجد
+    [InlineData("2026-13-01", false)] // شهر غير صالح
+    [InlineData("2027-02-29", false)] // غير كبيسة
+    [InlineData("2026-7-14", false)]  // بلا أصفار بادئة
+    [InlineData("14-07-2026", false)] // ترتيب خاطئ
+    [InlineData("2026/07/14", false)] // فواصل خاطئة
+    [InlineData("", false)]
+    [InlineData("   ", false)]
+    [InlineData(null, false)]
+    public void IsValidDayKey_AcceptsValid_RejectsInvalid(string? key, bool expected)
+    {
+        Assert.Equal(expected, ReportingCalendarPolicy.IsValidDayKey(key));
+    }
+
+    // (D3) تحليل مفتاح اليوم ذهابًا وإيابًا.
+    [Fact]
+    public void ParseDayKey_RoundTrips()
+    {
+        var date = new DateOnly(2026, 7, 14);
+        var key = ReportingCalendarPolicy.DayKey(date);
+        Assert.Equal(date, ReportingCalendarPolicy.ParseDayKey(key));
+        Assert.Equal(key, ReportingCalendarPolicy.DayKey(ReportingCalendarPolicy.ParseDayKey(key)));
+    }
+
+    // (D4) العطلة الأسبوعية اليومية = الجمعة **وحدها** (أيام العمل اليومية السبت→الخميس، والسبت يوم عمل).
+    [Theory]
+    [InlineData(2026, 7, 10, true)]  // جمعة  → عطلة
+    [InlineData(2026, 7, 11, false)] // سبت   → يوم عمل
+    [InlineData(2026, 7, 12, false)] // أحد
+    [InlineData(2026, 7, 13, false)] // اثنين
+    [InlineData(2026, 7, 14, false)] // ثلاثاء
+    [InlineData(2026, 7, 15, false)] // أربعاء
+    [InlineData(2026, 7, 16, false)] // خميس
+    public void IsDailyHoliday_FridayOnly(int y, int m, int d, bool expected)
+    {
+        Assert.Equal(expected, ReportingCalendarPolicy.IsDailyHoliday(new DateOnly(y, m, d)));
+    }
+
+    // (D4-b) تصريح صريح لتصحيح السبت: الجمعة عطلة، السبت ليس عطلة، ومفتاح السبت يُولَّد صحيحًا.
+    [Fact]
+    public void IsDailyHoliday_Friday_True_Saturday_False_WithSaturdayDayKey()
+    {
+        var friday = new DateOnly(2026, 7, 10);
+        var saturday = new DateOnly(2026, 7, 11);
+        Assert.True(ReportingCalendarPolicy.IsDailyHoliday(friday));
+        Assert.False(ReportingCalendarPolicy.IsDailyHoliday(saturday));
+        Assert.Equal(DayOfWeek.Saturday, saturday.DayOfWeek);
+        Assert.Equal("2026-07-11", ReportingCalendarPolicy.DayKey(saturday));
+        Assert.True(ReportingCalendarPolicy.IsValidDayKey("2026-07-11"));
+    }
+
+    // (D5) أسماء الأيام العربية + التسمية الكاملة «الثلاثاء 14 يوليو 2026».
+    [Theory]
+    [InlineData(2026, 7, 14, "الثلاثاء", "الثلاثاء 14 يوليو 2026")]
+    [InlineData(2026, 7, 10, "الجمعة", "الجمعة 10 يوليو 2026")]
+    [InlineData(2026, 7, 11, "السبت", "السبت 11 يوليو 2026")]
+    [InlineData(2026, 1, 4, "الأحد", "الأحد 4 يناير 2026")]
+    public void ArFullDateLabel_MatchesArabicDayAndMonth(int y, int m, int d, string dayName, string full)
+    {
+        var date = new DateOnly(y, m, d);
+        Assert.Equal(dayName, ReportingCalendarPolicy.ArDayName(date));
+        Assert.Equal(full, ReportingCalendarPolicy.ArFullDateLabel(date));
+    }
+
+    // (D6) مفاتيح اليوم السابق/التالي (تقويميًّا، عبر حدود الشهر/السنة/الكبيسة).
+    [Theory]
+    [InlineData(2026, 7, 14, "2026-07-13", "2026-07-15")]
+    [InlineData(2026, 7, 1, "2026-06-30", "2026-07-02")]   // حدّ شهر
+    [InlineData(2026, 12, 31, "2026-12-30", "2027-01-01")] // حدّ سنة
+    [InlineData(2028, 2, 28, "2028-02-27", "2028-02-29")]  // قبل الكبيس
+    [InlineData(2028, 2, 29, "2028-02-28", "2028-03-01")]  // الكبيس
+    public void PreviousNextDayKey_AreAdjacentDays(int y, int m, int d, string prev, string next)
+    {
+        var date = new DateOnly(y, m, d);
+        Assert.Equal(prev, ReportingCalendarPolicy.PreviousDayKey(date));
+        Assert.Equal(next, ReportingCalendarPolicy.NextDayKey(date));
+    }
 }

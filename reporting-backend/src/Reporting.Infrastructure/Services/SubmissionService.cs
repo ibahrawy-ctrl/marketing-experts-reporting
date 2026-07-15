@@ -101,6 +101,21 @@ public class SubmissionService : ISubmissionService
             if (cycleStart > ReportingCalendarPolicy.RiyadhToday())
                 return Result<SubmissionDto>.Failure("لا يمكن إنشاء تقرير لدورة لم تبدأ بعد.", "calendar.cycle_not_open");
         }
+        else // Daily — تقارير المبيعات اليومية: لا نثق بمفتاح اليوم القادم من الواجهة.
+        {
+            // مفتاح اليوم يجب أن يكون YYYY-MM-DD صالحًا بنيويًّا (يرفض 2026-02-30/2026-13-01).
+            if (!ReportingCalendarPolicy.IsValidDayKey(periodKey))
+                return Result<SubmissionDto>.Failure("مفتاح اليوم غير صالح.", "report.daily_key_invalid");
+            var day = ReportingCalendarPolicy.ParseDayKey(periodKey);
+            // لا تقارير في العطلة الأسبوعية (الجمعة وحدها) بحسب سياسة اليوميّ. السبت يوم عمل.
+            if (ReportingCalendarPolicy.IsDailyHoliday(day))
+                return Result<SubmissionDto>.Failure(
+                    "لا تقارير يومية في العطلة الأسبوعية (الجمعة).", "calendar.day_is_holiday");
+            // لا يوم مستقبليّ لم يبدأ بعد.
+            if (day > ReportingCalendarPolicy.RiyadhToday())
+                return Result<SubmissionDto>.Failure(
+                    "لا يمكن إنشاء تقرير ليوم لم يبدأ بعد.", "calendar.future_day_locked");
+        }
 
         // منع ازدواج التقرير الأساسي (Phase 4 §4): لكل موظف تقرير أساسي واحد مطلوب لكل فترة.
         // قسم النبض يكون مضمَّنًا داخل التقرير الأساسي، أو قالبًا تكميليًا (Supplementary) لا يُحتسب

@@ -203,4 +203,40 @@ public static class ReportingCalendarPolicy
         var (year, week) = ParseCycleKey(cycleKey);
         return $"الأسبوع {week} — {year}";
     }
+
+    // ===== الوضع اليوميّ (Daily) — تقارير المبيعات =====
+    // مفتاح اليوم YYYY-MM-DD يُولَّد **خادميًّا** بتوقيت الرياض (لا حساب محليّ في الواجهة، ولا إدخال يدويّ).
+    // أيام العمل اليومية: السبت→الخميس. الجمعة **وحدها** عطلة أسبوعية (غير متاحة للتقارير اليومية). السبت يوم عمل يوميّ كامل.
+    // هذه الدوال خالصة (Pure) وتشترك مع الأسبوعيّ في مصدر الحقيقة نفسه (RiyadhToday/التسميات العربية).
+
+    /// <summary>مفتاح اليوم بصيغة YYYY-MM-DD (خادميّ، بلا انزياح منطقة زمنية).</summary>
+    public static string DayKey(DateOnly date) => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+    /// <summary>هل المفتاح بصيغة يوم YYYY-MM-DD صالحة بنيويًّا **وقابلة للعكس بلا خسارة**؟</summary>
+    public static bool IsValidDayKey(string? key)
+    {
+        if (string.IsNullOrWhiteSpace(key)) return false;
+        var s = key.Trim();
+        if (!System.Text.RegularExpressions.Regex.IsMatch(s, @"^\d{4}-\d{2}-\d{2}$")) return false;
+        return DateOnly.TryParseExact(s, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d)
+            && DayKey(d) == s; // تحقّق ذهاب-وإياب (يرفض مثل 2026-02-30 أو 2026-13-01).
+    }
+
+    /// <summary>تحليل مفتاح اليوم YYYY-MM-DD إلى تاريخ (يفترض صحّته البنيوية).</summary>
+    public static DateOnly ParseDayKey(string key) =>
+        DateOnly.ParseExact(key.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+    /// <summary>هل اليوم عطلة أسبوعية (الجمعة وحدها) بحسب سياسة التقارير اليومية؟ السبت يوم عمل.</summary>
+    public static bool IsDailyHoliday(DateOnly date) =>
+        date.DayOfWeek is DayOfWeek.Friday;
+
+    /// <summary>«الثلاثاء 14 يوليو 2026».</summary>
+    public static string ArFullDateLabel(DateOnly date) =>
+        $"{ArDayName(date)} {date.Day} {ArMonths[date.Month - 1]} {date.Year}";
+
+    /// <summary>مفتاح اليوم السابق (تقويميًّا).</summary>
+    public static string PreviousDayKey(DateOnly date) => DayKey(date.AddDays(-1));
+
+    /// <summary>مفتاح اليوم التالي (تقويميًّا).</summary>
+    public static string NextDayKey(DateOnly date) => DayKey(date.AddDays(1));
 }

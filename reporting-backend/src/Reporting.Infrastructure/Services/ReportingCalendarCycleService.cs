@@ -1,17 +1,22 @@
+using Microsoft.EntityFrameworkCore;
 using Reporting.Application.Calendar;
 using Reporting.Application.Common;
+using Reporting.Domain.Enums;
+using Reporting.Infrastructure.Persistence;
 
 namespace Reporting.Infrastructure.Services;
 
 /// <summary>
-/// ROLE-AWARE-REPORTING-CALENDAR — Phase 2.3. خدمة خالصة (Pure) تحسب دورات المستخدم الحاليّ عبر
-/// <see cref="ReportingCalendarPolicy"/> (مصدر الحقيقة الوحيد). النافذة السبت→الجمعة موحّدة لكل المستويات،
+/// ROLE-AWARE-REPORTING-CALENDAR — Phase 2.3/2.6. تحسب دورات المستخدم الأسبوعية وأيامه اليومية عبر
+/// <see cref="ReportingCalendarPolicy"/> (مصدر الحقيقة الوحيد). النافذة الأسبوعية السبت→الجمعة موحّدة لكل المستويات،
 /// وتاريخ الاستحقاق يختلف بحسب **الدور الأساسيّ الخادميّ** (RoleAccess.PrimaryRole) فقط — لا يُرسَل من الواجهة.
-/// قراءة/حساب فقط: لا وصول لقاعدة البيانات، لا تعديل، لا هجرة، لا سير عمل.
+/// الدورات الأسبوعية حساب خالص بلا قاعدة بيانات؛ الأيام اليومية تقرأ حالة التسليمات من القاعدة (قراءة فقط)
+/// لاشتقاق حالة كل يوم. لا تعديل بيانات، لا هجرة، لا سير عمل.
 /// </summary>
 public class ReportingCalendarCycleService : IReportingCalendarCycleService
 {
     private readonly ICurrentUser _currentUser;
+    private readonly AppDbContext _db;
 
     // حدود آمنة لعدد الدورات المُعادة (منع طلبات ضخمة).
     private const int DefaultPast = 8;
@@ -21,9 +26,27 @@ public class ReportingCalendarCycleService : IReportingCalendarCycleService
     // دورة ماضية أقدم من هذا الحدّ تتطلّب سببًا للتسليم المتأخّر (عتبة القِدَم).
     private const int HistoricalReasonThreshold = -2;
 
-    public ReportingCalendarCycleService(ICurrentUser currentUser)
+    // حدود آمنة لنافذة الأيام اليومية.
+    private const int DefaultPreviousDays = 10;
+    private const int DefaultNextDays = 2;
+    private const int MaxPreviousDays = 40;
+    private const int MaxNextDays = 7;
+
+    // الحالات التي تُعدّ «مُرسَلة» لأغراض عرض التقويم اليوميّ (تسليم رسميّ لا مسودّة/معادة).
+    private static readonly SubmissionStatus[] SubmittedStatuses =
+    {
+        SubmissionStatus.Submitted,
+        SubmissionStatus.ApprovedByDirectManager,
+        SubmissionStatus.ApprovedByNextLevel,
+        SubmissionStatus.Escalated,
+        SubmissionStatus.Closed,
+        SubmissionStatus.Visible
+    };
+
+    public ReportingCalendarCycleService(ICurrentUser currentUser, AppDbContext db)
     {
         _currentUser = currentUser;
+        _db = db;
     }
 
     public Task<Result<MyCyclesDto>> GetMyCyclesAsync(
@@ -80,6 +103,144 @@ public class ReportingCalendarCycleService : IReportingCalendarCycleService
 
         var dto = BuildCycle(cycleKey.Trim(), role, roleLabel, offset, today, context);
         return Task.FromResult(Result<ReportingCycleDto>.Success(dto));
+    }
+
+    // ===== الوضع اليوميّ (Daily) — نافذة أيام مُدرِكة لحالة تسليمات المستخدم =====
+    public async Task<Result<MyDaysDto>> GetMyDaysAsync(
+        string? anchorDate,
+        int? previousCount,
+        int? nextCount,
+        Guid? templateId,
+        CancellationToken ct = default)
+    {
+        if (!_currentUser.IsAuthenticated || _currentUser.UserId is not Guid userId)
+            return Result<MyDaysDto>.Failure("غير مصرّح.", "auth.unauthenticated");
+
+        var role = RoleAccess.PrimaryRole(_currentUser.Roles);
+        var roleLabel = Roles.DisplayAr(role);
+        var today = ReportingCalendarPolicy.RiyadhToday();
+
+        // نقطة الارتكاز: تاريخ مُرسَل اختياريّ (للتنقّل)، وإلّا اليوم. لا نثق بمفتاح غير صالح بنيويًّا.
+        DateOnly anchor;
+        if (string.IsNullOrWhiteSpace(anchorDate))
+            anchor = today;
+        else if (ReportingCalendarPolicy.IsValidDayKey(anchorDate))
+            anchor = ReportingCalendarPolicy.ParseDayKey(anchorDate);
+        else
+            return Result<MyDaysDto>.Failure("مفتاح اليوم غير صالح.", "calendar.day_key_invalid");
+
+        var prev = Math.Clamp(previousCount ?? DefaultPreviousDays, 0, MaxPreviousDays);
+        var next = Math.Clamp(nextCount ?? DefaultNextDays, 0, MaxNextDays);
+
+        // نافذة الأيام حول نقطة الارتكاز (من الأقدم إلى الأحدث).
+        var dates = new List<DateOnly>(prev + next + 1);
+        for (var d = -prev; d <= next; d++)
+            dates.Add(anchor.AddDays(d));
+
+        var dayKeys = dates.Select(ReportingCalendarPolicy.DayKey).ToList();
+
+        // حالة كل يوم تُقرأ من تسليمات المستخدم اليومية لهذه المفاتيح (قراءة فقط، لا تعديل).
+        var subs = await _db.ReportSubmissions
+            .AsNoTracking()
+            .Where(s => s.SubmitterId == userId
+                        && s.PeriodType == PeriodType.Daily
+                        && dayKeys.Contains(s.PeriodKey))
+            .Select(s => new { s.PeriodKey, s.Status })
+            .ToListAsync(ct);
+
+        // لكل يوم: هل يوجد تسليم رسميّ؟ هل مسودّة؟ هل معاد للتعديل؟
+        var byKey = subs
+            .GroupBy(s => s.PeriodKey)
+            .ToDictionary(g => g.Key, g => new DayStatusFlags(
+                Submitted: g.Any(x => SubmittedStatuses.Contains(x.Status)),
+                Draft: g.Any(x => x.Status == SubmissionStatus.Draft),
+                Returned: g.Any(x => x.Status == SubmissionStatus.Returned)));
+
+        var days = new List<ReportingDayDto>(dates.Count);
+        foreach (var date in dates)
+        {
+            var key = ReportingCalendarPolicy.DayKey(date);
+            byKey.TryGetValue(key, out var flags);
+            days.Add(BuildDay(date, today, flags));
+        }
+
+        var currentDayKey = ReportingCalendarPolicy.DayKey(today);
+        var dto = new MyDaysDto(templateId, role, roleLabel, currentDayKey, today, days);
+        return Result<MyDaysDto>.Success(dto);
+    }
+
+    private readonly record struct DayStatusFlags(bool Submitted, bool Draft, bool Returned);
+
+    // ===== بناء صفّ يوم واحد (حالة واحدة حصرًا لكل يوم) =====
+    private static ReportingDayDto BuildDay(DateOnly date, DateOnly today, DayStatusFlags flags)
+    {
+        var isToday = date == today;
+        var isPast = date < today;
+        var isFuture = date > today;
+        var isHoliday = ReportingCalendarPolicy.IsDailyHoliday(date);
+
+        var isSelectable = !isHoliday && !isFuture;
+        var isOpenForDraft = isSelectable;
+        var isDueToday = isToday && !isHoliday;
+        var isOverdue = isPast && !isHoliday && !flags.Submitted;
+
+        // ترتيب حسم الحالة (حالة واحدة حصرًا): عطلة ← مستقبل مقفل ← مُرسَل ← معاد ← ماضٍ متأخّر ← اليوم.
+        string status;
+        string statusLabel;
+        string? lockReason = null;
+        if (isHoliday)
+        {
+            status = "Holiday";
+            statusLabel = "عطلة أسبوعية";
+            lockReason = "لا تقارير يومية في العطلة الأسبوعية (الجمعة).";
+        }
+        else if (isFuture)
+        {
+            status = "FutureLocked";
+            statusLabel = "يوم لم يبدأ بعد";
+            lockReason = "لا يمكن إنشاء تقرير ليوم لم يبدأ بعد.";
+        }
+        else if (flags.Submitted)
+        {
+            status = "Submitted";
+            statusLabel = "مُرسَل";
+        }
+        else if (flags.Returned)
+        {
+            status = "Returned";
+            statusLabel = "مُعاد للتعديل";
+        }
+        else if (isOverdue)
+        {
+            status = "Overdue";
+            statusLabel = flags.Draft ? "مسودّة غير مُرسَلة — متأخّر" : "متأخّر — لم يُرسَل";
+        }
+        else // اليوم الحاليّ (يوم عمل)
+        {
+            status = flags.Draft ? "Draft" : "Available";
+            statusLabel = flags.Draft ? "مسودّة غير مُرسَلة" : "متاح للتسليم";
+        }
+
+        return new ReportingDayDto(
+            DayKey: ReportingCalendarPolicy.DayKey(date),
+            Date: date,
+            DayNameAr: ReportingCalendarPolicy.ArDayName(date),
+            FullDateLabel: ReportingCalendarPolicy.ArFullDateLabel(date),
+            IsToday: isToday,
+            IsPast: isPast,
+            IsFuture: isFuture,
+            IsHoliday: isHoliday,
+            IsSelectable: isSelectable,
+            IsOpenForDraft: isOpenForDraft,
+            IsDueToday: isDueToday,
+            IsOverdue: isOverdue,
+            IsSubmitted: flags.Submitted,
+            HasDraft: flags.Draft,
+            Status: status,
+            StatusLabel: statusLabel,
+            LockReason: lockReason,
+            PreviousDayKey: ReportingCalendarPolicy.PreviousDayKey(date),
+            NextDayKey: ReportingCalendarPolicy.NextDayKey(date));
     }
 
     // ===== بناء صفّ دورة واحدة (خالص، بلا حالة) =====

@@ -20,6 +20,7 @@ const EMPLOYEE_MARKER = 'تقريرك مطلوب الآن';
 const EMPLOYEE_DASHBOARD = {
   dashboardType: 'Employee',
   period: { label: 'الأسبوع الحالي', key: '2026-W26' },
+  summaryCards: [],
   widgets: [],
 };
 

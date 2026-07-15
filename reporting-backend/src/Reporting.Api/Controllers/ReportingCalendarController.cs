@@ -27,6 +27,17 @@ public class ReportingCalendarController : ApiControllerBase
         CancellationToken ct = default)
         => FromResult(await _service.GetMyCyclesAsync(context, templateId, past, future, ct));
 
+    // أيام المستخدم اليومية (ماضٍ قريب + اليوم + مستقبل مسموح) مُدرِكة لحالة تسليماته، بحسب دوره الأساسيّ.
+    // anchorDate اختياريّ (YYYY-MM-DD) للتنقّل، templateId اختياريّ (سياق)، previousCount/nextCount مُقيَّدان بحدود آمنة.
+    [HttpGet("my-days")]
+    public async Task<IActionResult> MyDays(
+        [FromQuery] string? anchorDate = null,
+        [FromQuery] int? previousCount = null,
+        [FromQuery] int? nextCount = null,
+        [FromQuery] Guid? templateId = null,
+        CancellationToken ct = default)
+        => FromResult(await _service.GetMyDaysAsync(anchorDate, previousCount, nextCount, templateId, ct));
+
     // تشخيص إداريّ: حلّ دورة واحدة لمفتاح معطى بحسب دور المستخدم الحاليّ (يرفض المفاتيح غير الصالحة).
     [HttpGet("resolve")]
     [Authorize(Policy = Policies.AdminOnly)]
