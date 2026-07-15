@@ -3,7 +3,9 @@ import { MemoryRouter } from 'react-router-dom';
 import { it, expect, vi, beforeEach } from 'vitest';
 import type { Role } from '../types/api';
 
-// ===== RC3-Task1.1A — ظهور روابط المبيعات الثلاثة في القائمة الجانبية =====
+// ===== RC3-Task1.1A — ظهور روابط المبيعات الثلاثة (NAVIGATION-REGRESSION-HOTFIX-R1) =====
+// في التنقّل المدمج روابط المبيعات الثلاثة تبويبات ضمن وحدة «التقارير»، تظهر فقط حين تكون
+// الوحدة نشطة؛ لذا نُصيّر عند مسارٍ داخل وحدة التقارير (/app/submissions) لإظهار شريط التبويبات.
 // تجميع المبيعات: Manager/GM/CEO/Admin فقط.
 // لوحة مبيعات الفريق: TeamLeader فقط.
 // لوحة مبيعاتي: مندوب المبيعات (isSalesRep) فقط — لا الأدمن.
@@ -33,9 +35,10 @@ const AGG = 'تجميع المبيعات';
 const TEAM = 'لوحة مبيعات الفريق';
 const MINE = 'لوحة مبيعاتي';
 
-function renderShell() {
+// نُصيّر افتراضيًّا داخل وحدة «التقارير» كي يظهر شريط تبويباتها (حيث تعيش روابط المبيعات).
+function renderShell(initialPath = '/app/submissions') {
   return render(
-    <MemoryRouter initialEntries={['/app']}>
+    <MemoryRouter initialEntries={[initialPath]}>
       <DashboardShell>
         <div>محتوى</div>
       </DashboardShell>
@@ -107,10 +110,12 @@ it('الموظف العادي (غير مندوب) لا يرى أيًّا من ر
   expect(screen.queryByText(MINE)).toBeNull();
 });
 
-it('عناصر قائمة أخرى في مجموعة التشغيل تبقى ظاهرة (لا كسر للترتيب/العناصر)', () => {
+it('وحدات الشريط الجانبي وتبويبات وحدة التقارير تبقى ظاهرة (لا كسر للتنقّل المدمج)', () => {
   authState.roles = ['Admin'];
   renderShell();
+  // وحدات رئيسية في الشريط الجانبي.
   expect(screen.getByText('الرئيسية')).toBeInTheDocument();
-  expect(screen.getByText('التقارير المقدمة')).toBeInTheDocument();
+  // تبويبات وحدة التقارير النشطة (اللصيقة بالمسمّى الحرفي في navConfig).
+  expect(screen.getByText('التقارير المقدَّمة')).toBeInTheDocument();
   expect(screen.getByText('تقويم التقارير')).toBeInTheDocument();
 });
