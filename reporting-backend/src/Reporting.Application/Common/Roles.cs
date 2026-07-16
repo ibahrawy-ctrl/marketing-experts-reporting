@@ -341,6 +341,18 @@ public static class Roles
         Hr, Admin, Ceo, GeneralManager
     };
 
+    /// <summary>
+    /// الأدوار المخوّلة بالوصول إلى «الأرشيف الإداريّ» واسترجاع العناصر المحذوفة إداريًّا ناعمًا
+    /// (RESTORE-ARCHIVE-GOVERNANCE-R1 — تقارير + تقييمات KPI): Admin / CEO / GM فقط.
+    /// عمدًا لا تشمل Manager / TeamLeader / HR / CeoSupport / Employee / Viewer.
+    /// الاسترجاع يعكس الحذف الإداريّ فقط (Hybrid) بلا إعادة توجيه صامتة ولا حذف نهائيّ ولا إشعارات.
+    /// (تُطابق حاليًّا AdminReportKpiDeleters عمدًا — نفس صلاحية الحذف الإداريّ هي صلاحية الاسترجاع.)
+    /// </summary>
+    public static readonly string[] ArchiveGovernanceAccessors =
+    {
+        Admin, Ceo, GeneralManager
+    };
+
     public const string DisplayAr_Admin = "مدير النظام";
     public const string DisplayAr_Ceo = "الرئيس التنفيذي";
     public const string DisplayAr_GeneralManager = "المدير العام";
@@ -477,4 +489,8 @@ public static class Policies
 
     // الإشارة/التعليق/طلب إعادة الفتح على تقييم KPI (بلا اعتماد/رفض/حذف) — HR + Admin/CEO/GM (Roles.KpiReviewFlaggers).
     public const string KpiReviewFlag = "KpiReviewFlag";
+
+    // الوصول إلى «الأرشيف الإداريّ» واسترجاع العناصر المحذوفة إداريًّا (RESTORE-ARCHIVE-GOVERNANCE-R1) —
+    // Admin/CEO/GM فقط (Roles.ArchiveGovernanceAccessors). قراءة الأرشيف + استرجاع Hybrid بلا حذف نهائيّ ولا إشعارات.
+    public const string ArchiveGovernanceAccess = "ArchiveGovernanceAccess";
 }

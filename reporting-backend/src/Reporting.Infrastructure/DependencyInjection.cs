@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Reporting.Application.AccountPortfolio;
+using Reporting.Application.Archive;
 using Reporting.Application.Auth;
 using Reporting.Application.Audit;
 using Reporting.Application.Calendar;
@@ -97,6 +98,7 @@ public static class DependencyInjection
         services.AddScoped<IClientService, ClientService>();
         services.AddScoped<IProjectService, ProjectService>();
         services.AddScoped<IPayrollImpactService, PayrollImpactService>();
+        services.AddScoped<IArchiveService, ArchiveService>();
         services.AddScoped<IAccountPortfolioService, AccountPortfolioService>();
         services.AddScoped<ICourseService, CourseService>();
         services.AddScoped<Application.Services.IServiceCatalogService, ServiceCatalogService>();

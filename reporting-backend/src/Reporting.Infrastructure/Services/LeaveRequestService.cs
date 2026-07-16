@@ -257,11 +257,17 @@ public class LeaveRequestService : ILeaveRequestService
         // يعتمد طلبه الشخصي؛ يبدأ مباشرةً عند المدير. لا ينطبق على طلب الموارد البشرية (له مساره).
         var isTeamLeaderRequest = !isHrRequest && _currentUser.IsInRole(Roles.TeamLeader);
 
+        // تجاوز خطوة قائد الفريق (Direct Reporting Override): قاعدة عامة — إن كان الموظّف مضبوطًا على
+        // BypassTeamLeaderApproval=true فلا قائد فعلي له في مسار الاعتماد رغم بقائه ضمن فريق له قائد،
+        // فيُوجَّه الطلب مباشرةً إلى مديره المباشر (ثم fallback المعتمد). لا يمسّ TeamId ولا قائد الفريق.
+        var requesterBypassesTeamLeader = await _db.Users.Where(u => u.Id == uid)
+            .Select(u => u.BypassTeamLeaderApproval).FirstOrDefaultAsync(ct);
+
         // قائد الفريق الفعلي للموظّف (T-WF2): خطوة قائد الفريق يعتمدها قائد فريق الموظّف الفعلي حصرًا.
-        // إن لم يكن للموظّف فريق، أو لا قائد محدّد للفريق، أو القائد هو الموظّف نفسه ⇒ لا قائد فعلي
-        // ⇒ يُتخطّى قائد الفريق عند الإنشاء ويُوجَّه الطلب مباشرةً إلى المدير (fallback آمن بلا توقّف).
+        // إن لم يكن للموظّف فريق، أو لا قائد محدّد للفريق، أو القائد هو الموظّف نفسه، أو الموظّف Direct
+        // Reporting ⇒ لا قائد فعلي ⇒ يُتخطّى قائد الفريق عند الإنشاء ويُوجَّه الطلب مباشرةً إلى المدير.
         Guid? effectiveTeamLeaderId = null;
-        if (!isHrRequest && !isTeamLeaderRequest)
+        if (!isHrRequest && !isTeamLeaderRequest && !requesterBypassesTeamLeader)
         {
             var teamId = await _db.Users.Where(u => u.Id == uid).Select(u => u.TeamId).FirstOrDefaultAsync(ct);
             if (teamId is Guid tid)
@@ -305,6 +311,10 @@ public class LeaveRequestService : ILeaveRequestService
             AddEvent(entity.Id, uid, "team_leader_step_skipped", LeaveRequestStep.Employee,
                 LeaveRequestStatus.Submitted, LeaveRequestStatus.TeamLeaderApproved,
                 "تم تخطي مراجعة قائد الفريق لأن مقدم الطلب هو قائد الفريق.");
+        else if (requesterBypassesTeamLeader)
+            AddEvent(entity.Id, uid, "team_leader_step_skipped", LeaveRequestStep.Employee,
+                LeaveRequestStatus.Submitted, LeaveRequestStatus.TeamLeaderApproved,
+                "تم تخطي مراجعة قائد الفريق (تبعية مباشرة للمدير)، وتم توجيه الطلب إلى المدير المباشر.");
         else if (noEffectiveTeamLeader)
             AddEvent(entity.Id, uid, "team_leader_step_skipped", LeaveRequestStep.Employee,
                 LeaveRequestStatus.Submitted, LeaveRequestStatus.TeamLeaderApproved,
@@ -673,9 +683,14 @@ public class LeaveRequestService : ILeaveRequestService
         // لمجرد أنّ نطاقهم يشمل الموظّف. إن وُجد قائد فريق محدّد ⇒ هو وحده يُسمح له (وإلا 403).
         if (step == LeaveRequestStep.TeamLeader)
         {
+            // تجاوز خطوة قائد الفريق (Direct Reporting Override): طلب الموظّف Direct Reporting
+            // لا يمرّ بخطوة قائد الفريق أصلًا (يُوجَّه للمدير عند الإنشاء)، لكن كحارس دفاعي
+            // للطلبات القديمة نُعامِله كأنّه بلا قائد فريق فعلي فيؤول للمراجعة ضمن النطاق الإداري.
+            var requesterBypassesTeamLeader = await _db.Users.Where(u => u.Id == entity.RequesterUserId)
+                .Select(u => u.BypassTeamLeaderApproval).FirstOrDefaultAsync(ct);
             var teamId = await _db.Users.Where(u => u.Id == entity.RequesterUserId)
                 .Select(u => u.TeamId).FirstOrDefaultAsync(ct);
-            Guid? teamLeaderId = teamId is Guid tid
+            Guid? teamLeaderId = (!requesterBypassesTeamLeader && teamId is Guid tid)
                 ? await _db.Teams.Where(t => t.Id == tid).Select(t => t.TeamLeaderId).FirstOrDefaultAsync(ct)
                 : null;
             if (teamLeaderId is Guid tl)

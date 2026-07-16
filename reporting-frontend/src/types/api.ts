@@ -3244,3 +3244,80 @@ export interface MyDaysDto {
   today: string;
   days: ReportingDayDto[];
 }
+
+// ===== الأرشيف الإداريّ (RESTORE-ARCHIVE-GOVERNANCE-R1) =====
+// عناصر محذوفة إداريًّا ناعمًا (تقارير + تقييمات KPI) قابلة للقراءة والاسترجاع وفق دلالات Hybrid.
+export type ArchiveItemType = 'Report' | 'KpiEvaluation';
+export type ArchiveRetentionStatus = 'Fresh' | 'ReviewDue' | 'LongTerm';
+export type ArchiveRestoreStrategy = 'NotApplicable' | 'HistoricalApproverRestored' | 'NoActiveApprover';
+
+export interface ArchiveWorkflowStepDto {
+  level: number;
+  approverId: string;
+  approverName: string | null;
+  status: string;
+  comment: string | null;
+  decidedAtUtc: string | null;
+}
+
+export interface ArchiveAuditEntryDto {
+  id: string;
+  action: string;
+  actorId: string | null;
+  actorName: string | null;
+  createdAtUtc: string;
+  dataJson: string | null;
+}
+
+export interface ArchiveItemDto {
+  archiveItemId: string;
+  itemType: ArchiveItemType;
+  employeeId: string;
+  employeeName: string;
+  templateName: string;
+  periodKey: string;
+  status: string;
+  deletedAtUtc: string;
+  deletedByUserId: string | null;
+  deletedByName: string | null;
+  deletionReason: string | null;
+  canRestore: boolean;
+  restoreBlockedCode: string | null;
+  restoreBlockedReason: string | null;
+  daysSinceDeletion: number;
+  retentionStatus: ArchiveRetentionStatus;
+}
+
+export interface ArchiveDetailsDto extends ArchiveItemDto {
+  currentApproverId: string | null;
+  currentApproverName: string | null;
+  workflowSteps: ArchiveWorkflowStepDto[];
+  fieldValuesCount: number;
+  kpiResultsCount: number;
+  reviewEventsCount: number;
+  auditTrail: ArchiveAuditEntryDto[];
+  historicalApproverId: string | null;
+  historicalApproverName: string | null;
+  historicalApproverIsActive: boolean | null;
+  restoreStrategy: ArchiveRestoreStrategy;
+  restoreWarning: string | null;
+}
+
+export interface ArchivePagedResult {
+  items: ArchiveItemDto[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface ArchiveListFilter {
+  itemType?: ArchiveItemType;
+  periodKey?: string;
+  employeeId?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface RestoreRequest {
+  reason: string;
+}

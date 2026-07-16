@@ -49,6 +49,7 @@ import AccountPortfolioProjectPage from './pages/AccountPortfolioProjectPage';
 import AccountPortfolioClientPage from './pages/AccountPortfolioClientPage';
 import GovernanceEscalationsPage from './pages/GovernanceEscalationsPage';
 import GovernanceActionItemsPage from './pages/GovernanceActionItemsPage';
+import AdminArchivePage from './pages/AdminArchivePage';
 import type { Role } from './types/api';
 
 const EXEC_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'Manager', 'TeamLeader', 'CeoSupport', 'Viewer'];
@@ -80,6 +81,8 @@ const ACCOUNT_PORTFOLIO_ROLES: Role[] = ['AccountPortfolioReader', 'Admin'];
 const GOVERNANCE_ESCALATION_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'CeoSupport', 'Manager', 'TeamLeader', 'HR', 'Employee'];
 // إجراءات الحوكمة والمتابعة (GOV-ACTION-ITEMS-R1) — تطابق سياسة GovernanceActionItemAccess بالخادم؛ الفرز (واسع/نطاق/HR/موظف) مفروض داخليًّا.
 const GOVERNANCE_ACTION_ITEM_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'CeoSupport', 'Manager', 'TeamLeader', 'HR', 'Employee'];
+// الأرشيف الإداريّ (RESTORE-ARCHIVE-GOVERNANCE-R1) — قراءة/استرجاع العناصر المحذوفة إداريًّا؛ تطابق سياسة ArchiveGovernanceAccess بالخادم.
+const ARCHIVE_GOVERNANCE_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager'];
 
 function Landing() {
   return (
@@ -197,6 +200,8 @@ const APP_ROUTES: { path: string; element: ReactNode; roles?: Role[] }[] = [
   { path: '/app/services', element: <ServiceManagementPage />, roles: TEMPLATE_GOVERNANCE_ROLES },
   { path: '/app/settings', element: <SettingsPage />, roles: ADMIN },
   { path: '/app/audit', element: <AuditPage />, roles: ['Admin', 'CEO', 'GeneralManager'] },
+  // الأرشيف الإداريّ (RESTORE-ARCHIVE-GOVERNANCE-R1) — قراءة/استرجاع المحذوف إداريًّا؛ تطابق سياسة ArchiveGovernanceAccess بالخادم.
+  { path: '/app/admin/archive', element: <AdminArchivePage />, roles: ARCHIVE_GOVERNANCE_ROLES },
   { path: '/app/development', element: <DevelopmentPage /> },
   { path: '/app/reports', element: <ExecutiveReportsPage />, roles: EXEC_ROLES },
 ];

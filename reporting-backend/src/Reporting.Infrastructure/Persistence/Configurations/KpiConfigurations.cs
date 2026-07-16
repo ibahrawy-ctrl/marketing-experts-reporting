@@ -57,7 +57,11 @@ public class KpiEvaluationConfiguration : IEntityTypeConfiguration<KpiEvaluation
         b.Property(x => x.Trend).HasConversion<string>().HasMaxLength(20);
         b.Property(x => x.DeletionReason).HasMaxLength(1000);
         b.Property(x => x.ReviewNote).HasMaxLength(2000);
-        b.HasIndex(x => new { x.KpiTemplateVersionId, x.SubjectUserId, x.PeriodKey }).IsUnique();
+        // فهرس فريد جزئيّ: يمنع ازدواج التقييمات النشطة فقط، ويسمح ببقاء تقييم محذوف ناعمًا بنفس المفتاح
+        // بجوار تقييم نشط (يماثل نمط report_submissions). شرط لاسترجاع الحوكمة دون تعارض.
+        b.HasIndex(x => new { x.KpiTemplateVersionId, x.SubjectUserId, x.PeriodKey })
+            .IsUnique()
+            .HasFilter("\"IsDeleted\" = false");
         b.HasIndex(x => x.SubjectUserId);
         b.HasMany(x => x.Results).WithOne(x => x.KpiEvaluation!)
             .HasForeignKey(x => x.KpiEvaluationId).OnDelete(DeleteBehavior.Cascade);

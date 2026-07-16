@@ -17,4 +17,10 @@ public class ApplicationUser : IdentityUser<Guid>
     public Guid? TeamId { get; set; }
     public Guid? JobRoleId { get; set; }
     public Guid? ManagerId { get; set; }
+
+    // تجاوز خطوة قائد الفريق في مسارات الاعتماد (Direct Reporting Override) — قاعدة عامة قابلة لإعادة
+    // الاستخدام لأي موظّف يتبع مديره مباشرةً رغم بقائه ضمن فريق له قائد. القيمة الافتراضية false لجميع
+    // المستخدمين؛ عند true تُتخطّى خطوة قائد الفريق (إجازة/استئذان/تقرير) ويبدأ المسار من المدير المباشر
+    // النشط ثم fallback المعتمد (GM ← CEO/Admin). لا يمسّ الانتماء التشغيلي للفريق ولا مسار KPI.
+    public bool BypassTeamLeaderApproval { get; set; }
 }

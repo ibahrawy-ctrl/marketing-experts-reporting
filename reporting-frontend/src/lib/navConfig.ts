@@ -24,6 +24,7 @@ const KPI_FINANCE_EXPORT: Role[] = ['Admin', 'CEO', 'GeneralManager', 'HR', 'Ceo
 const GOVERNANCE_ESCALATION: Role[] = ['Admin', 'CEO', 'GeneralManager', 'CeoSupport', 'Manager', 'TeamLeader', 'HR', 'Employee'];
 const GOVERNANCE_ACTION_ITEMS: Role[] = ['Admin', 'CEO', 'GeneralManager', 'CeoSupport', 'Manager', 'TeamLeader', 'HR', 'Employee'];
 const AUDIT: Role[] = ['Admin', 'CEO', 'GeneralManager'];
+const ARCHIVE_GOVERNANCE: Role[] = ['Admin', 'CEO', 'GeneralManager'];
 
 export type ModuleId =
   | 'dashboard'
@@ -126,6 +127,7 @@ export const MODULES: NavModule[] = [
       { to: '/app/governance/escalations', label: 'التصعيدات', roles: GOVERNANCE_ESCALATION },
       { to: '/app/governance/action-items', label: 'إجراءات الحوكمة', roles: GOVERNANCE_ACTION_ITEMS },
       { to: '/app/audit', label: 'سجل التدقيق', roles: AUDIT },
+      { to: '/app/admin/archive', label: 'الأرشيف الإداري', roles: ARCHIVE_GOVERNANCE, keywords: 'استرجاع محذوف أرشفة' },
       { to: '/app/email-notifications', label: 'سجل إشعارات البريد', roles: GOVERNANCE },
     ],
   },

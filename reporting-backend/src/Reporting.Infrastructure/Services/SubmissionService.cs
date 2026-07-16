@@ -373,8 +373,14 @@ public class SubmissionService : ISubmissionService
     /// </summary>
     private async Task<Guid?> ResolveFirstApproverAsync(Guid submitterId, Guid? submitterTeamId, Guid? submitterManagerId, CancellationToken ct)
     {
-        // 1) قائد فريق المقدّم (الفريق نشط، القائد نشط، وليس المقدّم نفسه).
-        if (submitterTeamId is Guid teamId)
+        // تجاوز خطوة قائد الفريق (Direct Reporting Override): قاعدة عامة — إن كان المقدّم مضبوطًا على
+        // BypassTeamLeaderApproval=true فلا قائد فريق فعلي له في مسار اعتماد التقارير رغم بقائه ضمن فريق
+        // له قائد، فيبدأ المسار مباشرةً من المدير المباشر ثم الاحتياطي (GM ← Admin/CEO). لا يمسّ TeamId.
+        var submitterBypassesTeamLeader = await _db.Users.Where(u => u.Id == submitterId)
+            .Select(u => u.BypassTeamLeaderApproval).FirstOrDefaultAsync(ct);
+
+        // 1) قائد فريق المقدّم (الفريق نشط، القائد نشط، وليس المقدّم نفسه) — يُتخطّى لموظّف Direct Reporting.
+        if (!submitterBypassesTeamLeader && submitterTeamId is Guid teamId)
         {
             var tlId = await _db.Teams
                 .Where(t => t.Id == teamId && t.IsActive)
@@ -409,6 +415,14 @@ public class SubmissionService : ISubmissionService
     /// </summary>
     private async Task<Guid?> ResolveSubmitterTeamLeaderIdAsync(Guid submitterId, CancellationToken ct)
     {
+        // تجاوز خطوة قائد الفريق (Direct Reporting Override): الموظّف Direct Reporting لا قائد فريق فعلي
+        // له في مسار التقارير ⇒ لا يبدأ مساره عند قائد الفريق ولا يُعاد إدخال قائد الفريق في التصعيد التالي.
+        var bypassesTeamLeader = await _db.Users
+            .Where(u => u.Id == submitterId)
+            .Select(u => u.BypassTeamLeaderApproval)
+            .FirstOrDefaultAsync(ct);
+        if (bypassesTeamLeader) return null;
+
         var teamId = await _db.Users
             .Where(u => u.Id == submitterId)
             .Select(u => u.TeamId)
@@ -629,6 +643,24 @@ public class SubmissionService : ISubmissionService
             return Result<SubmissionDto>.Failure("التسليم محذوف إداريًّا بالفعل.", "submission.already_deleted.conflict");
 
         var now = DateTime.UtcNow;
+
+        // RESTORE-ARCHIVE-GOVERNANCE-R1 (Phase 7) — لقطة كاملة لسير العمل قبل الحذف تُحفَظ في الأثر التدقيقيّ:
+        // الحالة قبل الحذف + المعتمِد الحاليّ + كل خطوات الاعتماد (المستوى/المعتمِد/الحالة/القرار). تُلتقَط قبل أيّ تعديل.
+        // تُثري الاسترجاع Hybrid (Phase 8) بمصدر أساسيّ لإعادة بناء المسار التاريخيّ، دون أيّ تغيير في سلوك الحذف.
+        var statusBeforeDelete = submission.Status;
+        var currentApproverBeforeDelete = submission.CurrentApproverId;
+        var workflowBeforeDelete = submission.ApprovalSteps
+            .OrderBy(a => a.Level)
+            .Select(a => new
+            {
+                level = a.Level,
+                approverId = a.ApproverId,
+                status = a.Status.ToString(),
+                comment = a.Comment,
+                decidedAtUtc = a.DecidedAtUtc
+            })
+            .ToList();
+
         // حذف إداريّ ناعم: لا حذف صفوف — يُعلَّم IsDeleted فيختفي من كل القوائم/التجميعات (Global Query Filter) ومن «بانتظار اعتمادي».
         submission.IsDeleted = true;
         submission.DeletedAtUtc = now;
@@ -648,7 +680,15 @@ public class SubmissionService : ISubmissionService
         await _db.SaveChangesAsync(ct);
 
         await _audit.LogAsync(userId, "submission.admin_deleted", nameof(ReportSubmission), submission.Id,
-            JsonSerializer.Serialize(new { reason, submitterId = submission.SubmitterId, periodKey = submission.PeriodKey }), ct: ct);
+            JsonSerializer.Serialize(new
+            {
+                reason,
+                submitterId = submission.SubmitterId,
+                periodKey = submission.PeriodKey,
+                statusBeforeDelete = statusBeforeDelete.ToString(),
+                currentApproverId = currentApproverBeforeDelete,
+                workflowBeforeDelete
+            }), ct: ct);
 
         var dto = await BuildDtoAsync(submissionId, ct);
         return Result<SubmissionDto>.Success(dto);

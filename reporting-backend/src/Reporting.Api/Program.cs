@@ -122,6 +122,9 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy(Policies.KpiReview, p => p.RequireRole(Roles.KpiReviewers));
     // الإشارة/التعليق/طلب إعادة الفتح على تقييم KPI (بلا اعتماد/رفض/حذف) — HR + Admin/CEO/GM.
     options.AddPolicy(Policies.KpiReviewFlag, p => p.RequireRole(Roles.KpiReviewFlaggers));
+    // ===== RESTORE-ARCHIVE-GOVERNANCE-R1 — الأرشيف الإداريّ واسترجاع المحذوف =====
+    // قراءة الأرشيف الإداريّ (تقارير + KPI محذوفة ناعمًا) واسترجاعها وفق Hybrid — Admin/CEO/GM فقط.
+    options.AddPolicy(Policies.ArchiveGovernanceAccess, p => p.RequireRole(Roles.ArchiveGovernanceAccessors));
 });
 
 // ===== Rate limiting لمنع التخمين على المصادقة =====

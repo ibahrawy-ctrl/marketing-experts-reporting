@@ -13,7 +13,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
     {
         builder.UseEnvironment("Testing");
         builder.UseSetting("ConnectionStrings:Default",
-            "Host=localhost;Database=reporting_test;Username=ibrahimelbahrawi");
+            "Host=localhost;Database=reporting_test_archr1;Username=ibrahimelbahrawi");
         builder.UseSetting("Jwt:Key", "testing-only-signing-key-not-for-production-32chars!!");
         builder.UseSetting("Jwt:Issuer", "reporting-api");
         builder.UseSetting("Jwt:Audience", "reporting-spa");
