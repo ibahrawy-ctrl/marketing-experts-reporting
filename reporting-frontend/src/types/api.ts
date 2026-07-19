@@ -3162,6 +3162,56 @@ export interface B2bSourceReport {
 // الدور الأساسيّ الخادميّ فقط. كل الحقول محسوبة على الخادم — الواجهة لا تعيد حساب أيّ مفتاح دورة.
 export type ReportingCalendarContext = 'Report' | 'Kpi';
 
+// ===== REPORTING-CYCLE-SUBMISSION-STATUS-CONSISTENCY-R1 — الحالة الموحّدة =====
+// كلّ الحقول محسوبة خادميًّا عبر UnifiedReportStatusService. الواجهة تعرض فقط ولا تحسب أيّ حالة/تأخّر.
+export type UnifiedCycleStatus =
+  | 'NotAssigned'
+  | 'NotRequired'
+  | 'NotDue'
+  | 'DueNow'
+  | 'Draft'
+  | 'OverdueDraft'
+  | 'SubmittedOnTime'
+  | 'SubmittedLate'
+  | 'PendingApproval'
+  | 'ReturnedForChanges'
+  | 'OverdueReturned'
+  | 'Approved'
+  | 'Closed'
+  | 'OverdueNotSubmitted';
+
+// شدّة الحالة الموحّدة (سلسلة خادميّة): none | info | success | warn | alert.
+export type UnifiedCycleSeverity = 'none' | 'info' | 'success' | 'warn' | 'alert';
+
+export interface UnifiedReportCycleStatusDto {
+  templateId: string | null;
+  templateVersionId: string | null;
+  templateName: string;
+  periodType: PeriodType;
+  periodKey: string;
+  cycleLabel: string;
+  cycleStartDate: string;
+  cycleEndDate: string;
+  dueAt: string;
+  assignmentId: string | null;
+  isAssigned: boolean;
+  submissionId: string | null;
+  submissionStatus: SubmissionStatus | null;
+  submittedAt: string | null;
+  approvedAt: string | null;
+  closedAt: string | null;
+  hasSubmission: boolean;
+  isLate: boolean;
+  delayDays: number;
+  unifiedStatus: UnifiedCycleStatus;
+  statusLabel: string;
+  statusDescription: string;
+  severity: UnifiedCycleSeverity;
+  availableActions: string[];
+  actionUrl: string;
+  isCurrentPriority: boolean;
+}
+
 export interface ReportingCycleDto {
   cycleKey: string;
   cycleNumber: number;
@@ -3190,6 +3240,9 @@ export interface ReportingCycleDto {
   requiresReason: boolean;
   today: string;
   context: ReportingCalendarContext;
+  // REPORTING-CYCLE-SUBMISSION-STATUS-CONSISTENCY-R1 — الحالة الموحّدة الخادميّة (إضافيّة، nullable).
+  // الواجهة تستهلكها بدل حساب الحالة محليًّا؛ الحقول القديمة أعلاه باقية للتوافق الخلفيّ.
+  unified: UnifiedReportCycleStatusDto | null;
 }
 
 export interface MyCyclesDto {

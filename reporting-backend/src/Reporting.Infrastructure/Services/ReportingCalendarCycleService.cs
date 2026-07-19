@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Reporting.Application.Calendar;
 using Reporting.Application.Common;
+using Reporting.Application.Reports;
 using Reporting.Domain.Enums;
 using Reporting.Infrastructure.Persistence;
 
@@ -17,6 +18,8 @@ public class ReportingCalendarCycleService : IReportingCalendarCycleService
 {
     private readonly ICurrentUser _currentUser;
     private readonly AppDbContext _db;
+    // REPORTING-CYCLE-SUBMISSION-STATUS-CONSISTENCY-R1 — مصدر الحالة الموحّد (إثراء المسار الأسبوعيّ إضافيًّا).
+    private readonly IUnifiedReportStatusService _unified;
 
     // حدود آمنة لعدد الدورات المُعادة (منع طلبات ضخمة).
     private const int DefaultPast = 8;
@@ -43,13 +46,14 @@ public class ReportingCalendarCycleService : IReportingCalendarCycleService
         SubmissionStatus.Visible
     };
 
-    public ReportingCalendarCycleService(ICurrentUser currentUser, AppDbContext db)
+    public ReportingCalendarCycleService(ICurrentUser currentUser, AppDbContext db, IUnifiedReportStatusService unified)
     {
         _currentUser = currentUser;
         _db = db;
+        _unified = unified;
     }
 
-    public Task<Result<MyCyclesDto>> GetMyCyclesAsync(
+    public async Task<Result<MyCyclesDto>> GetMyCyclesAsync(
         ReportingCalendarContext context,
         Guid? templateId,
         int? past,
@@ -57,7 +61,7 @@ public class ReportingCalendarCycleService : IReportingCalendarCycleService
         CancellationToken ct = default)
     {
         if (!_currentUser.IsAuthenticated || _currentUser.UserId is null)
-            return Task.FromResult(Result<MyCyclesDto>.Failure("غير مصرّح.", "auth.unauthenticated"));
+            return Result<MyCyclesDto>.Failure("غير مصرّح.", "auth.unauthenticated");
 
         var role = RoleAccess.PrimaryRole(_currentUser.Roles);
         var roleLabel = Roles.DisplayAr(role);
@@ -77,20 +81,33 @@ public class ReportingCalendarCycleService : IReportingCalendarCycleService
             cycles.Add(BuildCycle(key, role, roleLabel, offset, today, context));
         }
 
+        // REPORTING-CYCLE-SUBMISSION-STATUS-CONSISTENCY-R1 — إثراء إضافيّ بالحالة الموحّدة:
+        // استدعاء دفعيّ واحد للمحرّك (بلا N+1) ثم دمج الحالة في كل صفّ دورة. فشل الإثراء لا يكسر التقويم
+        // (الحقول القديمة تبقى؛ Unified يبقى null فتتراجع الواجهة للسلوك القديم — توافق خلفيّ كامل).
+        var keys = cycles.Select(c => c.CycleKey).ToList();
+        var unifiedResult = await _unified.GetMyWeeklyCycleStatusesAsync(keys, templateId, ct);
+        if (unifiedResult.Succeeded && unifiedResult.Value is { Count: > 0 } unifiedList)
+        {
+            var byKey = unifiedList.ToDictionary(u => u.PeriodKey);
+            for (var i = 0; i < cycles.Count; i++)
+                if (byKey.TryGetValue(cycles[i].CycleKey, out var u))
+                    cycles[i] = cycles[i] with { Unified = u };
+        }
+
         var dto = new MyCyclesDto(context, templateId, role, roleLabel, currentKey, today, cycles);
-        return Task.FromResult(Result<MyCyclesDto>.Success(dto));
+        return Result<MyCyclesDto>.Success(dto);
     }
 
-    public Task<Result<ReportingCycleDto>> ResolveAsync(
+    public async Task<Result<ReportingCycleDto>> ResolveAsync(
         string cycleKey,
         ReportingCalendarContext context,
         CancellationToken ct = default)
     {
         if (!_currentUser.IsAuthenticated || _currentUser.UserId is null)
-            return Task.FromResult(Result<ReportingCycleDto>.Failure("غير مصرّح.", "auth.unauthenticated"));
+            return Result<ReportingCycleDto>.Failure("غير مصرّح.", "auth.unauthenticated");
 
         if (!ReportingCalendarPolicy.IsValidCycleKey(cycleKey))
-            return Task.FromResult(Result<ReportingCycleDto>.Failure("مفتاح الدورة غير صالح.", "calendar.cycle_key_invalid"));
+            return Result<ReportingCycleDto>.Failure("مفتاح الدورة غير صالح.", "calendar.cycle_key_invalid");
 
         var role = RoleAccess.PrimaryRole(_currentUser.Roles);
         var roleLabel = Roles.DisplayAr(role);
@@ -102,7 +119,13 @@ public class ReportingCalendarCycleService : IReportingCalendarCycleService
         var offset = (targetStart.DayNumber - currentStart.DayNumber) / 7;
 
         var dto = BuildCycle(cycleKey.Trim(), role, roleLabel, offset, today, context);
-        return Task.FromResult(Result<ReportingCycleDto>.Success(dto));
+
+        // إثراء إضافيّ بالحالة الموحّدة (لدور المستخدم الحاليّ)؛ الفشل لا يكسر التشخيص.
+        var unifiedResult = await _unified.GetMyWeeklyCycleStatusAsync(cycleKey.Trim(), null, ct);
+        if (unifiedResult.Succeeded && unifiedResult.Value is { } u)
+            dto = dto with { Unified = u };
+
+        return Result<ReportingCycleDto>.Success(dto);
     }
 
     // ===== الوضع اليوميّ (Daily) — نافذة أيام مُدرِكة لحالة تسليمات المستخدم =====

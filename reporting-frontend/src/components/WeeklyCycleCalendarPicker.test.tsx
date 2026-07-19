@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { WeeklyCycleCalendarPicker } from './WeeklyCycleCalendarPicker';
-import type { MyCyclesDto, ReportingCycleDto } from '../types/api';
+import type { MyCyclesDto, ReportingCycleDto, UnifiedReportCycleStatusDto } from '../types/api';
 
 // اختبار عدم التراجع للوضع الأسبوعيّ: نتأكّد أن منتقي الدورة الأسبوعيّة لم يتأثّر بإضافة الوضع اليوميّ،
 // ولا يزال يقرأ الدورات من الخادم بلا إدخال نصّيّ. نُحاكي هوك الدورات لعزل المكوّن عن الشبكة.
@@ -32,6 +32,39 @@ function cycle(overrides: Partial<ReportingCycleDto> = {}): ReportingCycleDto {
     roleDueDateLabel: 'الأربعاء 15 يوليو 2026',
     ...overrides,
   } as ReportingCycleDto;
+}
+
+// REPORTING-CYCLE-SUBMISSION-STATUS-CONSISTENCY-R1: بانٍ للحالة الموحّدة الخادميّة (كما تصل من الـAPI).
+function unified(overrides: Partial<UnifiedReportCycleStatusDto> = {}): UnifiedReportCycleStatusDto {
+  return {
+    templateId: null,
+    templateVersionId: null,
+    templateName: 'قالب',
+    periodType: 'Weekly',
+    periodKey: '2026-W29',
+    cycleLabel: 'الأسبوع 29 — 2026',
+    cycleStartDate: '2026-07-11',
+    cycleEndDate: '2026-07-17',
+    dueAt: '2026-07-15',
+    assignmentId: null,
+    isAssigned: true,
+    submissionId: null,
+    submissionStatus: null,
+    submittedAt: null,
+    approvedAt: null,
+    closedAt: null,
+    hasSubmission: false,
+    isLate: false,
+    delayDays: 0,
+    unifiedStatus: 'DueNow',
+    statusLabel: 'مستحقّ الآن',
+    statusDescription: '',
+    severity: 'info',
+    availableActions: [],
+    actionUrl: '/submissions?period=2026-W29',
+    isCurrentPriority: true,
+    ...overrides,
+  };
 }
 
 function cyclesData(): MyCyclesDto {
@@ -92,5 +125,63 @@ describe('WeeklyCycleCalendarPicker (no regression)', () => {
     });
     render(<Harness />);
     expect(screen.getByText('إعادة المحاولة')).toBeInTheDocument();
+  });
+});
+
+// REPORTING-CYCLE-SUBMISSION-STATUS-CONSISTENCY-R1 — الشارة/المؤشّر يتبعان الحالة الموحّدة الخادميّة لا الحساب المحليّ.
+describe('WeeklyCycleCalendarPicker (unified server status)', () => {
+  it('شارة الدورة المختارة تعرض تسمية الحالة الموحّدة الخادميّة لا «الدورة الحالية» المحسوبة محليًّا', () => {
+    mockUseReportingCalendar.mockReturnValue({
+      data: {
+        ...cyclesData(),
+        cycles: [
+          cycle({ unified: unified({ unifiedStatus: 'SubmittedOnTime', statusLabel: 'سُلّم في الوقت', severity: 'success' }) }),
+        ],
+      },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    render(<Harness />);
+    // التسمية الخادميّة تظهر (الشارة + سطر الحالة)، ولا تُحسب «الدورة الحالية» محليًّا رغم isCurrent=true.
+    expect(screen.getAllByText('سُلّم في الوقت').length).toBeGreaterThan(0);
+    expect(screen.queryByText('الدورة الحالية')).toBeNull();
+  });
+
+  it('مؤشّر «تجاوز الموعد» يتبع unified.isLate لا الحقل القديم isOverdue', () => {
+    mockUseReportingCalendar.mockReturnValue({
+      data: {
+        ...cyclesData(),
+        // isOverdue القديم=false لكن الحالة الموحّدة الخادميّة late=true ⇒ يجب أن يظهر المؤشّر.
+        cycles: [
+          cycle({ isOverdue: false, unified: unified({ unifiedStatus: 'OverdueNotSubmitted', statusLabel: 'متأخّر غير مُسلَّم', severity: 'alert', isLate: true }) }),
+        ],
+      },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    render(<Harness />);
+    expect(screen.getByText(/تجاوز الموعد/)).toBeInTheDocument();
+    expect(screen.getByText(/الحالة:/)).toBeInTheDocument();
+  });
+
+  it('دورة مُغلَقة سُلّمت متأخّرًا (isLate=true) لا تعرض «تجاوز الموعد» بل تسمية «مُغلَق» فقط', () => {
+    mockUseReportingCalendar.mockReturnValue({
+      data: {
+        ...cyclesData(),
+        // حالة أحمد W28: مُغلَقة لكنّها سُلّمت بعد الموعد ⇒ isLate=true. يجب ألّا يظهر «تجاوز الموعد»
+        // (الحالة الطرفيّة تعرض تسميتها الخادميّة فقط) — شرط: لا تجاوز موعد لـApproved/Closed.
+        cycles: [
+          cycle({ isOverdue: true, unified: unified({ unifiedStatus: 'Closed', statusLabel: 'مُغلَق', severity: 'success', isLate: true }) }),
+        ],
+      },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    render(<Harness />);
+    expect(screen.queryByText(/تجاوز الموعد/)).toBeNull();
+    expect(screen.getAllByText('مُغلَق').length).toBeGreaterThan(0);
   });
 });

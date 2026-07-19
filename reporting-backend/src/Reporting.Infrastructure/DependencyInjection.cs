@@ -94,6 +94,7 @@ public static class DependencyInjection
         services.AddScoped<IExecutiveDashboardService, ExecutiveDashboardService>();
         services.AddScoped<IReportCalendarService, ReportCalendarService>();
         services.AddScoped<IReportingCalendarCycleService, ReportingCalendarCycleService>();
+        services.AddScoped<IUnifiedReportStatusService, UnifiedReportStatusService>();
         services.AddScoped<IClientProjectAccess, ClientProjectAccess>();
         services.AddScoped<IClientService, ClientService>();
         services.AddScoped<IProjectService, ProjectService>();

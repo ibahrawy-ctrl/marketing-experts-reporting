@@ -9,6 +9,15 @@ import type { ReportingCalendarContext, ReportingCycleDto } from '../types/api';
 // يوم يختار الأسبوع كاملًا. لا إدخال نصّي، ولا إعادة حساب لأيّ مفتاح دورة في الواجهة — كل الدورات وتواريخ
 // الاستحقاق محسوبة خادميًّا بحسب الدور الأساسيّ للمستخدم عبر GET /api/reporting-calendar/my-cycles.
 
+// REPORTING-CYCLE-SUBMISSION-STATUS-CONSISTENCY-R1: حالات التأخّر «القابلة للإجراء» وحدها تُظهر مؤشّر
+// «— تجاوز الموعد» بجوار الموعد النهائيّ. الحالات الطرفيّة (مُغلَق/مُسلَّم متأخّرًا/بانتظار الاعتماد) تعرض
+// تسميتها الخادميّة في سطر «الحالة» ولا تُوصَف بأنّها «تجاوز الموعد» (شرط: لا تجاوز موعد لـApproved/Closed).
+const OVERDUE_ACTIONABLE_STATUSES = new Set<string>([
+  'OverdueNotSubmitted',
+  'OverdueDraft',
+  'OverdueReturned',
+]);
+
 // أسماء الأيّام مرتّبة من السبت إلى الجمعة (بداية الأسبوع الإداريّ المعتمد).
 const WEEKDAYS_AR = ['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'];
 const MONTHS_AR = [
@@ -250,8 +259,20 @@ export function WeeklyCycleCalendarPicker({
           </p>
           <p className="mt-1 text-ink-2">
             آخر موعد لدورك ({selectedCycle.roleLabel}): <span className="font-medium text-ink">{selectedCycle.roleDueDateLabel}</span>
-            {selectedCycle.isOverdue && <span className="mr-2 text-alert">— تجاوز الموعد</span>}
+            {/* REPORTING-CYCLE-SUBMISSION-STATUS-CONSISTENCY-R1: مؤشّر «تجاوز الموعد» يظهر فقط لحالات التأخّر
+                القابلة للإجراء (Overdue*) من الحالة الموحّدة الخادميّة — لا للحالات الطرفيّة (مُغلَق/مُسلَّم
+                متأخّرًا) ولو كان isLate=true؛ fallback للحقل القديم isOverdue إن غاب الحقل الموحّد. */}
+            {(selectedCycle.unified
+              ? OVERDUE_ACTIONABLE_STATUSES.has(selectedCycle.unified.unifiedStatus)
+              : selectedCycle.isOverdue) && (
+              <span className="mr-2 text-alert">— تجاوز الموعد</span>
+            )}
           </p>
+          {selectedCycle.unified && (
+            <p className="mt-1 text-ink-2">
+              الحالة: <span className="font-medium text-ink">{selectedCycle.unified.statusLabel}</span>
+            </p>
+          )}
           {selectedCycle.isLocked && selectedCycle.lockReason && (
             <p className="mt-1 text-xs text-alert">{selectedCycle.lockReason}</p>
           )}
@@ -266,7 +287,21 @@ export function WeeklyCycleCalendarPicker({
   );
 }
 
+// REPORTING-CYCLE-SUBMISSION-STATUS-CONSISTENCY-R1: تحويل شدّة الحالة الموحّدة الخادميّة إلى نبرة الشارة.
+const SEVERITY_TONE: Record<string, 'success' | 'gold' | 'alert' | 'navy' | 'muted'> = {
+  success: 'success',
+  info: 'navy',
+  warn: 'gold',
+  alert: 'alert',
+  none: 'muted',
+};
+
 function CycleStatusBadge({ cycle }: { cycle: ReportingCycleDto }) {
+  // المصدر خادميّ حصرًا: الشارة تعرض تسمية/شدّة الحالة الموحّدة دون حساب محليّ.
+  if (cycle.unified) {
+    return <Badge tone={SEVERITY_TONE[cycle.unified.severity] ?? 'muted'}>{cycle.unified.statusLabel}</Badge>;
+  }
+  // fallback خلفيّ للتوافق حين لا يتوفّر الحقل الموحّد (لا يجب أن يحدث بعد التمكين الخادميّ).
   if (cycle.isCurrent) return <Badge tone="success">الدورة الحالية</Badge>;
   if (cycle.isFuture) return <Badge tone="muted">مقفلة</Badge>;
   return <Badge tone="gold">دورة ماضية</Badge>;

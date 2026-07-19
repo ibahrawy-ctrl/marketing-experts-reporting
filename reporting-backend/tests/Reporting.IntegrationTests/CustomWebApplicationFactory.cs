@@ -12,8 +12,11 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
+        // قابلة للتجاوز عبر متغيّر البيئة TEST_DB_CONNECTION للسماح بقاعدة اختبار معزولة نظيفة؛
+        // الافتراضي يبقى reporting_test المشتركة (سلوك ملتزَم بلا تغيير حين غياب المتغيّر).
         builder.UseSetting("ConnectionStrings:Default",
-            "Host=localhost;Database=reporting_test_archr1;Username=ibrahimelbahrawi");
+            System.Environment.GetEnvironmentVariable("TEST_DB_CONNECTION")
+                ?? "Host=localhost;Database=reporting_test;Username=ibrahimelbahrawi");
         builder.UseSetting("Jwt:Key", "testing-only-signing-key-not-for-production-32chars!!");
         builder.UseSetting("Jwt:Issuer", "reporting-api");
         builder.UseSetting("Jwt:Audience", "reporting-spa");

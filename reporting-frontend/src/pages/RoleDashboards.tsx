@@ -27,6 +27,8 @@ import {
   improvementPlanStatusLabel,
   trainingNeedStatusLabel,
 } from '../lib/format';
+import { useReportingCalendar } from '../lib/useReportingCalendar';
+import { selectBannerCycleUnified, unifiedEmployeeBanner, unifiedUrgency } from '../lib/unifiedBanner';
 import type {
   DashboardDto,
   SummaryCardDto,
@@ -1424,26 +1426,45 @@ export function EmployeeDashboard({ dash, kpiDelta }: { dash: DashboardDto; kpiD
   const { data: mine } = useMine(true);
   const { data: plans } = usePlans(true);
   const { data: training } = useTraining(true);
+  // REPORTING-CYCLE-SUBMISSION-STATUS-CONSISTENCY-R1 — مصدر الحالة الوحيد للّافتة = الحقل الموحّد الخادميّ.
+  // نقرأ دورات الموظّف (past محدود) لنلتقط دورةً ماضيةً «متأخّرة غير مُسلَّمة» قد لا يكون لها صفّ تسليم أصلًا،
+  // ثمّ نختار الدورة التي عيّنها الخادم «مطلوب إجراؤها الآن» (isCurrentPriority) بدل الاعتماد على mine[0].
+  const { data: cycles } = useReportingCalendar({ context: 'Report', past: 8, future: 1 });
   const cur = mine?.[0] ?? null;
   const status = cur?.status ?? null;
 
-  const banner = (() => {
+  const bannerUnified = selectBannerCycleUnified(cycles?.cycles);
+  // نستعمل المسار الموحّد فقط حين يكون الموظّف مُسنَدًا وحالته ليست «غير مطلوب» — وإلّا نرجع للمسار القديم
+  // (يحمي مُقدّمي التقارير اليوميّة الذين لا يستهلكون my-cycles، فلا انحدار في سلوكهم).
+  const useUnified =
+    !!bannerUnified &&
+    bannerUnified.unifiedStatus !== 'NotAssigned' &&
+    bannerUnified.unifiedStatus !== 'NotRequired';
+
+  const legacyBanner = (() => {
     if (!cur || status === 'Draft')
-      return { title: 'تقريرك مطلوب الآن', desc: cur ? 'لديك مسودة غير مكتملة — أكملها وأرسلها للاعتماد.' : `تقرير ${dash.period.label} بانتظار البدء.`, cta: 'ابدأ / أكمل التقرير', t: 'orange' as const };
+      return { title: 'تقريرك مطلوب الآن', desc: cur ? 'لديك مسودة غير مكتملة — أكملها وأرسلها للاعتماد.' : `تقرير ${dash.period.label} بانتظار البدء.`, cta: 'ابدأ / أكمل التقرير', t: 'orange' as const, to: '/app/submissions' };
     if (status === 'Returned')
-      return { title: 'تقريرك أُعيد للتعديل', desc: 'راجع ملاحظات مديرك وعدّل التقرير ثم أعد إرساله.', cta: 'عدّل الآن', t: 'orange' as const };
+      return { title: 'تقريرك أُعيد للتعديل', desc: 'راجع ملاحظات مديرك وعدّل التقرير ثم أعد إرساله.', cta: 'عدّل الآن', t: 'orange' as const, to: '/app/submissions' };
     if (status === 'Closed' || status === 'Visible')
-      return { title: 'تم اعتماد تقريرك بالكامل', desc: 'اكتملت سلسلة الاعتماد حتى الإدارة العليا.', cta: 'عرض التقرير', t: 'success' as const };
-    return { title: 'تم إرسال تقريرك', desc: 'تقريرك قيد المراجعة في سلسلة الاعتماد.', cta: 'متابعة الحالة', t: 'navy' as const };
+      return { title: 'تم اعتماد تقريرك بالكامل', desc: 'اكتملت سلسلة الاعتماد حتى الإدارة العليا.', cta: 'عرض التقرير', t: 'success' as const, to: '/app/submissions' };
+    return { title: 'تم إرسال تقريرك', desc: 'تقريرك قيد المراجعة في سلسلة الاعتماد.', cta: 'متابعة الحالة', t: 'navy' as const, to: '/app/submissions' };
   })();
 
+  const banner = useUnified
+    ? (() => { const b = unifiedEmployeeBanner(bannerUnified!); return { title: b.title, desc: b.description, cta: b.cta, t: b.tone, to: b.to }; })()
+    : legacyBanner;
+
   const actions: NeedsActionEntry[] = [];
-  if (!cur)
+  if (useUnified && bannerUnified!.isCurrentPriority) {
+    const b = unifiedEmployeeBanner(bannerUnified!);
+    actions.push({ id: `cycle-${bannerUnified!.periodKey}`, title: b.title, context: bannerUnified!.statusDescription || bannerUnified!.cycleLabel, urgency: unifiedUrgency(bannerUnified!.severity), to: b.to, cta: b.cta });
+  } else if (!useUnified && !cur)
     actions.push({ id: 'start', title: `ابدأ تقرير ${dash.period.label}`, context: 'لم تبدأ تقرير هذه الفترة بعد', urgency: 'high', to: '/app/submissions', cta: 'ابدأ' });
-  else if (status === 'Draft')
-    actions.push({ id: 'draft', title: 'أكمل مسودة تقريرك وأرسلها', context: 'لديك مسودة غير مكتملة', urgency: 'high', to: `/app/submissions?open=${cur.id}`, cta: 'أكمل' });
-  else if (status === 'Returned')
-    actions.push({ id: 'returned', title: 'تقريرك أُعيد للتعديل', context: 'راجع ملاحظة المعتمِد وعدّل ثم أعد الإرسال', urgency: 'high', to: `/app/submissions?open=${cur.id}`, cta: 'عدّل' });
+  else if (!useUnified && status === 'Draft')
+    actions.push({ id: 'draft', title: 'أكمل مسودة تقريرك وأرسلها', context: 'لديك مسودة غير مكتملة', urgency: 'high', to: `/app/submissions?open=${cur!.id}`, cta: 'أكمل' });
+  else if (!useUnified && status === 'Returned')
+    actions.push({ id: 'returned', title: 'تقريرك أُعيد للتعديل', context: 'راجع ملاحظة المعتمِد وعدّل ثم أعد الإرسال', urgency: 'high', to: `/app/submissions?open=${cur!.id}`, cta: 'عدّل' });
   (plans ?? [])
     .filter((p) => p.status === 'Open' || p.status === 'InProgress')
     .slice(0, 3)
@@ -1456,7 +1477,7 @@ export function EmployeeDashboard({ dash, kpiDelta }: { dash: DashboardDto; kpiD
   return (
     <div className="space-y-6">
       <ActionBanner title={banner.title} description={banner.desc} tone={banner.t}
-        cta={<Link to="/app/submissions"><Button variant="inverted">{banner.cta}</Button></Link>} />
+        cta={<Link to={banner.to}><Button variant="inverted">{banner.cta}</Button></Link>} />
 
       <NeedsActionPanel
         items={actions}

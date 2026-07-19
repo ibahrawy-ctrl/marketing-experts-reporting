@@ -1,3 +1,5 @@
+using Reporting.Application.Reports;
+
 namespace Reporting.Application.Calendar;
 
 // ===== ROLE-AWARE-REPORTING-CALENDAR — نماذج واجهة تقويم الدورات المُدرِكة للأدوار (Phase 2.3) =====
@@ -51,7 +53,13 @@ public record ReportingCycleDto(
 
     // ----- مرجع اليوم -----
     DateOnly Today,
-    ReportingCalendarContext Context);
+    ReportingCalendarContext Context,
+
+    // ----- الحالة الموحّدة (REPORTING-CYCLE-SUBMISSION-STATUS-CONSISTENCY-R1) -----
+    // حقل إضافيّ (additive، nullable) مصدره المحرّك الخادميّ الموحّد UnifiedReportStatusService.
+    // الواجهة تعرض منه فقط (unifiedStatus/statusLabel/severity/availableActions/isLate/isCurrentPriority)
+    // ولا تحسب أيّ حالة؛ حقل IsOverdue القديم أعلاه يبقى مؤقّتًا للتوافق الخلفيّ حتى تحوّل كل الشاشات.
+    UnifiedReportCycleStatusDto? Unified = null);
 
 /// <summary>غلاف نتيجة my-cycles: بيانات الدور + الدورة الحالية + قائمة الدورات المتاحة للمستخدم.</summary>
 public record MyCyclesDto(
