@@ -42,8 +42,8 @@ public class ComplianceDueLateTests
         var dept = await CreateDeptAsync();
         var emp = await CreateWeeklyEmployeeAsync(roleId, deptId: dept);
         var week = PastWeekKey();
-        var end = ReportCalendarPolicy.WeekRange(week).End; // الأربعاء = موعد الموظّف
-        await AddSubmissionAsync(versionId, emp, week, SubmissionStatus.Submitted, AtRiyadh(end)); // في الموعد
+        var employeeDue = ReportCalendarPolicy.WeekRange(week).Start.AddDays(4); // الأربعاء = موعد الموظّف (السبت + 4)
+        await AddSubmissionAsync(versionId, emp, week, SubmissionStatus.Submitted, AtRiyadh(employeeDue)); // في الموعد
 
         var summary = await GetSummaryAsync(admin, week, dept);
         Assert.Equal(0, summary.Late);
@@ -120,8 +120,8 @@ public class ComplianceDueLateTests
         var onTime = await CreateWeeklyEmployeeAsync(roleId, deptId: dept);
         var missing = await CreateWeeklyEmployeeAsync(roleId, deptId: dept);
         var week = PastWeekKey();
-        var end = ReportCalendarPolicy.WeekRange(week).End;
-        await AddSubmissionAsync(versionId, onTime, week, SubmissionStatus.Submitted, AtRiyadh(end));
+        var employeeDue = ReportCalendarPolicy.WeekRange(week).Start.AddDays(4); // الأربعاء = موعد الموظّف
+        await AddSubmissionAsync(versionId, onTime, week, SubmissionStatus.Submitted, AtRiyadh(employeeDue));
 
         var summary = await GetSummaryAsync(admin, week, dept);
         Assert.Equal(2, summary.Expected);
@@ -231,14 +231,14 @@ public class ComplianceDueLateTests
         Assert.DoesNotContain(report.Rows, r => r.UserId == emp);
     }
 
-    // (11) الأسبوع التشغيلي خميس→أربعاء بلا تغيير: حدود مفتاح أسبوع منقضٍ تبدأ خميسًا وتنتهي أربعاء.
+    // (11) الأسبوع التشغيلي سبت→جمعة: حدود مفتاح أسبوع منقضٍ تبدأ سبتًا وتنتهي جمعة.
     [Fact]
-    public void WeeklyPeriod_ThursdayToWednesday_Unchanged()
+    public void WeeklyPeriod_SaturdayToFriday_Unchanged()
     {
         var week = PastWeekKey();
         var (start, end) = ReportCalendarPolicy.WeekRange(week);
-        Assert.Equal(DayOfWeek.Thursday, start.DayOfWeek);
-        Assert.Equal(DayOfWeek.Wednesday, end.DayOfWeek);
+        Assert.Equal(DayOfWeek.Saturday, start.DayOfWeek);
+        Assert.Equal(DayOfWeek.Friday, end.DayOfWeek);
         Assert.Equal(6, end.DayNumber - start.DayNumber);
     }
 

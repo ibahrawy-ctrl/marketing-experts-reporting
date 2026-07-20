@@ -40,9 +40,18 @@ public record MemberPerformanceDto(
 public record ActivityItemDto(
     Guid SubmissionId, string SubmitterName, string TemplateTitle, string Status, string PeriodKey, DateTime? SubmittedAtUtc);
 
-/// <summary>تقرير لم يُسلَّم بعد (مسودة) أو يحتاج إجراء (مُرجَع/مُصعَّد) داخل النطاق للفترة.</summary>
+/// <summary>
+/// بند تقرير يحتاج إجراءً داخل النطاق للفترة (Users-first): متأخّر بلا تسليم (non-starter، <see cref="SubmissionId"/>=null)،
+/// أو مسودّة متأخّرة، أو مُعاد للتعديل، أو مُصعَّد. <see cref="Status"/> يحمل اسم <c>ExpectedSubmissionStatus</c>
+/// و<see cref="StatusLabel"/>/<see cref="Severity"/> يأتيان جاهزَين من مصدر الحقيقة (لا حساب في الواجهة).
+/// </summary>
 public record PendingReportDto(
-    Guid SubmissionId, Guid SubmitterId, string SubmitterName, string TemplateTitle, string Status, string PeriodKey);
+    Guid? SubmissionId, Guid SubmitterId, string SubmitterName, string TemplateTitle, string Status, string PeriodKey)
+{
+    public string StatusLabel { get; init; } = "";
+    public string Severity { get; init; } = "info";
+    public bool HasSubmission { get; init; }
+}
 
 // ===== ملف أداء الموظف (Phase 3) — صفحة موحّدة محصورة بنطاق المستخدم =====
 

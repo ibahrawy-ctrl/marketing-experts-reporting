@@ -1410,12 +1410,15 @@ export interface ActivityItemDto {
   submittedAtUtc: string | null;
 }
 export interface PendingReportDto {
-  submissionId: string;
+  submissionId: string | null;
   submitterId: string;
   submitterName: string;
   templateTitle: string;
-  status: SubmissionStatus;
+  status: string;
   periodKey: string;
+  statusLabel: string;
+  severity: string;
+  hasSubmission: boolean;
 }
 
 // ===== ملف أداء الموظف (Phase 3) =====

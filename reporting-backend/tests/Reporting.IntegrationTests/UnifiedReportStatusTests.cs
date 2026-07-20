@@ -65,17 +65,21 @@ public class UnifiedReportStatusTests
         };
         db.ReportTemplates.Add(template);
 
+        // نُقدِّم أوّل نشر (قبل 60 يومًا) كي تسبق أرضيّةُ الانطباق الدوراتِ الماضية (21 يومًا)
+        // فتبقى مطلوبة — وإلا لصنّفتها بوّابة الانطباق NotRequired (سلوك R1 الصحيح للدورات قبل الأرضيّة).
         var version = new ReportTemplateVersion
         {
             ReportTemplateId = template.Id,
             VersionNumber = 1,
             IsPublished = true,
-            PublishedAtUtc = DateTime.UtcNow
+            PublishedAtUtc = DateTime.UtcNow.AddDays(-60)
         };
         db.ReportTemplateVersions.Add(version);
 
         var user = await db.Users.FirstAsync(u => u.Id == userId);
         user.JobRoleId = jobRole.Id;
+        // نُرجِع تاريخ إنشاء المستخدم قبل الدورات الماضية كي تكون أرضيّة الانطباق سابقةً لها.
+        user.CreatedAtUtc = DateTime.UtcNow.AddDays(-60);
         await db.SaveChangesAsync();
         return version.Id;
     }
@@ -105,7 +109,7 @@ public class UnifiedReportStatusTests
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var svc = new UnifiedReportStatusService(db, new StubCurrentUser(userId, roles.Length == 0 ? new[] { "Employee" } : roles));
+        var svc = new UnifiedReportStatusService(db, new StubCurrentUser(userId, roles.Length == 0 ? new[] { "Employee" } : roles), new SystemClock());
         return await svc.GetMyWeeklyCycleStatusAsync(cycleKey, null);
     }
 
@@ -118,7 +122,7 @@ public class UnifiedReportStatusTests
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var svc = new UnifiedReportStatusService(db, new StubCurrentUser(null));
+        var svc = new UnifiedReportStatusService(db, new StubCurrentUser(null), new SystemClock());
         var res = await svc.GetMyWeeklyCycleStatusesAsync(new[] { CurrentCycleKey() }, null);
         Assert.False(res.Succeeded);
         Assert.Equal("auth.unauthenticated", res.ErrorCode);
@@ -281,7 +285,7 @@ public class UnifiedReportStatusTests
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var svc = new UnifiedReportStatusService(db, new StubCurrentUser(uid, "Employee"));
+        var svc = new UnifiedReportStatusService(db, new StubCurrentUser(uid, "Employee"), new SystemClock());
         var res = await svc.GetMyWeeklyCycleStatusesAsync(new[] { cur, past, cur }, null); // مع تكرار
 
         Assert.True(res.Succeeded);
@@ -290,22 +294,24 @@ public class UnifiedReportStatusTests
         Assert.Equal(UnifiedCycleStatus.OverdueNotSubmitted, res.Value.First(r => r.PeriodKey == past).UnifiedStatus);
     }
 
-    // ===== 14) isCurrentPriority: الأولوية للدورة الأعلى إلحاحًا (المتأخّرة غير المُسلَّمة) =====
+    // ===== 14) isCurrentPriority: تُفضَّل الدورة الحاليّة كي لا يُخفيها بند تاريخيّ متأخّر =====
+    // REPORT-EXPECTED-SUBMISSION-STATUS-R1: الشارة للدورة الحاليّة (ضمن المهلة) لا للمتأخّرة التاريخيّة.
     [Fact]
-    public async Task CurrentPriority_PicksHighestActionRequired()
+    public async Task CurrentPriority_PrefersCurrentCycle_OverHistoricalOverdue()
     {
         var (_, uid) = await TestAuth.CreateUserAsync(_factory, "Employee");
         var vid = await SetupReportingRoleAsync(uid);
-        var cur = CurrentCycleKey();       // DueNow (رتبة 5)
-        var past = PastCycleKey();         // OverdueNotSubmitted (رتبة 1 — الأعلى)
+        var cur = CurrentCycleKey();       // DueNow (الدورة الحاليّة — ضمن المهلة)
+        var past = PastCycleKey();         // OverdueNotSubmitted (بند تاريخيّ متأخّر)
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var svc = new UnifiedReportStatusService(db, new StubCurrentUser(uid, "Employee"));
+        var svc = new UnifiedReportStatusService(db, new StubCurrentUser(uid, "Employee"), new SystemClock());
         var res = await svc.GetMyWeeklyCycleStatusesAsync(new[] { cur, past }, null);
 
-        Assert.True(res.Value!.First(r => r.PeriodKey == past).IsCurrentPriority);
-        Assert.False(res.Value.First(r => r.PeriodKey == cur).IsCurrentPriority);
+        // الدورة الحاليّة تحوز الشارة رغم وجود متأخّر تاريخيّ (لا يُخفي المتأخّرُ الحاليَّ ضمن المهلة).
+        Assert.True(res.Value!.First(r => r.PeriodKey == cur).IsCurrentPriority);
+        Assert.False(res.Value.First(r => r.PeriodKey == past).IsCurrentPriority);
     }
 
     // ===== 15) قراءة فقط: لا بريد/صندوق صادر/تغيير تسليم =====

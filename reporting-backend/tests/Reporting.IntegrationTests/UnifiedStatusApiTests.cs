@@ -46,17 +46,23 @@ public class UnifiedStatusApiTests
         };
         db.ReportTemplates.Add(template);
 
+        // أرضيّة الانطباق = MAX(إنشاء المستخدم، أوّل نشر للقالب). لاختبار اشتقاق الحالة (DueNow/OverdueNotSubmitted)
+        // يجب أن يكون المستخدم مؤهَّلًا قبل الدورات المفحوصة، وإلّا صنّفتها بوّابة الانطباق NotRequired (لا التزام رجعيّ
+        // منتصف الدورة — قاعدة REPORT-EXPECTED-SUBMISSION-STATUS-R1). لذا نُرجِع تاريخ النشر وإنشاء المستخدم 120 يومًا.
+        var eligibleFrom = DateTime.UtcNow.AddDays(-120);
+
         var version = new ReportTemplateVersion
         {
             ReportTemplateId = template.Id,
             VersionNumber = 1,
             IsPublished = true,
-            PublishedAtUtc = DateTime.UtcNow
+            PublishedAtUtc = eligibleFrom
         };
         db.ReportTemplateVersions.Add(version);
 
         var user = await db.Users.FirstAsync(u => u.Id == userId);
         user.JobRoleId = jobRole.Id;
+        user.CreatedAtUtc = eligibleFrom;
         await db.SaveChangesAsync();
         return version.Id;
     }

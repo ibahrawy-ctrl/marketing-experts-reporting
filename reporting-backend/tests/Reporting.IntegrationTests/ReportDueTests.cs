@@ -55,17 +55,21 @@ public class ReportDueTests
         };
         db.ReportTemplates.Add(template);
 
+        // أرضيّة الانطباق = MAX(إنشاء المستخدم، أوّل نشر للقالب). لاختبار أسبوع ماضٍ كتأخّر فعليّ،
+        // يجب أن يكون الموظّف موجودًا والقالب منشورًا قبل ذلك الأسبوع؛ وإلّا فالدورة قبل الأرضيّة = غير مطلوبة.
+        var floorAnchor = DateTime.UtcNow.AddDays(-60);
         var version = new ReportTemplateVersion
         {
             ReportTemplateId = template.Id,
             VersionNumber = 1,
             IsPublished = true,
-            PublishedAtUtc = DateTime.UtcNow
+            PublishedAtUtc = floorAnchor
         };
         db.ReportTemplateVersions.Add(version);
 
         var user = await db.Users.FirstAsync(u => u.Id == userId);
         user.JobRoleId = jobRole.Id;
+        if (user.CreatedAtUtc > floorAnchor) user.CreatedAtUtc = floorAnchor;
         await db.SaveChangesAsync();
         return version.Id;
     }
@@ -95,29 +99,31 @@ public class ReportDueTests
     private static string CurrentWeekKey() => ReportCalendarPolicy.WeekKeyFor(ReportCalendarPolicy.RiyadhToday());
     private static string PastWeekKey() => ReportCalendarPolicy.WeekKeyFor(ReportCalendarPolicy.RiyadhToday().AddDays(-21));
 
-    // ===== 1) الأسبوع التشغيلي: الخميس → الأربعاء (وموعد الموظّف = الأربعاء) =====
+    // ===== 1) الأسبوع التشغيلي: السبت → الجمعة (وموعد الموظّف = الأربعاء = بداية الدورة +4) =====
+    // (التقويم الرسميّ الموحّد Sat→Fri من ROLE-AWARE-REPORTING-CALENDAR؛ الموعد يُشتقّ من بداية الدورة لا نهايتها.)
     [Fact]
-    public void WeekBoundaries_AreThursdayToWednesday_EmployeeDueIsWednesday()
+    public void WeekBoundaries_AreSaturdayToFriday_EmployeeDueIsWednesday()
     {
         var key = CurrentWeekKey();
         var (start, end) = ReportCalendarPolicy.WeekRange(key);
-        Assert.Equal(DayOfWeek.Thursday, start.DayOfWeek);
-        Assert.Equal(DayOfWeek.Wednesday, end.DayOfWeek);
+        Assert.Equal(DayOfWeek.Saturday, start.DayOfWeek);
+        Assert.Equal(DayOfWeek.Friday, end.DayOfWeek);
         Assert.Equal(start.AddDays(6), end);
-        // موظّف عاديّ: موعده نهاية الأسبوع (الأربعاء).
-        Assert.Equal(end, ReportCalendarPolicy.DueDateForRole(key, Roles.Employee));
+        // موظّف عاديّ: موعده الأربعاء (بداية الدورة +4).
+        Assert.Equal(start.AddDays(4), ReportCalendarPolicy.DueDateForRole(key, Roles.Employee));
+        Assert.Equal(DayOfWeek.Wednesday, ReportCalendarPolicy.DueDateForRole(key, Roles.Employee).DayOfWeek);
     }
 
-    // ===== 2) مواعيد الأدوار: قائد=خميس(+1)، مدير=أحد(+4)، تنفيذي=اثنين(+5) =====
+    // ===== 2) مواعيد الأدوار: قائد=خميس(+5)، مدير=أحد(+8)، تنفيذي=اثنين(+9) — من بداية الدورة (السبت) =====
     [Fact]
     public void DueDateForRole_MapsTeamLeaderThursday_ManagerSunday_ExecutiveMonday()
     {
         var key = CurrentWeekKey();
-        var end = ReportCalendarPolicy.WeekRange(key).End; // الأربعاء
-        Assert.Equal(end.AddDays(1), ReportCalendarPolicy.DueDateForRole(key, Roles.TeamLeader));
-        Assert.Equal(end.AddDays(4), ReportCalendarPolicy.DueDateForRole(key, Roles.Manager));
-        Assert.Equal(end.AddDays(5), ReportCalendarPolicy.DueDateForRole(key, Roles.GeneralManager));
-        Assert.Equal(end.AddDays(5), ReportCalendarPolicy.DueDateForRole(key, Roles.Ceo));
+        var start = ReportCalendarPolicy.WeekRange(key).Start; // السبت = بداية الدورة
+        Assert.Equal(start.AddDays(5), ReportCalendarPolicy.DueDateForRole(key, Roles.TeamLeader));
+        Assert.Equal(start.AddDays(8), ReportCalendarPolicy.DueDateForRole(key, Roles.Manager));
+        Assert.Equal(start.AddDays(9), ReportCalendarPolicy.DueDateForRole(key, Roles.GeneralManager));
+        Assert.Equal(start.AddDays(9), ReportCalendarPolicy.DueDateForRole(key, Roles.Ceo));
         Assert.Equal(DayOfWeek.Thursday, ReportCalendarPolicy.DueDateForRole(key, Roles.TeamLeader).DayOfWeek);
         Assert.Equal(DayOfWeek.Sunday, ReportCalendarPolicy.DueDateForRole(key, Roles.Manager).DayOfWeek);
         Assert.Equal(DayOfWeek.Monday, ReportCalendarPolicy.DueDateForRole(key, Roles.Ceo).DayOfWeek);
@@ -156,8 +162,9 @@ public class ReportDueTests
         Assert.False(status.Submitted);
         Assert.False(status.IsOverdue);
         Assert.Equal(DelayType.NoDelay, status.DelayType);
-        // موعد الموظّف = نهاية الأسبوع (الأربعاء).
-        Assert.Equal(status.WeekEnd, status.EmployeeDueDate);
+        // موعد الموظّف = الأربعاء (بداية الأسبوع السبت + 4).
+        Assert.Equal(status.WeekStart.AddDays(4), status.EmployeeDueDate);
+        Assert.Equal(DayOfWeek.Wednesday, status.EmployeeDueDate.DayOfWeek);
     }
 
     // ===== 6) أسبوع ماضٍ: موظّف بلا تسليم ⇒ متأخّر (تجاوز الموعد) =====

@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Reporting.Application.Common;
 using Reporting.Application.Dashboard;
+using Reporting.Application.Reports;
 using Reporting.Domain.Enums;
 using Reporting.Infrastructure.Persistence;
 
@@ -16,12 +17,18 @@ public class DashboardService : IDashboardService
     private readonly AppDbContext _db;
     private readonly ICurrentUser _currentUser;
     private readonly IScopeResolver _scope;
+    private readonly IExpectedSubmissionStatusResolver _expected;
 
-    public DashboardService(AppDbContext db, ICurrentUser currentUser, IScopeResolver scope)
+    public DashboardService(
+        AppDbContext db,
+        ICurrentUser currentUser,
+        IScopeResolver scope,
+        IExpectedSubmissionStatusResolver expected)
     {
         _db = db;
         _currentUser = currentUser;
         _scope = scope;
+        _expected = expected;
     }
 
     private static readonly SubmissionStatus[] CompletedStatuses =
@@ -47,18 +54,26 @@ public class DashboardService : IDashboardService
 
         var key = string.IsNullOrWhiteSpace(periodKey) ? CurrentWeekKey() : periodKey.Trim();
 
+        // REPORT-EXPECTED-SUBMISSION-STATUS-R1 — عدّادات البطاقات Users-first (مطالَبون LEFT JOIN تسليمات):
+        // «المطلوبة» = الدورات المنطبقة الفعليّة، و«تحتاج إجراء» تشمل «من لم يبدأ ومتأخّر» (non-starter).
+        // مصدر واحد للحقيقة مع قائمة «pending-reports» ⇒ الأرقام متطابقة عبر الشاشات.
+        var expected = (await _expected.ResolveAsync(
+                new ExpectedStatusQuery(scopeIds, new[] { key }, null), ct))
+            .Where(r => r.IsExpected)
+            .ToList();
+
+        var total = expected.Count;
+        var completed = expected.Count(r => r.Status is ExpectedSubmissionStatus.Approved
+            or ExpectedSubmissionStatus.Closed);
+        var pending = expected.Count(r => r.Status == ExpectedSubmissionStatus.Submitted);
+        // «تحتاج إجراء» = متأخّر بلا تسليم + مسودّة متأخّرة + مُعاد + مُصعَّد (موحّد مع قائمة التقارير المتأخّرة).
+        var needsAction = expected.Count(r => r.IsActionable);
+
+        // تفصيل حالة التسليمات القائمة (ودجة الدونات) — عرض خام مستقلّ لِما سُلِّم فعلًا.
         var subs = await _db.ReportSubmissions
             .Where(s => scopeIds.Contains(s.SubmitterId) && s.PeriodKey == key)
             .Select(s => s.Status)
             .ToListAsync(ct);
-
-        var total = subs.Count;
-        var completed = subs.Count(s => CompletedStatuses.Contains(s));
-        var pending = subs.Count(s => s == SubmissionStatus.Submitted);
-        // «تحتاج إجراء» = التقارير المتوقّفة التي تتطلّب تحرّكًا من صاحبها/الفريق:
-        // مسودّة لم تُرسل + معادة للتعديل + مصعّدة. (تعريف موحّد مع شاشة التقارير.)
-        var needsAction = subs.Count(s =>
-            s == SubmissionStatus.Draft || s == SubmissionStatus.Returned || s == SubmissionStatus.Escalated);
 
         // ADMIN-GOVERNANCE-R1: لا يدخل التقييم النتائج النهائية إلا إذا كان معتمَدًا (Approved).
         // المحذوف إداريًّا (IsDeleted) مستبعَد تلقائيًّا عبر الفلتر العالميّ.
@@ -269,36 +284,23 @@ public class DashboardService : IDashboardService
         var scopeIds = await ResolveScopeIdsAsync(uid, scopeType, ct);
         var key = string.IsNullOrWhiteSpace(periodKey) ? CurrentWeekKey() : periodKey.Trim();
 
-        // "تحتاج إجراء" = مسودة لم تُسلَّم بعد، أو مُرجَعة/مُصعَّدة.
-        var pendingStatuses = new[] { SubmissionStatus.Draft, SubmissionStatus.Returned, SubmissionStatus.Escalated };
+        // REPORT-EXPECTED-SUBMISSION-STATUS-R1 — Users-first: كل مطالَب في النطاق LEFT JOIN تسليماته.
+        // بنود الإجراء تشمل «من لم يبدأ ومتأخّر» (non-starter، SubmissionId=null) لا المسودّات/المُعادة فقط.
+        var projection = await _expected.ResolveManagementAsync(key, scopeIds, null, ct);
 
-        var rows = await (
-            from s in _db.ReportSubmissions
-            where scopeIds.Contains(s.SubmitterId) && s.PeriodKey == key && pendingStatuses.Contains(s.Status)
-            join v in _db.ReportTemplateVersions on s.ReportTemplateVersionId equals v.Id
-            join t in _db.ReportTemplates on v.ReportTemplateId equals t.Id
-            select new
+        var items = projection.ActionItems
+            .Select(r => new PendingReportDto(
+                r.SubmissionId,
+                r.UserId,
+                r.UserFullName,
+                r.TemplateName,
+                r.Status.ToString(),
+                r.PeriodKey)
             {
-                s.Id,
-                s.SubmitterId,
-                Title = t.Title,
-                s.Status,
-                s.PeriodKey
+                StatusLabel = r.StatusLabel,
+                Severity = r.Severity,
+                HasSubmission = r.HasSubmission
             })
-            .ToListAsync(ct);
-
-        var names = await _db.Users
-            .Where(u => scopeIds.Contains(u.Id))
-            .ToDictionaryAsync(u => u.Id, u => u.FullName, ct);
-
-        var items = rows
-            .Select(s => new PendingReportDto(
-                s.Id,
-                s.SubmitterId,
-                names.TryGetValue(s.SubmitterId, out var n) ? n : "—",
-                s.Title,
-                s.Status.ToString(),
-                s.PeriodKey))
             .ToList();
 
         return Result<IReadOnlyList<PendingReportDto>>.Success(items);

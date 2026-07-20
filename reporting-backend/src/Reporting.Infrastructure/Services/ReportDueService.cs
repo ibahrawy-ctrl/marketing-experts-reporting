@@ -19,6 +19,8 @@ public class ReportDueService : IReportDueService
     private readonly AppDbContext _db;
     private readonly ICurrentUser _currentUser;
     private readonly IScopeResolver _scope;
+    // مصدر الحقيقة الموحّد للحالة المتوقّعة الأسبوعية (Gate C/D): تقويم واحد + حاسبة حالة واحدة + أرضيّة انطباق.
+    private readonly IExpectedSubmissionStatusResolver _expected;
 
     // حالات «أُرسِل التقرير» — تُعدّ تسليمًا قائمًا (أيّ حالة بعد المسودّة). مطابقة لـ ReportingService.
     private static readonly SubmissionStatus[] SubmittedStatuses =
@@ -35,11 +37,13 @@ public class ReportDueService : IReportDueService
         SubmissionStatus.ApprovedByNextLevel, SubmissionStatus.Escalated
     };
 
-    public ReportDueService(AppDbContext db, ICurrentUser currentUser, IScopeResolver scope)
+    public ReportDueService(AppDbContext db, ICurrentUser currentUser, IScopeResolver scope,
+        IExpectedSubmissionStatusResolver expected)
     {
         _db = db;
         _currentUser = currentUser;
         _scope = scope;
+        _expected = expected;
     }
 
     // ===== self-only: حالة تقرير الأسبوع الحالي للمستخدم نفسه (متاح للموظّف) =====
@@ -97,31 +101,30 @@ public class ReportDueService : IReportDueService
                 label, null));
         }
 
-        // أسبوعي: وحدة واحدة، موعدها بحسب دور المستخدم.
+        // أسبوعي: يُفوَّض بالكامل لمصدر الحقيقة الموحّد (ExpectedSubmissionStatusResolver) —
+        // أرضيّة الانطباق + الحالة الموحّدة + التسمية جاهزة (لا حساب تأخّر محلّي، Gate C/D).
         var due = ReportCalendarPolicy.DueDateForRole(key, primaryRole);
-        var sub = await _db.ReportSubmissions.AsNoTracking()
-            .Where(s => s.SubmitterId == uid && s.PeriodType == PeriodType.Weekly
-                        && s.PeriodKey == key && SubmittedStatuses.Contains(s.Status))
-            .OrderBy(s => s.SubmittedAtUtc ?? DateTime.MaxValue)
-            .Select(s => new { s.Id, s.SubmittedAtUtc })
-            .FirstOrDefaultAsync(ct);
+        var r = (await _expected.ResolveAsync(
+                new ExpectedStatusQuery(new[] { uid }, new[] { key }, null), ct))
+            .FirstOrDefault();
 
-        if (sub is not null)
+        // غير مطالَب بهذا الأسبوع (الدورة قبل أرضيّة الانطباق أو الموظّف غير نشط) ⇒ لا تأخّر.
+        if (r is null || !r.IsExpected)
         {
-            var submittedDate = sub.SubmittedAtUtc is DateTime at ? ReportCalendarPolicy.RiyadhDate(at) : today;
-            var late = submittedDate > due;
             return Result<ReportDueMyStatus>.Success(new ReportDueMyStatus(
-                key, ReportCalendarPolicy.WeekLabel(key), start, end, due,
-                Expected: true, Submitted: true, IsOverdue: false, DelayType.NoDelay,
-                late ? "سُلّم متأخرًا" : "سُلّم في الموعد", sub.Id));
+                key, ReportCalendarPolicy.WeekLabel(key), start, end, r?.DueAt ?? due,
+                Expected: false, Submitted: false, IsOverdue: false, DelayType.NoDelay,
+                r?.StatusLabel ?? "لا يُتوقَّع منك تقرير أسبوعي في هذا الأسبوع.", null));
         }
 
-        var isOverdue = today > due;
+        var hasFinal = r.HasSubmission && r.SubmissionStatus != SubmissionStatus.Draft;
+        var isOverdue = r.Status is ExpectedSubmissionStatus.OverdueNotSubmitted
+            or ExpectedSubmissionStatus.OverdueDraft;
         return Result<ReportDueMyStatus>.Success(new ReportDueMyStatus(
-            key, ReportCalendarPolicy.WeekLabel(key), start, end, due,
-            Expected: true, Submitted: false, IsOverdue: isOverdue,
+            key, ReportCalendarPolicy.WeekLabel(key), start, end, r.DueAt,
+            Expected: true, Submitted: hasFinal, IsOverdue: isOverdue,
             isOverdue ? DelayType.EmployeeReportNotSubmitted : DelayType.NoDelay,
-            isOverdue ? "متأخّر — لم يُسلَّم" : "لم يُسلَّم بعد (ضمن المهلة)", null));
+            r.StatusLabel, r.SubmissionId));
     }
 
     // ===== نظرة عامة على مواعيد التقارير ضمن نطاق المستخدم =====
@@ -231,22 +234,21 @@ public class ReportDueService : IReportDueService
 
         if (weekly.Count > 0)
         {
+            // يُفوَّض التقييم الأسبوعي لمصدر الحقيقة الموحّد: أرضيّة الانطباق + الحالة الموحّدة (Gate C/D).
+            // المرشّح غير المطالَب بهذا الأسبوع (قبل الأرضيّة/غير نشط) لا يدخل العدّ إطلاقًا.
             var weeklyIds = weekly.Select(c => c.UserId).ToList();
-            var rows = await _db.ReportSubmissions.AsNoTracking()
-                .Where(s => s.PeriodKey == key && s.PeriodType == PeriodType.Weekly
-                            && SubmittedStatuses.Contains(s.Status) && weeklyIds.Contains(s.SubmitterId))
-                .Select(s => new { s.SubmitterId, s.Id, s.SubmittedAtUtc })
-                .ToListAsync(ct);
-            var byUser = rows.GroupBy(s => s.SubmitterId)
-                .ToDictionary(g => g.Key, g => g.OrderBy(x => x.SubmittedAtUtc ?? DateTime.MaxValue).First());
+            var byUser = (await _expected.ResolveAsync(
+                    new ExpectedStatusQuery(weeklyIds, new[] { key }, null), ct))
+                .Where(r => r.IsExpected)
+                .ToDictionary(r => r.UserId);
 
             foreach (var c in weekly)
             {
-                var due = ReportCalendarPolicy.DueDateForRole(key, c.PrimaryRole);
-                if (byUser.TryGetValue(c.UserId, out var s))
-                    evals.Add(new DueEval(c, true, due, false, s.Id));
-                else
-                    evals.Add(new DueEval(c, false, due, today > due, null));
+                if (!byUser.TryGetValue(c.UserId, out var r)) continue;
+                var hasFinal = r.HasSubmission && r.SubmissionStatus != SubmissionStatus.Draft;
+                var overdue = r.Status is ExpectedSubmissionStatus.OverdueNotSubmitted
+                    or ExpectedSubmissionStatus.OverdueDraft;
+                evals.Add(new DueEval(c, hasFinal, r.DueAt, overdue, r.SubmissionId));
             }
         }
 

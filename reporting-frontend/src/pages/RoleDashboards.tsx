@@ -257,7 +257,16 @@ function PendingApprovalsCard({ items }: { items?: SubmissionListItem[] }) {
   );
 }
 
-// تقارير تحتاج إجراء (مسودة/معادة/مصعّدة) ضمن النطاق.
+// خريطة شدّة الحالة (من مصدر الحقيقة) إلى نغمة الشارة — لا حساب محليّ للحالة.
+const severityTone: Record<string, 'navy' | 'gold' | 'alert' | 'success' | 'muted'> = {
+  info: 'navy',
+  warn: 'gold',
+  alert: 'alert',
+  success: 'success',
+  none: 'muted',
+};
+
+// تقارير تحتاج إجراء (غير مُبتدأة/مسودة/معادة/مصعّدة) ضمن النطاق — Users-first.
 function PendingReportsCard({ items, title = 'تقارير متأخرة / تحتاج إجراء' }: { items?: PendingReportDto[]; title?: string }) {
   return (
     <Card>
@@ -268,10 +277,10 @@ function PendingReportsCard({ items, title = 'تقارير متأخرة / تحت
         <ul>
           {items.slice(0, 8).map((p) => (
             <ActionItem
-              key={p.submissionId}
+              key={p.submissionId ?? `${p.submitterId}-${p.periodKey}`}
               title={p.templateTitle}
               context={`${p.submitterName} · ${p.periodKey}`}
-              badge={<Badge tone="gold">{submissionStatusLabel[p.status]}</Badge>}
+              badge={<Badge tone={severityTone[p.severity] ?? 'gold'}>{p.statusLabel}</Badge>}
             />
           ))}
         </ul>
@@ -1542,7 +1551,7 @@ export function TeamLeaderDashboard({ dash }: { dash: DashboardDto }) {
   (escal ?? []).filter((e) => e.status === 'Open').slice(0, 3).forEach((e) =>
     actions.push({ id: `esc-${e.id}`, title: `تصعيد مفتوح: ${e.reason}`, context: e.targetName ?? '—', urgency: 'high', to: '/app/governance', cta: 'معالجة' }));
   (pending ?? []).slice(0, 4).forEach((p) =>
-    actions.push({ id: `late-${p.submissionId}`, title: `تقرير متأخر/مُعاد: ${p.templateTitle}`, context: `${p.submitterName} · ${submissionStatusLabel[p.status]}`, urgency: 'medium', to: '/app/submissions?tab=all', cta: 'متابعة' }));
+    actions.push({ id: `late-${p.submissionId ?? `${p.submitterId}-${p.periodKey}`}`, title: `تقرير متأخر/مُعاد: ${p.templateTitle}`, context: `${p.submitterName} · ${p.statusLabel}`, urgency: 'medium', to: '/app/submissions?tab=all', cta: 'متابعة' }));
   (members ?? []).filter(supportNeeded).slice(0, 3).forEach((m) =>
     actions.push({ id: `sup-${m.userId}`, title: `عضو يحتاج دعمًا: ${m.name}`, context: m.kpiAverage != null ? `متوسط KPI ${m.kpiAverage}${m.kpiTrend === 'Down' ? ' · اتجاه هابط' : ''}` : 'اتجاه هابط', urgency: 'medium', to: '/app/development', cta: 'خطة' }));
 
@@ -1614,7 +1623,7 @@ export function ManagerDashboard({ dash }: { dash: DashboardDto }) {
   if ((kpi?.belowTarget ?? 0) > 0)
     actions.push({ id: 'below', title: `${kpi!.belowTarget} موظف دون المستهدف KPI`, context: 'راجع التقييمات وافتح خطط تحسين', urgency: 'medium', to: '/app/kpi', cta: 'المؤشرات' });
   (pending ?? []).slice(0, 4).forEach((p) =>
-    actions.push({ id: `late-${p.submissionId}`, title: `تقرير متأخر/مُعاد: ${p.templateTitle}`, context: `${p.submitterName} · ${submissionStatusLabel[p.status]}`, urgency: 'medium', to: '/app/submissions?tab=all', cta: 'متابعة' }));
+    actions.push({ id: `late-${p.submissionId ?? `${p.submitterId}-${p.periodKey}`}`, title: `تقرير متأخر/مُعاد: ${p.templateTitle}`, context: `${p.submitterName} · ${p.statusLabel}`, urgency: 'medium', to: '/app/submissions?tab=all', cta: 'متابعة' }));
   (members ?? []).filter(supportNeeded).slice(0, 2).forEach((m) =>
     actions.push({ id: `sup-${m.userId}`, title: `عضو يحتاج دعمًا: ${m.name}`, context: m.kpiAverage != null ? `متوسط KPI ${m.kpiAverage}` : 'اتجاه هابط', urgency: 'low', to: '/app/development', cta: 'خطة' }));
 
@@ -1849,7 +1858,7 @@ export function CeoSupportDashboard({ dash }: { dash: DashboardDto }) {
 
   const actions: NeedsActionEntry[] = [];
   (pending ?? []).slice(0, 12).forEach((p) =>
-    actions.push({ id: `pend-${p.submissionId}`, title: `متابعة: ${p.templateTitle}`, context: `${p.submitterName} · ${p.periodKey} · ${submissionStatusLabel[p.status]}`, urgency: 'medium', to: `/app/submissions?open=${p.submissionId}`, cta: 'تابعي' }),
+    actions.push({ id: `pend-${p.submissionId ?? `${p.submitterId}-${p.periodKey}`}`, title: `متابعة: ${p.templateTitle}`, context: `${p.submitterName} · ${p.periodKey} · ${p.statusLabel}`, urgency: 'medium', to: p.submissionId ? `/app/submissions?open=${p.submissionId}` : '/app/submissions?tab=all', cta: 'تابعي' }),
   );
   if (rate < 95)
     actions.push({ id: 'week-incomplete', title: `صورة الأسبوع غير مكتملة (${rate}٪)`, context: `${comp?.pending ?? 0} تقرير قيد الانتظار من ${comp?.total ?? 0}`, urgency: 'low', to: '/app/reports', cta: 'تجهيز الملخّص' });

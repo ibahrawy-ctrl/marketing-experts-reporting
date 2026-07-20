@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Reporting.Application.Common;
 using Reporting.Application.Reports;
@@ -19,14 +20,16 @@ public class UnifiedReportStatusService : IUnifiedReportStatusService
 {
     private readonly AppDbContext _db;
     private readonly ICurrentUser _currentUser;
+    private readonly ISystemClock _clock;
 
     // منطقة النظام (الرياض) — نُطبِّقها على حدود الدورة قبل تمريرها للسياسة النقيّة.
     private static readonly TimeSpan Riyadh = ReportingCalendarPolicy.RiyadhOffset;
 
-    public UnifiedReportStatusService(AppDbContext db, ICurrentUser currentUser)
+    public UnifiedReportStatusService(AppDbContext db, ICurrentUser currentUser, ISystemClock clock)
     {
         _db = db;
         _currentUser = currentUser;
+        _clock = clock;
     }
 
     public async Task<Result<UnifiedReportCycleStatusDto>> GetMyWeeklyCycleStatusAsync(
@@ -65,7 +68,7 @@ public class UnifiedReportStatusService : IUnifiedReportStatusService
         // هل المستخدم مطالَب بتقرير أسبوعيّ ضمن هذا المسار؟ (مصدر الإسناد = قوالب التقارير المطابقة لمسمّاه).
         var me = await _db.Users.AsNoTracking()
             .Where(u => u.Id == uid)
-            .Select(u => new { u.Id, u.FullName, u.JobRoleId })
+            .Select(u => new { u.Id, u.FullName, u.JobRoleId, u.IsActive, u.CreatedAtUtc })
             .FirstOrDefaultAsync(ct);
         if (me is null)
             return Result<IReadOnlyList<UnifiedReportCycleStatusDto>>.Failure("المستخدم غير موجود.", "user.not_found");
@@ -83,6 +86,41 @@ public class UnifiedReportStatusService : IUnifiedReportStatusService
                 .Select(v => v.Id)
                 .ToListAsync(ct);
         }
+
+        // ===== أرضيّة الانطباق (Gate): الدورة قبلها ليست مطلوبة (لا التزام رجعيّ) =====
+        // نفس منطق ExpectedSubmissionStatusResolver: MAX(إنشاء المستخدم، أوّل نشر للقالب، إسناد موثَّق).
+        DateOnly? templateFirstPublished = null;
+        if (template is not null)
+        {
+            var pubDates = await _db.ReportTemplateVersions.AsNoTracking()
+                .Where(v => v.ReportTemplateId == template.TemplateId && v.IsPublished && v.PublishedAtUtc != null)
+                .Select(v => v.PublishedAtUtc!.Value)
+                .ToListAsync(ct);
+            if (pubDates.Count > 0)
+                templateFirstPublished = ReportingCalendarPolicy.RiyadhDate(EnsureUtc(pubDates.Min()));
+        }
+
+        DateOnly? auditedAssigned = null;
+        if (me.JobRoleId is Guid myJobRole)
+        {
+            var auditRaw = await _db.AuditLogs.AsNoTracking()
+                .Where(a => a.Action == "user.jobrole.changed" && a.EntityId == uid && a.DataJson != null)
+                .Select(a => new { a.DataJson, a.CreatedAtUtc })
+                .ToListAsync(ct);
+            DateTime? latest = null;
+            foreach (var a in auditRaw)
+            {
+                if (ParseNewJobRoleId(a.DataJson) == myJobRole && (latest is null || a.CreatedAtUtc > latest))
+                    latest = a.CreatedAtUtc;
+            }
+            if (latest is DateTime la)
+                auditedAssigned = ReportingCalendarPolicy.RiyadhDate(EnsureUtc(la));
+        }
+
+        var floor = ApplicabilityFloorPolicy.Resolve(new ApplicabilityFloorPolicy.FloorInput(
+            UserCreatedAt: ReportingCalendarPolicy.RiyadhDate(EnsureUtc(me.CreatedAtUtc)),
+            TemplateFirstPublishedAt: templateFirstPublished,
+            AuditedJobRoleAssignedAt: auditedAssigned));
 
         // ===== الجلب الدفعيّ الوحيد (بلا N+1): كلّ تسليمات المستخدم الأسبوعية لهذه المفاتيح، بكلّ الحالات =====
         var subsQuery = _db.ReportSubmissions.AsNoTracking()
@@ -102,7 +140,7 @@ public class UnifiedReportStatusService : IUnifiedReportStatusService
             .GroupBy(s => s.PeriodKey)
             .ToDictionary(g => g.Key, g => g.OrderByDescending(x => StatusProgressRank(x.Status)).First());
 
-        var now = DateTimeOffset.UtcNow;
+        var now = _clock.UtcNow;
         var results = new List<Row>(keys.Count);
 
         foreach (var key in keys)
@@ -113,6 +151,9 @@ public class UnifiedReportStatusService : IUnifiedReportStatusService
             // حدود الدورة بمنطقة الرياض: البداية 00:00، الموعد نهاية اليوم 23:59:59 (لمحاكاة مقارنة اليوم today>due).
             var cycleStartsAt = new DateTimeOffset(start.Year, start.Month, start.Day, 0, 0, 0, Riyadh);
             var dueAt = new DateTimeOffset(dueDate.Year, dueDate.Month, dueDate.Day, 23, 59, 59, Riyadh);
+
+            // بوّابة الانطباق: دورة تبدأ قبل الأرضيّة ليست مطلوبة ⇒ NotRequired (لا تظهر كمتأخّرة زائفة).
+            var cycleApplicable = ApplicabilityFloorPolicy.IsCycleApplicable(start, floor.Floor);
 
             byKey.TryGetValue(key, out var rep);
             var hasSubmission = rep is not null;
@@ -126,7 +167,7 @@ public class UnifiedReportStatusService : IUnifiedReportStatusService
 
             var input = new CycleStatusInput(
                 IsAssigned: isAssigned,
-                IsRequired: true,                 // NotRequired محجوزة لهذه المرحلة (لا إجازات كاملة بعد).
+                IsRequired: cycleApplicable,       // بوّابة الانطباق: الدورة قبل الأرضيّة ⇒ غير مطلوبة.
                 CycleStartsAt: cycleStartsAt,
                 DueAt: dueAt,
                 CurrentTime: now,
@@ -145,10 +186,13 @@ public class UnifiedReportStatusService : IUnifiedReportStatusService
                 template, derived));
         }
 
-        // isCurrentPriority: الدورة ذات أعلى أولوية إجراء (أدنى رتبة ضمن الرتب 1-6). واحدة فقط.
+        // isCurrentPriority: بوّابة الانطباق تُقصي الدورات قبل الأرضيّة (NotRequired ⇒ رتبة 99).
+        // نُفضِّل دورة اليوم الحاليّة إن تطلّبت إجراءً كي لا يُخفيها بند تاريخيّ متأخّر، ثمّ الأعلى إلحاحًا.
+        var currentKey = ReportingCalendarPolicy.CycleKeyFor(ReportingCalendarPolicy.RiyadhDate(now.UtcDateTime));
         var priorityKey = results
             .Where(r => ActionRequiredRank(r.Derived.Status) is int rank && rank <= 6)
-            .OrderBy(r => ActionRequiredRank(r.Derived.Status))
+            .OrderByDescending(r => r.Key == currentKey)
+            .ThenBy(r => ActionRequiredRank(r.Derived.Status))
             .ThenBy(r => r.DueDate)
             .Select(r => (string?)r.Key)
             .FirstOrDefault();
@@ -316,6 +360,27 @@ public class UnifiedReportStatusService : IUnifiedReportStatusService
         UnifiedCycleStatus.Closed => new[] { "view" },
         _ => Array.Empty<string>()
     };
+
+    // يستخرج newJobRoleId من DataJson لحدث user.jobrole.changed (قد يكون null أو GUID نصّيًّا).
+    private static Guid? ParseNewJobRoleId(string? dataJson)
+    {
+        if (string.IsNullOrWhiteSpace(dataJson)) return null;
+        try
+        {
+            using var doc = JsonDocument.Parse(dataJson);
+            if (!doc.RootElement.TryGetProperty("newJobRoleId", out var prop)) return null;
+            if (prop.ValueKind == JsonValueKind.String && Guid.TryParse(prop.GetString(), out var g))
+                return g;
+            return null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static DateTime EnsureUtc(DateTime dt) =>
+        dt.Kind == DateTimeKind.Utc ? dt : DateTime.SpecifyKind(dt, DateTimeKind.Utc);
 
     // ===== أنواع داخلية =====
     private sealed record TemplateRef(Guid TemplateId, Guid? VersionId, string Title);

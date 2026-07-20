@@ -58,6 +58,7 @@ public static class DependencyInjection
         services.Configure<AppOptions>(configuration.GetSection(AppOptions.SectionName));
 
         services.AddHttpContextAccessor();
+        services.AddSingleton<ISystemClock, SystemClock>();
         services.AddScoped<ICurrentUser, CurrentUser>();
         services.AddScoped<IScopeResolver, ScopeResolver>();
         services.AddScoped<ITokenService, TokenService>();
@@ -95,6 +96,7 @@ public static class DependencyInjection
         services.AddScoped<IReportCalendarService, ReportCalendarService>();
         services.AddScoped<IReportingCalendarCycleService, ReportingCalendarCycleService>();
         services.AddScoped<IUnifiedReportStatusService, UnifiedReportStatusService>();
+        services.AddScoped<IExpectedSubmissionStatusResolver, ExpectedSubmissionStatusResolver>();
         services.AddScoped<IClientProjectAccess, ClientProjectAccess>();
         services.AddScoped<IClientService, ClientService>();
         services.AddScoped<IProjectService, ProjectService>();
