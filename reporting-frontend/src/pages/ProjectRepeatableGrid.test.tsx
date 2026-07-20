@@ -263,6 +263,96 @@ it('37 full round-trip: stringify entries then parse recovers grid string[][]', 
   expect(parseGrid(back[0].answers.kw)).toEqual(rows);
 });
 
+// ===== MODERATION-PERFORMANCE-INSIGHTS-R1A — عرض المديرشن الحيّ V5 (Vocabulary 1) =====
+// يُثبِت عبر DOM: تجميع الحقول المتاحة في أقسام مرتّبة، ظهور القيمة "0" الرقمية،
+// سقوط القوالب غير-المديرشن للعرض العام (fallback)، تصفية صفوف الجدول الفارغة كليًّا.
+// لا مؤشرات محسوبة، لا مقاييس غير مدعومة بالبيانات.
+function moderationV5Config(): ProjectRepeatableConfig {
+  return {
+    projectRequired: true, minProjects: 1, maxProjects: 10,
+    fields: [
+      { key: 'project_status', label: 'حالة المشروع', type: 'Select', required: false, options: ['🟢 ممتاز', '🟡 مستقر', '🔴 يحتاج تدخل'] },
+      { key: 'time_consumption', label: 'استهلاك الوقت', type: 'Percentage', required: false },
+      { key: 'incoming_messages', label: 'الرسائل الواردة', type: 'Number', required: false },
+      { key: 'answered_messages', label: 'الرسائل المُجابة', type: 'Number', required: false },
+      { key: 'avg_response_minutes', label: 'متوسط زمن الرد (د)', type: 'Number', required: false },
+      { key: 'problematic_comments', label: 'التعليقات الإشكالية', type: 'Number', required: false },
+      { key: 'escalations', label: 'الحالات المصعّدة', type: 'Number', required: false },
+      { key: 'complaints', label: 'الشكاوى', type: 'Number', required: false },
+      { key: 'converted_opportunities', label: 'الفرص المحوَّلة', type: 'Number', required: false },
+      { key: 'cases_grid', label: 'سجل الحالات', type: 'Grid', required: false, columns: ['نوع الحالة', 'الوصف', 'القناة', 'الحالة', 'هل تم التصعيد؟', 'الإجراء التالي'] },
+      { key: 'done', label: 'ما أُنجز', type: 'LongText', required: false },
+      { key: 'issues', label: 'المشكلات', type: 'LongText', required: false },
+      { key: 'recurring_questions', label: 'الأسئلة المتكررة', type: 'LongText', required: false },
+      { key: 'next_week', label: 'خطة الأسبوع القادم', type: 'LongText', required: false },
+      { key: 'recommendations', label: 'التوصيات', type: 'LongText', required: false },
+    ],
+  };
+}
+
+// ---- 38: عرض المديرشن V5 يُظهِر عناوين الأقسام الخمسة والقيمة "0" الرقمية ----
+it('38 ProjectRepeatableDisplay renders V5 moderation grouped sections including a "0" value', () => {
+  const entries: ProjectRepeatableEntry[] = [{
+    projectId: 'p1',
+    answers: {
+      project_status: '🟢 ممتاز', time_consumption: '80', incoming_messages: '120', answered_messages: '118',
+      avg_response_minutes: '5', problematic_comments: '2', escalations: '0', complaints: '1', converted_opportunities: '3',
+      cases_grid: JSON.stringify([['شكوى', 'تأخر رد', 'واتساب', 'مغلقة', 'لا', 'متابعة']]),
+      done: 'إنجاز', issues: 'لا يوجد', recurring_questions: 'الأسعار', next_week: 'حملة', recommendations: 'تحسين الرد',
+    },
+  }];
+  render(<ProjectRepeatableDisplay config={moderationV5Config()} entries={entries} projects={[project('p1', 'مشروع أ', 'عميل س')]} />);
+  for (const t of ['نظرة عامة', 'حجم العمل', 'الجودة والتصعيد', 'الحالات', 'السرد والتوصيات'])
+    expect(screen.getByText(t)).toBeInTheDocument();
+  expect(screen.getByText('🟢 ممتاز')).toBeInTheDocument();
+  expect(screen.getByText('0')).toBeInTheDocument(); // escalations=0 يجب أن يظهر لا أن يُخفى
+  expect(screen.getByText('نوع الحالة')).toBeInTheDocument(); // رأس عمود cases_grid
+});
+
+// ---- 39: مفتاح غير معروف في قالب المديرشن يظهر تحت «حقول إضافية» ----
+it('39 unknown moderation key falls under "حقول إضافية" section', () => {
+  const cfg = moderationV5Config();
+  cfg.fields.push({ key: 'legacy_extra', label: 'حقل قديم', type: 'ShortText', required: false });
+  const entries: ProjectRepeatableEntry[] = [{
+    projectId: 'p1',
+    answers: { project_status: '🟢 ممتاز', incoming_messages: '10', cases_grid: '[]', legacy_extra: 'قيمة قديمة' },
+  }];
+  render(<ProjectRepeatableDisplay config={cfg} entries={entries} projects={[project('p1', 'مشروع أ')]} />);
+  expect(screen.getByText('حقول إضافية')).toBeInTheDocument();
+  expect(screen.getByText('حقل قديم')).toBeInTheDocument();
+  expect(screen.getByText('قيمة قديمة')).toBeInTheDocument();
+});
+
+// ---- 40: قالب غير-مديرشن يسقط للعرض العام بلا عناوين أقسام (fallback) ----
+it('40 non-moderation config uses generic flat layout (no group titles)', () => {
+  const cfg: ProjectRepeatableConfig = {
+    projectRequired: true, minProjects: 1, maxProjects: 5,
+    fields: [{ key: 'kw', label: 'كلمات المشروع', type: 'Grid', required: false, columns: ['الكلمة'] }],
+  };
+  const entries: ProjectRepeatableEntry[] = [{ projectId: 'p1', answers: { kw: '[["seo"]]' } }];
+  render(<ProjectRepeatableDisplay config={cfg} entries={entries} projects={[project('p1', 'مشروع أ')]} />);
+  expect(screen.queryByText('نظرة عامة')).not.toBeInTheDocument();
+  expect(screen.queryByText('السرد والتوصيات')).not.toBeInTheDocument();
+  expect(screen.getByText('كلمات المشروع')).toBeInTheDocument();
+  expect(screen.getByText('seo')).toBeInTheDocument();
+});
+
+// ---- 41: GridDisplay يتخطّى الصفوف الفارغة كليًّا ويُبقي الصفوف ذات القيم ----
+it('41 GridDisplay skips fully-empty rows and keeps filled rows', () => {
+  render(<GridDisplay columns={['نوع الحالة', 'الوصف']} rows={[['', ''], ['شكوى', 'تأخر'], ['  ', '']]} />);
+  expect(screen.getByText('شكوى')).toBeInTheDocument();
+  expect(screen.getByText('تأخر')).toBeInTheDocument();
+  // صفّ واحد فقط ذو قيمة يظهر (خليّتان).
+  expect(screen.getAllByRole('cell')).toHaveLength(2);
+});
+
+// ---- 42: GridDisplay يعرض شرطة عندما تكون كل الصفوف فارغة كليًّا ----
+it('42 GridDisplay shows dash when all rows are fully empty', () => {
+  render(<GridDisplay columns={['نوع الحالة', 'الوصف']} rows={[['', ''], ['  ', '']]} />);
+  expect(screen.getByText('—')).toBeInTheDocument();
+  expect(screen.queryAllByRole('cell')).toHaveLength(0);
+});
+
 describe('R1B Grid frontend suite meta', () => {
   it('covers editor, display, helpers and round-trip', () => {
     expect(true).toBe(true);

@@ -1409,6 +1409,23 @@ export function ProjectRepeatableEditor({
   );
 }
 
+// ===== تجميع حقول المديرشن (Vocabulary 1 المعتمدة للقالب الحيّ V5) =====
+// عرض مجمّع مفهوم للحقول المتاحة فقط. لا يحسب أي مؤشر جديد ولا يعرض أي مقياس غير مدعوم بالبيانات.
+const MOD_VOCAB1_GROUPS: { title: string; keys: string[] }[] = [
+  { title: 'نظرة عامة', keys: ['project_status', 'time_consumption'] },
+  { title: 'حجم العمل', keys: ['incoming_messages', 'answered_messages', 'avg_response_minutes'] },
+  { title: 'الجودة والتصعيد', keys: ['problematic_comments', 'escalations', 'complaints', 'converted_opportunities'] },
+  { title: 'الحالات', keys: ['cases_grid'] },
+  { title: 'السرد والتوصيات', keys: ['done', 'issues', 'recurring_questions', 'next_week', 'recommendations'] },
+];
+const MOD_VOCAB1_KNOWN = new Set(MOD_VOCAB1_GROUPS.flatMap((g) => g.keys));
+
+// كشف مفردات المديرشن المعتمدة عبر وجود مفاتيح دالّة؛ غير ذلك يسقط للعرض العام (توافق خلفي V1–V4/غير-المديرشن).
+export function isModerationVocab1(config: ProjectRepeatableConfig): boolean {
+  const keys = new Set(config.fields.map((f) => f.key));
+  return keys.has('project_status') && keys.has('incoming_messages') && keys.has('cases_grid');
+}
+
 // ===== قسم المشاريع المتكرر: عرض للقراءة فقط مجمّع حسب المشروع =====
 export function ProjectRepeatableDisplay({
   config, entries, projects,
@@ -1431,25 +1448,70 @@ export function ProjectRepeatableDisplay({
     return raw;
   };
 
-  return (
-    <div className="space-y-3">
-      {entries.map((entry, i) => (
-        <div key={i} className="rounded-lg border border-line bg-white p-3">
-          <p className="mb-2 font-semibold text-navy">{projectName(entry.projectId)}</p>
+  const renderFields = (fields: RepeatableSubField[], entry: ProjectRepeatableEntry) => {
+    const nonGrid = fields.filter((sf) => sf.type !== 'Grid');
+    const grids = fields.filter((sf) => sf.type === 'Grid');
+    return (
+      <>
+        {nonGrid.length > 0 && (
           <dl className="grid gap-x-6 gap-y-1.5 text-sm md:grid-cols-2">
-            {config.fields.filter((sf) => sf.type !== 'Grid').map((sf) => (
+            {nonGrid.map((sf) => (
               <div key={sf.key} className="flex justify-between gap-3 border-b border-line/60 pb-1">
                 <dt className="text-ink-2">{sf.label}</dt>
                 <dd className="font-medium text-ink whitespace-pre-wrap">{showAnswer(sf, entry.answers[sf.key])}</dd>
               </div>
             ))}
           </dl>
-          {config.fields.filter((sf) => sf.type === 'Grid').map((sf) => (
-            <div key={sf.key} className="mt-3">
-              <p className="mb-1 text-sm font-medium text-ink-2">{sf.label}</p>
-              <GridDisplay columns={sf.columns ?? []} rows={parseGrid(entry.answers[sf.key])} />
+        )}
+        {grids.map((sf) => (
+          <div key={sf.key} className="mt-3">
+            <p className="mb-1 text-sm font-medium text-ink-2">{sf.label}</p>
+            <GridDisplay columns={sf.columns ?? []} rows={parseGrid(entry.answers[sf.key])} />
+          </div>
+        ))}
+      </>
+    );
+  };
+
+  // عرض المديرشن المجمّع (Vocabulary 1): أقسام مرتّبة مع ذيل «حقول إضافية» لأي مفتاح غير معروف.
+  if (isModerationVocab1(config)) {
+    const byKey = new Map(config.fields.map((f) => [f.key, f]));
+    const groups = MOD_VOCAB1_GROUPS
+      .map((g) => ({ title: g.title, fields: g.keys.map((k) => byKey.get(k)).filter((f): f is RepeatableSubField => !!f) }))
+      .filter((g) => g.fields.length > 0);
+    const extra = config.fields.filter((f) => !MOD_VOCAB1_KNOWN.has(f.key));
+    return (
+      <div className="space-y-3">
+        {entries.map((entry, i) => (
+          <div key={i} className="rounded-lg border border-line bg-white p-3">
+            <p className="mb-2 font-semibold text-navy">{projectName(entry.projectId)}</p>
+            <div className="space-y-3">
+              {groups.map((g) => (
+                <section key={g.title}>
+                  <h5 className="mb-1.5 text-sm font-semibold text-navy/80">{g.title}</h5>
+                  {renderFields(g.fields, entry)}
+                </section>
+              ))}
+              {extra.length > 0 && (
+                <section>
+                  <h5 className="mb-1.5 text-sm font-semibold text-ink-2">حقول إضافية</h5>
+                  {renderFields(extra, entry)}
+                </section>
+              )}
             </div>
-          ))}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // العرض العام (توافق خلفي لكل القوالب الأخرى/غير-المديرشن).
+  return (
+    <div className="space-y-3">
+      {entries.map((entry, i) => (
+        <div key={i} className="rounded-lg border border-line bg-white p-3">
+          <p className="mb-2 font-semibold text-navy">{projectName(entry.projectId)}</p>
+          {renderFields(config.fields, entry)}
         </div>
       ))}
     </div>
@@ -1458,7 +1520,9 @@ export function ProjectRepeatableDisplay({
 
 export function GridDisplay({ columns, rows }: { columns: string[]; rows: string[][] }) {
   const cols = columns.length ? columns : ['القيمة'];
-  if (!rows.length) return <p className="rounded-lg border border-line bg-offwhite px-3 py-2 text-sm">—</p>;
+  // تصفية الصفوف الفارغة كليًّا (بيانات ناقصة أو مشوّهة) — لا نعرض صفوفًا خاوية.
+  const filled = rows.filter((row) => Array.isArray(row) && cols.some((_, c) => (row[c] ?? '').toString().trim() !== ''));
+  if (!filled.length) return <p className="rounded-lg border border-line bg-offwhite px-3 py-2 text-sm">—</p>;
   return (
     <div className="overflow-x-auto rounded-lg border border-line">
       <table className="w-full text-sm">
@@ -1470,7 +1534,7 @@ export function GridDisplay({ columns, rows }: { columns: string[]; rows: string
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, r) => (
+          {filled.map((row, r) => (
             <tr key={r} className="border-t border-line">
               {cols.map((_, c) => (
                 <td key={c} className="px-2 py-1.5">{row[c] ?? ''}</td>
