@@ -285,16 +285,23 @@ public class ReportingAggregationService : IReportingAggregationService
         var iLost = I(B2cByCourseReportSchema.ColLost);
 
         var itemFilter = string.IsNullOrWhiteSpace(filter.Item) ? null : filter.Item.Trim();
+        // COURSE-DUPLICATE-MERGE-R1: توحيد مفتاح الفلترة عبر السياسة ⇒ فلترة الدورة الموحّدة تشمل كلّ أسمائها البديلة.
+        var itemFilterKey = itemFilter is null ? null : CourseNamePolicy.NormalizeForGrouping(itemFilter);
         var rowsIgnored = 0;
         var accum = new Dictionary<(string Period, Guid Emp, string Course), B2cAccum>();
+        // COURSE-DUPLICATE-MERGE-R1: خريطة مفتاح التجميع الموحّد ⇒ اسم العرض الرسميّ (أوّل تهجئة لغير المعنيّة).
+        var display = new Dictionary<string, string>(StringComparer.Ordinal);
 
         foreach (var r in scan.RawRows)
         {
             var course = Text(r.Cells, iCourse);
             if (course.Length == 0) { rowsIgnored++; continue; } // صفّ بلا دورة ⇒ لا يمكن تجميعه.
-            if (itemFilter is not null && !string.Equals(course, itemFilter, StringComparison.OrdinalIgnoreCase)) continue;
+            // COURSE-DUPLICATE-MERGE-R1: مفتاح موحّد قبل التجميع ⇒ دمج الأسماء البديلة تحت الدورة الموحّدة.
+            var courseKey = CourseNamePolicy.NormalizeForGrouping(course);
+            if (itemFilterKey is not null && !string.Equals(courseKey, itemFilterKey, StringComparison.Ordinal)) continue;
+            if (!display.ContainsKey(courseKey)) display[courseKey] = CourseNamePolicy.GetCanonicalDisplayName(course);
 
-            var key = (r.PeriodKey, r.SubmitterId, course);
+            var key = (r.PeriodKey, r.SubmitterId, courseKey);
             if (!accum.TryGetValue(key, out var a))
             {
                 a = new B2cAccum { TeamId = r.TeamId, DepartmentId = r.DepartmentId };
@@ -316,8 +323,9 @@ public class ReportingAggregationService : IReportingAggregationService
         var rows = accum
             .Select(kv =>
             {
-                var (period, emp, course) = kv.Key;
+                var (period, emp, courseKey) = kv.Key;
                 var a = kv.Value;
+                var course = display.GetValueOrDefault(courseKey, courseKey); // اسم العرض الرسميّ الموحّد.
                 return new B2cCourseAggregateRow(
                     period, emp, names.GetValueOrDefault(emp, string.Empty), course, a.TeamId, a.DepartmentId,
                     a.WorkHours, a.Leads, a.Contacted, a.Qualified, a.FollowUps, a.Sales, a.Revenue, a.Lost,
@@ -464,14 +472,19 @@ public class ReportingAggregationService : IReportingAggregationService
         var iRevenue = I(B2cNewOldReportSchema.ColRevenue);
         var iLost = I(B2cNewOldReportSchema.ColLost);
 
+        // COURSE-DUPLICATE-MERGE-R1: توحيد مفتاح الفلترة عبر السياسة ⇒ فلترة الدورة الموحّدة تشمل كلّ أسمائها البديلة.
+        var itemFilterKey = itemFilter is null ? null : CourseNamePolicy.NormalizeForGrouping(itemFilter);
+
         foreach (var r in scan.RawRows)
         {
             var course = Text(r.Cells, iCourse);
             if (course.Length == 0) { rowsIgnored++; continue; } // صفّ بلا دورة ⇒ لا يمكن تجميعه.
-            if (itemFilter is not null && !string.Equals(course, itemFilter, StringComparison.OrdinalIgnoreCase)) continue;
+            // COURSE-DUPLICATE-MERGE-R1: مفتاح موحّد قبل التجميع ⇒ دمج الأسماء البديلة تحت الدورة الموحّدة.
+            var courseKey = CourseNamePolicy.NormalizeForGrouping(course);
+            if (itemFilterKey is not null && !string.Equals(courseKey, itemFilterKey, StringComparison.Ordinal)) continue;
 
-            if (!display.TryGetValue(course, out var canon)) { canon = course; display[course] = course; }
-            var key = (canon, r.SubmitterId);
+            if (!display.ContainsKey(courseKey)) display[courseKey] = CourseNamePolicy.GetCanonicalDisplayName(course);
+            var key = (courseKey, r.SubmitterId);
             if (!bucket.TryGetValue(key, out var a))
             {
                 a = new B2cAccum { TeamId = r.TeamId, DepartmentId = r.DepartmentId };
@@ -838,17 +851,22 @@ public class ReportingAggregationService : IReportingAggregationService
         var iRevenue = I(B2cNewOldReportSchema.ColRevenue);
         var iLost = I(B2cNewOldReportSchema.ColLost);
 
+        // COURSE-DUPLICATE-MERGE-R1: توحيد مفتاح الفلترة عبر السياسة ⇒ فلترة الدورة الموحّدة تشمل كلّ أسمائها البديلة.
+        var itemFilterKey = itemFilter is null ? null : CourseNamePolicy.NormalizeForGrouping(itemFilter);
+
         foreach (var r in scan.RawRows)
         {
             var course = Text(r.Cells, iCourse);
             if (course.Length == 0) { rowsIgnored++; continue; }
-            if (itemFilter is not null && !string.Equals(course, itemFilter, StringComparison.OrdinalIgnoreCase)) continue;
+            // COURSE-DUPLICATE-MERGE-R1: مفتاح موحّد قبل التجميع ⇒ دمج الأسماء البديلة تحت الدورة الموحّدة.
+            var courseKey = CourseNamePolicy.NormalizeForGrouping(course);
+            if (itemFilterKey is not null && !string.Equals(courseKey, itemFilterKey, StringComparison.Ordinal)) continue;
 
-            if (!display.ContainsKey(course)) display[course] = course;
-            if (!bucket.TryGetValue(course, out var a))
+            if (!display.ContainsKey(courseKey)) display[courseKey] = CourseNamePolicy.GetCanonicalDisplayName(course);
+            if (!bucket.TryGetValue(courseKey, out var a))
             {
                 a = new B2cAccum { TeamId = r.TeamId, DepartmentId = r.DepartmentId };
-                bucket[course] = a;
+                bucket[courseKey] = a;
             }
             a.WorkHours += Num(r.Cells, iWork);
             a.Leads += Num(r.Cells, iLeads);

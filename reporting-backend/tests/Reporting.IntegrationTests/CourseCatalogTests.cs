@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Reporting.Application.Common;
 using Reporting.Application.Courses;
 using Xunit;
 
@@ -107,8 +108,9 @@ public class CourseCatalogTests
         var (employee, _) = await TestAuth.CreateUserAsync(_factory, "Employee");
         var list = await (await employee.GetAsync("/api/courses")).ReadAsync<List<CourseDto>>();
         Assert.NotNull(list);
-        // الكتالوج المبذور يحوي «الدبلوم الشامل» و«Google Ads» على الأقل.
-        Assert.Contains(list!, c => c.NameAr == "الدبلوم الشامل");
+        // COURSE-DUPLICATE-MERGE-R1: الـSeeder يبذر الاسم الموحّد؛ وأيّ اسم بديل معتمَد قائم يُغطّي الدورة
+        // الموحّدة (idempotent بمفتاح التجميع). لذا نتحقّق من وجود اسم بديل للدورة الموحّدة (لا الاسم القديم حرفيًّا).
+        Assert.Contains(list!, c => CourseNamePolicy.IsAliasOfCanonicalCourse(c.NameAr));
         Assert.Contains(list!, c => c.NameAr == "Google Ads");
         Assert.All(list!, c => Assert.True(c.IsActive));
     }
