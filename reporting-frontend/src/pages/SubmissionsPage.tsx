@@ -1351,6 +1351,20 @@ export function ProjectRepeatableEditor({
             {config.fields.map((sf) => {
               const val = entry.answers[sf.key] ?? '';
               const label = `${sf.label}${sf.required ? ' *' : ''}`;
+              // حقل الخطر التفصيلي يظهر فقط عند «نعم»؛ التبديل إلى «لا» لا يمسح القيمة (تبقى محفوظة في answers).
+              if (sf.key === 'risk_note' && (entry.answers['risk_exists'] ?? '') !== 'نعم') return null;
+              // تحليل المحتوى: بطاقات تحليل بدل جدول Grid التقليدي (تخزين مطابق: مصفوفة صفوف JSON في answers[key]).
+              if (sf.key === 'content_highlights') {
+                return (
+                  <div key={sf.key} className="md:col-span-2">
+                    <p className="mb-1 text-sm font-medium text-ink">{label}</p>
+                    <ContentAnalysisCardsEditor
+                      rows={parseGrid(val)}
+                      onChange={(rows) => setAnswer(i, sf.key, JSON.stringify(rows))}
+                    />
+                  </div>
+                );
+              }
               // جدول صفوف داخل المشروع: يمتدّ على عرض كامل، صفوفه محفوظة كنصّ JSON في answers[key].
               if (sf.type === 'Grid') {
                 return (
@@ -1366,7 +1380,7 @@ export function ProjectRepeatableEditor({
               }
               const k = subFieldInputKind(sf.type);
               return (
-                <Field key={sf.key} label={label}>
+                <Field key={sf.key} label={label} help={MOD_FIELD_GUIDANCE[sf.key]}>
                   {k === 'bool' ? (
                     <Select value={val} onChange={(e) => setAnswer(i, sf.key, e.target.value)}>
                       <option value="">—</option>
@@ -1411,14 +1425,30 @@ export function ProjectRepeatableEditor({
 
 // ===== تجميع حقول المديرشن (Vocabulary 1 المعتمدة للقالب الحيّ V5) =====
 // عرض مجمّع مفهوم للحقول المتاحة فقط. لا يحسب أي مؤشر جديد ولا يعرض أي مقياس غير مدعوم بالبيانات.
+// أقسام قصّة المديرشن. تجميع R1A الخمسة يبقى كما هو حرفيًّا (توافق خلفي V5 W28/W29)؛ أقسام تحليل المحتوى
+// الجديدة (V6) تُدرَج قبل السرد الختامي، وتُسقَط تلقائيًّا للقوالب الأقدم عبر مرشّح المجموعات الفارغة أدناه.
 const MOD_VOCAB1_GROUPS: { title: string; keys: string[] }[] = [
   { title: 'نظرة عامة', keys: ['project_status', 'time_consumption'] },
   { title: 'حجم العمل', keys: ['incoming_messages', 'answered_messages', 'avg_response_minutes'] },
   { title: 'الجودة والتصعيد', keys: ['problematic_comments', 'escalations', 'complaints', 'converted_opportunities'] },
   { title: 'الحالات', keys: ['cases_grid'] },
+  { title: 'تحليل المحتوى', keys: ['content_highlights'] },
+  { title: 'قراءة الجمهور والدروس والقرارات', keys: ['audience_insight', 'lessons_learned', 'decisions_required'] },
+  { title: 'المخاطر والفرص', keys: ['risk_exists', 'risk_note'] },
   { title: 'السرد والتوصيات', keys: ['done', 'issues', 'recurring_questions', 'next_week', 'recommendations'] },
 ];
 const MOD_VOCAB1_KNOWN = new Set(MOD_VOCAB1_GROUPS.flatMap((g) => g.keys));
+
+// إرشادات كتابة الحقول السردية الجديدة (تظهر تحت عنوان الحقل في المحرّر فقط، لا في العرض).
+const MOD_FIELD_GUIDANCE: Record<string, string> = {
+  audience_insight:
+    'اكتب أبرز ما لاحظته من تفاعل الجمهور هذا الأسبوع: التعليقات الإيجابية أو السلبية، الاعتراضات، الموضوعات التي جذبت الاهتمام، وأي فرص محتوى جديدة.',
+  lessons_learned: 'ماذا نكرر؟ / ماذا نوقف؟ / ماذا نحسن؟',
+  decisions_required: 'ما القرار المطلوب، ومن الجهة المطلوب منها اتخاذه؟',
+};
+
+// عقد بطاقة تحليل المحتوى: العمود الأول = التصنيف (بخيارات مثبَّتة)، والأعمدة الستة مطابقة لعقد V6.
+const CONTENT_ANALYSIS_CLASSIFICATIONS = ['أفضل محتوى', 'أضعف محتوى'];
 
 // كشف مفردات المديرشن المعتمدة عبر وجود مفاتيح دالّة؛ غير ذلك يسقط للعرض العام (توافق خلفي V1–V4/غير-المديرشن).
 export function isModerationVocab1(config: ProjectRepeatableConfig): boolean {
@@ -1466,7 +1496,11 @@ export function ProjectRepeatableDisplay({
         {grids.map((sf) => (
           <div key={sf.key} className="mt-3">
             <p className="mb-1 text-sm font-medium text-ink-2">{sf.label}</p>
-            <GridDisplay columns={sf.columns ?? []} rows={parseGrid(entry.answers[sf.key])} />
+            {sf.key === 'content_highlights' ? (
+              <ContentAnalysisCardsDisplay rows={parseGrid(entry.answers[sf.key])} />
+            ) : (
+              <GridDisplay columns={sf.columns ?? []} rows={parseGrid(entry.answers[sf.key])} />
+            )}
           </div>
         ))}
       </>
@@ -1482,25 +1516,38 @@ export function ProjectRepeatableDisplay({
     const extra = config.fields.filter((f) => !MOD_VOCAB1_KNOWN.has(f.key));
     return (
       <div className="space-y-3">
-        {entries.map((entry, i) => (
-          <div key={i} className="rounded-lg border border-line bg-white p-3">
-            <p className="mb-2 font-semibold text-navy">{projectName(entry.projectId)}</p>
-            <div className="space-y-3">
-              {groups.map((g) => (
-                <section key={g.title}>
-                  <h5 className="mb-1.5 text-sm font-semibold text-navy/80">{g.title}</h5>
-                  {renderFields(g.fields, entry)}
-                </section>
-              ))}
-              {extra.length > 0 && (
-                <section>
-                  <h5 className="mb-1.5 text-sm font-semibold text-ink-2">حقول إضافية</h5>
-                  {renderFields(extra, entry)}
-                </section>
-              )}
+        {entries.map((entry, i) => {
+          // رؤية قسم المخاطر مرهونة بالقيمة لكل مشروع: يظهر عند «نعم» أو عند وجود ملاحظة خطر تاريخية غير فارغة؛
+          // «لا» + ملاحظة فارغة ⇒ يُخفى القسم كليًّا (دون فقدان أي معلومة تاريخية إن وُجدت).
+          const entryGroups = groups
+            .map((g) => {
+              if (!g.fields.some((f) => f.key === 'risk_exists' || f.key === 'risk_note')) return g;
+              const riskYes = (entry.answers['risk_exists'] ?? '').trim() === 'نعم';
+              const noteFilled = (entry.answers['risk_note'] ?? '').trim() !== '';
+              if (!riskYes && !noteFilled) return { ...g, fields: [] as RepeatableSubField[] };
+              return { ...g, fields: g.fields.filter((f) => (f.key === 'risk_note' ? riskYes || noteFilled : true)) };
+            })
+            .filter((g) => g.fields.length > 0);
+          return (
+            <div key={i} className="rounded-lg border border-line bg-white p-3">
+              <p className="mb-2 font-semibold text-navy">{projectName(entry.projectId)}</p>
+              <div className="space-y-3">
+                {entryGroups.map((g) => (
+                  <section key={g.title}>
+                    <h5 className="mb-1.5 text-sm font-semibold text-navy/80">{g.title}</h5>
+                    {renderFields(g.fields, entry)}
+                  </section>
+                ))}
+                {extra.length > 0 && (
+                  <section>
+                    <h5 className="mb-1.5 text-sm font-semibold text-ink-2">حقول إضافية</h5>
+                    {renderFields(extra, entry)}
+                  </section>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     );
   }
@@ -1543,6 +1590,123 @@ export function GridDisplay({ columns, rows }: { columns: string[]; rows: string
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+// ===== تحليل المحتوى: محرّر بطاقات (بديل GridEditor لمفتاح content_highlights) =====
+// كل بطاقة = صفّ من ستّ خلايا [التصنيف، المنصة، نوع المحتوى، الرابط/التعريف، لماذا اختير، الدرس/الإجراء].
+// التخزين مطابق تمامًا لجدول Grid (مصفوفة صفوف نصية JSON في answers[key]) — بلا نوع حقل جديد ولا فقدان قيَم.
+export function ContentAnalysisCardsEditor({
+  rows, onChange,
+}: {
+  rows: string[][];
+  onChange: (rows: string[][]) => void;
+}) {
+  // نضمن أن لكل صفّ ستّ خلايا قبل التعديل (توافق مع صفوف قديمة ناقصة).
+  const setCell = (r: number, c: number, v: string) => {
+    const next = rows.map((row) => {
+      const copy = Array.isArray(row) ? [...row] : [];
+      while (copy.length < 6) copy.push('');
+      return copy;
+    });
+    next[r][c] = v;
+    onChange(next);
+  };
+  const addCard = () => onChange([...rows, ['', '', '', '', '', '']]);
+  const removeCard = (r: number) => onChange(rows.filter((_, i) => i !== r));
+
+  return (
+    <div className="space-y-3">
+      {rows.length === 0 && (
+        <p className="text-xs text-ink-3">لا يوجد تحليل محتوى بعد. يُفضَّل إضافة بطاقة لأفضل محتوى وأخرى لأضعف محتوى (غير إلزامي).</p>
+      )}
+      {rows.map((row, r) => (
+        <div key={r} className="space-y-2 rounded-lg border border-navy/20 bg-white p-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold text-navy">بطاقة تحليل محتوى #{r + 1}</span>
+            <button type="button" onClick={() => removeCard(r)} className="text-sm text-alert hover:underline">حذف البطاقة</button>
+          </div>
+          <div className="grid gap-2 md:grid-cols-2">
+            <Field label="التصنيف">
+              <Select value={row[0] ?? ''} onChange={(e) => setCell(r, 0, e.target.value)}>
+                <option value="">اختر…</option>
+                {CONTENT_ANALYSIS_CLASSIFICATIONS.map((o) => (
+                  <option key={o} value={o}>{o}</option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="المنصة">
+              <Input value={row[1] ?? ''} onChange={(e) => setCell(r, 1, e.target.value)} />
+            </Field>
+            <Field label="نوع المحتوى">
+              <Input value={row[2] ?? ''} onChange={(e) => setCell(r, 2, e.target.value)} />
+            </Field>
+            <Field label="رابط المحتوى أو تعريفه">
+              <Input value={row[3] ?? ''} onChange={(e) => setCell(r, 3, e.target.value)} />
+            </Field>
+          </div>
+          <Field label="لماذا تم اختياره؟">
+            <textarea
+              className="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-navy focus:outline-none"
+              rows={2}
+              value={row[4] ?? ''}
+              onChange={(e) => setCell(r, 4, e.target.value)}
+            />
+          </Field>
+          <Field label="الدرس المستفاد أو الإجراء المقترح">
+            <textarea
+              className="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-navy focus:outline-none"
+              rows={2}
+              value={row[5] ?? ''}
+              onChange={(e) => setCell(r, 5, e.target.value)}
+            />
+          </Field>
+        </div>
+      ))}
+      <Button variant="ghost" onClick={addCard}>+ إضافة تحليل محتوى</Button>
+    </div>
+  );
+}
+
+// ===== تحليل المحتوى: عرض بطاقات للقراءة فقط (Draft/Submitted/Returned/Approved/Closed) =====
+export function ContentAnalysisCardsDisplay({ rows }: { rows: string[][] }) {
+  const cell = (row: string[], c: number) => (row?.[c] ?? '').toString().trim();
+  const filled = rows.filter((row) => Array.isArray(row) && row.some((c) => (c ?? '').toString().trim() !== ''));
+  if (!filled.length) return <p className="rounded-lg border border-line bg-offwhite px-3 py-2 text-sm">—</p>;
+  const tone = (cls: string): 'success' | 'alert' | 'muted' =>
+    cls === 'أفضل محتوى' ? 'success' : cls === 'أضعف محتوى' ? 'alert' : 'muted';
+  const frame = (cls: string) =>
+    cls === 'أفضل محتوى' ? 'border-green-100 bg-green-50/40'
+      : cls === 'أضعف محتوى' ? 'border-red-100 bg-red-50/40'
+      : 'border-line bg-white';
+  return (
+    <div className="space-y-2">
+      {filled.map((row, r) => {
+        const cls = cell(row, 0);
+        return (
+          <div key={r} className={`rounded-lg border p-3 ${frame(cls)}`}>
+            <div className="mb-1.5 flex flex-wrap items-center gap-2">
+              {cls && <Badge tone={tone(cls)}>{cls}</Badge>}
+              {cell(row, 1) && <span className="text-xs text-ink-2">المنصة: <span className="text-ink">{cell(row, 1)}</span></span>}
+              {cell(row, 2) && <span className="text-xs text-ink-2">نوع المحتوى: <span className="text-ink">{cell(row, 2)}</span></span>}
+            </div>
+            {cell(row, 3) && <p className="mb-1 text-xs text-ink-2">الرابط/التعريف: <span className="text-ink break-all">{cell(row, 3)}</span></p>}
+            {cell(row, 4) && (
+              <div className="mb-1">
+                <span className="text-xs text-ink-2">لماذا تم اختياره؟ </span>
+                <span className="whitespace-pre-wrap text-sm text-ink">{cell(row, 4)}</span>
+              </div>
+            )}
+            {cell(row, 5) && (
+              <div>
+                <span className="text-xs text-ink-2">الدرس المستفاد أو الإجراء المقترح: </span>
+                <span className="whitespace-pre-wrap text-sm text-ink">{cell(row, 5)}</span>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
