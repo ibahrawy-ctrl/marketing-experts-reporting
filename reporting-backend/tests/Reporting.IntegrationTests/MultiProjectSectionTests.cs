@@ -144,4 +144,48 @@ public class MultiProjectSectionTests
         // المسؤول بلا مدير مباشر ⇒ يُغلق التسليم مباشرة.
         Assert.Equal(SubmissionStatus.Closed, submitted!.Status);
     }
+
+    // مفتاح دورة أسبوعية صالحة وقد بدأت فعلًا (حسب تاريخ ريّاض الحالي) كي تمرّ حارس التقويم
+    // (calendar.cycle_not_open) ونصل فعليًّا إلى تحقّق القسم المتكرر. مستقل عن تاريخ التشغيل.
+    private static string CurrentCycleKey()
+        => ReportingCalendarPolicy.CycleKeyFor(ReportingCalendarPolicy.RiyadhToday());
+
+    // ===== 6: تكرار نفس المشروع في القسم الواحد → 400 (صفّ واحد لكل مشروع/فترة) =====
+    [Fact]
+    public async Task Submit_DuplicateProject_Returns400()
+    {
+        var admin = await TestAuth.LoginAsAdminAsync(_factory);
+        var (templateId, fieldId) = await PublishSectionTemplateAsync(admin);
+        var project = await CreateProjectAsync(admin, "مشروع مكرر");
+
+        var draftId = await CreateDraftAsync(admin, templateId, CurrentCycleKey());
+        // نفس المشروع مرّتين ضمن نفس التسليم ⇒ يجب أن يُرفَض.
+        await SaveSectionAsync(admin, draftId, fieldId,
+            $"[{{\"projectId\":\"{project.Id}\",\"answers\":{{\"spend\":\"1000\"}}}}," +
+            $"{{\"projectId\":\"{project.Id}\",\"answers\":{{\"spend\":\"2000\"}}}}]");
+
+        var res = await admin.PostAsync($"/api/submissions/{draftId}/submit", null);
+        Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode);
+    }
+
+    // ===== 7: مشروعان مختلفان في القسم الواحد → نجاح (الحارس يمنع التكرار فقط) =====
+    [Fact]
+    public async Task Submit_TwoDistinctProjects_Succeeds()
+    {
+        var admin = await TestAuth.LoginAsAdminAsync(_factory);
+        var (templateId, fieldId) = await PublishSectionTemplateAsync(admin);
+        var projectA = await CreateProjectAsync(admin, "مشروع أ");
+        var projectB = await CreateProjectAsync(admin, "مشروع ب");
+
+        var draftId = await CreateDraftAsync(admin, templateId, CurrentCycleKey());
+        await SaveSectionAsync(admin, draftId, fieldId,
+            $"[{{\"projectId\":\"{projectA.Id}\",\"answers\":{{\"spend\":\"1000\"}}}}," +
+            $"{{\"projectId\":\"{projectB.Id}\",\"answers\":{{\"spend\":\"2000\"}}}}]");
+
+        var submitted = await (await admin.PostAsync($"/api/submissions/{draftId}/submit", null))
+            .ReadAsync<SubmissionDto>();
+
+        // المسؤول بلا مدير مباشر ⇒ يُغلق التسليم مباشرة.
+        Assert.Equal(SubmissionStatus.Closed, submitted!.Status);
+    }
 }

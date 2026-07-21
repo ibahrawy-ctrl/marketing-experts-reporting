@@ -958,6 +958,10 @@ public class SubmissionService : ISubmissionService
                 continue;
             }
 
+            // منع تكرار المشروع داخل القسم الواحد: صفّ واحد لكل مشروع في التقرير (فترة واحدة) —
+            // يمنع ازدواج بيانات نفس (العميل/المشروع) ضمن نفس التسليم. مقصور على القسم الحالي.
+            var seenProjects = new HashSet<Guid>();
+
             foreach (var entry in entries)
             {
                 if (config.ProjectRequired || entry.ProjectId is not null)
@@ -970,6 +974,11 @@ public class SubmissionService : ISubmissionService
                     if (!vis.CanViewProject(pid))
                     {
                         errors.Add($"قسم «{sec.Label}»: مشروع خارج نطاق صلاحيتك.");
+                        continue;
+                    }
+                    if (!seenProjects.Add(pid))
+                    {
+                        errors.Add($"قسم «{sec.Label}»: لا يمكن تكرار نفس المشروع أكثر من مرة في التقرير الواحد.");
                         continue;
                     }
                 }
