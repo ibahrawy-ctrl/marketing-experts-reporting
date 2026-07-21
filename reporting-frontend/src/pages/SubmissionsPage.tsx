@@ -615,11 +615,22 @@ export function parseRepeatableConfig(json: string | null): ProjectRepeatableCon
       projectRequired: p.projectRequired ?? true,
       minProjects: Number.isFinite(p.minProjects) ? Number(p.minProjects) : 1,
       maxProjects: Number.isFinite(p.maxProjects) ? Number(p.maxProjects) : 10,
-      fields: Array.isArray(p.fields) ? p.fields : [],
+      fields: Array.isArray(p.fields) ? p.fields.map(normalizeSubField) : [],
     };
   } catch {
     return fallback;
   }
+}
+
+// تطبيع القيود الرقميّة الاختيارية لحقل فرعيّ (PROJECT-REPEATABLE-NUMERIC-VALIDATION-R1).
+// القوالب القديمة بلا هذه الخصائص تبقى كما هي (كل القيود undefined ⇒ بلا فرض).
+function normalizeSubField(f: RepeatableSubField): RepeatableSubField {
+  const out: RepeatableSubField = { ...f };
+  out.min = Number.isFinite(f.min) ? Number(f.min) : undefined;
+  out.max = Number.isFinite(f.max) ? Number(f.max) : undefined;
+  out.integerOnly = f.integerOnly === true;
+  out.step = Number.isFinite(f.step) && Number(f.step) > 0 ? Number(f.step) : undefined;
+  return out;
 }
 
 export function parseRepeatableEntries(json: string | null | undefined): ProjectRepeatableEntry[] {
@@ -644,6 +655,31 @@ export function subFieldInputKind(t: RepeatableSubField['type']): 'number' | 'lo
   if (t === 'Boolean') return 'bool';
   if (t === 'Select') return 'select';
   return 'text';
+}
+
+// الأنواع الرقميّة داخل القسم المتكرّر.
+const REPEATABLE_NUMERIC_TYPES: RepeatableSubField['type'][] = ['Number', 'Currency', 'Decimal', 'Percentage'];
+
+// تحقّق رقميّ فوريّ يطابق قواعد الخادم (PROJECT-REPEATABLE-NUMERIC-VALIDATION-R1).
+// يُرجِع رسالة خطأ عربيّة أو null. لا يُطبَّق إلا على الحقول الرقميّة ذات القيد؛ القيمة الفارغة تُترَك للمطلوبيّة.
+// الخادم يبقى مرجع الفرض النهائيّ؛ هذا للتغذية الراجعة الفوريّة فقط.
+export function validateRepeatableNumber(sf: RepeatableSubField, raw: string): string | null {
+  if (!REPEATABLE_NUMERIC_TYPES.includes(sf.type)) return null;
+  const hasConstraint =
+    sf.min !== undefined || sf.max !== undefined || sf.integerOnly === true || sf.step !== undefined;
+  if (!hasConstraint) return null;
+  if (raw === null || raw === undefined || raw.trim() === '') return null; // الفراغ ⇒ يخضع للمطلوبيّة لا للرقم.
+  const num = Number(raw);
+  if (!Number.isFinite(num)) return 'قيمة رقميّة غير صالحة.';
+  if (sf.integerOnly && !Number.isInteger(num)) return 'يجب إدخال عدد صحيح.';
+  if (sf.min !== undefined && num < sf.min) return `القيمة أقل من الحدّ الأدنى (${sf.min}).`;
+  if (sf.max !== undefined && num > sf.max) return `القيمة أكبر من الحدّ الأقصى (${sf.max}).`;
+  if (sf.step !== undefined && sf.step > 0) {
+    const baseline = sf.min ?? 0;
+    const q = (num - baseline) / sf.step;
+    if (Math.abs(q - Math.round(q)) > 1e-7) return `القيمة لا تطابق خطوة الإدخال (${sf.step}).`;
+  }
+  return null;
 }
 
 function SubmissionDetail({ id, onBack }: { id: string; onBack: () => void }) {
@@ -1379,6 +1415,7 @@ export function ProjectRepeatableEditor({
                 );
               }
               const k = subFieldInputKind(sf.type);
+              const numError = k === 'number' ? validateRepeatableNumber(sf, val) : null;
               return (
                 <Field key={sf.key} label={label} help={MOD_FIELD_GUIDANCE[sf.key]}>
                   {k === 'bool' ? (
@@ -1402,7 +1439,17 @@ export function ProjectRepeatableEditor({
                       onChange={(e) => setAnswer(i, sf.key, e.target.value)}
                     />
                   ) : k === 'number' ? (
-                    <Input type="number" value={val} onChange={(e) => setAnswer(i, sf.key, e.target.value)} />
+                    <>
+                      <Input
+                        type="number"
+                        value={val}
+                        min={sf.min}
+                        max={sf.max}
+                        step={sf.integerOnly ? (sf.step ?? 1) : sf.step}
+                        onChange={(e) => setAnswer(i, sf.key, e.target.value)}
+                      />
+                      {numError && <p className="mt-1 text-xs text-red-600">{numError}</p>}
+                    </>
                   ) : k === 'date' ? (
                     <Input type="date" value={val ? val.slice(0, 10) : ''} onChange={(e) => setAnswer(i, sf.key, e.target.value)} />
                   ) : (

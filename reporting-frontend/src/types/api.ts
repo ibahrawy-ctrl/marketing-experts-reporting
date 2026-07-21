@@ -1141,6 +1141,12 @@ export interface RepeatableSubField {
   columns?: string[];
   // خيارات القائمة المنسدلة — تُستخدم فقط عندما يكون النوع 'Select'.
   options?: string[];
+  // قيود رقميّة اختيارية للحقول الرقميّة (PROJECT-REPEATABLE-NUMERIC-VALIDATION-R1).
+  // كلّها اختياريّة: القوالب القديمة بلا هذه الخصائص تبقى بلا فرض رقميّ.
+  min?: number;
+  max?: number;
+  integerOnly?: boolean;
+  step?: number;
 }
 
 // إعداد قسم المشاريع المتكرر — يُخزَّن في configJson لحقل ProjectRepeatableSection.

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Reporting.Application.Audit;
@@ -898,7 +899,18 @@ public class SubmissionService : ISubmissionService
         public string Label { get; set; } = string.Empty;
         public string Type { get; set; } = string.Empty;
         public bool Required { get; set; }
+        // قيود رقمية اختيارية للحقول الرقمية داخل القسم المتكرّر (PROJECT-REPEATABLE-NUMERIC-VALIDATION-R1).
+        // كلّها اختياريّة: القوالب القديمة بلا هذه الخصائص تبقى بلا فرض رقميّ (توافق خلفيّ تامّ).
+        public decimal? Min { get; set; }
+        public decimal? Max { get; set; }
+        public bool IntegerOnly { get; set; }
+        public decimal? Step { get; set; }
     }
+
+    // الحقل يخضع للتحقّق الرقميّ فقط إذا كان نوعه رقميًّا وله قيد رقميّ واحد على الأقل.
+    // القواعد الرقميّة نفسها في RepeatableNumericValidation (مصدر الحقيقة الوحيد، مُختبَر وحدةً).
+    private static bool HasNumericConstraint(RepeatableField f) =>
+        RepeatableNumericValidation.HasConstraint(f.Type, f.Min, f.Max, f.IntegerOnly, f.Step);
 
     private sealed class RepeatableEntry
     {
@@ -958,12 +970,29 @@ public class SubmissionService : ISubmissionService
                 continue;
             }
 
+            // فحص سلامة قيود الحقول الرقميّة مرّة واحدة لكل قسم قبل التحقّق من الصفوف.
+            // تعريف غير صالح (Min>Max أو Step<=0) ⇒ report.repeatable_config_invalid ونتخطّى القسم.
+            var configInvalid = false;
+            foreach (var nf in config.Fields.Where(HasNumericConstraint))
+            {
+                if (!RepeatableNumericValidation.IsConstraintDefinitionValid(nf.Min, nf.Max, nf.Step))
+                {
+                    errors.Add($"{RepeatableNumericValidation.ConfigInvalid} | قسم «{sec.Label}» الحقل «{nf.Label}»: تعريف قيود رقميّة غير صالح.");
+                    configInvalid = true;
+                }
+            }
+            if (configInvalid) continue;
+
+            var numericFields = config.Fields.Where(HasNumericConstraint).ToList();
+
             // منع تكرار المشروع داخل القسم الواحد: صفّ واحد لكل مشروع في التقرير (فترة واحدة) —
             // يمنع ازدواج بيانات نفس (العميل/المشروع) ضمن نفس التسليم. مقصور على القسم الحالي.
             var seenProjects = new HashSet<Guid>();
 
-            foreach (var entry in entries)
+            for (var rowIndex = 0; rowIndex < entries.Count; rowIndex++)
             {
+                var entry = entries[rowIndex];
+                var rowNum = rowIndex + 1;
                 if (config.ProjectRequired || entry.ProjectId is not null)
                 {
                     if (entry.ProjectId is not Guid pid || pid == Guid.Empty)
@@ -988,6 +1017,34 @@ public class SubmissionService : ISubmissionService
                     var has = entry.Answers.TryGetValue(sf.Key, out var av) && AnswerHasValue(av);
                     if (!has)
                         errors.Add($"قسم «{sec.Label}»: الحقل «{sf.Label}» مطلوب لكل مشروع.");
+                }
+
+                // التحقّق الرقميّ للحقول ذات القيود (min/max/integerOnly/step).
+                // يُطبَّق فقط على الحقول الرقميّة التي تحمل قيدًا واحدًا على الأقل ⇒ القوالب القديمة بلا قيود لا تتأثّر.
+                foreach (var nf in numericFields)
+                {
+                    // القيمة الفارغة/الغائبة: المطلوبيّة عولجت أعلاه؛ هنا نتخطّى الفراغ (الاختياريّ يبقى مقبولًا فارغًا).
+                    if (!entry.Answers.TryGetValue(nf.Key, out var nav) || !AnswerHasValue(nav))
+                        continue;
+
+                    if (!RepeatableNumericValidation.TryGetNumber(nav, out var num))
+                    {
+                        errors.Add($"{RepeatableNumericValidation.NumberInvalid} | قسم «{sec.Label}» الحقل «{nf.Label}» الصف {rowNum}: قيمة رقميّة غير صالحة.");
+                        continue;
+                    }
+
+                    var code = RepeatableNumericValidation.ValidateParsed(num, nf.Min, nf.Max, nf.IntegerOnly, nf.Step);
+                    if (code is null) continue;
+
+                    var detail = code switch
+                    {
+                        RepeatableNumericValidation.IntegerRequired => "يجب إدخال عدد صحيح.",
+                        RepeatableNumericValidation.BelowMin => $"القيمة أقل من الحدّ الأدنى ({nf.Min?.ToString(CultureInfo.InvariantCulture)}).",
+                        RepeatableNumericValidation.AboveMax => $"القيمة أكبر من الحدّ الأقصى ({nf.Max?.ToString(CultureInfo.InvariantCulture)}).",
+                        RepeatableNumericValidation.StepInvalid => $"القيمة لا تطابق خطوة الإدخال ({nf.Step?.ToString(CultureInfo.InvariantCulture)}).",
+                        _ => "قيمة رقميّة غير صالحة.",
+                    };
+                    errors.Add($"{code} | قسم «{sec.Label}» الحقل «{nf.Label}» الصف {rowNum}: {detail}");
                 }
             }
         }
