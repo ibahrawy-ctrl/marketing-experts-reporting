@@ -78,6 +78,7 @@ public static class DependencyInjection
         services.AddScoped<IReportingService, ReportingService>();
         services.AddScoped<IReportingAggregationService, ReportingAggregationService>();
         services.AddScoped<IPodExecutionAggregationService, PodExecutionAggregationService>();
+        services.AddScoped<IProjectFirstExecutionAggregationService, ProjectFirstExecutionAggregationService>();
         services.AddScoped<IReportDueService, ReportDueService>();
         services.AddScoped<IReportReminderService, ReportReminderService>();
         services.AddScoped<IGovernanceService, GovernanceService>();

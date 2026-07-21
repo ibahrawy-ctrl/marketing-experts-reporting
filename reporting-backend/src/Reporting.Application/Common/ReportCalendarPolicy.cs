@@ -1,3 +1,6 @@
+using System.Globalization;
+using Reporting.Domain.Enums;
+
 namespace Reporting.Application.Common;
 
 /// <summary>
@@ -80,4 +83,61 @@ public static class ReportCalendarPolicy
 
     /// <summary>تسمية مختصرة للأسبوع «الأسبوع 27 — 2026».</summary>
     public static string ShortWeekLabel(string weekKey) => ReportingCalendarPolicy.ShortCycleLabel(weekKey);
+
+    // ===== مفتاح الفترة السابقة (للمقارنة الدورية في محرّك التجميع Project-First) =====
+
+    /// <summary>
+    /// يشتقّ مفتاح الفترة **السابقة** لنوع فترة ومفتاح معطى (قراءة فقط، بلا تأثير جانبي):
+    /// Weekly YYYY-Www ⇒ الأسبوع التشغيلي السابق (إزاحة −7 يومًا عبر CycleKeyFor/CycleRange)،
+    /// Monthly YYYY-MM ⇒ الشهر السابق، Quarterly YYYY-Qn ⇒ الربع السابق (Q1⇒Q4 والسنة −1)،
+    /// Daily YYYY-MM-DD ⇒ اليوم السابق. أي مفتاح غير صالح/تعذّر اشتقاقه ⇒ null (لا مقارنة).
+    /// </summary>
+    public static string? PreviousPeriodKey(PeriodType periodType, string? periodKey)
+    {
+        if (string.IsNullOrWhiteSpace(periodKey)) return null;
+        try
+        {
+            switch (periodType)
+            {
+                case PeriodType.Weekly:
+                    if (!IsWeekKey(periodKey)) return null;
+                    var (start, _) = WeekRange(periodKey);
+                    return WeekKeyFor(start.AddDays(-7));
+
+                case PeriodType.Monthly:
+                {
+                    var parts = periodKey.Split('-');
+                    if (parts.Length != 2) return null;
+                    var y = int.Parse(parts[0], CultureInfo.InvariantCulture);
+                    var m = int.Parse(parts[1], CultureInfo.InvariantCulture);
+                    if (m < 1 || m > 12) return null;
+                    m--; if (m == 0) { m = 12; y--; }
+                    return $"{y:D4}-{m:D2}";
+                }
+
+                case PeriodType.Quarterly:
+                {
+                    var parts = periodKey.Split('-');
+                    if (parts.Length != 2 || !parts[1].StartsWith("Q", StringComparison.OrdinalIgnoreCase)) return null;
+                    var y = int.Parse(parts[0], CultureInfo.InvariantCulture);
+                    var q = int.Parse(parts[1].Substring(1), CultureInfo.InvariantCulture);
+                    if (q < 1 || q > 4) return null;
+                    q--; if (q == 0) { q = 4; y--; }
+                    return $"{y:D4}-Q{q}";
+                }
+
+                case PeriodType.Daily:
+                    if (!DateOnly.TryParseExact(periodKey, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d))
+                        return null;
+                    return d.AddDays(-1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+                default:
+                    return null;
+            }
+        }
+        catch
+        {
+            return null;
+        }
+    }
 }
