@@ -138,6 +138,28 @@ public static class ReportingCalendarPolicy
     public static (DateOnly Start, DateOnly End) DataCoverageWindow(string cycleKey) =>
         CycleRange(cycleKey);
 
+    // ===== نافذة تاريخية محدودة (Bounded Historical Window) =====
+    // عند عدم اختيار فترة محدّدة، يُحسَب «المتوقّع المفقود» عبر آخر عدد ثابت من الدورات
+    // (شاملًا الدورة الحاليّة) — لا «كل الفترات» بلا حدّ. عدد استعلامات المُحلِّل ثابت
+    // بنيويًّا مهما اتّسعت النافذة (دفعيّ عبر keys.Contains)، فالأداء محدود ومتوقَّع.
+
+    /// <summary>
+    /// مفاتيح آخر <paramref name="count"/> دورة (YYYY-Www) منتهيةً بالدورة المحتوية لـ<paramref name="today"/>،
+    /// من الأحدث إلى الأقدم. تُرجِع قائمة فارغة إن كان العدد أقلّ من 1.
+    /// </summary>
+    public static IReadOnlyList<string> RecentCycleKeys(DateOnly today, int count)
+    {
+        if (count < 1) return Array.Empty<string>();
+        var keys = new List<string>(count);
+        var start = CycleStart(today);
+        for (var i = 0; i < count; i++)
+        {
+            keys.Add(CycleKeyFor(start));
+            start = start.AddDays(-7);
+        }
+        return keys;
+    }
+
     // ===== انتماء الدورة لشهر/ربع/سنة (تجميع KPI) =====
     // تنتمي الدورة للشهر/الربع/السنة التي يقع فيها **مرجع الثلاثاء** — فلا تُحتسب دورة لفترتين.
 

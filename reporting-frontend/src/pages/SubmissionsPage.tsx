@@ -23,6 +23,8 @@ import { DailyCalendarPicker } from '../components/DailyCalendarPicker';
 import { normalizeDigits, sanitizeNumericInput, isNumericGridColumn } from '../lib/numericNormalizer';
 import type {
   SubmissionListItem,
+  UnifiedSubmissionOverview,
+  SubmissionQuickFilter,
   SubmissionDto,
   SubmissionFieldValueDto,
   ReportTemplateListItem,
@@ -40,11 +42,6 @@ import type {
 
 type Tab = 'all' | 'mine' | 'pending';
 const MANAGEMENT_ROLES = ['Admin', 'CEO', 'GeneralManager', 'Manager', 'TeamLeader', 'CeoSupport', 'Viewer'] as const;
-const LATE_STATES: SubmissionStatus[] = ['Draft', 'Returned'];
-// «تحتاج إجراء» = التقارير المتوقّفة التي تتطلّب تحرّكًا من صاحبها/الفريق.
-// تعريف موحّد مع بطاقة لوحة التحكم (DashboardService): مسودّة + معادة + مصعّدة.
-// «بانتظار اعتمادي» (currentApproverId) بُعد منفصل ولا يُدمج هنا.
-const NEEDS_ACTION_STATES: SubmissionStatus[] = ['Draft', 'Returned', 'Escalated'];
 
 const statusTone: Partial<Record<SubmissionStatus, 'navy' | 'success' | 'orange' | 'alert' | 'gold'>> = {
   Draft: 'gold',
@@ -113,18 +110,26 @@ export default function SubmissionsPage() {
   );
 }
 
-// ===== تبويب «كل التقارير» — جدول متقدّم بفلاتر متعددة (للإدارة) =====
-type QuickFilter = '' | 'late' | 'mine-approval' | 'returned' | 'closed' | 'needs-action';
+// ===== تبويب «كل التقارير» — العرض الموحّد (SUBMITTED-REPORTS-MISSING-EXPECTED-OVERDUE-R1) =====
+// يستهلك GET /api/submissions/overview: التسليمات الفعليّة UNION الالتزامات المتوقّعة غير المُقدَّمة.
+// كل الفلاتر والعدّادات والترقيم تُحسَب في الخادم؛ الواجهة عرضٌ فقط بلا فلترة محليّة.
+type QuickFilter = SubmissionQuickFilter;
+const OVERVIEW_PAGE_SIZE = 200;
+
+// أطوار حالة الصفّ المتوقّع غير المُقدَّم لا وجود لها في submissionStatusLabel، فتُعامَل بلونٍ خاص.
+const rowStatusTone = (
+  status: SubmissionStatus | 'NotSubmitted',
+  overdue: boolean,
+): 'navy' | 'success' | 'orange' | 'alert' | 'gold' | 'muted' => {
+  if (status === 'NotSubmitted') return overdue ? 'alert' : 'gold';
+  return statusTone[status as SubmissionStatus] ?? 'muted';
+};
 
 function AllReportsTab({ onOpen, initialTeam }: { onOpen: (id: string) => void; initialTeam: string | null }) {
-  const { user, hasAnyRole } = useAuth();
+  const { hasAnyRole } = useAuth();
   // العرض الافتراضي حسب الدور: المعتمِدون المباشرون يبدؤون على «بانتظار اعتمادي»،
   // والإدارة العليا على «الكل».
-  const defaultQuick: QuickFilter = hasAnyRole('TeamLeader', 'Manager') ? 'mine-approval' : '';
-  const { data: items, isLoading, isError, refetch } = useQuery({
-    queryKey: ['submissions-all'],
-    queryFn: async () => (await api.get<SubmissionListItem[]>('/submissions')).data,
-  });
+  const defaultQuick: QuickFilter = hasAnyRole('TeamLeader', 'Manager') ? 'MineApproval' : 'None';
   const users = useDirectoryUsers();
   const teams = useTeams();
   const departments = useDepartments();
@@ -136,59 +141,93 @@ function AllReportsTab({ onOpen, initialTeam }: { onOpen: (id: string) => void; 
   const [period, setPeriod] = useState('');
   const [status, setStatus] = useState('');
   const [quick, setQuick] = useState<QuickFilter>(defaultQuick);
+  const [page, setPage] = useState(1);
+
+  // إعادة الترقيم للصفحة الأولى كلما تغيّر أي فلتر.
+  const resetPage = () => setPage(1);
+
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['submissions-overview', team, dept, employee, template, period, status, quick, page],
+    queryFn: async () => {
+      const params: Record<string, string | number> = { page, pageSize: OVERVIEW_PAGE_SIZE, quickFilter: quick };
+      if (team) params.teamId = team;
+      if (dept) params.departmentId = dept;
+      if (employee) params.submitterId = employee;
+      if (template) params.reportTemplateId = template;
+      if (period) params.periodKey = period;
+      if (status) params.status = status;
+      return (await api.get<UnifiedSubmissionOverview>('/submissions/overview', { params })).data;
+    },
+  });
 
   const userName = (id: string | null) => (users.data ?? []).find((u) => u.id === id)?.fullName ?? '—';
-
-  const filtered = useMemo(() => {
-    let rows = items ?? [];
-    if (team) rows = rows.filter((s) => s.teamId === team);
-    if (dept) rows = rows.filter((s) => s.departmentId === dept);
-    if (employee) rows = rows.filter((s) => s.submitterId === employee);
-    if (template) rows = rows.filter((s) => s.templateTitle === template);
-    if (period) rows = rows.filter((s) => s.periodKey === period);
-    if (status) rows = rows.filter((s) => s.status === status);
-    if (quick === 'late') rows = rows.filter((s) => LATE_STATES.includes(s.status));
-    if (quick === 'mine-approval') rows = rows.filter((s) => s.currentApproverId === user?.userId);
-    if (quick === 'returned') rows = rows.filter((s) => s.status === 'Returned');
-    if (quick === 'closed') rows = rows.filter((s) => s.status === 'Closed' || s.status === 'Visible');
-    if (quick === 'needs-action') rows = rows.filter((s) => NEEDS_ACTION_STATES.includes(s.status));
-    return rows;
-  }, [items, team, dept, employee, template, period, status, quick, user?.userId]);
 
   if (isLoading) return <LoadingState label="يتم تحميل التقارير…" />;
   if (isError) return <QueryError onRetry={() => refetch()} description="حدث خطأ أثناء جلب قائمة التقارير. أعد المحاولة." />;
 
-  const all = items ?? [];
-  const templateNames = [...new Set(all.map((s) => s.templateTitle))].sort();
-  const periods = [...new Set(all.map((s) => s.periodKey))].sort().reverse();
+  const items = data?.items ?? [];
+  const summary = data?.summary;
+  const totalCount = data?.totalCount ?? 0;
+  // خيارات القوالب مشتقّة من الصفوف الظاهرة (أفضل جهد ضمن الصفحة).
+  const templateOptions = [
+    ...new Map(items.filter((r) => r.reportTemplateId).map((r) => [r.reportTemplateId!, r.templateTitle])).entries(),
+  ].sort((a, b) => a[1].localeCompare(b[1], 'ar'));
+  const periods = [...new Set(items.map((r) => r.periodKey))].sort().reverse();
 
-  // بطاقات ملخّص قابلة للنقر — كل بطاقة تضبط الفلتر السريع المقابل.
-  const myApproval = all.filter((s) => s.currentApproverId === user?.userId).length;
-  const lateCount = all.filter((s) => LATE_STATES.includes(s.status)).length;
-  const returnedCount = all.filter((s) => s.status === 'Returned').length;
-  const closedCount = all.filter((s) => s.status === 'Closed' || s.status === 'Visible').length;
-  const needsActionCount = all.filter((s) => NEEDS_ACTION_STATES.includes(s.status)).length;
-  const SUMMARY: { key: QuickFilter; label: string; value: number; tone: 'navy' | 'orange' | 'alert' | 'gold' | 'success' }[] = [
-    { key: '', label: 'إجمالي التقارير', value: all.length, tone: 'navy' },
-    { key: 'needs-action', label: 'يحتاج إجراء الآن', value: needsActionCount, tone: needsActionCount > 0 ? 'orange' : 'success' },
-    { key: 'mine-approval', label: 'بانتظار اعتمادي', value: myApproval, tone: myApproval > 0 ? 'gold' : 'success' },
-    { key: 'late', label: 'متأخرة', value: lateCount, tone: lateCount > 0 ? 'alert' : 'success' },
-    { key: 'returned', label: 'معادة للتعديل', value: returnedCount, tone: returnedCount > 0 ? 'gold' : 'success' },
-    { key: 'closed', label: 'مغلقة', value: closedCount, tone: 'success' },
+  // بطاقات ملخّص قابلة للنقر — القيم من ملخّص الخادم على المجموعة الكاملة المفلترة (قبل الترقيم).
+  const SUMMARY: {
+    key: QuickFilter;
+    label: string;
+    value: number;
+    sub?: string;
+    tone: 'navy' | 'orange' | 'alert' | 'gold' | 'success';
+  }[] = [
+    { key: 'None', label: 'إجمالي التقارير', value: summary?.total ?? 0, tone: 'navy' },
+    {
+      key: 'NeedsAction',
+      label: 'يحتاج إجراء الآن',
+      value: summary?.needsActionCount ?? 0,
+      tone: (summary?.needsActionCount ?? 0) > 0 ? 'orange' : 'success',
+    },
+    {
+      key: 'Overdue',
+      label: 'متأخرة',
+      value: summary?.overdueCount ?? 0,
+      sub: (summary?.missingOverdueCount ?? 0) > 0 ? `منها ${summary?.missingOverdueCount} لم تُقدَّم` : undefined,
+      tone: (summary?.overdueCount ?? 0) > 0 ? 'alert' : 'success',
+    },
+    {
+      key: 'MineApproval',
+      label: 'بانتظار اعتمادي',
+      value: summary?.waitingMyApprovalCount ?? 0,
+      tone: (summary?.waitingMyApprovalCount ?? 0) > 0 ? 'orange' : 'success',
+    },
+    {
+      key: 'Returned',
+      label: 'معادة للتعديل',
+      value: summary?.returnedCount ?? 0,
+      tone: (summary?.returnedCount ?? 0) > 0 ? 'gold' : 'success',
+    },
+    { key: 'Closed', label: 'مغلقة', value: summary?.closedCount ?? 0, tone: 'success' },
   ];
 
   const QUICKS: [QuickFilter, string][] = [
-    ['', 'الكل'],
-    ['needs-action', 'يحتاج إجراء'],
-    ['late', 'المتأخرة'],
-    ['mine-approval', 'بانتظار اعتمادي'],
-    ['returned', 'المعادة'],
-    ['closed', 'المغلقة'],
+    ['None', 'الكل'],
+    ['NeedsAction', 'يحتاج إجراء'],
+    ['Overdue', 'المتأخرة'],
+    ['MineApproval', 'بانتظار اعتمادي'],
+    ['Returned', 'المعادة'],
+    ['Closed', 'المغلقة'],
   ];
 
   const toneText: Record<'navy' | 'orange' | 'alert' | 'gold' | 'success', string> = {
     navy: 'text-navy', orange: 'text-orange-600', alert: 'text-alert', gold: 'text-gold', success: 'text-success',
   };
+
+  const setFilter = (setter: (v: string) => void) => (v: string) => { setter(v); resetPage(); };
+  const setQuickFilter = (q: QuickFilter) => { setQuick(q); resetPage(); };
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / OVERVIEW_PAGE_SIZE));
 
   return (
     <div className="space-y-4">
@@ -197,50 +236,55 @@ function AllReportsTab({ onOpen, initialTeam }: { onOpen: (id: string) => void; 
         {SUMMARY.map((c) => (
           <button
             key={c.label}
-            onClick={() => setQuick(c.key)}
+            onClick={() => setQuickFilter(c.key)}
             className={`rounded-2xl border bg-white p-4 text-right transition hover:shadow-sm ${
               quick === c.key ? 'border-orange ring-1 ring-orange' : 'border-line'
             }`}
           >
             <p className={`text-2xl font-extrabold ${toneText[c.tone]}`}>{c.value}</p>
             <p className="mt-0.5 text-xs text-ink-2">{c.label}</p>
+            {c.sub && <p className="mt-0.5 text-[11px] font-semibold text-alert">{c.sub}</p>}
           </button>
         ))}
       </div>
+      {/* توضيح عقد الملخّص: الأرقام والقائمة يُشتقّان من نفس المجموعة بعد كل الفلاتر والتصفية السريعة. */}
+      <p className="px-1 text-[11px] text-ink-2">
+        الأرقام أعلاه تعكس نفس المجموعة المعروضة في القائمة بالأسفل بعد تطبيق كل الفلاتر (الفترة/الفريق/الإدارة/الموظف/نوع التقرير/البحث) والتصفية السريعة. تغيير التصفية السريعة يُحدّث هذه الأرقام والقائمة معًا.
+      </p>
 
       <Card>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-          <Select value={team} onChange={(e) => setTeam(e.target.value)}>
+          <Select value={team} onChange={(e) => setFilter(setTeam)(e.target.value)}>
             <option value="">كل الفرق</option>
             {(teams.data ?? []).map((t) => (
               <option key={t.id} value={t.id}>{t.nameAr}</option>
             ))}
           </Select>
-          <Select value={dept} onChange={(e) => setDept(e.target.value)}>
+          <Select value={dept} onChange={(e) => setFilter(setDept)(e.target.value)}>
             <option value="">كل الإدارات</option>
             {(departments.data ?? []).map((d) => (
               <option key={d.id} value={d.id}>{d.nameAr}</option>
             ))}
           </Select>
-          <Select value={employee} onChange={(e) => setEmployee(e.target.value)}>
+          <Select value={employee} onChange={(e) => setFilter(setEmployee)(e.target.value)}>
             <option value="">كل الموظفين</option>
             {(users.data ?? []).map((u) => (
               <option key={u.id} value={u.id}>{u.fullName}</option>
             ))}
           </Select>
-          <Select value={template} onChange={(e) => setTemplate(e.target.value)}>
+          <Select value={template} onChange={(e) => setFilter(setTemplate)(e.target.value)}>
             <option value="">كل أنواع التقارير</option>
-            {templateNames.map((t) => (
-              <option key={t} value={t}>{t}</option>
+            {templateOptions.map(([id, title]) => (
+              <option key={id} value={id}>{title}</option>
             ))}
           </Select>
-          <Select value={period} onChange={(e) => setPeriod(e.target.value)}>
-            <option value="">كل الفترات</option>
+          <Select value={period} onChange={(e) => setFilter(setPeriod)(e.target.value)}>
+            <option value="">آخر 12 أسبوعًا</option>
             {periods.map((p) => (
               <option key={p} value={p}>{p}</option>
             ))}
           </Select>
-          <Select value={status} onChange={(e) => setStatus(e.target.value)}>
+          <Select value={status} onChange={(e) => setFilter(setStatus)(e.target.value)}>
             <option value="">كل الحالات</option>
             {(Object.keys(submissionStatusLabel) as SubmissionStatus[]).map((s) => (
               <option key={s} value={s}>{submissionStatusLabel[s]}</option>
@@ -251,7 +295,7 @@ function AllReportsTab({ onOpen, initialTeam }: { onOpen: (id: string) => void; 
           {QUICKS.map(([k, label]) => (
             <button
               key={label}
-              onClick={() => setQuick(k)}
+              onClick={() => setQuickFilter(k)}
               className={`rounded-full border px-3 py-1 text-xs font-semibold ${
                 quick === k ? 'border-navy bg-navy text-white' : 'border-line text-ink-2 hover:bg-offwhite'
               }`}
@@ -263,14 +307,14 @@ function AllReportsTab({ onOpen, initialTeam }: { onOpen: (id: string) => void; 
       </Card>
 
       <Card className="overflow-x-auto p-0">
-        {filtered.length === 0 ? (
+        {items.length === 0 ? (
           <div className="py-12 text-center">
             <p className="text-sm font-medium text-ink-2">
-              {all.length === 0 ? 'لا توجد تقارير بعد.' : 'لا توجد تقارير مطابقة للفلاتر.'}
+              {totalCount === 0 ? 'لا توجد تقارير بعد.' : 'لا توجد تقارير مطابقة للفلاتر.'}
             </p>
             <p className="mx-auto mt-1 max-w-md text-xs text-ink-3">
-              {all.length === 0
-                ? 'تظهر التقارير هنا بمجرّد أن يبدأ الموظفون في تسليمها. تُنشأ التقارير من قوالب منشورة في تبويب «تقاريري».'
+              {totalCount === 0
+                ? 'تظهر التقارير هنا بمجرّد أن يبدأ الموظفون في تسليمها، أو كصفوف «لم تُقدَّم» للالتزامات المتوقّعة.'
                 : 'لا يوجد تقرير يطابق الفلاتر المحدّدة حاليًا. جرّب توسيع نطاق الفلاتر أو إعادة ضبطها.'}
             </p>
           </div>
@@ -284,32 +328,49 @@ function AllReportsTab({ onOpen, initialTeam }: { onOpen: (id: string) => void; 
                 <th className="px-3 py-2.5 font-semibold">الحالة</th>
                 <th className="px-3 py-2.5 font-semibold">تاريخ الإرسال</th>
                 <th className="px-3 py-2.5 font-semibold">المسؤول الحالي</th>
-                <th className="px-3 py-2.5 font-semibold">متأخر؟</th>
+                <th className="px-3 py-2.5 font-semibold">الاستحقاق / التأخّر</th>
                 <th className="px-3 py-2.5 font-semibold"></th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((s) => {
-                const late = LATE_STATES.includes(s.status);
+              {items.map((r) => {
+                // الصفّ المتوقّع غير المُقدَّم (null-safe): لا مُعرِّف تسليم، لا فتح ولا إجراءات.
+                const missing = r.isExpectedSubmission && !r.hasSubmission;
+                const key = missing
+                  ? `expected-${r.submitterId}-${r.reportTemplateId}-${r.periodKey}`
+                  : r.submissionId!;
+                const openRow = () => { if (!missing && r.submissionId) onOpen(r.submissionId); };
                 return (
                   <tr
-                    key={s.id}
-                    onClick={() => onOpen(s.id)}
-                    className="cursor-pointer border-b border-line last:border-0 hover:bg-offwhite"
+                    key={key}
+                    onClick={openRow}
+                    className={`border-b border-line last:border-0 ${
+                      missing ? 'bg-alert/5' : 'cursor-pointer hover:bg-offwhite'
+                    }`}
                   >
-                    <td className="px-3 py-2.5 font-semibold text-navy hover:text-orange hover:underline">{s.templateTitle}</td>
-                    <td className="px-3 py-2.5 text-ink-2">{s.submitterName}</td>
-                    <td className="px-3 py-2.5 text-ink-2">{periodTypeLabel[s.periodType]} {s.periodKey}</td>
-                    <td className="px-3 py-2.5">
-                      <Badge tone={statusTone[s.status] ?? 'muted'}>{submissionStatusLabel[s.status]}</Badge>
+                    <td className={`px-3 py-2.5 font-semibold ${missing ? 'text-ink' : 'text-navy hover:text-orange hover:underline'}`}>
+                      {r.templateTitle}
                     </td>
-                    <td className="px-3 py-2.5 text-ink-2">{formatDate(s.submittedAtUtc)}</td>
-                    <td className="px-3 py-2.5 text-ink-2">{s.currentApproverId ? userName(s.currentApproverId) : '—'}</td>
+                    <td className="px-3 py-2.5 text-ink-2">{r.submitterName}</td>
+                    <td className="px-3 py-2.5 text-ink-2">{periodTypeLabel[r.periodType]} {r.periodKey}</td>
                     <td className="px-3 py-2.5">
-                      {late ? <Badge tone="alert">متأخر</Badge> : <span className="text-ink-3">—</span>}
+                      <Badge tone={rowStatusTone(r.status, r.isOverdue)}>{r.statusLabel}</Badge>
+                    </td>
+                    <td className="px-3 py-2.5 text-ink-2">{missing ? '—' : formatDate(r.submittedAtUtc)}</td>
+                    <td className="px-3 py-2.5 text-ink-2">{r.currentApproverId ? userName(r.currentApproverId) : '—'}</td>
+                    <td className="px-3 py-2.5">
+                      {r.isOverdue ? (
+                        <Badge tone="alert">{missing ? `متأخر — لم يُقدَّم (${r.delayDays} يوم)` : `متأخر (${r.delayDays} يوم)`}</Badge>
+                      ) : (
+                        <span className="text-ink-3">استحقاق {formatDate(r.dueAt)}</span>
+                      )}
                     </td>
                     <td className="px-3 py-2.5">
-                      <Button variant="ghost" onClick={(e) => { e.stopPropagation(); onOpen(s.id); }}>عرض التقرير</Button>
+                      {missing ? (
+                        <span className="text-xs text-ink-3">لا يوجد تسليم بعد</span>
+                      ) : (
+                        <Button variant="ghost" onClick={(e) => { e.stopPropagation(); openRow(); }}>عرض التقرير</Button>
+                      )}
                     </td>
                   </tr>
                 );
@@ -318,7 +379,16 @@ function AllReportsTab({ onOpen, initialTeam }: { onOpen: (id: string) => void; 
           </table>
         )}
       </Card>
-      <p className="text-xs text-ink-3">إجمالي المعروض: {filtered.length} من {all.length} تقرير.</p>
+      <div className="flex items-center justify-between text-xs text-ink-3">
+        <p>إجمالي المطابق: {totalCount} تقرير (يشمل المتوقّع غير المُقدَّم).</p>
+        {totalPages > 1 && (
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>السابق</Button>
+            <span>صفحة {page} من {totalPages}</span>
+            <Button variant="ghost" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>التالي</Button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

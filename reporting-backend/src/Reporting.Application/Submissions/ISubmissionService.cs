@@ -21,6 +21,14 @@ public interface ISubmissionService
     Task<Result<SubmissionSummaryDto>> SummaryAsync(SubmissionFilter filter, CancellationToken ct = default);
 
     /// <summary>
+    /// SUBMITTED-REPORTS-MISSING-EXPECTED-OVERDUE-R1 — العرض الموحّد لـ«كل التقارير»:
+    /// التسليمات الفعليّة UNION الالتزامات المتوقّعة غير المُقدَّمة (non-starters) لنافذة الدورة الفعّالة،
+    /// بعد نطاق التفويض ثم الفلاتر ثم QuickFilter، مع عدّادات (تشمل المتأخّر بنوعيه) وترقيم للقائمة فقط.
+    /// لا يكتب أيّ تسليم صناعيّ؛ الصفوف المتوقّعة تُشتقّ آنيًّا عبر IExpectedSubmissionStatusResolver.
+    /// </summary>
+    Task<Result<UnifiedSubmissionOverviewDto>> GetOverviewAsync(UnifiedSubmissionFilter filter, CancellationToken ct = default);
+
+    /// <summary>
     /// حذف إداريّ ناعم لتقرير مُسلَّم (ADMIN-GOVERNANCE-R1، Admin/CEO/GM فقط): IsDeleted=true + سبب إلزاميّ + تدقيق.
     /// يحوّل خطوات الاعتماد المعلّقة إلى CancelledByAdministrativeDeletion ويصفّر CurrentApproverId
     /// فيختفي التقرير من كل القوائم والتجميعات ومن «بانتظار اعتمادي». لا حذف صفوف.

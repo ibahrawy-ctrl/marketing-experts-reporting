@@ -88,3 +88,109 @@ public record SubmissionSummaryDto(
     string? PeriodKey,
     int Total,
     IReadOnlyList<StatusCount> ByStatus);
+
+// ===== SUBMITTED-REPORTS-MISSING-EXPECTED-OVERDUE-R1 — العقد الوظيفيّ للصفّ الموحّد =====
+
+/// <summary>
+/// نوع صفّ العرض الموحّد في «كل التقارير»:
+/// <see cref="ExistingSubmission"/> = تسليم فعليّ قائم (صفّ في report_submissions)،
+/// <see cref="ExpectedMissingSubmission"/> = التزام متوقّع لم يُقدَّم إطلاقًا (لا صفّ في القاعدة — مُشتقّ آنيًّا).
+/// لا يُكتَب أيّ تسليم صناعيّ إلى القاعدة؛ الصفّ المتوقّع يُبنى قراءةً فقط من IExpectedSubmissionStatusResolver.
+/// </summary>
+public enum SubmissionRowKind
+{
+    ExistingSubmission = 0,
+    ExpectedMissingSubmission = 1
+}
+
+/// <summary>
+/// الفلتر السريع الموحّد (يطابق شرائح الواجهة). <see cref="Overdue"/> يُرجِع النوعين معًا
+/// (المتأخّر القائم Draft/Returned بعد الموعد + المتوقّع غير المُقدَّم بعد الموعد).
+/// </summary>
+public enum SubmissionQuickFilter
+{
+    None = 0,
+    Overdue = 1,
+    NeedsAction = 2,
+    Returned = 3,
+    Closed = 4,
+    MineApproval = 5
+}
+
+/// <summary>
+/// صفّ العرض الموحّد. المفتاح المنطقيّ = ReportTemplateId + SubmitterId + PeriodKey (للتوحيد ومنع التكرار).
+/// عقد الصفّ المتوقّع غير المُقدَّم (null-safe): SubmissionId=null، HasSubmission=false،
+/// IsExpectedSubmission=true، Status="NotSubmitted"، CurrentApproverId=null، SubmittedAtUtc=null،
+/// IsOverdue=true فقط بعد تجاوز حدّ الاستحقاق الصارم.
+/// </summary>
+public sealed record UnifiedSubmissionRowDto(
+    SubmissionRowKind RowKind,
+    Guid? SubmissionId,
+    Guid? ReportTemplateId,
+    string TemplateTitle,
+    Guid SubmitterId,
+    string SubmitterName,
+    Guid? TeamId,
+    string? TeamName,
+    Guid? DepartmentId,
+    string? DepartmentName,
+    PeriodType PeriodType,
+    string PeriodKey,
+    string Status,
+    string StatusLabel,
+    string Severity,
+    DateTime? SubmittedAtUtc,
+    Guid? CurrentApproverId,
+    DateOnly DueAt,
+    bool HasSubmission,
+    bool IsExpectedSubmission,
+    bool IsOverdue,
+    int DelayDays);
+
+/// <summary>
+/// فلتر العرض الموحّد. يوسّع فلاتر القائمة القائمة بـ QuickFilter + ReportTemplateId + Search + ترقيم الصفحات.
+/// كلّ الفلاتر (عدا الترقيم) تنطبق أيضًا على الصفّ المتوقّع غير المُقدَّم.
+/// </summary>
+public sealed record UnifiedSubmissionFilter(
+    string? PeriodKey = null,
+    Guid? SubmitterId = null,
+    Guid? TeamId = null,
+    Guid? DepartmentId = null,
+    Guid? ReportTemplateId = null,
+    SubmissionStatus? Status = null,
+    string? Search = null,
+    SubmissionQuickFilter QuickFilter = SubmissionQuickFilter.None,
+    int Page = 1,
+    int PageSize = 200);
+
+/// <summary>
+/// عدّادات العرض الموحّد — تُحسَب من نفس المصدر الموحّد بعد النطاق والفلاتر وQuickFilter (قبل الترقيم فقط).
+/// القرار الوظيفيّ المعتمد: البطاقات تعكس نفس مجموعة الصفوف بعد QuickFilter (W30 + Overdue ⇒ أرقام متأخّري W30 فقط).
+/// OverdueCount = مجموع المتأخّر القائم + المتوقّع المتأخّر (كلاهما).
+/// WaitingMyApprovalCount = عدد مميّز للتسليمات الفعليّة (ExistingSubmission بمعرّف) التي معتمِدها الحاليّ = المستخدم المصادَق؛
+/// يُحسَب خادميًّا بعد النطاق والفلاتر وQuickFilter وقبل الترقيم، بلا اعتماد على الدور ولا صفوف متوقّعة غير مُقدَّمة.
+/// </summary>
+public sealed record UnifiedSubmissionSummaryDto(
+    string? PeriodKey,
+    int Total,
+    int OverdueCount,
+    int ExistingOverdueCount,
+    int MissingOverdueCount,
+    int ExpectedMissingCount,
+    int NeedsActionCount,
+    int ReturnedCount,
+    int ClosedCount,
+    int WaitingMyApprovalCount,
+    IReadOnlyList<StatusCount> ByStatus);
+
+/// <summary>
+/// نتيجة العرض الموحّد: صفوف مُرقَّمة + عدّادات على المجموعة بعد QuickFilter (قبل الترقيم فقط).
+/// المصدر واحد: التسليمات الفعليّة UNION الالتزامات المتوقّعة غير المُقدَّمة، بعد النطاق ثم الفلاتر ثم QuickFilter؛
+/// ثمّ Summary والصفوف كلاهما من نفس المجموعة (TotalCount == Summary.Total دائمًا).
+/// </summary>
+public sealed record UnifiedSubmissionOverviewDto(
+    IReadOnlyList<UnifiedSubmissionRowDto> Items,
+    UnifiedSubmissionSummaryDto Summary,
+    int Page,
+    int PageSize,
+    int TotalCount);

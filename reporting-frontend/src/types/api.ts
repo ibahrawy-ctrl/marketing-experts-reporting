@@ -451,6 +451,66 @@ export interface SubmissionListItem {
   currentApproverId: string | null;
 }
 
+// ===== SUBMITTED-REPORTS-MISSING-EXPECTED-OVERDUE-R1 — العرض الموحّد لـ«كل التقارير» =====
+// نوع الصفّ: تسليم فعليّ قائم (ExistingSubmission) أو التزام متوقّع لم يُقدَّم (ExpectedMissingSubmission، بلا صفّ في القاعدة).
+export type SubmissionRowKind = 'ExistingSubmission' | 'ExpectedMissingSubmission';
+export type SubmissionQuickFilter =
+  | 'None'
+  | 'Overdue'
+  | 'NeedsAction'
+  | 'Returned'
+  | 'Closed'
+  | 'MineApproval';
+
+// صفّ موحّد. للصفّ المتوقّع غير المُقدَّم: submissionId=null، hasSubmission=false،
+// isExpectedSubmission=true، status="NotSubmitted"، currentApproverId=null، submittedAtUtc=null.
+export interface UnifiedSubmissionRow {
+  rowKind: SubmissionRowKind;
+  submissionId: string | null;
+  reportTemplateId: string | null;
+  templateTitle: string;
+  submitterId: string;
+  submitterName: string;
+  teamId: string | null;
+  teamName: string | null;
+  departmentId: string | null;
+  departmentName: string | null;
+  periodType: PeriodType;
+  periodKey: string;
+  status: SubmissionStatus | 'NotSubmitted';
+  statusLabel: string;
+  severity: string;
+  submittedAtUtc: string | null;
+  currentApproverId: string | null;
+  dueAt: string;
+  hasSubmission: boolean;
+  isExpectedSubmission: boolean;
+  isOverdue: boolean;
+  delayDays: number;
+}
+
+export interface UnifiedSubmissionSummary {
+  periodKey: string | null;
+  total: number;
+  overdueCount: number;
+  existingOverdueCount: number;
+  missingOverdueCount: number;
+  expectedMissingCount: number;
+  needsActionCount: number;
+  returnedCount: number;
+  closedCount: number;
+  waitingMyApprovalCount: number;
+  byStatus: { status: SubmissionStatus; count: number }[];
+}
+
+export interface UnifiedSubmissionOverview {
+  items: UnifiedSubmissionRow[];
+  summary: UnifiedSubmissionSummary;
+  page: number;
+  pageSize: number;
+  totalCount: number;
+}
+
 // ===== Governance =====
 export interface RiskDto {
   id: string;

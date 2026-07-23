@@ -5,6 +5,7 @@ using Reporting.Application.Audit;
 using Reporting.Application.Clients;
 using Reporting.Application.Common;
 using Reporting.Application.Notifications;
+using Reporting.Application.Reports;
 using Reporting.Application.Submissions;
 using Reporting.Application.Templates;
 using Reporting.Domain.Entities.Submissions;
@@ -23,6 +24,8 @@ public class SubmissionService : ISubmissionService
     private readonly IClientProjectAccess _access;
     private readonly IReportTemplateService _templates;
     private readonly IReportViewGrantService _grants;
+    private readonly IExpectedSubmissionStatusResolver _expected;
+    private readonly ISystemClock _clock;
 
     // الحالات التي يجوز لمستفيد منح الرؤية رؤيتها فقط (REPORT-VIEW-GRANTS-R1):
     // تقارير مُرسَلة رسميًّا بحالة معتمدة — تُستبعد المسودّة (Draft) والمُعادة للتعديل (Returned).
@@ -36,9 +39,13 @@ public class SubmissionService : ISubmissionService
         SubmissionStatus.Visible
     };
 
+    // النافذة التاريخية المحدودة لـ«المتوقّع المفقود» عند عدم اختيار فترة: آخر 12 أسبوعًا شاملةً الحاليّ.
+    private const int HistoricalWindowWeeks = 12;
+
     public SubmissionService(AppDbContext db, ICurrentUser currentUser,
         INotificationService notifications, IAuditService audit, IScopeResolver scope, IClientProjectAccess access,
-        IReportTemplateService templates, IReportViewGrantService grants)
+        IReportTemplateService templates, IReportViewGrantService grants,
+        IExpectedSubmissionStatusResolver expected, ISystemClock clock)
     {
         _db = db;
         _currentUser = currentUser;
@@ -48,6 +55,8 @@ public class SubmissionService : ISubmissionService
         _access = access;
         _templates = templates;
         _grants = grants;
+        _expected = expected;
+        _clock = clock;
     }
 
     public async Task<Result<SubmissionDto>> CreateOrGetDraftAsync(CreateSubmissionRequest request, CancellationToken ct = default)
@@ -760,6 +769,311 @@ public class SubmissionService : ISubmissionService
         var total = grouped.Sum(g => g.Count);
 
         return Result<SubmissionSummaryDto>.Success(new SubmissionSummaryDto(filter.PeriodKey, total, grouped));
+    }
+
+    // ===== SUBMITTED-REPORTS-MISSING-EXPECTED-OVERDUE-R1 — العرض الموحّد لـ«كل التقارير» =====
+    // المصدر الموحّد: التسليمات الفعليّة (كل الحالات/الأنواع) UNION الالتزامات المتوقّعة غير المُقدَّمة
+    // (non-starters) للدورة الفعّالة، تُشتقّ آنيًّا عبر IExpectedSubmissionStatusResolver (بلا أيّ كتابة صناعيّة).
+    // الترتيب الملزم: النطاق (نفس ListAsync) ⟶ Period ⟶ Team ⟶ Department ⟶ Submitter ⟶ Template ⟶ Search
+    // ⟶ QuickFilter ⟶ Summary (العدّادات على المجموعة بعد QuickFilter) ⟶ الترقيم (للقائمة فقط).
+    // القرار الوظيفيّ المعتمد: الصفوف والعدّادات والبطاقات جميعها تُحسب على نفس المجموعة بعد QuickFilter
+    // (مثال: W30 + Overdue ⇒ صفوف وأرقام متأخّري W30 فقط). حساب التأخّر عبر ReportingCalendarPolicy (مصدر واحد؛ لا سياسة ثانية).
+    public async Task<Result<UnifiedSubmissionOverviewDto>> GetOverviewAsync(UnifiedSubmissionFilter filter, CancellationToken ct = default)
+    {
+        if (_currentUser.UserId is not Guid userId)
+            return Result<UnifiedSubmissionOverviewDto>.Failure("غير مصرّح.", "auth.unauthenticated");
+
+        var scope = await _scope.ResolveAsync(ct);
+        var now = _clock.UtcNow;
+        var riyadhToday = ReportingCalendarPolicy.RiyadhDate(now.UtcDateTime);
+        var periodKeyFilter = string.IsNullOrWhiteSpace(filter.PeriodKey) ? null : filter.PeriodKey.Trim();
+
+        // نافذة «المتوقّع المفقود»:
+        //   • فترة محدّدة صالحة  ⇒ دورة واحدة فقط (المفتاح المختار).
+        //   • بلا فترة (النطاق الافتراضيّ) ⇒ نافذة تاريخية محدودة = آخر HistoricalWindowWeeks دورة
+        //     شاملةً الدورة الحاليّة (لا «كل الفترات» بلا حدّ). عدد استعلامات المُحلِّل ثابت مهما اتّسعت.
+        var expectedWindow = ReportingCalendarPolicy.IsValidCycleKey(periodKeyFilter)
+            ? new[] { periodKeyFilter! }
+            : ReportingCalendarPolicy.RecentCycleKeys(riyadhToday, HistoricalWindowWeeks).ToArray();
+
+        // ===== (أ) الصفوف الفعليّة (DB) — نفس منطق النطاق والمنح في ListAsync =====
+        var q = _db.ReportSubmissions.AsNoTracking().AsQueryable();
+        if (!scope.SeesAll)
+        {
+            var ids = scope.UserIds;
+            var grantIds = await _grants.ResolveGrantedSubmitterIdsAsync(userId, ct);
+            if (grantIds.Count == 0)
+                q = q.Where(s => ids.Contains(s.SubmitterId));
+            else
+                q = q.Where(s => ids.Contains(s.SubmitterId)
+                                 || (grantIds.Contains(s.SubmitterId) && GrantViewableStatuses.Contains(s.Status)));
+        }
+
+        // فلاتر العرض الموحّد على الصفوف الفعليّة (تنطبق أيضًا لاحقًا على الصفّ المتوقّع).
+        if (filter.Status is not null) q = q.Where(s => s.Status == filter.Status);
+        if (periodKeyFilter is not null) q = q.Where(s => s.PeriodKey == periodKeyFilter);
+        if (filter.SubmitterId is not null) q = q.Where(s => s.SubmitterId == filter.SubmitterId);
+        if (filter.TeamId is not null) q = q.Where(s => s.TeamId == filter.TeamId);
+        if (filter.DepartmentId is not null) q = q.Where(s => s.DepartmentId == filter.DepartmentId);
+        if (filter.ReportTemplateId is Guid rtid)
+            q = q.Where(s => _db.ReportTemplateVersions.Any(v => v.Id == s.ReportTemplateVersionId && v.ReportTemplateId == rtid));
+
+        var actualRaw = await q
+            .Select(s => new
+            {
+                s.Id,
+                ReportTemplateId = _db.ReportTemplateVersions
+                    .Where(v => v.Id == s.ReportTemplateVersionId).Select(v => (Guid?)v.ReportTemplateId).FirstOrDefault(),
+                Title = _db.ReportTemplateVersions
+                    .Where(v => v.Id == s.ReportTemplateVersionId).Select(v => v.ReportTemplate!.Title).FirstOrDefault(),
+                s.SubmitterId,
+                s.TeamId,
+                s.DepartmentId,
+                s.PeriodType,
+                s.PeriodKey,
+                s.Status,
+                s.SubmittedAtUtc,
+                s.CurrentApproverId
+            })
+            .ToListAsync(ct);
+
+        // تسميات دفعيّة (أسماء المُرسِلين/الفِرَق/الإدارات) + الأدوار الأساسيّة لاشتقاق موعد الاستحقاق (بلا N+1).
+        var submitterIds = actualRaw.Select(r => r.SubmitterId).Distinct().ToList();
+        var names = await UserNamesAsync(submitterIds, ct);
+        var roles = await UserPrimaryRolesAsync(submitterIds, ct);
+        var teamIds = actualRaw.Where(r => r.TeamId is not null).Select(r => r.TeamId!.Value).Distinct().ToList();
+        var deptIds = actualRaw.Where(r => r.DepartmentId is not null).Select(r => r.DepartmentId!.Value).Distinct().ToList();
+        var teamNames = teamIds.Count == 0 ? new Dictionary<Guid, string>()
+            : await _db.Teams.AsNoTracking().Where(t => teamIds.Contains(t.Id)).ToDictionaryAsync(t => t.Id, t => t.NameAr, ct);
+        var deptNames = deptIds.Count == 0 ? new Dictionary<Guid, string>()
+            : await _db.Departments.AsNoTracking().Where(d => deptIds.Contains(d.Id)).ToDictionaryAsync(d => d.Id, d => d.NameAr, ct);
+
+        var rows = new List<UnifiedSubmissionRowDto>(actualRaw.Count);
+        var existingKeys = new HashSet<(Guid Template, Guid Submitter, string Period)>();
+
+        foreach (var r in actualRaw)
+        {
+            var role = RoleAccess.PrimaryRole(roles.GetValueOrDefault(r.SubmitterId) ?? new List<string>());
+            var isCycle = ReportingCalendarPolicy.IsValidCycleKey(r.PeriodKey);
+            DateOnly dueDate;
+            var isOverdue = false;
+            var delayDays = 0;
+            if (isCycle)
+            {
+                dueDate = ReportingCalendarPolicy.RoleDueDate(r.PeriodKey, role);
+                var dueAt = new DateTimeOffset(dueDate.Year, dueDate.Month, dueDate.Day, 23, 59, 59, ReportingCalendarPolicy.RiyadhOffset);
+                // تعريف التأخّر الصارم للصفوف الفعليّة: مسودّة/مُعاد فقط، وبعد تجاوز حدّ الاستحقاق (now > dueAt).
+                var overdueEligible = r.Status is SubmissionStatus.Draft or SubmissionStatus.Returned;
+                isOverdue = overdueEligible && now > dueAt;
+                if (isOverdue) delayDays = Math.Max(0, riyadhToday.DayNumber - dueDate.DayNumber);
+            }
+            else if (ReportingCalendarPolicy.IsValidDayKey(r.PeriodKey))
+            {
+                dueDate = ReportingCalendarPolicy.ParseDayKey(r.PeriodKey);
+            }
+            else
+            {
+                dueDate = riyadhToday;
+            }
+
+            var (label, severity) = ExistingLabelAndSeverity(r.Status, isOverdue);
+            if (r.ReportTemplateId is Guid tid)
+                existingKeys.Add((tid, r.SubmitterId, r.PeriodKey));
+
+            rows.Add(new UnifiedSubmissionRowDto(
+                RowKind: SubmissionRowKind.ExistingSubmission,
+                SubmissionId: r.Id,
+                ReportTemplateId: r.ReportTemplateId,
+                TemplateTitle: r.Title ?? string.Empty,
+                SubmitterId: r.SubmitterId,
+                SubmitterName: names.GetValueOrDefault(r.SubmitterId, string.Empty),
+                TeamId: r.TeamId,
+                TeamName: r.TeamId is Guid tm ? teamNames.GetValueOrDefault(tm) : null,
+                DepartmentId: r.DepartmentId,
+                DepartmentName: r.DepartmentId is Guid dp ? deptNames.GetValueOrDefault(dp) : null,
+                PeriodType: r.PeriodType,
+                PeriodKey: r.PeriodKey,
+                Status: r.Status.ToString(),
+                StatusLabel: label,
+                Severity: severity,
+                SubmittedAtUtc: r.SubmittedAtUtc,
+                CurrentApproverId: r.CurrentApproverId,
+                DueAt: dueDate,
+                HasSubmission: true,
+                IsExpectedSubmission: false,
+                IsOverdue: isOverdue,
+                DelayDays: delayDays));
+        }
+
+        // ===== (ب) الصفوف المتوقّعة غير المُقدَّمة (resolver) للدورة الفعّالة — بلا كتابة صناعيّة =====
+        // تُستبعَد إن طُلِب فلتر حالة تسليم فعليّة، أو إن كان مفتاح الفلتر ليس دورة صالحة.
+        var includeExpected =
+            filter.Status is null
+            && (periodKeyFilter is null || ReportingCalendarPolicy.IsValidCycleKey(periodKeyFilter));
+        if (includeExpected && scope.UserIds.Count > 0)
+        {
+            var expected = await _expected.ResolveAsync(
+                new ExpectedStatusQuery(scope.UserIds, expectedWindow, filter.ReportTemplateId), ct);
+
+            foreach (var e in expected)
+            {
+                if (!e.IsExpected || e.HasSubmission) continue; // فقط الالتزام المتوقّع غير المُقدَّم إطلاقًا.
+                if (e.TemplateId is not Guid etid) continue;
+                // إزالة التكرار على المفتاح المنطقيّ (ReportTemplateId + SubmitterId + PeriodKey).
+                if (existingKeys.Contains((etid, e.UserId, e.PeriodKey))) continue;
+
+                // فلاتر SubmitterId/Team/Dept تُطبَّق على الصفّ المتوقّع أيضًا.
+                if (filter.SubmitterId is Guid fsid && e.UserId != fsid) continue;
+                if (filter.TeamId is Guid ftid && e.TeamId != ftid) continue;
+                if (filter.DepartmentId is Guid fdid && e.DepartmentId != fdid) continue;
+
+                var isOverdue = e.Status == ExpectedSubmissionStatus.OverdueNotSubmitted;
+
+                rows.Add(new UnifiedSubmissionRowDto(
+                    RowKind: SubmissionRowKind.ExpectedMissingSubmission,
+                    SubmissionId: null,
+                    ReportTemplateId: etid,
+                    TemplateTitle: e.TemplateName,
+                    SubmitterId: e.UserId,
+                    SubmitterName: e.UserFullName,
+                    TeamId: e.TeamId,
+                    TeamName: e.TeamName,
+                    DepartmentId: e.DepartmentId,
+                    DepartmentName: e.DepartmentName,
+                    PeriodType: PeriodType.Weekly,
+                    PeriodKey: e.PeriodKey,
+                    Status: "NotSubmitted",
+                    StatusLabel: isOverdue ? "متأخّر — لم يُقدَّم" : "لم يبدأ التقرير",
+                    Severity: isOverdue ? "alert" : "info",
+                    SubmittedAtUtc: null,
+                    CurrentApproverId: null,
+                    DueAt: e.DueAt,
+                    HasSubmission: false,
+                    IsExpectedSubmission: true,
+                    IsOverdue: isOverdue,
+                    DelayDays: isOverdue ? e.DelayDays : 0));
+            }
+        }
+
+        // ===== (ج) Search (اسم المُرسِل/عنوان القالب/الفريق/الإدارة) على المجموعة الموحّدة =====
+        if (!string.IsNullOrWhiteSpace(filter.Search))
+        {
+            var term = filter.Search.Trim();
+            rows = rows.Where(x =>
+                (x.SubmitterName?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false)
+                || (x.TemplateTitle?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false)
+                || (x.TeamName?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false)
+                || (x.DepartmentName?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false)).ToList();
+        }
+
+        // ===== (د) QuickFilter — يُطبَّق قبل العدّادات والترقيم =====
+        // القرار الوظيفيّ المعتمد: Summary/البطاقات والصفوف تُشتقّ من نفس المجموعة بعد QuickFilter.
+        var filtered = ApplyQuickFilter(rows, filter.QuickFilter, userId);
+
+        // ===== (هـ) العدّادات على المجموعة بعد QuickFilter =====
+        // PeriodKey في الملخّص = الفترة المختارة إن وُجدت، وإلا null (النطاق = النافذة التاريخية المحدودة).
+        var summary = BuildOverviewSummary(filtered, periodKeyFilter, userId);
+
+        // ===== (و) الترتيب ثمّ الترقيم (للقائمة فقط) =====
+        filtered = filtered
+            .OrderByDescending(x => x.IsOverdue)
+            .ThenBy(x => x.DueAt)
+            .ThenBy(x => x.SubmitterName, StringComparer.Ordinal)
+            .ToList();
+
+        var totalCount = filtered.Count;
+        var page = filter.Page < 1 ? 1 : filter.Page;
+        var pageSize = filter.PageSize < 1 ? 200 : filter.PageSize;
+        var items = filtered.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+
+        return Result<UnifiedSubmissionOverviewDto>.Success(
+            new UnifiedSubmissionOverviewDto(items, summary, page, pageSize, totalCount));
+    }
+
+    // «يحتاج إجراءً» = تسليم فعليّ قائم (ExistingSubmission بمعرّف) بحالة مسودّة/مُعاد/مُصعَّد فقط.
+    // الصفّ المتوقّع غير المُقدَّم (ExpectedMissingSubmission) لا يدخل NeedsAction مطلقًا (لا قبل الاستحقاق ولا بعده)؛
+    // المتوقّع المتأخّر يبقى في Overdue فقط. هذا العقد النهائيّ المعتمَد قبل RC.
+    private static bool IsNeedsAction(UnifiedSubmissionRowDto r)
+        => r.RowKind == SubmissionRowKind.ExistingSubmission
+           && r.SubmissionId is not null
+           && r.Status is nameof(SubmissionStatus.Draft)
+               or nameof(SubmissionStatus.Returned)
+               or nameof(SubmissionStatus.Escalated);
+
+    // «بانتظار اعتمادي» = تسليم فعليّ قائم (ExistingSubmission بمعرّف) معتمِده الحاليّ هو المستخدم المصادَق.
+    // لا اعتماد على الدور، لا Pending عام، ولا صفّ متوقّع غير مُقدَّم.
+    private static bool IsWaitingMyApproval(UnifiedSubmissionRowDto r, Guid userId)
+        => r.RowKind == SubmissionRowKind.ExistingSubmission
+           && r.SubmissionId is not null
+           && r.CurrentApproverId == userId;
+
+    private static UnifiedSubmissionSummaryDto BuildOverviewSummary(
+        IReadOnlyList<UnifiedSubmissionRowDto> rows, string? selectedPeriodKey, Guid userId)
+    {
+        var existingOverdue = rows.Count(r => !r.IsExpectedSubmission && r.IsOverdue);
+        var missingOverdue = rows.Count(r => r.IsExpectedSubmission && r.IsOverdue);
+        var expectedMissing = rows.Count(r => r.IsExpectedSubmission);
+        var needsAction = rows.Where(IsNeedsAction).Select(r => r.SubmissionId).Distinct().Count();
+        var returned = rows.Count(r => !r.IsExpectedSubmission && r.Status == nameof(SubmissionStatus.Returned));
+        var closed = rows.Count(r => !r.IsExpectedSubmission && r.Status == nameof(SubmissionStatus.Closed));
+        // «بانتظار اعتمادي» = عدد مميّز للتسليمات الفعليّة (ExistingSubmission بمعرّف) التي معتمِدها الحاليّ = المستخدم المصادَق.
+        // يُحسَب هنا على نفس المجموعة بعد النطاق والفلاتر وQuickFilter وقبل الترقيم — لا من صفوف الصفحة، لا من الدور، ولا من صفّ متوقّع.
+        var waitingMyApproval = rows.Where(r => IsWaitingMyApproval(r, userId)).Select(r => r.SubmissionId).Distinct().Count();
+
+        var byStatus = rows
+            .Where(r => !r.IsExpectedSubmission)
+            .GroupBy(r => r.Status)
+            .Select(g => Enum.TryParse<SubmissionStatus>(g.Key, out var st) ? new StatusCount(st, g.Count()) : null)
+            .Where(x => x is not null)
+            .Select(x => x!)
+            .ToList();
+
+        return new UnifiedSubmissionSummaryDto(
+            PeriodKey: selectedPeriodKey,
+            Total: rows.Count,
+            OverdueCount: existingOverdue + missingOverdue,
+            ExistingOverdueCount: existingOverdue,
+            MissingOverdueCount: missingOverdue,
+            ExpectedMissingCount: expectedMissing,
+            NeedsActionCount: needsAction,
+            ReturnedCount: returned,
+            ClosedCount: closed,
+            WaitingMyApprovalCount: waitingMyApproval,
+            ByStatus: byStatus);
+    }
+
+    private static List<UnifiedSubmissionRowDto> ApplyQuickFilter(
+        IReadOnlyList<UnifiedSubmissionRowDto> rows, SubmissionQuickFilter quick, Guid userId) => quick switch
+    {
+        SubmissionQuickFilter.Overdue => rows.Where(r => r.IsOverdue).ToList(),
+        SubmissionQuickFilter.NeedsAction => rows.Where(IsNeedsAction).ToList(),
+        SubmissionQuickFilter.Returned => rows.Where(r => !r.IsExpectedSubmission && r.Status == nameof(SubmissionStatus.Returned)).ToList(),
+        SubmissionQuickFilter.Closed => rows.Where(r => !r.IsExpectedSubmission && r.Status == nameof(SubmissionStatus.Closed)).ToList(),
+        SubmissionQuickFilter.MineApproval => rows.Where(r => IsWaitingMyApproval(r, userId)).ToList(),
+        _ => rows.ToList()
+    };
+
+    private static (string Label, string Severity) ExistingLabelAndSeverity(SubmissionStatus status, bool isOverdue) => status switch
+    {
+        SubmissionStatus.Draft => isOverdue ? ("مسودّة متأخّرة", "alert") : ("مسودّة", "info"),
+        SubmissionStatus.Returned => isOverdue ? ("مُعاد للتعديل — متأخّر", "alert") : ("مُعاد للتعديل", "warn"),
+        SubmissionStatus.Submitted => ("مُسلَّم — بانتظار الاعتماد", "info"),
+        SubmissionStatus.ApprovedByDirectManager => ("معتمَد — المدير المباشر", "info"),
+        SubmissionStatus.ApprovedByNextLevel => ("معتمَد — المستوى التالي", "info"),
+        SubmissionStatus.Escalated => ("مُصعَّد", "warn"),
+        SubmissionStatus.Closed => ("مُغلَق", "success"),
+        SubmissionStatus.Visible => ("منشور", "success"),
+        _ => (status.ToString(), "none")
+    };
+
+    private async Task<Dictionary<Guid, List<string>>> UserPrimaryRolesAsync(IReadOnlyCollection<Guid> userIds, CancellationToken ct)
+    {
+        if (userIds.Count == 0) return new Dictionary<Guid, List<string>>();
+        var pairs = await (from ur in _db.UserRoles
+                           join r in _db.Roles on ur.RoleId equals r.Id
+                           where userIds.Contains(ur.UserId) && r.Name != null
+                           select new { ur.UserId, r.Name }).ToListAsync(ct);
+        return pairs.GroupBy(p => p.UserId).ToDictionary(g => g.Key, g => g.Select(x => x.Name!).ToList());
     }
 
     private static IQueryable<ReportSubmission> ApplyFilter(IQueryable<ReportSubmission> q, SubmissionFilter filter)
