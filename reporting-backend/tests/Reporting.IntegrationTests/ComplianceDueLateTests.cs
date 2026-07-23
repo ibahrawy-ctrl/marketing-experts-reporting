@@ -30,8 +30,14 @@ public class ComplianceDueLateTests
     public ComplianceDueLateTests(CustomWebApplicationFactory factory) => _factory = factory;
 
     // أسبوع تشغيلي منقضٍ بالكامل (قبل ~3 أسابيع) ⇒ موعد دور الموظّف (الأربعاء) مضى ⇒ غير المُسلِّم = MissingOverdue.
-    private static string PastWeekKey() =>
-        ReportCalendarPolicy.WeekKeyFor(ReportCalendarPolicy.RiyadhToday().AddDays(-21));
+    // مثبَّت في/بعد أرضيّة الإطلاق الأسبوعيّ 2026-07-04 (نافذة انتقاليّة قصيرة قرب الإطلاق) كي يبقى منطبقًا.
+    private static string PastWeekKey()
+    {
+        var start = ReportCalendarPolicy.WeekRange(ReportCalendarPolicy.WeekKeyFor(ReportCalendarPolicy.RiyadhToday().AddDays(-21))).Start;
+        var floorStart = ApplicabilityFloorPolicy.WeeklyReportingLaunchFloor;
+        if (start < floorStart) start = floorStart;
+        return ReportCalendarPolicy.WeekKeyFor(start);
+    }
 
     // (1) سلّم داخل الأسبوع (≤ الأربعاء) ⇒ OnTime (لا متأخر).
     [Fact]

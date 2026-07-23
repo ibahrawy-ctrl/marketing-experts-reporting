@@ -120,7 +120,8 @@ public class UnifiedReportStatusService : IUnifiedReportStatusService
         var floor = ApplicabilityFloorPolicy.Resolve(new ApplicabilityFloorPolicy.FloorInput(
             UserCreatedAt: ReportingCalendarPolicy.RiyadhDate(EnsureUtc(me.CreatedAtUtc)),
             TemplateFirstPublishedAt: templateFirstPublished,
-            AuditedJobRoleAssignedAt: auditedAssigned));
+            AuditedJobRoleAssignedAt: auditedAssigned,
+            OrganizationalLaunchFloor: ApplicabilityFloorPolicy.WeeklyReportingLaunchFloor));
 
         // ===== الجلب الدفعيّ الوحيد (بلا N+1): كلّ تسليمات المستخدم الأسبوعية لهذه المفاتيح، بكلّ الحالات =====
         var subsQuery = _db.ReportSubmissions.AsNoTracking()

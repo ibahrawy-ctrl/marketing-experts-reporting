@@ -558,7 +558,19 @@ public class ReportingService : IReportingService
         if (candidates.Count == 0) return new List<ComplianceEval>();
 
         var today = ReportCalendarPolicy.RiyadhToday();
-        var weeklyCandidates = candidates.Where(c => c.Cadence != PeriodType.Daily).ToList();
+
+        // أرضيّة الانطباق الأسبوعيّة المركزيّة (WEEKLY-REPORTING-APPLICABILITY-FLOOR-R1): دورة أسبوعيّة تبدأ
+        // قبل أرضيّة الإطلاق المعتمَدة على مستوى المنظّمة (4 يوليو 2026 = بداية 2026-W28) غير مطلوبة إطلاقًا،
+        // فلا تُولِّد أيّ وحدة أسبوعيّة متوقَّعة (لا Expected/Missing/MissingOverdue ولا مقام التزام ولا تخفيض نسبة).
+        // مصدر واحد مركزيّ = ApplicabilityFloorPolicy.WeeklyReportingLaunchFloor (نفس ثابت المستهلكات الأخرى).
+        // يُطبَّق على المرشّحين الأسبوعيّين فقط — اليوميّ (مبيعات) غير متأثّر (خارج نطاق قرار الإطلاق الأسبوعيّ).
+        var weekStart = ReportCalendarPolicy.WeekRange(key).Start;
+        var weeklyApplicable = ApplicabilityFloorPolicy.IsCycleApplicable(
+            weekStart, ApplicabilityFloorPolicy.WeeklyReportingLaunchFloor);
+
+        var weeklyCandidates = weeklyApplicable
+            ? candidates.Where(c => c.Cadence != PeriodType.Daily).ToList()
+            : new List<ComplianceCandidate>();
         var dailyCandidates = candidates.Where(c => c.Cadence == PeriodType.Daily).ToList();
         var evals = new List<ComplianceEval>(candidates.Count);
 

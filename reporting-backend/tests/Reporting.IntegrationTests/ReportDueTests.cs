@@ -97,7 +97,14 @@ public class ReportDueTests
     }
 
     private static string CurrentWeekKey() => ReportCalendarPolicy.WeekKeyFor(ReportCalendarPolicy.RiyadhToday());
-    private static string PastWeekKey() => ReportCalendarPolicy.WeekKeyFor(ReportCalendarPolicy.RiyadhToday().AddDays(-21));
+    // «الأسبوع الماضي» مثبَّت في/بعد أرضيّة الإطلاق الأسبوعيّ 2026-07-04 (نافذة انتقاليّة قصيرة قرب الإطلاق).
+    private static string PastWeekKey()
+    {
+        var start = ReportCalendarPolicy.WeekRange(ReportCalendarPolicy.WeekKeyFor(ReportCalendarPolicy.RiyadhToday().AddDays(-21))).Start;
+        var floorStart = ApplicabilityFloorPolicy.WeeklyReportingLaunchFloor;
+        if (start < floorStart) start = floorStart;
+        return ReportCalendarPolicy.WeekKeyFor(start);
+    }
 
     // ===== 1) الأسبوع التشغيلي: السبت → الجمعة (وموعد الموظّف = الأربعاء = بداية الدورة +4) =====
     // (التقويم الرسميّ الموحّد Sat→Fri من ROLE-AWARE-REPORTING-CALENDAR؛ الموعد يُشتقّ من بداية الدورة لا نهايتها.)

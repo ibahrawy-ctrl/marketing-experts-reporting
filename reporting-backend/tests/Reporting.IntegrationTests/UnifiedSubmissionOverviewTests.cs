@@ -30,8 +30,10 @@ public class UnifiedSubmissionOverviewTests
     private readonly CustomWebApplicationFactory _factory;
     public UnifiedSubmissionOverviewTests(CustomWebApplicationFactory factory) => _factory = factory;
 
-    // ساعة ثابتة: الإثنين 2026-07-13 09:00Z (= 12:00 الرياض) — قبل موعد الموظّف (الأربعاء) للدورة الحاليّة.
-    private static readonly DateTimeOffset Fixed = new(2026, 7, 13, 9, 0, 0, TimeSpan.Zero);
+    // ساعة ثابتة: الإثنين 2026-11-23 09:00Z (= 12:00 الرياض) — قبل موعد الموظّف (الأربعاء) للدورة الحاليّة.
+    // مؤخَّرة إلى ما بعد أرضيّة الإطلاق الأسبوعيّ 2026-07-04 كي تقع كلّ الدورات المختبَرة (الحاليّة، −21، −42،
+    // نافذة الاثنَي عشر أسبوعًا، وحتى −140 = دورة 2026-07-04 بالضبط) في/بعد الأرضيّة، فلا تتدخّل أرضيّة الإطلاق.
+    private static readonly DateTimeOffset Fixed = new(2026, 11, 23, 9, 0, 0, TimeSpan.Zero);
     private static DateTime EarlyAnchor => Fixed.UtcDateTime.AddDays(-180);
 
     private static string CurrentKey() =>

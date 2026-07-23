@@ -61,7 +61,8 @@ public class HrPackageATests
         var (emp, empId) = await TestAuth.CreateUserAsync(_factory, Roles.Employee);
         await SetJobRoleAsync(empId, roleId);
 
-        var weekKey = "2026-W25";
+        // أسبوع منطبق (في/بعد أرضيّة الإطلاق الأسبوعيّ 2026-07-04 = 2026-W28) كي يظهر الموظّف في قائمة الالتزام.
+        var weekKey = "2026-W28";
         var draft = await (await emp.PostAsJsonAsync("/api/submissions",
             new CreateSubmissionRequest(templateId, PeriodType.Weekly, weekKey))).ReadAsync<SubmissionDto>();
         await emp.PutAsJsonAsync($"/api/submissions/{draft!.Id}/values",

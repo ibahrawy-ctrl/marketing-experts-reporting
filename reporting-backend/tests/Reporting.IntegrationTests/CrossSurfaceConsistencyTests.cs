@@ -27,7 +27,14 @@ public class CrossSurfaceConsistencyTests
     public CrossSurfaceConsistencyTests(CustomWebApplicationFactory factory) => _factory = factory;
 
     private static string CurrentWeekKey() => ReportCalendarPolicy.WeekKeyFor(ReportCalendarPolicy.RiyadhToday());
-    private static string PastWeekKey() => ReportCalendarPolicy.WeekKeyFor(ReportCalendarPolicy.RiyadhToday().AddDays(-21));
+    // «الأسبوع الماضي» مثبَّت في/بعد أرضيّة الإطلاق الأسبوعيّ 2026-07-04 (نافذة انتقاليّة قصيرة قرب الإطلاق).
+    private static string PastWeekKey()
+    {
+        var start = ReportCalendarPolicy.WeekRange(ReportCalendarPolicy.WeekKeyFor(ReportCalendarPolicy.RiyadhToday().AddDays(-21))).Start;
+        var floorStart = ApplicabilityFloorPolicy.WeeklyReportingLaunchFloor;
+        if (start < floorStart) start = floorStart;
+        return ReportCalendarPolicy.WeekKeyFor(start);
+    }
 
     /// <summary>يجعل المستخدم مطالَبًا بتقرير أسبوعيّ عبر مسمّى + قالب أساسي منشور، بأرضيّة قبل الأسابيع المختبَرة.</summary>
     private async Task<Guid> SetupReportingRoleAsync(Guid userId)

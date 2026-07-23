@@ -159,7 +159,8 @@ public sealed class ExpectedSubmissionStatusResolver : IExpectedSubmissionStatus
             var floor = ApplicabilityFloorPolicy.Resolve(new ApplicabilityFloorPolicy.FloorInput(
                 UserCreatedAt: userCreated,
                 TemplateFirstPublishedAt: templateFirstPublished,
-                AuditedJobRoleAssignedAt: auditedAssigned));
+                AuditedJobRoleAssignedAt: auditedAssigned,
+                OrganizationalLaunchFloor: ApplicabilityFloorPolicy.WeeklyReportingLaunchFloor));
 
             var deptName = u.DepartmentId is Guid did ? deptNames.GetValueOrDefault(did) : null;
             var teamName = u.TeamId is Guid tid ? teamNames.GetValueOrDefault(tid) : null;

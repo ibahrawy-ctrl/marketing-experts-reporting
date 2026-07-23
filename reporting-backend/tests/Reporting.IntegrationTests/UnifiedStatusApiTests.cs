@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Reporting.Application.Calendar;
+using Reporting.Application.Common;
 using Reporting.Domain.Entities.Org;
 using Reporting.Domain.Entities.Templates;
 using Reporting.Domain.Enums;
@@ -105,8 +106,10 @@ public class UnifiedStatusApiTests
         var data = await (await employee.GetAsync("/api/reporting-calendar/my-cycles?past=8&future=1"))
             .ReadAsync<MyCyclesDto>();
 
-        // دورة ماضية واضحة (تجاوزت موعدها بأسابيع) بلا تسليم ⇒ متأخّرة غير مُسلَّمة.
-        var past = data!.Cycles.First(c => c.IsPast && c.Offset <= -2);
+        // دورة ماضية واضحة (تجاوزت موعدها) بلا تسليم ⇒ متأخّرة غير مُسلَّمة.
+        // تُختار أقدم دورة ماضية منطبقة (بدايتها في/بعد أرضيّة الإطلاق الأسبوعيّ 2026-07-04)؛ فالدورات
+        // قبل الأرضيّة غير منطبقة (لا متأخّرة) ولا يصحّ التأكيد عليها بحالة OverdueNotSubmitted.
+        var past = data!.Cycles.First(c => c.IsPast && c.CycleStart >= ApplicabilityFloorPolicy.WeeklyReportingLaunchFloor);
         Assert.NotNull(past.Unified);
         Assert.Equal(UnifiedCycleStatus.OverdueNotSubmitted, past.Unified!.UnifiedStatus);
         Assert.True(past.Unified.IsLate);

@@ -13,10 +13,19 @@ namespace Reporting.Application.Common;
 /// </summary>
 public static class ApplicabilityFloorPolicy
 {
+    /// <summary>
+    /// أرضيّة إطلاق التقارير الأسبوعيّة على مستوى المنظّمة (قرار أعمال معتمَد):
+    /// أوّل دورة أسبوعيّة منطبقة = الدورة المرتبطة بـ 4 يوليو 2026 (السبت = بداية 2026-W28).
+    /// أيّ دورة أسبوعيّة تبدأ قبل هذا التاريخ غير مطلوبة إطلاقًا. مصدر واحد مركزيّ يُحقَن
+    /// في المستهلكات الأسبوعيّة فقط (لا يمسّ اليوميّ/الشهريّ).
+    /// </summary>
+    public static readonly DateOnly WeeklyReportingLaunchFloor = new(2026, 7, 4);
+
     public readonly record struct FloorInput(
         DateOnly UserCreatedAt,
         DateOnly? TemplateFirstPublishedAt,
-        DateOnly? AuditedJobRoleAssignedAt);
+        DateOnly? AuditedJobRoleAssignedAt,
+        DateOnly? OrganizationalLaunchFloor = null);
 
     public readonly record struct FloorResult(
         DateOnly Floor,
@@ -32,6 +41,15 @@ public static class ApplicabilityFloorPolicy
             floor = pub;
         if (input.AuditedJobRoleAssignedAt is DateOnly assigned && assigned > floor)
             floor = assigned;
+
+        // أرضيّة إطلاق التقارير الأسبوعيّة على مستوى المنظّمة (قرار أعمال معتمَد) تُرفَع كمكوّن رابع.
+        // حين تحكم (تساوي الأرضيّة أو تتجاوزها) ⇒ مصدر صريح OrganizationalLaunchFloor بثقة عالية،
+        // لأنّ التاريخ قرار منظّميّ معتمَد لا اشتقاق تقديريّ. تُقدَّم في التفسير على بقيّة المكوّنات.
+        if (input.OrganizationalLaunchFloor is DateOnly launch && launch >= floor)
+        {
+            floor = launch;
+            return new FloorResult(floor, ApplicabilitySource.OrganizationalLaunchFloor, ApplicabilityConfidence.High);
+        }
 
         // المصدر ودرجة الثقة:
         // - إسناد موثَّق متوفّر ⇒ ثقة عالية (High)، ومصدره AuditedJobRoleAssignment إن كان هو الحاكم.
@@ -112,7 +130,10 @@ public enum ApplicabilitySource
     TemplatePublicationFloor = 2,
 
     /// <summary>تساوى أكثر من مكوّن عند الأرضيّة (أرضيّة محافِظة مركّبة).</summary>
-    CombinedConservativeFloor = 3
+    CombinedConservativeFloor = 3,
+
+    /// <summary>حَكَمت أرضيّة إطلاق التقارير الأسبوعيّة المعتمَدة على مستوى المنظّمة (4 يوليو 2026).</summary>
+    OrganizationalLaunchFloor = 4
 }
 
 /// <summary>درجة الثقة في أرضيّة الانطباق.</summary>

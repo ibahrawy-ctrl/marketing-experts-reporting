@@ -24,8 +24,10 @@ public class ExpectedSubmissionStatusResolverTests
     private readonly CustomWebApplicationFactory _factory;
     public ExpectedSubmissionStatusResolverTests(CustomWebApplicationFactory factory) => _factory = factory;
 
-    // ساعة ثابتة: الإثنين 2026-07-13 09:00Z (= 12:00 الرياض) — قبل موعد الموظّف (الأربعاء) للدورة الحاليّة.
-    private static readonly DateTimeOffset Fixed = new(2026, 7, 13, 9, 0, 0, TimeSpan.Zero);
+    // ساعة ثابتة: الإثنين 2026-11-23 09:00Z (= 12:00 الرياض) — قبل موعد الموظّف (الأربعاء) للدورة الحاليّة.
+    // مؤخَّرة إلى ما بعد أرضيّة الإطلاق الأسبوعيّ 2026-07-04 كي تكون كلّ الدورات المختبَرة (الحاليّة و−21)
+    // في/بعد الأرضيّة، فيبقى سلوك الأرضيّة الفرديّة (المستخدم/القالب) هو الحاكم دون أن تتدخّل أرضيّة الإطلاق.
+    private static readonly DateTimeOffset Fixed = new(2026, 11, 23, 9, 0, 0, TimeSpan.Zero);
 
     private sealed class FixedClock : ISystemClock
     {

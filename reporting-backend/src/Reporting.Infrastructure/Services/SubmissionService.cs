@@ -864,7 +864,13 @@ public class SubmissionService : ISubmissionService
                 var dueAt = new DateTimeOffset(dueDate.Year, dueDate.Month, dueDate.Day, 23, 59, 59, ReportingCalendarPolicy.RiyadhOffset);
                 // تعريف التأخّر الصارم للصفوف الفعليّة: مسودّة/مُعاد فقط، وبعد تجاوز حدّ الاستحقاق (now > dueAt).
                 var overdueEligible = r.Status is SubmissionStatus.Draft or SubmissionStatus.Returned;
-                isOverdue = overdueEligible && now > dueAt;
+                // أرضيّة الانطباق الأسبوعيّة المركزيّة (WEEKLY-REPORTING-APPLICABILITY-FLOOR-R1): صفّ فعليّ لدورة
+                // تبدأ قبل أرضيّة الإطلاق المعتمَدة (4 يوليو 2026 = بداية 2026-W28) لا يُصنَّف متأخّرًا إطلاقًا —
+                // يبقى مرئيًّا بحالته الفعليّة (مسودّة/مُعاد) دون عقوبة تأخّر. نفس ثابت أرضيّة بقيّة المستهلكات.
+                var cycleApplicable = ApplicabilityFloorPolicy.IsCycleApplicable(
+                    ReportingCalendarPolicy.CycleRange(r.PeriodKey).Start,
+                    ApplicabilityFloorPolicy.WeeklyReportingLaunchFloor);
+                isOverdue = cycleApplicable && overdueEligible && now > dueAt;
                 if (isOverdue) delayDays = Math.Max(0, riyadhToday.DayNumber - dueDate.DayNumber);
             }
             else if (ReportingCalendarPolicy.IsValidDayKey(r.PeriodKey))

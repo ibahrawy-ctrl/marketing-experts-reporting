@@ -114,7 +114,15 @@ public class UnifiedReportStatusTests
     }
 
     private static string CurrentCycleKey() => ReportingCalendarPolicy.CycleKeyFor(ReportingCalendarPolicy.RiyadhToday());
-    private static string PastCycleKey() => ReportingCalendarPolicy.CycleKeyFor(ReportingCalendarPolicy.RiyadhToday().AddDays(-21));
+    // «الأسبوع الماضي» مثبَّت في/بعد أرضيّة الإطلاق الأسبوعيّ 2026-07-04: لو وقعت الدورة (اليوم−21) قبل الأرضيّة
+    // (نافذة انتقاليّة قصيرة قرب الإطلاق) نُثبِّتها على دورة الأرضيّة نفسها (2026-W28) كي تبقى منطبقة ومتأخّرة.
+    private static string PastCycleKey()
+    {
+        var start = ReportingCalendarPolicy.CycleStart(ReportingCalendarPolicy.RiyadhToday().AddDays(-21));
+        var floorStart = ApplicabilityFloorPolicy.WeeklyReportingLaunchFloor;
+        if (start < floorStart) start = floorStart;
+        return ReportingCalendarPolicy.CycleKeyFor(start);
+    }
 
     // ===== 1) غير مصادَق ⇒ auth.unauthenticated =====
     [Fact]
