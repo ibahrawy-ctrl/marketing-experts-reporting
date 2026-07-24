@@ -257,9 +257,11 @@ public class WeeklyApplicabilityFloorTests
         Assert.DoesNotContain(report.Rows, r => r.UserId == emp);
     }
 
-    // (16) المندوب اليوميّ (SALES_B2C) غير متأثّر بأرضيّة الأسبوعيّ: أسبوع ما قبل الأرضيّة ⇒ متوقَّع 5، مُسلَّم 5.
+    // (16) DAILY-REPORTING-APPLICABILITY-R1: المندوب اليوميّ (SALES_B2C) خاضع لأرضيّة الإطلاق المنظّميّة
+    // (4 يوليو 2026) مثل الأسبوعيّ. أسبوع كامل قبل الأرضيّة ⇒ لا يوم يوميّ متوقَّع (Expected=0، Submitted=0،
+    // لا عقوبة تأخّر/غياب). التسليمات اليوميّة التاريخيّة الخمسة تبقى مخزَّنة ومقروءة في القاعدة (لا حذف/إعادة كتابة).
     [Fact]
-    public async Task Compliance_PreFloorWeek_DailySales_Unaffected_ByWeeklyFloor()
+    public async Task Compliance_PreFloorWeek_DailySales_SubjectToOrganizationalFloor_NoExpected()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var (roleId, versionId) = await EnsureDailyRoleAsync(admin, "SALES_B2C");
@@ -272,8 +274,18 @@ public class WeeklyApplicabilityFloorTests
                 SubmissionStatus.Submitted, AtRiyadh(d));
 
         var summary = await GetSummaryAsync(admin, week, dept);
-        Assert.Equal(5, summary.Expected);   // اليوميّ خارج نطاق الأرضيّة الأسبوعيّة
-        Assert.Equal(5, summary.Submitted);
+        Assert.Equal(0, summary.Expected);   // كلّ أيّام الأسبوع قبل الأرضيّة المنظّميّة ⇒ لا توقّع يوميّ (لا عقوبة قبل 4 يوليو).
+        Assert.Equal(0, summary.Submitted);  // لا وحدات التزام يوميّة قبل الأرضيّة (تُطابق سلوك ما قبل الأرضيّة الأسبوعيّ).
+        Assert.Equal(0, summary.MissingOverdue);
+        Assert.Equal(0, summary.Late);
+
+        // مع ذلك التسليمات اليوميّة الخمسة التاريخيّة باقية في القاعدة دون مساس (المتطلّب 11: حفظ ما قبل الأرضيّة).
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var storedCount = await db.ReportSubmissions.AsNoTracking()
+            .CountAsync(s => s.SubmitterId == emp && s.PeriodType == PeriodType.Daily
+                             && s.Status == SubmissionStatus.Submitted);
+        Assert.Equal(5, storedCount);
     }
 
     // (17) معادلات الالتزام صحيحة عند حدّ الأرضيّة (2026-W28): Expected-Submitted=Missing، LateSubmitted+MissingOverdue=Late.

@@ -14,12 +14,19 @@ namespace Reporting.Application.Common;
 public static class ApplicabilityFloorPolicy
 {
     /// <summary>
-    /// أرضيّة إطلاق التقارير الأسبوعيّة على مستوى المنظّمة (قرار أعمال معتمَد):
-    /// أوّل دورة أسبوعيّة منطبقة = الدورة المرتبطة بـ 4 يوليو 2026 (السبت = بداية 2026-W28).
-    /// أيّ دورة أسبوعيّة تبدأ قبل هذا التاريخ غير مطلوبة إطلاقًا. مصدر واحد مركزيّ يُحقَن
-    /// في المستهلكات الأسبوعيّة فقط (لا يمسّ اليوميّ/الشهريّ).
+    /// أرضيّة إطلاق التقارير على مستوى المنظّمة (قرار أعمال معتمَد، cadence-agnostic):
+    /// 4 يوليو 2026. لا يُطالَب أيّ موظّف بأيّ تقرير (أسبوعيّ **أو يوميّ**) قبل هذا التاريخ.
+    /// **هذا هو الحرف التاريخيّ الوحيد** في النظام لأرضيّة الإطلاق المنظّميّة — كلّ المستهلكات
+    /// (الأسبوعيّ عبر <see cref="WeeklyReportingLaunchFloor"/>، واليوميّ مباشرةً) تشير إليه؛
+    /// لا يُدخَل حرف تاريخ ثانٍ في أيّ مكان.
     /// </summary>
-    public static readonly DateOnly WeeklyReportingLaunchFloor = new(2026, 7, 4);
+    public static readonly DateOnly OrganizationalReportingLaunchFloor = new(2026, 7, 4);
+
+    /// <summary>
+    /// اسم توافقيّ خلفيّ للمستهلكات الأسبوعيّة القائمة = نفس أرضيّة الإطلاق المنظّميّة
+    /// (<see cref="OrganizationalReportingLaunchFloor"/>). لا حرف تاريخ مستقلّ — مجرّد إشارة.
+    /// </summary>
+    public static readonly DateOnly WeeklyReportingLaunchFloor = OrganizationalReportingLaunchFloor;
 
     public readonly record struct FloorInput(
         DateOnly UserCreatedAt,
@@ -103,6 +110,14 @@ public static class ApplicabilityFloorPolicy
     /// </summary>
     public static bool IsCycleApplicable(DateOnly cycleStart, DateOnly floor) =>
         cycleStart >= floor;
+
+    /// <summary>
+    /// هل يوم تقرير يوميّ (PeriodKey = yyyy-MM-dd) منطبق على أرضيّة الإطلاق؟
+    /// منطبق ⟺ اليوم نفسه في/بعد الأرضيّة. أيّ يوم قبل الأرضيّة غير مطلوب إطلاقًا
+    /// (لا توقّع/مفقود/متأخّر/عقوبة التزام) — يحفظ التسليمات اليوميّة قبل الأرضيّة دون معاقبتها.
+    /// </summary>
+    public static bool IsDailyDateApplicable(DateOnly day, DateOnly floor) =>
+        day >= floor;
 
     /// <summary>
     /// أوّل دورة تشغيليّة مؤهَّلة (CycleKey) على أرضيّة الانطباق:

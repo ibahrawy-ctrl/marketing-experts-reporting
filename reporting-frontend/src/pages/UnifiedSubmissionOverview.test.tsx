@@ -406,3 +406,122 @@ describe('العرض الموحّد — تكافؤ الفترة والملخّص
     );
   });
 });
+
+// ===== DAILY-REPORTING-APPLICABILITY-R1 §6 — إثبات DOM للعرض الموحّد اليوميّ =====
+// تُثبِت أنّ العرض الموحّد يعرض الصفّ اليوميّ الفعليّ (بمفتاح اليوم الخام محفوظًا، بما فيه
+// الصيغ التاريخية القديمة مثل 6-7-2026)، والصفّ اليوميّ المتوقّع غير المُقدَّم («لا يوجد تسليم بعد»
+// بلا أزرار)، والتأخّر اليوميّ، وأنّ فلتر Overdue يدمج اليوميّ والأسبوعيّ في قائمة واحدة.
+const dailyRows = [
+  {
+    rowKind: 'ExistingSubmission', submissionId: 'd-1', reportTemplateId: 'dt1',
+    templateTitle: 'تقرير المبيعات اليوميّ', submitterId: 'u-reem', submitterName: 'ريم',
+    teamId: null, teamName: null, departmentId: null, departmentName: null,
+    periodType: 'Daily', periodKey: '2026-07-06', status: 'Closed', statusLabel: 'مُغلق',
+    severity: 'None', submittedAtUtc: '2026-07-06T09:00:00Z', currentApproverId: null, dueAt: '2026-07-06',
+    hasSubmission: true, isExpectedSubmission: false, isOverdue: false, delayDays: 0,
+  },
+  {
+    // مفتاح قديم غير قياسيّ محفوظ خامًّا في العرض (يومي 6-7-2026) — لا تطبيع مرئيّ في الواجهة.
+    rowKind: 'ExistingSubmission', submissionId: 'd-2', reportTemplateId: 'dt1',
+    templateTitle: 'تقرير المبيعات اليوميّ', submitterId: 'u-salem', submitterName: 'سالم',
+    teamId: null, teamName: null, departmentId: null, departmentName: null,
+    periodType: 'Daily', periodKey: '6-7-2026', status: 'Submitted', statusLabel: 'مُرسَل',
+    severity: 'None', submittedAtUtc: '2026-07-06T09:00:00Z', currentApproverId: null, dueAt: '2026-07-06',
+    hasSubmission: true, isExpectedSubmission: false, isOverdue: false, delayDays: 0,
+  },
+  {
+    rowKind: 'ExistingSubmission', submissionId: 'd-3', reportTemplateId: 'dt1',
+    templateTitle: 'تقرير المبيعات اليوميّ', submitterId: 'u-nasser', submitterName: 'ناصر',
+    teamId: null, teamName: null, departmentId: null, departmentName: null,
+    periodType: 'Daily', periodKey: '2026-07-20', status: 'Draft', statusLabel: 'مسودّة متأخّرة',
+    severity: 'High', submittedAtUtc: null, currentApproverId: null, dueAt: '2026-07-20',
+    hasSubmission: true, isExpectedSubmission: false, isOverdue: true, delayDays: 2,
+  },
+  {
+    rowKind: 'ExpectedMissingSubmission', submissionId: null, reportTemplateId: 'dt1',
+    templateTitle: 'تقرير المبيعات اليوميّ', submitterId: 'u-hind', submitterName: 'هند',
+    teamId: null, teamName: null, departmentId: null, departmentName: null,
+    periodType: 'Daily', periodKey: '2026-07-19', status: 'NotSubmitted', statusLabel: 'متأخّر — لم يُقدَّم',
+    severity: 'High', submittedAtUtc: null, currentApproverId: null, dueAt: '2026-07-19',
+    hasSubmission: false, isExpectedSubmission: true, isOverdue: true, delayDays: 1,
+  },
+];
+
+// مجموعة مختلطة: صفّ يوميّ متأخّر + صفّ أسبوعيّ متأخّر — لإثبات أنّ Overdue يدمج الإيقاعين.
+const mixedOverdueRows = [dailyRows[2], dailyRows[3], rows[0], rows[3]];
+
+function mockApiWithRows(items: unknown[], totalCount = items.length) {
+  lastOverviewParams = undefined;
+  vi.spyOn(api, 'get').mockImplementation((url: string, config?: { params?: Record<string, unknown> }) => {
+    if (url === '/auth/me') return Promise.resolve({ data: me } as never);
+    if (url === '/submissions/overview') {
+      lastOverviewParams = config?.params;
+      const p = (config?.params?.page as number) ?? 1;
+      return Promise.resolve({
+        data: { items, summary, page: p, pageSize: 200, totalCount },
+      } as never);
+    }
+    return Promise.resolve({ data: [] } as never);
+  });
+}
+
+describe('العرض الموحّد اليوميّ — إثبات DOM (DAILY-REPORTING-APPLICABILITY-R1 §6)', () => {
+  it('DUI1: الصفّ اليوميّ الفعليّ يعرض الاسم والحالة وخليّة «يومي <مفتاح اليوم>»', async () => {
+    mockApiWithRows(dailyRows);
+    renderPage();
+    const reem = (await screen.findByText('ريم')).closest('tr')!;
+    expect(within(reem).getByText('مُغلق')).toBeInTheDocument();
+    expect(within(reem).getByText('يومي 2026-07-06')).toBeInTheDocument();
+  });
+
+  it('DUI2: المفتاح القديم غير القياسيّ محفوظ خامًّا في العرض (يومي 6-7-2026)', async () => {
+    mockApiWithRows(dailyRows);
+    renderPage();
+    const salem = (await screen.findByText('سالم')).closest('tr')!;
+    // العرض لا يطبّع المفتاح — يعرضه كما خُزِّن (التطبيع داخليّ خادميّ فقط).
+    expect(within(salem).getByText('يومي 6-7-2026')).toBeInTheDocument();
+  });
+
+  it('DUI3: الصفّ اليوميّ الفعليّ يعرض زرّ «عرض التقرير»', async () => {
+    mockApiWithRows(dailyRows);
+    renderPage();
+    const reem = (await screen.findByText('ريم')).closest('tr')!;
+    expect(within(reem).getByText('عرض التقرير')).toBeInTheDocument();
+  });
+
+  it('DUI4: الصفّ اليوميّ الفعليّ المتأخّر يعرض حالة التأخّر', async () => {
+    mockApiWithRows(dailyRows);
+    renderPage();
+    const nasser = (await screen.findByText('ناصر')).closest('tr')!;
+    expect(within(nasser).getByText('مسودّة متأخّرة')).toBeInTheDocument();
+    expect(within(nasser).getByText('يومي 2026-07-20')).toBeInTheDocument();
+  });
+
+  it('DUI5: الصفّ اليوميّ المتوقّع غير المُقدَّم — «لا يوجد تسليم بعد» بلا أيّ زرّ', async () => {
+    mockApiWithRows(dailyRows);
+    renderPage();
+    const hind = (await screen.findByText('هند')).closest('tr')!;
+    expect(within(hind).getByText('لا يوجد تسليم بعد')).toBeInTheDocument();
+    expect(within(hind).queryByText('عرض التقرير')).not.toBeInTheDocument();
+    expect(within(hind).queryAllByRole('button')).toHaveLength(0);
+    expect(within(hind).getByText('يومي 2026-07-19')).toBeInTheDocument();
+  });
+
+  it('DUI6: فلتر Overdue يدمج اليوميّ والأسبوعيّ في القائمة نفسها', async () => {
+    mockApiWithRows(mixedOverdueRows);
+    renderPage();
+    // صفوف يوميّة (ناصر متأخّر فعليّ + هند متوقّع متأخّر) وأسبوعية (أحمد + ليلى) معًا.
+    expect(await screen.findByText('ناصر')).toBeInTheDocument();
+    expect(screen.getByText('هند')).toBeInTheDocument();
+    expect(screen.getByText('أحمد')).toBeInTheDocument();
+    expect(screen.getByText('ليلى')).toBeInTheDocument();
+    // إيقاعان مختلفان ظاهران في القائمة الموحّدة نفسها.
+    expect(screen.getByText('يومي 2026-07-20')).toBeInTheDocument();
+    // صفّان أسبوعيّان بنفس المفتاح W29 (أحمد + ليلى) ⇒ خليّتان بالنصّ نفسه.
+    expect(screen.getAllByText('أسبوعي 2026-W29').length).toBeGreaterThanOrEqual(1);
+    // النقر على شريحة «المتأخرة» يدفع quickFilter=Overdue إلى الخادم (نفس الطلب الموحّد للإيقاعين).
+    const chips = screen.getAllByText('المتأخرة');
+    await userEvent.click(chips[chips.length - 1]);
+    await waitFor(() => expect(lastOverviewParams?.quickFilter).toBe('Overdue'));
+  });
+});

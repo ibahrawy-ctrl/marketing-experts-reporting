@@ -228,7 +228,8 @@ public static class ReportingCalendarPolicy
 
     // ===== الوضع اليوميّ (Daily) — تقارير المبيعات =====
     // مفتاح اليوم YYYY-MM-DD يُولَّد **خادميًّا** بتوقيت الرياض (لا حساب محليّ في الواجهة، ولا إدخال يدويّ).
-    // أيام العمل اليومية: السبت→الخميس. الجمعة **وحدها** عطلة أسبوعية (غير متاحة للتقارير اليومية). السبت يوم عمل يوميّ كامل.
+    // أيام العمل اليومية المتوقَّعة: **الأحد→الخميس**. الجمعة **والسبت** عطلة أسبوعية لا تدخل التوقّع/الالتزام.
+    // التقرير الفعليّ في يوم غير منطبق (جمعة/سبت) يبقى محفوظًا ومرئيًّا تاريخيًّا لكن لا يدخل المتوقّع/البسط/المقام.
     // هذه الدوال خالصة (Pure) وتشترك مع الأسبوعيّ في مصدر الحقيقة نفسه (RiyadhToday/التسميات العربية).
 
     /// <summary>مفتاح اليوم بصيغة YYYY-MM-DD (خادميّ، بلا انزياح منطقة زمنية).</summary>
@@ -248,9 +249,74 @@ public static class ReportingCalendarPolicy
     public static DateOnly ParseDayKey(string key) =>
         DateOnly.ParseExact(key.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture);
 
-    /// <summary>هل اليوم عطلة أسبوعية (الجمعة وحدها) بحسب سياسة التقارير اليومية؟ السبت يوم عمل.</summary>
+    // الصيغ المقبولة لتطبيع مفتاح يوم إلى تاريخ منطقيّ واحد (CanonicalDay).
+    // ISO الصارم أوّلًا (yyyy-MM-dd)، ثم صيغ ISO غير مبطّنة (yyyy-M-d)، ثم صيغ قديمة يوم-شهر-سنة (d-M-yyyy).
+    // الترتيب مهمّ: القيم غير الصالحة (يوم>31 أو سنة موضعها خطأ) ترفض التفسير الخاطئ فيسقط لأوّل صيغة صحيحة.
+    // موضع السنة رباعيّ الأرقام يفصل بنيويًّا بين عائلتَي yyyy-first و d-first فلا تداخل.
+    private static readonly string[] CanonicalDayFormats =
+    {
+        "yyyy-MM-dd", "yyyy-M-d", "yyyy-MM-d", "yyyy-M-dd",
+        "d-M-yyyy", "dd-MM-yyyy", "d-MM-yyyy", "dd-M-yyyy",
+    };
+
+    /// <summary>
+    /// يُطبِّع مفتاح يوم — بما فيه الصيغ التاريخية غير القياسية (مثل <c>6-7-2026</c> أو <c>2026-07-9</c>) —
+    /// إلى تاريخ منطقيّ واحد (CanonicalDay). لا يعدّل التخزين ولا يُعيد كتابة المفتاح الخام؛ يُستعمَل داخليًّا
+    /// لاشتقاق موعد الاستحقاق ومنع الازدواج بين التسليم الفعليّ والصفّ المتوقّع المُولَّد (DAILY-…-R1 §2/§3).
+    /// يُعيد <c>false</c> للمفاتيح غير القابلة للتفسير (تبقى مرئيّة بحالتها الخام دون توليد «متوقّع مفقود»).
+    /// </summary>
+    public static bool TryCanonicalDay(string? key, out DateOnly day)
+    {
+        day = default;
+        if (string.IsNullOrWhiteSpace(key)) return false;
+        return DateOnly.TryParseExact(
+            key.Trim(), CanonicalDayFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out day);
+    }
+
+    /// <summary>
+    /// **مصدر الحقيقة الوحيد** لعقد أيام العمل اليومية المتوقَّعة (DAILY-BUSINESS-DAY-COMPLIANCE-R1 §4):
+    /// يوم منطبق للتوقّع اليوميّ ⟺ **الأحد→الخميس** (أيّ ليس جمعة ولا سبت).
+    /// كل السطوح (التقرير/الاستحقاق/التقويم/الدورة/التذكير/التسليم/التجميع) يجب أن تفوّض إلى هذه الدالّة
+    /// بدل تكرار استبعاد الجمعة/السبت لكل خدمة على حدة.
+    /// </summary>
+    public static bool IsDailyExpectedBusinessDay(DateOnly date) =>
+        date.DayOfWeek is not (DayOfWeek.Friday or DayOfWeek.Saturday);
+
+    /// <summary>
+    /// هل اليوم عطلة أسبوعية (الجمعة **أو السبت**) بحسب سياسة **التوقّع/الالتزام** اليومي؟
+    /// معكوس <see cref="IsDailyExpectedBusinessDay"/> تمامًا — لا يدخل التوقّع/الالتزام.
+    /// **لا تُستخدَم في بوابة إنشاء التقرير** (تلك تخصّها <see cref="IsDailySubmissionBlockedDay"/>).
+    /// </summary>
     public static bool IsDailyHoliday(DateOnly date) =>
+        !IsDailyExpectedBusinessDay(date);
+
+    /// <summary>
+    /// **بوابة إنشاء التقرير اليومي** (DAILY-BUSINESS-DAY-COMPLIANCE-R1 — قرار إنشاء يوم السبت):
+    /// سياسة **مستقلّة** عن التوقّع/الالتزام تحافظ على سلوك الإنشاء السابق حرفيًّا:
+    /// **الجمعة فقط** ممنوعة من إنشاء التقرير اليومي، و**السبت مسموح** (تقرير فعليّ طوعيّ).
+    /// تقرير السبت الطوعيّ يظهر في التقارير المقدَّمة لكنه لا يدخل Expected/Compliance ولا يولّد Missing/Reminder.
+    /// **لا تربط هذه الدالّة بـ <see cref="IsDailyHoliday"/> (الجمعة+السبت)** حتى لا يُحظَر إنشاء السبت.
+    /// </summary>
+    public static bool IsDailySubmissionBlockedDay(DateOnly date) =>
         date.DayOfWeek is DayOfWeek.Friday;
+
+    /// <summary>
+    /// **الأيام اليومية المتوقَّعة** لدورة (Sat→Fri) حتى «اليوم» (شامل الحدّ الأدنى المؤسّسي):
+    /// نافذة الدورة = <see cref="CycleRange"/> (لا WeekRange الخميس→الأربعاء)، مقيَّدة بـ
+    /// <see cref="ApplicabilityFloorPolicy.IsDailyDateApplicable"/> (أرضية الإطلاق) و
+    /// <see cref="IsDailyExpectedBusinessDay"/> (الأحد→الخميس). مصدر مشترك لكل سطوح «المتوقّع».
+    /// </summary>
+    public static List<DateOnly> DailyExpectedDates(string cycleKey, DateOnly today)
+    {
+        var (start, end) = CycleRange(cycleKey);
+        var cap = today < end ? today : end;
+        var floor = ApplicabilityFloorPolicy.OrganizationalReportingLaunchFloor;
+        var dates = new List<DateOnly>();
+        for (var d = start; d <= cap; d = d.AddDays(1))
+            if (ApplicabilityFloorPolicy.IsDailyDateApplicable(d, floor) && IsDailyExpectedBusinessDay(d))
+                dates.Add(d);
+        return dates;
+    }
 
     /// <summary>«الثلاثاء 14 يوليو 2026».</summary>
     public static string ArFullDateLabel(DateOnly date) =>

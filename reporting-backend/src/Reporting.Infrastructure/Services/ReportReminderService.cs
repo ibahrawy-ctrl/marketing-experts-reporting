@@ -418,18 +418,24 @@ public class ReportReminderService : IReportReminderService
             if (dates.Count > 0)
             {
                 var dailyIds = daily.Select(c => c.UserId).ToList();
-                var dateKeys = dates.Select(d => d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)).ToList();
+                var (winStart, winEnd) = ReportingCalendarPolicy.CycleRange(key); // نافذة الدورة اليوميّة Sat→Fri
+                // DAILY-…-R1 §3: تحميل عريض بلا فلترة نصّية قياسيّة (كي لا تسقط المفاتيح القديمة)
+                // ثم تطبيع كلّ مفتاح إلى اليوم المنطقيّ داخل نافذة الأسبوع، والمطابقة على (المستخدم، اليوم المنطقيّ).
                 var rows = await _db.ReportSubmissions.AsNoTracking()
-                    .Where(s => s.PeriodType == PeriodType.Daily && dateKeys.Contains(s.PeriodKey)
+                    .Where(s => s.PeriodType == PeriodType.Daily && s.PeriodKey != null
                                 && SubmittedStatuses.Contains(s.Status) && dailyIds.Contains(s.SubmitterId))
                     .Select(s => new { s.SubmitterId, s.PeriodKey })
                     .ToListAsync(ct);
-                var byUserDay = rows.Select(r => (r.SubmitterId, r.PeriodKey)).ToHashSet();
+                var byUserDay = new HashSet<(Guid, string)>();
+                foreach (var r in rows)
+                    if (ReportingCalendarPolicy.TryCanonicalDay(r.PeriodKey, out var cd)
+                        && cd >= winStart && cd <= winEnd)
+                        byUserDay.Add((r.SubmitterId, ReportingCalendarPolicy.DayKey(cd)));
 
                 foreach (var c in daily)
                     foreach (var day in dates)
                     {
-                        var dayKey = day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+                        var dayKey = ReportingCalendarPolicy.DayKey(day);
                         if (byUserDay.Contains((c.UserId, dayKey)))
                             evals.Add(new DueEval(c, true, day, false, null));
                         else
@@ -444,20 +450,26 @@ public class ReportReminderService : IReportReminderService
     // ===== المراجعات العالقة على مستوى الشركة (بلا قيد نطاق) =====
     private async Task<List<PendingReview>> ResolvePendingReviewsAsync(string key, CancellationToken ct)
     {
-        var (start, end) = ReportCalendarPolicy.WeekRange(key);
-        var dayKeys = new List<string>();
-        for (var d = start; d <= end; d = d.AddDays(1))
-            dayKeys.Add(d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+        // نافذة تصفية اليوميّة العالقة = نافذة الدورة Sat→Fri (لا WeekRange الخميس→الأربعاء).
+        var (start, end) = ReportingCalendarPolicy.CycleRange(key);
 
+        // DAILY-…-R1 §3: لا نفلتر اليوميّة العالقة بقائمة مفاتيح قياسيّة عند قاعدة البيانات (كي لا تسقط
+        // المفاتيح القديمة)؛ نُحمِّل كلّ اليوميّة العالقة ثم نُطبِّق نافذة الأسبوع المنطقيّة داخليًّا بعد التطبيع.
         var raw = await _db.ReportSubmissions.AsNoTracking()
             .Where(s => PendingApprovalStatuses.Contains(s.Status) && s.CurrentApproverId != null
                         && ((s.PeriodType == PeriodType.Weekly && s.PeriodKey == key)
-                            || (s.PeriodType == PeriodType.Daily && dayKeys.Contains(s.PeriodKey))))
+                            || s.PeriodType == PeriodType.Daily))
             .Select(s => new
             {
                 s.Id, s.PeriodType, s.PeriodKey, s.TeamId, s.DepartmentId,
                 ApproverId = s.CurrentApproverId!.Value
             }).ToListAsync(ct);
+        if (raw.Count == 0) return new List<PendingReview>();
+
+        // استبعاد اليوميّة خارج نافذة الأسبوع المنطقيّة (بعد التطبيع)؛ غير القابلة للتفسير تُستبعَد.
+        raw = raw.Where(s => s.PeriodType != PeriodType.Daily
+                             || (ReportingCalendarPolicy.TryCanonicalDay(s.PeriodKey, out var cd)
+                                 && cd >= start && cd <= end)).ToList();
         if (raw.Count == 0) return new List<PendingReview>();
 
         var today = ReportCalendarPolicy.RiyadhToday();
@@ -471,7 +483,7 @@ public class ReportReminderService : IReportReminderService
             var role = RoleAccess.PrimaryRole(approverRoles.GetValueOrDefault(s.ApproverId) ?? new List<string>());
             var weekKeyOfReport = s.PeriodType == PeriodType.Weekly
                 ? s.PeriodKey
-                : (DateOnly.TryParse(s.PeriodKey, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dd)
+                : (ReportingCalendarPolicy.TryCanonicalDay(s.PeriodKey, out var dd)
                     ? ReportCalendarPolicy.WeekKeyFor(dd) : key);
             var reviewDue = ReportCalendarPolicy.DueDateForRole(weekKeyOfReport, role);
             var delay = role switch
@@ -511,16 +523,11 @@ public class ReportReminderService : IReportReminderService
         return list.ToHashSet();
     }
 
-    private static List<DateOnly> DailyExpectedDates(string weekKey, DateOnly today)
-    {
-        var (start, end) = ReportCalendarPolicy.WeekRange(weekKey);
-        var cap = today < end ? today : end;
-        var dates = new List<DateOnly>();
-        for (var d = start; d <= cap; d = d.AddDays(1))
-            if (d.DayOfWeek is not (DayOfWeek.Friday or DayOfWeek.Saturday))
-                dates.Add(d);
-        return dates;
-    }
+    // DAILY-BUSINESS-DAY-COMPLIANCE-R1 §4: يُفوَّض بالكامل إلى مصدر الحقيقة المركزيّ
+    // (ReportingCalendarPolicy.DailyExpectedDates = نافذة الدورة Sat→Fri + أرضيّة الإطلاق + الأحد→الخميس).
+    // بهذا يزول الخلل السابق (كان التذكير بلا أرضيّة إطلاق ويستعمل WeekRange الخميس→الأربعاء).
+    private static List<DateOnly> DailyExpectedDates(string cycleKey, DateOnly today) =>
+        ReportingCalendarPolicy.DailyExpectedDates(cycleKey, today);
 
     private static string NormalizeWeekKey(string? weekKey) =>
         ReportCalendarPolicy.IsWeekKey(weekKey) ? weekKey!.Trim() : ReportCalendarPolicy.WeekKeyFor(ReportCalendarPolicy.RiyadhToday());

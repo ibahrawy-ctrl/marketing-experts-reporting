@@ -118,6 +118,18 @@ public enum SubmissionQuickFilter
 }
 
 /// <summary>
+/// فلتر الدورية الصريح للعرض الموحّد (DAILY-REPORTING-APPLICABILITY-R1): الافتراضيّ <see cref="All"/>
+/// يشمل اليوميّ والأسبوعيّ معًا؛ <see cref="Daily"/> يقصر على اليوميّة؛ <see cref="Weekly"/> يقصر على الأسبوعيّة.
+/// يُطبَّق على التسليمات الفعليّة والصفوف المتوقّعة غير المُقدَّمة على حدٍّ سواء.
+/// </summary>
+public enum SubmissionCadenceFilter
+{
+    All = 0,
+    Daily = 1,
+    Weekly = 2
+}
+
+/// <summary>
 /// صفّ العرض الموحّد. المفتاح المنطقيّ = ReportTemplateId + SubmitterId + PeriodKey (للتوحيد ومنع التكرار).
 /// عقد الصفّ المتوقّع غير المُقدَّم (null-safe): SubmissionId=null، HasSubmission=false،
 /// IsExpectedSubmission=true، Status="NotSubmitted"، CurrentApproverId=null، SubmittedAtUtc=null،
@@ -160,6 +172,7 @@ public sealed record UnifiedSubmissionFilter(
     SubmissionStatus? Status = null,
     string? Search = null,
     SubmissionQuickFilter QuickFilter = SubmissionQuickFilter.None,
+    SubmissionCadenceFilter Cadence = SubmissionCadenceFilter.All,
     int Page = 1,
     int PageSize = 200);
 

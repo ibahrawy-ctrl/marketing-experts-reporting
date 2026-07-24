@@ -160,20 +160,30 @@ public class ReportingCalendarCycleService : IReportingCalendarCycleService
         for (var d = -prev; d <= next; d++)
             dates.Add(anchor.AddDays(d));
 
-        var dayKeys = dates.Select(ReportingCalendarPolicy.DayKey).ToList();
+        var windowStart = dates[0];
+        var windowEnd = dates[^1];
 
-        // حالة كل يوم تُقرأ من تسليمات المستخدم اليومية لهذه المفاتيح (قراءة فقط، لا تعديل).
-        var subs = await _db.ReportSubmissions
+        // DAILY-…-R1 §3: قراءة حالة كل يوم على اليوم المنطقيّ (CanonicalDay) لا على النصّ الخام؛ نُحمِّل
+        // تسليمات المستخدم اليوميّة بلا فلترة نصّية قياسيّة (كي لا تسقط المفاتيح القديمة مثل 6-7-2026)
+        // ثم نُطبِّع كلّ مفتاح ونحصره في نافذة الأيام المعروضة قبل التجميع.
+        var rawSubs = await _db.ReportSubmissions
             .AsNoTracking()
             .Where(s => s.SubmitterId == userId
                         && s.PeriodType == PeriodType.Daily
-                        && dayKeys.Contains(s.PeriodKey))
+                        && s.PeriodKey != null)
             .Select(s => new { s.PeriodKey, s.Status })
             .ToListAsync(ct);
 
+        var subs = rawSubs
+            .Select(s => ReportingCalendarPolicy.TryCanonicalDay(s.PeriodKey, out var cd)
+                ? new { DayKey = ReportingCalendarPolicy.DayKey(cd), Day = cd, s.Status, Ok = true }
+                : new { DayKey = string.Empty, Day = default(DateOnly), s.Status, Ok = false })
+            .Where(x => x.Ok && x.Day >= windowStart && x.Day <= windowEnd)
+            .ToList();
+
         // لكل يوم: هل يوجد تسليم رسميّ؟ هل مسودّة؟ هل معاد للتعديل؟
         var byKey = subs
-            .GroupBy(s => s.PeriodKey)
+            .GroupBy(s => s.DayKey)
             .ToDictionary(g => g.Key, g => new DayStatusFlags(
                 Submitted: g.Any(x => SubmittedStatuses.Contains(x.Status)),
                 Draft: g.Any(x => x.Status == SubmissionStatus.Draft),
@@ -215,7 +225,7 @@ public class ReportingCalendarCycleService : IReportingCalendarCycleService
         {
             status = "Holiday";
             statusLabel = "عطلة أسبوعية";
-            lockReason = "لا تقارير يومية في العطلة الأسبوعية (الجمعة).";
+            lockReason = "لا تقارير يومية في العطلة الأسبوعية (الجمعة/السبت).";
         }
         else if (isFuture)
         {

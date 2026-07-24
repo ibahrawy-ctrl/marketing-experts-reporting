@@ -131,7 +131,9 @@ public class ReportingAggregationService : IReportingAggregationService
         {
             case PeriodType.Weekly:
                 if (!ReportCalendarPolicy.IsWeekKey(key)) return null;
-                var wr = ReportCalendarPolicy.WeekRange(key); // (خميس البداية، أربعاء النهاية)
+                // نافذة الدورة (السبت→الجمعة) لتجميع كل التقارير الفعليّة الواقعة داخلها —
+                // تجميع الفعليّ لا يستبعد الجمعة/السبت (§5: الفعليّ يبقى مرئيًّا)؛ الاستبعاد خاصّ بالتوقّع فقط.
+                var wr = ReportCalendarPolicy.WeekRange(key);
                 return (wr.Start, wr.End);
             case PeriodType.Monthly:
                 var mp = key.Split('-'); // YYYY-MM
@@ -185,13 +187,10 @@ public class ReportingAggregationService : IReportingAggregationService
         var range = PeriodDateRange(filter.PeriodType, filter.PeriodKey);
         if (range is not null)
         {
-            // الترتيب المعجمي لصيغة YYYY-MM-DD مطابق للترتيب الزمني ⇒ مقارنة نصّية قابلة للترجمة في EF.
-            var fromKey = range.Value.From.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-            var toKey = range.Value.To.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-            subsQ = subsQ.Where(s => s.PeriodType == PeriodType.Daily
-                && s.PeriodKey != null
-                && string.Compare(s.PeriodKey, fromKey) >= 0
-                && string.Compare(s.PeriodKey, toKey) <= 0);
+            // DAILY-…-R1 §3: لا نعتمد المقارنة المعجمية (string.Compare) لحصر النطاق — فهي تُسقِط المفاتيح
+            // القديمة غير المبطّنة (مثل 2026-07-9 تقع معجميًّا بعد 2026-07-31). نحصر النوع اليوميّ عند
+            // قاعدة البيانات فقط، ثم نُطبِّق نطاق الفترة على اليوم المنطقيّ (CanonicalDay) داخليًّا.
+            subsQ = subsQ.Where(s => s.PeriodType == PeriodType.Daily && s.PeriodKey != null);
         }
         else
         {
@@ -210,6 +209,17 @@ public class ReportingAggregationService : IReportingAggregationService
         var subs = await subsQ
             .Select(s => new { s.Id, s.SubmitterId, s.TeamId, s.DepartmentId, s.PeriodKey })
             .ToListAsync(ct);
+
+        // DAILY-…-R1 §3: تطبيق نطاق الفترة على اليوم المنطقيّ داخليًّا (بعد التطبيع) عند التجميع؛
+        // المفاتيح غير القابلة للتفسير تُستبعَد من النطاق (لا تُنسَب لأسبوع/شهر/ربع خطأً).
+        if (range is not null)
+        {
+            var (from, to) = (range.Value.From, range.Value.To);
+            subs = subs
+                .Where(s => ReportingCalendarPolicy.TryCanonicalDay(s.PeriodKey, out var cd)
+                            && cd >= from && cd <= to)
+                .ToList();
+        }
 
         var scan = new GridScan { SubmissionsConsidered = subs.Count };
         if (subs.Count == 0) return scan;

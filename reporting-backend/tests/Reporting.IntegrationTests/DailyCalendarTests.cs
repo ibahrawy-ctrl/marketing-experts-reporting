@@ -105,7 +105,8 @@ public class DailyCalendarTests
         Assert.Equal("Holiday", holiday.Status);
         Assert.NotNull(holiday.LockReason);
 
-        var future = data.Days.FirstOrDefault(d => d.IsFuture);
+        // يوم مستقبليّ يوم عمل (غير عطلة) كي تكون حالته FutureLocked لا Holiday.
+        var future = data.Days.FirstOrDefault(d => d.IsFuture && !d.IsHoliday);
         Assert.NotNull(future);
         Assert.False(future!.IsSelectable);
         Assert.Equal("FutureLocked", future.Status);
@@ -240,11 +241,11 @@ public class DailyCalendarTests
         var (employee, employeeId) = await TestAuth.CreateUserWithJobRoleCodeAsync(_factory, "Employee", "SALES_B2C", ceoId);
         await AssignTemplateToEmployeeAsync(admin, templateId, employeeId);
 
-        // أقرب عطلة ماضية (الجمعة وحدها) قبل اليوم — ماضية كي لا يسبق حارسُ المستقبل حارسَ العطلة.
-        var day = ReportingCalendarPolicy.RiyadhToday();
-        do { day = day.AddDays(-1); } while (!ReportingCalendarPolicy.IsDailyHoliday(day));
-        // تصحيح السبت: العطلة الوحيدة الآن هي الجمعة.
+        // DAILY-BUSINESS-DAY-COMPLIANCE-R1 (قرار إنشاء يوم السبت): بوابة الإنشاء تحظر **الجمعة وحدها**
+        // (IsDailySubmissionBlockedDay) لا الجمعة+السبت — نستهدف أقرب جمعة ماضية كي لا يسبق حارسُ المستقبل حارسَ العطلة.
+        var day = PrevFriday(ReportingCalendarPolicy.RiyadhToday());
         Assert.Equal(DayOfWeek.Friday, day.DayOfWeek);
+        Assert.True(ReportingCalendarPolicy.IsDailySubmissionBlockedDay(day));
 
         var res = await employee.PostAsJsonAsync("/api/submissions",
             new CreateSubmissionRequest(templateId, PeriodType.Daily, ReportingCalendarPolicy.DayKey(day)));
@@ -253,9 +254,9 @@ public class DailyCalendarTests
         Assert.Contains("calendar.day_is_holiday", body);
     }
 
-    // ---------- تصحيح السبت الإلزاميّ: السبت يوم عمل يوميّ كامل، الجمعة وحدها عطلة ----------
+    // ---------- عقد أيّام العمل اليوميّة (DAILY-BUSINESS-DAY-COMPLIANCE-R1): الجمعة والسبت عطلة أسبوعية ----------
 
-    // أقرب سبت ماضٍ (يوم عمل يوميّ) قبل اليوم.
+    // أقرب سبت ماضٍ (عطلة أسبوعية) قبل اليوم.
     private static DateOnly PrevSaturday(DateOnly today)
     {
         var d = today;
@@ -271,8 +272,11 @@ public class DailyCalendarTests
         return d;
     }
 
+    // DAILY-BUSINESS-DAY-COMPLIANCE-R1 (قرار إنشاء يوم السبت + اختبار #23): بوابة الإنشاء **لم تتغيّر** عن
+    // السلوك السابق — السبت يبقى مسموحًا لإنشاء تقرير فعليّ طوعيّ (السبت **ليس** يوم إنشاء محظور).
+    // يظهر لاحقًا في التقارير المقدَّمة لكنه لا يدخل Expected/Compliance ولا يولّد Missing/Reminder.
     [Fact]
-    public async Task CreateDaily_Saturday_WithServerKey_Succeeds()
+    public async Task CreateDaily_Saturday_Allowed()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var (templateId, _) = await GetSeededB2cTemplateAsync(admin);
@@ -280,21 +284,19 @@ public class DailyCalendarTests
         var (employee, employeeId) = await TestAuth.CreateUserWithJobRoleCodeAsync(_factory, "Employee", "SALES_B2C", ceoId);
         await AssignTemplateToEmployeeAsync(admin, templateId, employeeId);
 
-        // السبت يوم عمل يوميّ كامل ⇒ إنشاء تقرير ليوم سبت ماضٍ يجب أن ينجح (لا يُرفَض كعطلة).
+        // السبت عطلة توقّع/التزام (IsDailyHoliday=true) لكنه **ليس** يوم إنشاء محظور (IsDailySubmissionBlockedDay=false).
         var saturday = PrevSaturday(ReportingCalendarPolicy.RiyadhToday());
         Assert.Equal(DayOfWeek.Saturday, saturday.DayOfWeek);
-        Assert.False(ReportingCalendarPolicy.IsDailyHoliday(saturday));
+        Assert.True(ReportingCalendarPolicy.IsDailyHoliday(saturday));
+        Assert.False(ReportingCalendarPolicy.IsDailySubmissionBlockedDay(saturday));
 
         var res = await employee.PostAsJsonAsync("/api/submissions",
             new CreateSubmissionRequest(templateId, PeriodType.Daily, ReportingCalendarPolicy.DayKey(saturday)));
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
-        var dto = await res.ReadAsync<SubmissionDto>();
-        Assert.Equal(SubmissionStatus.Draft, dto!.Status);
-        Assert.Equal(ReportingCalendarPolicy.DayKey(saturday), dto.PeriodKey);
     }
 
     [Fact]
-    public async Task MyDays_Saturday_IsWorking_AndFriday_IsHoliday()
+    public async Task MyDays_Saturday_And_Friday_AreHoliday()
     {
         var (employee, _) = await TestAuth.CreateUserAsync(_factory, "Employee");
         // نافذة ماضية واسعة تضمن احتواء سبت وجمعة.
@@ -304,10 +306,11 @@ public class DailyCalendarTests
         var saturday = ReportingCalendarPolicy.DayKey(PrevSaturday(ReportingCalendarPolicy.RiyadhToday()));
         var friday = ReportingCalendarPolicy.DayKey(PrevFriday(ReportingCalendarPolicy.RiyadhToday()));
 
-        // السبت يوم عمل: ليس Holiday ولا معلَّم عطلة.
+        // السبت عطلة أسبوعية: Holiday، غير قابل للاختيار.
         var sat = Assert.Single(data!.Days.Where(d => d.DayKey == saturday));
-        Assert.False(sat.IsHoliday);
-        Assert.NotEqual("Holiday", sat.Status);
+        Assert.True(sat.IsHoliday);
+        Assert.Equal("Holiday", sat.Status);
+        Assert.False(sat.IsSelectable);
 
         // الجمعة عطلة: Holiday، غير قابلة للاختيار.
         var fri = Assert.Single(data.Days.Where(d => d.DayKey == friday));

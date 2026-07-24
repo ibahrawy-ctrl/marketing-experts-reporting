@@ -6,6 +6,7 @@ using Reporting.Application.Calendar;
 using Reporting.Application.Submissions;
 using Reporting.Application.Templates;
 using Reporting.Domain.Entities.Org;
+using Reporting.Domain.Entities.Submissions;
 using Reporting.Domain.Enums;
 using Reporting.Infrastructure.Persistence;
 using Xunit;
@@ -199,8 +200,37 @@ public class ReportCalendarTests
 
     // ===== §9 / §14.9 / §14.22 / §14.23 — تجميع تقارير المبيعات اليومية أسبوعيًّا =====
 
+    // W28 = 2026-07-04 (السبت) → 2026-07-10 (الجمعة). أيّام العمل بعد أرضية الإطلاق (2026-07-04):
+    // الأحد 05 → الخميس 09 = 5 أيّام. السبت 04 والجمعة 10 مستبعدان (عطلة أسبوعية).
+    private const string W28Key = "2026-W28";
+
+    /// <summary>
+    /// يُدرج تقريرًا يوميًّا فعليًّا مباشرةً في القاعدة (يتجاوز حارس CreateAsync الذي يمنع الجمعة/السبت)
+    /// لإثبات §5: التقرير الفعليّ على يوم غير منطبق يبقى محفوظًا لكنه لا يدخل بسط الالتزام.
+    /// </summary>
+    private async Task InsertDailyDirectAsync(Guid templateId, Guid submitterId, string dayKey)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var versionId = await db.ReportTemplateVersions
+            .Where(v => v.ReportTemplateId == templateId)
+            .OrderByDescending(v => v.VersionNumber)
+            .Select(v => v.Id)
+            .FirstAsync();
+        db.ReportSubmissions.Add(new ReportSubmission
+        {
+            ReportTemplateVersionId = versionId,
+            SubmitterId = submitterId,
+            PeriodType = PeriodType.Daily,
+            PeriodKey = dayKey,
+            Status = SubmissionStatus.Submitted,
+            SubmittedAtUtc = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+    }
+
     [Fact]
-    public async Task SalesDailyCompliance_AggregatesDays_FlagsIncompleteWeek()
+    public async Task SalesDailyCompliance_W28_ExpectedFiveBusinessDays_ExcludesFridaySaturday()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var salesRole = await EnsureJobRoleAsync("SALES_B2C");
@@ -212,15 +242,21 @@ public class ReportCalendarTests
         await SetJobRoleAsync(completeId, salesRole);
         await SetJobRoleAsync(partialId, salesRole);
 
-        // الأسبوع الماضي بالكامل = 7 أيام متوقَّعة (الخميس 04/06 → الأربعاء 10/06).
-        var days = new[] { "2026-06-04", "2026-06-05", "2026-06-06", "2026-06-07", "2026-06-08", "2026-06-09", "2026-06-10" };
-        foreach (var d in days)
+        // أيّام العمل الخمسة (الأحد→الخميس) تُرسَل عبر الـ API (تمرّ حارس CreateAsync).
+        var businessDays = new[] { "2026-07-05", "2026-07-06", "2026-07-07", "2026-07-08", "2026-07-09" };
+        foreach (var d in businessDays)
             await SubmitAsync(completeRep, templateId, fieldId, PeriodType.Daily, d);
-        // المندوب الجزئي: 3 أيام فقط ⇒ أسبوع ناقص يحتاج مراجعة.
-        foreach (var d in days[..3])
+
+        // §5: تقريران فعليّان على السبت 04 والجمعة 10 يُدرَجان مباشرةً (يمنعهما الـ API) —
+        // يجب ألّا يزيدا البسط (submitted يبقى 5 لا 7) ولا التوقّع.
+        await InsertDailyDirectAsync(templateId, completeId, "2026-07-04"); // السبت (أرضية الإطلاق)
+        await InsertDailyDirectAsync(templateId, completeId, "2026-07-10"); // الجمعة
+
+        // المندوب الجزئي: 3 أيّام عمل فقط ⇒ أسبوع ناقص يحتاج مراجعة (المتوقّع 5، الناقص 2).
+        foreach (var d in businessDays[..3])
             await SubmitAsync(partialRep, templateId, fieldId, PeriodType.Daily, d);
 
-        var report = await (await tlClient.GetAsync($"/api/report-calendar/sales-daily-compliance?weekKey={PastWeek}"))
+        var report = await (await tlClient.GetAsync($"/api/report-calendar/sales-daily-compliance?weekKey={W28Key}"))
             .ReadAsync<SalesDailyComplianceReport>();
 
         Assert.NotNull(report);
@@ -228,13 +264,16 @@ public class ReportCalendarTests
         var completeRow = report.Rows.Single(r => r.UserId == completeId);
         var partialRow = report.Rows.Single(r => r.UserId == partialId);
 
-        Assert.Equal(7, completeRow.ExpectedDays);
-        Assert.Equal(7, completeRow.SubmittedDays);
+        // §6 #4: المتوقّع = 5 (أيّام العمل) لا 7 (عدّ خام للدورة).
+        Assert.Equal(5, completeRow.ExpectedDays);
+        // §6 #5: السبت 04 والجمعة 10 لا يدخلان البسط — المُسلَّم المحتسَب = 5 فقط.
+        Assert.Equal(5, completeRow.SubmittedDays);
         Assert.True(completeRow.IsComplete);
         Assert.False(completeRow.NeedsReview);
 
+        Assert.Equal(5, partialRow.ExpectedDays);
         Assert.Equal(3, partialRow.SubmittedDays);
-        Assert.Equal(4, partialRow.MissingDays);
+        Assert.Equal(2, partialRow.MissingDays);
         Assert.False(partialRow.IsComplete);
         Assert.True(partialRow.NeedsReview);   // §14.23 أسبوع ناقص ⇒ يحتاج مراجعة
     }

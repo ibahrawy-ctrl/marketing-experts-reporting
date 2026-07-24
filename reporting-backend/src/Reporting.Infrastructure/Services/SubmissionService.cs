@@ -117,8 +117,11 @@ public class SubmissionService : ISubmissionService
             if (!ReportingCalendarPolicy.IsValidDayKey(periodKey))
                 return Result<SubmissionDto>.Failure("مفتاح اليوم غير صالح.", "report.daily_key_invalid");
             var day = ReportingCalendarPolicy.ParseDayKey(periodKey);
-            // لا تقارير في العطلة الأسبوعية (الجمعة وحدها) بحسب سياسة اليوميّ. السبت يوم عمل.
-            if (ReportingCalendarPolicy.IsDailyHoliday(day))
+            // DAILY-BUSINESS-DAY-COMPLIANCE-R1 (قرار إنشاء يوم السبت): بوابة الإنشاء **مستقلّة**
+            // عن عقد التوقّع/الالتزام — الجمعة وحدها ممنوعة، والسبت يبقى مسموحًا (تقرير فعليّ طوعيّ).
+            // نستخدم IsDailySubmissionBlockedDay (الجمعة فقط) لا IsDailyHoliday (الجمعة+السبت)
+            // حتى لا يُحظَر إنشاء تقرير السبت الذي كان مسموحًا سابقًا.
+            if (ReportingCalendarPolicy.IsDailySubmissionBlockedDay(day))
                 return Result<SubmissionDto>.Failure(
                     "لا تقارير يومية في العطلة الأسبوعية (الجمعة).", "calendar.day_is_holiday");
             // لا يوم مستقبليّ لم يبدأ بعد.
@@ -817,6 +820,9 @@ public class SubmissionService : ISubmissionService
         if (filter.DepartmentId is not null) q = q.Where(s => s.DepartmentId == filter.DepartmentId);
         if (filter.ReportTemplateId is Guid rtid)
             q = q.Where(s => _db.ReportTemplateVersions.Any(v => v.Id == s.ReportTemplateVersionId && v.ReportTemplateId == rtid));
+        // فلتر الدورية الصريح (DAILY-REPORTING-APPLICABILITY-R1) على الصفوف الفعليّة: Daily/Weekly يقصر النوع، All يشمل الكلّ.
+        if (filter.Cadence == SubmissionCadenceFilter.Daily) q = q.Where(s => s.PeriodType == PeriodType.Daily);
+        else if (filter.Cadence == SubmissionCadenceFilter.Weekly) q = q.Where(s => s.PeriodType == PeriodType.Weekly);
 
         var actualRaw = await q
             .Select(s => new
@@ -873,9 +879,25 @@ public class SubmissionService : ISubmissionService
                 isOverdue = cycleApplicable && overdueEligible && now > dueAt;
                 if (isOverdue) delayDays = Math.Max(0, riyadhToday.DayNumber - dueDate.DayNumber);
             }
-            else if (ReportingCalendarPolicy.IsValidDayKey(r.PeriodKey))
+            else if (ReportingCalendarPolicy.TryCanonicalDay(r.PeriodKey, out var canonicalDay))
             {
-                dueDate = ReportingCalendarPolicy.ParseDayKey(r.PeriodKey);
+                // تطبيع مفتاح اليوم إلى تاريخ منطقيّ واحد (يشمل الصيغ التاريخية غير القياسية مثل 6-7-2026
+                // أو 2026-07-9). المفتاح الخام يبقى في القاعدة وفي حقل PeriodKey للصفّ؛ التطبيع داخليّ فقط
+                // لاشتقاق موعد الاستحقاق والتأخّر بحسب اليوم المنطقيّ (DAILY-REPORTING-APPLICABILITY-R1 §2).
+                dueDate = canonicalDay;
+                // DAILY-REPORTING-APPLICABILITY-R1: صفّ يوميّ فعليّ يُصنَّف متأخّرًا فقط إذا كان يومه
+                // (أ) منطبقًا على أرضيّة الإطلاق المنظّميّة (≥ 4 يوليو 2026)، و(ب) يوم عمل (لا جمعة/سبت)،
+                // و(ج) حالته مسودّة/مُعاد فقط، و(د) تجاوز موعد نهاية يومه (now > dueAt = 23:59:59 من يومه).
+                // يوم عطلة أو قبل الأرضيّة أو حالة مُرسَلة/مُغلقة: يبقى مرئيًّا بحالته الفعليّة دون عقوبة تأخّر.
+                var dayApplicable = ApplicabilityFloorPolicy.IsDailyDateApplicable(
+                    dueDate, ApplicabilityFloorPolicy.OrganizationalReportingLaunchFloor);
+                // DAILY-BUSINESS-DAY-COMPLIANCE-R1: تفويض «يوم العمل» للسياسة المركزيّة الوحيدة
+                // (الأحد→الخميس فقط) بدل تكرار منطق الجمعة/السبت داخل الخدمة. مصدر واحد للحقيقة.
+                var isBusinessDay = ReportingCalendarPolicy.IsDailyExpectedBusinessDay(dueDate);
+                var overdueEligible = r.Status is SubmissionStatus.Draft or SubmissionStatus.Returned;
+                var dueAt = new DateTimeOffset(dueDate.Year, dueDate.Month, dueDate.Day, 23, 59, 59, ReportingCalendarPolicy.RiyadhOffset);
+                isOverdue = dayApplicable && isBusinessDay && overdueEligible && now > dueAt;
+                if (isOverdue) delayDays = Math.Max(0, riyadhToday.DayNumber - dueDate.DayNumber);
             }
             else
             {
@@ -916,13 +938,21 @@ public class SubmissionService : ISubmissionService
         var includeExpected =
             filter.Status is null
             && (periodKeyFilter is null || ReportingCalendarPolicy.IsValidCycleKey(periodKeyFilter));
-        if (includeExpected && scope.UserIds.Count > 0)
+        // فلتر الدورية على الصفوف المتوقّعة: Weekly ⇒ لا توليد يوميّ؛ Daily ⇒ لا توليد أسبوعيّ؛ All ⇒ كلاهما.
+        var includeWeeklyExpected = includeExpected && filter.Cadence != SubmissionCadenceFilter.Daily;
+        var includeDailyExpected = includeExpected && filter.Cadence != SubmissionCadenceFilter.Weekly;
+        if (includeWeeklyExpected && scope.UserIds.Count > 0)
         {
+            // المستخدمون ذوو الدورية اليوميّة (مبيعات) داخل النطاق يُستبعَدون من صفوف المتوقّع الأسبوعيّة:
+            // مسمّاهم يوميّ فيُطالَبون يوميًّا لا أسبوعيًّا؛ رغم أن نوع قالبهم الأساسيّ الافتراضيّ قد يكون أسبوعيًّا،
+            // الدورية الفعليّة تُشتقّ من رمز المسمّى (ReportCadencePolicy). لا تحويل يوميّ→أسبوعيّ (القسم 5).
+            var dailyScopedUserIds = await ResolveDailyScopedUserIdsAsync(scope, ct);
             var expected = await _expected.ResolveAsync(
                 new ExpectedStatusQuery(scope.UserIds, expectedWindow, filter.ReportTemplateId), ct);
 
             foreach (var e in expected)
             {
+                if (dailyScopedUserIds.Contains(e.UserId)) continue; // دورية يوميّة ⇒ لا صفّ متوقّع أسبوعيّ.
                 if (!e.IsExpected || e.HasSubmission) continue; // فقط الالتزام المتوقّع غير المُقدَّم إطلاقًا.
                 if (e.TemplateId is not Guid etid) continue;
                 // إزالة التكرار على المفتاح المنطقيّ (ReportTemplateId + SubmitterId + PeriodKey).
@@ -961,6 +991,30 @@ public class SubmissionService : ISubmissionService
             }
         }
 
+        // ===== (ب-2) الصفوف المتوقّعة غير المُقدَّمة اليوميّة (DAILY-REPORTING-APPLICABILITY-R1) =====
+        // مرآة منطق ReportDueService: مرشّحو الدورية اليوميّة (مبيعات) ضمن النطاق، لكلّ يوم عمل منطبق
+        // (≥ أرضيّة الإطلاق 4 يوليو 2026، لا جمعة/سبت) داخل نافذة الدورات، إن لم يوجد تسليم فعليّ.
+        // لا كتابة صناعيّة؛ صفوف عرض-فقط. التأخّر = riyadhToday > اليوم (تجاوز نهاية يومه).
+        if (includeDailyExpected && scope.UserIds.Count > 0)
+        {
+            // إزالة التكرار على مستوى (المُرسِل، اليوم المنطقيّ) بغضّ النظر عن القالب: أيّ صفّ يوميّ فعليّ
+            // (بأيّ حالة) موجود في rows ⇒ لا يُولَّد له صفّ متوقّع (يُجنّب الازدواج مع صفّ Fix A الفعليّ).
+            // DAILY-REPORTING-APPLICABILITY-R1 §3: المطابقة على التاريخ المنطقيّ بعد التطبيع (CanonicalDay)
+            // لا على النصّ الخام — كي يُطابِق مفتاح قديم مثل 6-7-2026 اليومَ المنطقيّ 2026-07-06 فلا يُولَّد
+            // له «متوقّع مفقود» مكرّر. المفاتيح غير القابلة للتفسير تُستبعَد من مجموعة المطابقة (لا تُخفَى؛
+            // صفّها الفعليّ يبقى ظاهرًا، لكنّها لا تُطابِق أيّ يوم عمل قياسيّ فلا تُنتِج/تكبت متوقّعًا خطأً).
+            var actualDailyDays = new HashSet<(Guid, string)>();
+            foreach (var r in actualRaw)
+            {
+                if (r.PeriodType != PeriodType.Daily) continue;
+                if (ReportingCalendarPolicy.TryCanonicalDay(r.PeriodKey, out var cday))
+                    actualDailyDays.Add((r.SubmitterId, ReportingCalendarPolicy.DayKey(cday)));
+            }
+            var dailyRows = await BuildDailyExpectedMissingAsync(
+                scope, filter, expectedWindow, riyadhToday, actualDailyDays, ct);
+            rows.AddRange(dailyRows);
+        }
+
         // ===== (ج) Search (اسم المُرسِل/عنوان القالب/الفريق/الإدارة) على المجموعة الموحّدة =====
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
@@ -994,6 +1048,151 @@ public class SubmissionService : ISubmissionService
 
         return Result<UnifiedSubmissionOverviewDto>.Success(
             new UnifiedSubmissionOverviewDto(items, summary, page, pageSize, totalCount));
+    }
+
+    // ===== توليد صفوف «المتوقّع المفقود» اليوميّة للعرض الموحّد (DAILY-REPORTING-APPLICABILITY-R1) =====
+    // عرض-فقط، مرآة منطق ReportDueService لمرشّحي الدورية اليوميّة (مبيعات): لكلّ مرشّح ضمن نطاق scope.UserIds
+    // (نفس مجموعة المُحلِّل الأسبوعيّ) × كلّ يوم عمل منطبق (≥ أرضيّة الإطلاق 4 يوليو 2026، لا جمعة/سبت، لا مستقبل)
+    // داخل نافذة الدورات، إن لم يوجد أيّ تسليم يوميّ فعليّ لذلك (المُرسِل، اليوم). التأخّر = riyadhToday > اليوم.
+    // بلا كتابة صناعيّة إلى القاعدة؛ الصفوف مُشتقّة آنيًّا.
+    private async Task<List<UnifiedSubmissionRowDto>> BuildDailyExpectedMissingAsync(
+        ScopeContext scope,
+        UnifiedSubmissionFilter filter,
+        IReadOnlyList<string> expectedWindow,
+        DateOnly riyadhToday,
+        HashSet<(Guid SubmitterId, string PeriodKey)> actualDailyDays,
+        CancellationToken ct)
+    {
+        var empty = new List<UnifiedSubmissionRowDto>();
+
+        // (1) القوالب الأساسيّة المنشورة المرتبطة بمسمّى (غير شهريّة) → قالب واحد لكلّ مسمّى (أوّل بالعنوان).
+        var roleTemplates = await _db.ReportTemplates.AsNoTracking()
+            .Where(t => t.JobRoleId != null && t.IsActive
+                        && t.Classification == TemplateClassification.Primary
+                        && t.DefaultPeriodType != PeriodType.Monthly
+                        && _db.ReportTemplateVersions.Any(v => v.ReportTemplateId == t.Id && v.IsPublished))
+            .Select(t => new { RoleId = t.JobRoleId!.Value, TemplateId = t.Id, t.Title })
+            .ToListAsync(ct);
+        if (roleTemplates.Count == 0) return empty;
+
+        var templateByRole = roleTemplates
+            .GroupBy(x => x.RoleId)
+            .ToDictionary(g => g.Key, g => g.OrderBy(x => x.Title, StringComparer.Ordinal).First());
+
+        // (2) قصر على مسمّيات الدورية اليوميّة (المبيعات) عبر رمز المسمّى (ExpectedCadence == Daily).
+        var roleIds = templateByRole.Keys.ToHashSet();
+        var roleCodes = await _db.JobRoles.AsNoTracking()
+            .Where(j => roleIds.Contains(j.Id))
+            .Select(j => new { j.Id, j.Code })
+            .ToListAsync(ct);
+        var dailyRoleIds = roleCodes
+            .Where(j => ReportCadencePolicy.ExpectedCadence(j.Code) == PeriodType.Daily)
+            .Select(j => j.Id)
+            .ToHashSet();
+        if (dailyRoleIds.Count == 0) return empty;
+
+        // فلتر القالب الصريح: إن حُدِّد ReportTemplateId، اقصر على المسمّيات التي قالبها = المطلوب.
+        if (filter.ReportTemplateId is Guid rtid)
+        {
+            dailyRoleIds = dailyRoleIds.Where(rid => templateByRole[rid].TemplateId == rtid).ToHashSet();
+            if (dailyRoleIds.Count == 0) return empty;
+        }
+
+        // (3) المرشّحون: نشطون، مسمّاهم يوميّ، ضمن نطاق scope.UserIds، مع فلاتر SubmitterId/Team/Dept.
+        var allowed = scope.UserIds;
+        var candQ = _db.Users.AsNoTracking()
+            .Where(u => u.IsActive && u.JobRoleId != null && dailyRoleIds.Contains(u.JobRoleId!.Value)
+                        && allowed.Contains(u.Id));
+        if (filter.SubmitterId is Guid fsid) candQ = candQ.Where(u => u.Id == fsid);
+        if (filter.TeamId is Guid ftid) candQ = candQ.Where(u => u.TeamId == ftid);
+        if (filter.DepartmentId is Guid fdid) candQ = candQ.Where(u => u.DepartmentId == fdid);
+
+        var cands = await candQ
+            .Select(u => new { u.Id, u.FullName, u.TeamId, u.DepartmentId, JobRoleId = u.JobRoleId!.Value })
+            .ToListAsync(ct);
+        if (cands.Count == 0) return empty;
+
+        // (4) أسماء الفِرَق/الإدارات دفعيًّا (بلا N+1).
+        var teamIds = cands.Where(c => c.TeamId is not null).Select(c => c.TeamId!.Value).Distinct().ToList();
+        var deptIds = cands.Where(c => c.DepartmentId is not null).Select(c => c.DepartmentId!.Value).Distinct().ToList();
+        var teamNames = teamIds.Count == 0 ? new Dictionary<Guid, string>()
+            : await _db.Teams.AsNoTracking().Where(t => teamIds.Contains(t.Id)).ToDictionaryAsync(t => t.Id, t => t.NameAr, ct);
+        var deptNames = deptIds.Count == 0 ? new Dictionary<Guid, string>()
+            : await _db.Departments.AsNoTracking().Where(d => deptIds.Contains(d.Id)).ToDictionaryAsync(d => d.Id, d => d.NameAr, ct);
+
+        // (5) أيّام العمل المنطبقة لكلّ دورة في النافذة (مبوَّبة بأرضيّة الإطلاق، لا جمعة/سبت، لا مستقبل).
+        var applicableDays = new List<DateOnly>();
+        foreach (var cycleKey in expectedWindow)
+            applicableDays.AddRange(DailyExpectedDates(cycleKey, riyadhToday));
+        applicableDays = applicableDays.Distinct().OrderBy(d => d).ToList();
+        if (applicableDays.Count == 0) return empty;
+
+        // (6) توليد الصفوف: لكلّ مرشّح × كلّ يوم منطبق، إن لم يوجد تسليم يوميّ فعليّ لذلك (المُرسِل، اليوم).
+        var result = new List<UnifiedSubmissionRowDto>();
+        foreach (var c in cands)
+        {
+            var tpl = templateByRole[c.JobRoleId];
+            foreach (var day in applicableDays)
+            {
+                var dayKey = day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+                if (actualDailyDays.Contains((c.Id, dayKey))) continue; // تسليم فعليّ قائم ⇒ لا صفّ متوقّع.
+
+                var isOverdue = riyadhToday > day; // متأخّر بعد تجاوز نهاية يومه (اليوم التالي فأكثر).
+                var delayDays = isOverdue ? Math.Max(0, riyadhToday.DayNumber - day.DayNumber) : 0;
+
+                result.Add(new UnifiedSubmissionRowDto(
+                    RowKind: SubmissionRowKind.ExpectedMissingSubmission,
+                    SubmissionId: null,
+                    ReportTemplateId: tpl.TemplateId,
+                    TemplateTitle: tpl.Title,
+                    SubmitterId: c.Id,
+                    SubmitterName: c.FullName,
+                    TeamId: c.TeamId,
+                    TeamName: c.TeamId is Guid tm ? teamNames.GetValueOrDefault(tm) : null,
+                    DepartmentId: c.DepartmentId,
+                    DepartmentName: c.DepartmentId is Guid dp ? deptNames.GetValueOrDefault(dp) : null,
+                    PeriodType: PeriodType.Daily,
+                    PeriodKey: dayKey,
+                    Status: "NotSubmitted",
+                    StatusLabel: isOverdue ? "متأخّر — لم يُقدَّم" : "لم يبدأ التقرير",
+                    Severity: isOverdue ? "alert" : "info",
+                    SubmittedAtUtc: null,
+                    CurrentApproverId: null,
+                    DueAt: day,
+                    HasSubmission: false,
+                    IsExpectedSubmission: true,
+                    IsOverdue: isOverdue,
+                    DelayDays: delayDays));
+            }
+        }
+
+        return result;
+    }
+
+    // DAILY-BUSINESS-DAY-COMPLIANCE-R1 §4: أيّام التقرير اليوميّة المتوقَّعة داخل دورة —
+    // تفويض إلى المصدر المركزيّ الوحيد ReportingCalendarPolicy.DailyExpectedDates
+    // (أرضيّة الإطلاق + استبعاد الجمعة/السبت + عدم تجاوز اليوم). لا تكرار للعقد لكل خدمة.
+    private static List<DateOnly> DailyExpectedDates(string cycleKey, DateOnly today) =>
+        ReportingCalendarPolicy.DailyExpectedDates(cycleKey, today);
+
+    // مجموعة معرّفات المستخدمين ذوي الدورية اليوميّة (مبيعات) داخل النطاق، مُشتقّة من رمز المسمّى الوظيفيّ
+    // عبر ReportCadencePolicy.ExpectedCadence (لا من DefaultPeriodType للقالب). تُستخدَم لاستبعادهم من صفوف
+    // المتوقّع الأسبوعيّة (المُحلِّل الأسبوعيّ يفرز على DefaultPeriodType=Weekly فيسرّبهم). لا تحويل يوميّ→أسبوعيّ.
+    private async Task<HashSet<Guid>> ResolveDailyScopedUserIdsAsync(ScopeContext scope, CancellationToken ct)
+    {
+        if (scope.UserIds.Count == 0) return new HashSet<Guid>();
+        var pairs = await _db.Users.AsNoTracking()
+            .Where(u => scope.UserIds.Contains(u.Id) && u.JobRoleId != null)
+            .Select(u => new
+            {
+                u.Id,
+                Code = _db.JobRoles.Where(j => j.Id == u.JobRoleId!.Value).Select(j => j.Code).FirstOrDefault()
+            })
+            .ToListAsync(ct);
+        return pairs
+            .Where(p => ReportCadencePolicy.ExpectedCadence(p.Code) == PeriodType.Daily)
+            .Select(p => p.Id)
+            .ToHashSet();
     }
 
     // «يحتاج إجراءً» = تسليم فعليّ قائم (ExistingSubmission بمعرّف) بحالة مسودّة/مُعاد/مُصعَّد فقط.

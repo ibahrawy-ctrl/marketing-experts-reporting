@@ -202,10 +202,14 @@ public class ReportCalendarService : IReportCalendarService
 
         var candidates = await ExpectedReportersAsync(PeriodType.Daily, scope, ct);
 
-        // الأيام المتوقَّعة = الأيام المنقضية من الأسبوع حتى تاريخه (لا نفترض أيام العطلات — تقويم أيام العمل مؤجَّل).
+        // DAILY-BUSINESS-DAY-COMPLIANCE-R1 §4: الأيام المتوقَّعة = **أيام العمل فقط** (الأحد→الخميس)
+        // ضمن الدورة حتى تاريخه، مقيَّدةً بأرضية الإطلاق المؤسّسيّة — عبر المصدر المركزيّ الوحيد
+        // ReportingCalendarPolicy.DailyExpectedDates. لا عدّ خام لأيام الدورة (كان يُدخِل الجمعة/السبت).
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var elapsedEnd = today < weekEnd ? today : weekEnd;
-        var expectedDays = elapsedEnd >= weekStart ? elapsedEnd.DayNumber - weekStart.DayNumber + 1 : 0;
+        var expectedDates = ReportingCalendarPolicy.DailyExpectedDates(key, today);
+        var expectedDaySet = expectedDates.ToHashSet();
+        var expectedDays = expectedDates.Count;
 
         var candidateIds = candidates.Select(c => c.Id).ToList();
         var dailySubs = await _db.ReportSubmissions.AsNoTracking()
@@ -219,12 +223,16 @@ public class ReportCalendarService : IReportCalendarService
         var daysByUser = new Dictionary<Guid, HashSet<DateOnly>>();
         foreach (var s in dailySubs)
         {
-            if (!DateOnly.TryParse(s.PeriodKey, CultureInfo.InvariantCulture, DateTimeStyles.None, out var day))
+            // DAILY-…-R1 §3: تطبيع اليوم المنطقيّ (CanonicalDay) بدل DateOnly.TryParse المُبهَم الذي يفسّر
+            // المفاتيح القديمة (مثل 6-7-2026) بترتيب شهر-أوّلًا خاطئ فيضعها في يوم غير صحيح.
+            if (!ReportingCalendarPolicy.TryCanonicalDay(s.PeriodKey, out var day))
             {
                 if (s.SubmittedAtUtc is DateTime at) day = DateOnly.FromDateTime(at);
                 else continue;
             }
-            if (day < weekStart || day > weekEnd) continue;
+            // §5: التقرير الفعليّ على يوم غير منطبق (جمعة/سبت/قبل الأرضية) يبقى محفوظًا/مرئيًّا تاريخيًّا
+            // لكنه لا يدخل بسط الالتزام — نَعُدّ فقط الأيام المتوقَّعة (أيام العمل ضمن الدورة).
+            if (!expectedDaySet.Contains(day)) continue;
             if (!daysByUser.TryGetValue(s.SubmitterId, out var set))
             {
                 set = new HashSet<DateOnly>();

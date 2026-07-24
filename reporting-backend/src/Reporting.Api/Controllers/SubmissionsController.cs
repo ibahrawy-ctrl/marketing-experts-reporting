@@ -47,10 +47,11 @@ public class SubmissionsController : ApiControllerBase
         [FromQuery] string? periodKey, [FromQuery] Guid? submitterId, [FromQuery] Guid? teamId,
         [FromQuery] Guid? departmentId, [FromQuery] Guid? reportTemplateId, [FromQuery] SubmissionStatus? status,
         [FromQuery] string? search, [FromQuery] SubmissionQuickFilter quickFilter = SubmissionQuickFilter.None,
+        [FromQuery] SubmissionCadenceFilter cadence = SubmissionCadenceFilter.All,
         [FromQuery] int page = 1, [FromQuery] int pageSize = 200, CancellationToken ct = default)
         => FromResult(await _service.GetOverviewAsync(
             new UnifiedSubmissionFilter(periodKey, submitterId, teamId, departmentId, reportTemplateId,
-                status, search, quickFilter, page, pageSize), ct));
+                status, search, quickFilter, cadence, page, pageSize), ct));
 
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> Get(Guid id, CancellationToken ct)

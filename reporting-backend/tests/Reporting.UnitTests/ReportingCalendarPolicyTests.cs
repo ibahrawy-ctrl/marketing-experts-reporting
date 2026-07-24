@@ -212,31 +212,79 @@ public class ReportingCalendarPolicyTests
         Assert.Equal(key, ReportingCalendarPolicy.DayKey(ReportingCalendarPolicy.ParseDayKey(key)));
     }
 
-    // (D4) العطلة الأسبوعية اليومية = الجمعة **وحدها** (أيام العمل اليومية السبت→الخميس، والسبت يوم عمل).
+    // (D4) DAILY-BUSINESS-DAY-COMPLIANCE-R1: العطلة الأسبوعية اليومية = **الجمعة والسبت**
+    // (أيّام العمل اليومية = الأحد→الخميس فقط تدخل التوقّع والالتزام).
     [Theory]
     [InlineData(2026, 7, 10, true)]  // جمعة  → عطلة
-    [InlineData(2026, 7, 11, false)] // سبت   → يوم عمل
+    [InlineData(2026, 7, 11, true)]  // سبت   → عطلة
     [InlineData(2026, 7, 12, false)] // أحد
     [InlineData(2026, 7, 13, false)] // اثنين
     [InlineData(2026, 7, 14, false)] // ثلاثاء
     [InlineData(2026, 7, 15, false)] // أربعاء
     [InlineData(2026, 7, 16, false)] // خميس
-    public void IsDailyHoliday_FridayOnly(int y, int m, int d, bool expected)
+    public void IsDailyHoliday_FridayAndSaturday(int y, int m, int d, bool expected)
     {
         Assert.Equal(expected, ReportingCalendarPolicy.IsDailyHoliday(new DateOnly(y, m, d)));
     }
 
-    // (D4-b) تصريح صريح لتصحيح السبت: الجمعة عطلة، السبت ليس عطلة، ومفتاح السبت يُولَّد صحيحًا.
+    // (D4-b) عقد أيّام العمل: الجمعة والسبت عطلة، ومعكوسها IsDailyExpectedBusinessDay للأحد→الخميس.
     [Fact]
-    public void IsDailyHoliday_Friday_True_Saturday_False_WithSaturdayDayKey()
+    public void IsDailyHoliday_FridaySaturday_True_BusinessDays_ExpectedTrue()
     {
         var friday = new DateOnly(2026, 7, 10);
         var saturday = new DateOnly(2026, 7, 11);
+        var sunday = new DateOnly(2026, 7, 12);
+        var thursday = new DateOnly(2026, 7, 16);
         Assert.True(ReportingCalendarPolicy.IsDailyHoliday(friday));
-        Assert.False(ReportingCalendarPolicy.IsDailyHoliday(saturday));
-        Assert.Equal(DayOfWeek.Saturday, saturday.DayOfWeek);
+        Assert.True(ReportingCalendarPolicy.IsDailyHoliday(saturday));
+        Assert.False(ReportingCalendarPolicy.IsDailyExpectedBusinessDay(friday));
+        Assert.False(ReportingCalendarPolicy.IsDailyExpectedBusinessDay(saturday));
+        Assert.True(ReportingCalendarPolicy.IsDailyExpectedBusinessDay(sunday));
+        Assert.True(ReportingCalendarPolicy.IsDailyExpectedBusinessDay(thursday));
+        // مفتاح السبت لا يزال يُولَّد ويُقرأ صحيحًا (التقارير الفعليّة القديمة تبقى مقروءة — §5).
         Assert.Equal("2026-07-11", ReportingCalendarPolicy.DayKey(saturday));
         Assert.True(ReportingCalendarPolicy.IsValidDayKey("2026-07-11"));
+    }
+
+    // (D4-d) DAILY-BUSINESS-DAY-COMPLIANCE-R1 (قرار إنشاء يوم السبت + اختبار #23):
+    // بوابة إنشاء التقرير **مستقلّة** عن عقد التوقّع/الالتزام — الجمعة وحدها محظورة للإنشاء،
+    // والسبت **غير محظور** (يبقى مسموحًا كتقرير فعليّ طوعيّ) رغم أنه عطلة توقّع/التزام.
+    [Theory]
+    [InlineData(2026, 7, 10, true)]  // جمعة → محظورة للإنشاء
+    [InlineData(2026, 7, 11, false)] // سبت  → مسموح للإنشاء (السلوك السابق محفوظ)
+    [InlineData(2026, 7, 12, false)] // أحد
+    [InlineData(2026, 7, 13, false)] // اثنين
+    [InlineData(2026, 7, 16, false)] // خميس
+    public void IsDailySubmissionBlockedDay_FridayOnly(int y, int m, int d, bool expected)
+    {
+        Assert.Equal(expected, ReportingCalendarPolicy.IsDailySubmissionBlockedDay(new DateOnly(y, m, d)));
+    }
+
+    // (D4-e) الفصل الصريح بين السياستين: السبت عطلة توقّع (IsDailyHoliday) لكنه ليس يوم إنشاء محظور.
+    [Fact]
+    public void Saturday_IsHolidayForExpected_ButNotBlockedForSubmission()
+    {
+        var saturday = new DateOnly(2026, 7, 11);
+        Assert.True(ReportingCalendarPolicy.IsDailyHoliday(saturday));            // خارج التوقّع/الالتزام
+        Assert.False(ReportingCalendarPolicy.IsDailySubmissionBlockedDay(saturday)); // لكن الإنشاء مسموح
+        var friday = new DateOnly(2026, 7, 10);
+        Assert.True(ReportingCalendarPolicy.IsDailyHoliday(friday));
+        Assert.True(ReportingCalendarPolicy.IsDailySubmissionBlockedDay(friday));  // الجمعة محظورة للإنشاء
+    }
+
+    // (D4-c) DailyExpectedDates لدورة W28 = 5 أيّام عمل فقط (الأحد 05 → الخميس 09)،
+    // مستبعِدةً السبت 04 (أرضية+عطلة) والجمعة 10 (عطلة).
+    [Fact]
+    public void DailyExpectedDates_W28_FiveBusinessDays_ExcludesFridaySaturday()
+    {
+        var today = new DateOnly(2026, 7, 24);
+        var dates = ReportingCalendarPolicy.DailyExpectedDates("2026-W28", today);
+        Assert.Equal(5, dates.Count);
+        Assert.Equal(new DateOnly(2026, 7, 5), dates[0]);   // الأحد
+        Assert.Equal(new DateOnly(2026, 7, 9), dates[^1]);  // الخميس
+        Assert.DoesNotContain(new DateOnly(2026, 7, 4), dates);   // السبت (أرضية الإطلاق + عطلة)
+        Assert.DoesNotContain(new DateOnly(2026, 7, 10), dates);  // الجمعة
+        Assert.All(dates, d => Assert.True(d.DayOfWeek is not (DayOfWeek.Friday or DayOfWeek.Saturday)));
     }
 
     // (D5) أسماء الأيام العربية + التسمية الكاملة «الثلاثاء 14 يوليو 2026».

@@ -257,13 +257,18 @@ public class ReportRemindersTests
     }
 
     // ===== 12) النوع 3 (يوميّ): صفّ لكل يوم عمل متأخّر في أسبوع ماضٍ كامل (5 أيام) =====
+    // DAILY-BUSINESS-DAY-COMPLIANCE-R1: أسبوع W28 (السبت 2026-07-04 → الجمعة 2026-07-10) هو أوّل
+    // أسبوع دورة بعد أرضيّة الإطلاق المؤسّسيّة (2026-07-04) وقد انقضى بالكامل قبل «اليوم» (2026-07-24).
+    // أيّام العمل المتوقَّعة فيه = الأحد→الخميس بعد الأرضية = 05,06,07,08,09 = 5 (السبت 04 عطلة،
+    // والجمعة 10 عطلة). لا يُستعمَل PastWeekKey (today−21 = 2026-07-03) لأنه أسبوع سابق للأرضية
+    // بالكامل ⇒ 0 متوقَّع ⇒ 0 تذكيرات تأخّر (السلوك الصحيح الموحَّد: لا تأخّر قبل إطلاق النظام).
     [Fact]
     public async Task Generate_DailyOverdue_PastWeek_CreatesRowPerWorkingDay()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var (_, userId) = await TestAuth.CreateUserAsync(_factory, "Employee");
         await SetupReportingRoleAsync(userId, "SALES_B2C");
-        var key = PastWeekKey();
+        const string key = "2026-W28"; // أوّل أسبوع دورة منقضٍ بعد أرضيّة الإطلاق
 
         await GenerateAsync(admin, new { weekKey = key });
 
@@ -272,7 +277,7 @@ public class ReportRemindersTests
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var count = await db.EmailNotifications.CountAsync(n =>
             n.CorrelationKey.StartsWith("report-overdue:") && n.CorrelationKey.EndsWith(suffix));
-        // أسبوع تشغيليّ كامل ماضٍ = 5 أيام عمل (خميس، أحد، اثنين، ثلاثاء، أربعاء).
+        // أيّام العمل بعد الأرضية في W28 = 05,06,07,08,09 = 5 (السبت 04 والجمعة 10 مستبعدان).
         Assert.Equal(5, count);
     }
 
@@ -464,20 +469,23 @@ public class ReportRemindersTests
     }
 
     // ===== 24) تقييد التاريخ: اليوميّ يقتصر على اليوم المحدّد فقط =====
+    // DAILY-BUSINESS-DAY-COMPLIANCE-R1: يُستعمَل أسبوع W28 المنقضي بعد الأرضية (لا PastWeekKey
+    // السابق للأرضية بالكامل الذي يُنتج 0 أيّام متوقَّعة). اليومان مختاران من أيّام العمل بعد
+    // الأرضية (الاثنين 07-06 والأربعاء 07-08) لضمان دخولهما التوقّع وفق العقد الموحَّد.
     [Fact]
     public async Task Generate_DateRestriction_LimitsDailyToSingleDay()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var (_, userId) = await TestAuth.CreateUserAsync(_factory, "Employee");
         await SetupReportingRoleAsync(userId, "SALES_B2C");
-        var key = PastWeekKey();
-        var (start, _) = ReportCalendarPolicy.WeekRange(key); // الخميس (يوم عمل)
-        var otherDay = start.AddDays(4); // الاثنين (يوم عمل مختلف)
+        const string key = "2026-W28";
+        var restrictedDay = new DateOnly(2026, 7, 6); // الاثنين — يوم عمل ضمن W28 بعد الأرضية
+        var otherDay = new DateOnly(2026, 7, 8);       // الأربعاء — يوم عمل مختلف بعد الأرضية
 
-        await GenerateAsync(admin, new { weekKey = key, date = DateKey(start) });
+        await GenerateAsync(admin, new { weekKey = key, date = DateKey(restrictedDay) });
 
         var suffix = $":{userId}:{DelayType.EmployeeReportNotSubmitted}";
-        Assert.Equal(1, await CountByKeyAsync($"report-overdue:{DateKey(start)}{suffix}"));
+        Assert.Equal(1, await CountByKeyAsync($"report-overdue:{DateKey(restrictedDay)}{suffix}"));
         Assert.Equal(0, await CountByKeyAsync($"report-overdue:{DateKey(otherDay)}{suffix}"));
     }
 
