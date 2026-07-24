@@ -52,16 +52,21 @@ const statusTone: Partial<Record<SubmissionStatus, 'navy' | 'success' | 'orange'
   Visible: 'success',
 };
 
-export default function SubmissionsPage() {
+// ROLE-AWARE-PERSONAL-REPORT-SUBMISSION-ACCESS-R1: personalOnly=true يعرض سطح «تقاريري» الشخصيّ فقط
+// (مسار /app/my-reports) موازيًا لسطح الفريق (/app/submissions) — لا يستبدل أحدهما الآخر ولا يخفي المسار
+// الشخصيّ عن القادة/الإدارة. مقاد بالمسار (route-aware) لا بأدوار مُصلَّبة داخل الصفحة.
+export default function SubmissionsPage({ personalOnly = false }: { personalOnly?: boolean } = {}) {
   // الحالة محفوظة في رابط الصفحة (?tab=&open=) لدعم الروابط العميقة من اللوحات.
   const [params, setParams] = useSearchParams();
   const { hasAnyRole, canApprove } = useAuth();
-  const isManagement = hasAnyRole(...MANAGEMENT_ROLES);
+  // في سطح «تقاريري» الشخصيّ لا يُفعَّل عرض الإدارة إطلاقًا (يبقى شخصيًّا محضًا).
+  const isManagement = !personalOnly && hasAnyRole(...MANAGEMENT_ROLES);
   const teamParam = params.get('team');
 
   const requested = params.get('tab');
-  const tab: Tab =
-    requested === 'pending' && canApprove
+  const tab: Tab = personalOnly
+    ? 'mine'
+    : requested === 'pending' && canApprove
       ? 'pending'
       : requested === 'mine'
         ? 'mine'
@@ -81,28 +86,33 @@ export default function SubmissionsPage() {
 
   // «بانتظار اعتمادي» يظهر فقط لمن يملك صلاحية الاعتماد (Admin/CEO/GM/Manager/TeamLeader).
   // الموظف/المُطّلع/مساند الإدارة لا يعتمدون تقارير الآخرين فلا يُعرض لهم التبويب.
-  const tabs: [Tab, string][] = [
-    ...(isManagement ? ([['all', 'كل التقارير']] as [Tab, string][]) : []),
-    ['mine', 'تقاريري'],
-    ...(canApprove ? ([['pending', 'بانتظار اعتمادي']] as [Tab, string][]) : []),
-  ];
+  // في سطح «تقاريري» الشخصيّ: لا شريط تبويبات (سطح واحد شخصيّ). في سطح الفريق: التبويبات المعتادة.
+  const tabs: [Tab, string][] = personalOnly
+    ? []
+    : [
+        ...(isManagement ? ([['all', 'كل التقارير']] as [Tab, string][]) : []),
+        ['mine', 'تقاريري'],
+        ...(canApprove ? ([['pending', 'بانتظار اعتمادي']] as [Tab, string][]) : []),
+      ];
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-navy">التقارير المقدمة</h1>
-      <div className="flex gap-2 border-b border-line">
-        {tabs.map(([k, label]) => (
-          <button
-            key={k}
-            onClick={() => setTab(k)}
-            className={`-mb-px border-b-2 px-4 py-2 text-sm font-semibold ${
-              tab === k ? 'border-orange text-navy' : 'border-transparent text-ink-2'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <h1 className="text-2xl font-bold text-navy">{personalOnly ? 'تقاريري' : 'التقارير المقدمة'}</h1>
+      {tabs.length > 0 && (
+        <div className="flex gap-2 border-b border-line">
+          {tabs.map(([k, label]) => (
+            <button
+              key={k}
+              onClick={() => setTab(k)}
+              className={`-mb-px border-b-2 px-4 py-2 text-sm font-semibold ${
+                tab === k ? 'border-orange text-navy' : 'border-transparent text-ink-2'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
       {tab === 'all' && isManagement && <AllReportsTab onOpen={open} initialTeam={teamParam} />}
       {tab === 'mine' && <MineTab onOpen={open} />}
       {tab === 'pending' && <PendingTab onOpen={open} />}

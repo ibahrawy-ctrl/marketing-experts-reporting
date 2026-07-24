@@ -233,7 +233,8 @@ public class DailyApplicabilityUnifiedOverdueTests
         var currentUser = new TestCurrentUser(actorId, roles);
         var scopeResolver = new ScopeResolver(db, currentUser);
         var grants = new ReportViewGrantService(db, currentUser, scope.ServiceProvider.GetRequiredService<IAuditService>());
-        var expected = new ExpectedSubmissionStatusResolver(db, clock);
+        var templates = new ReportTemplateService(db, currentUser, scopeResolver, null!);
+        var expected = new ExpectedSubmissionStatusResolver(db, clock, templates);
         var svc = new SubmissionService(db, currentUser, null!, null!, scopeResolver, null!, null!, grants, expected, clock);
         var result = await svc.GetOverviewAsync(filter);
         Assert.True(result.Succeeded, result.Error);
@@ -686,7 +687,8 @@ public class DailyApplicabilityUnifiedOverdueTests
         var currentUser = new TestCurrentUser(actorId, roles);
         var scopeResolver = new ScopeResolver(db, currentUser);
         var grants = new ReportViewGrantService(db, currentUser, null!); // قراءة فقط (لا تدقيق)
-        var expected = new ExpectedSubmissionStatusResolver(db, clock);
+        var templates = new ReportTemplateService(db, currentUser, scopeResolver, null!);
+        var expected = new ExpectedSubmissionStatusResolver(db, clock, templates);
         var svc = new SubmissionService(db, currentUser, null!, null!, scopeResolver, null!, null!, grants, expected, clock);
 
         counter.Reset();
@@ -978,8 +980,10 @@ public class DailyApplicabilityUnifiedOverdueTests
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var currentUser = new TestCurrentUser(uid, "Employee");
         var clock = new FixedClock(Fixed);
-        var svc = new ReportDueService(db, currentUser, new ScopeResolver(db, currentUser),
-            new ExpectedSubmissionStatusResolver(db, clock));
+        var scopeResolver = new ScopeResolver(db, currentUser);
+        var svc = new ReportDueService(db, currentUser, scopeResolver,
+            new ExpectedSubmissionStatusResolver(db, clock,
+                new ReportTemplateService(db, currentUser, scopeResolver, null!)));
 
         var r = await svc.MyStatusAsync(W28Key);
         Assert.True(r.Succeeded, r.Error);
@@ -1068,5 +1072,98 @@ public class DailyApplicabilityUnifiedOverdueTests
         var r = await svc.AggregateB2cByCourseAsync(filter);
         Assert.True(r.Succeeded, r.Error);
         Assert.Equal(1, r.Value!.SubmissionsConsidered); // لولا التطبيع لَكان 0.
+    }
+
+    // ============================================================================
+    // SUBMISSION-OVERVIEW-DAILY-CYCLEKEY-R1 (Phase 8) — فلتر مفتاح دورة أسبوعيّة (YYYY-Www) على
+    // العرض الموحّد يجب ألّا يُسقِط التسليمات اليوميّة الفعليّة الواقعة داخل الدورة (مفاتيحها YYYY-MM-DD
+    // أو صيغ قديمة) بالمطابقة النصّيّة، فيولّد لها «متوقّع مفقود» زائفًا. الحلّ: مطابقة اليوميّ باليوم
+    // المنطقيّ داخل نطاق الدورة (CanonicalDay ∈ CycleRange). الأسبوعيّ يبقى بالتساوي النصّيّ.
+    // ============================================================================
+
+    // ===== 43) Cadence=Daily + PeriodKey=W28Key: التسليم اليوميّ الفعليّ داخل الدورة يظهر ولا يُولَّد =====
+    // له «متوقّع مفقود» زائف (قبل الإصلاح كان يُسقَط نصّيًّا فيظهر كأنّه لم يُقدَّم).
+    [Fact]
+    public async Task D43_CycleKeyFilter_DailyCadence_ActualWithinCycle_ShownNoFalseExpected()
+    {
+        var (_, uid) = await TestAuth.CreateUserAsync(_factory, "Employee");
+        var s = await SeedDailyExpectedAsync(uid);
+        await InsertDailyAsync(s.VersionId, uid, Day07, SubmissionStatus.Submitted); // ثلاثاء داخل W28.
+
+        var o = await OverviewAsync(uid, new[] { "Employee" },
+            new UnifiedSubmissionFilter(PeriodKey: W28Key, Cadence: SubmissionCadenceFilter.Daily, PageSize: 1000));
+
+        // الصفّ الفعليّ لليوم داخل الدورة ظاهر (لم يُسقَط بمطابقة النصّ W28 ≠ 2026-07-07).
+        var actual = Assert.Single(Daily(o, uid),
+            x => x.RowKind == SubmissionRowKind.ExistingSubmission && x.PeriodKey == Day07);
+        Assert.True(actual.HasSubmission);
+        Assert.Equal(nameof(SubmissionStatus.Submitted), actual.Status);
+
+        // لا صفّ «متوقّع مفقود» زائف لنفس اليوم.
+        Assert.DoesNotContain(Daily(o, uid),
+            x => x.RowKind == SubmissionRowKind.ExpectedMissingSubmission && x.PeriodKey == Day07);
+
+        // بقيّة أيّام العمل داخل الدورة (بلا تسليم) تبقى متوقّعة (سلامة الاشتقاق لم تنكسر).
+        Assert.Contains(Daily(o, uid),
+            x => x.RowKind == SubmissionRowKind.ExpectedMissingSubmission && x.PeriodKey == Day05);
+    }
+
+    // ===== 44) Cadence=All + PeriodKey=W28Key: نفس الإثبات مع الدورية الشاملة (لا تحويل، لا إسقاط) =====
+    [Fact]
+    public async Task D44_CycleKeyFilter_AllCadence_DailyActualWithinCycle_Shown()
+    {
+        var (_, uid) = await TestAuth.CreateUserAsync(_factory, "Employee");
+        var s = await SeedDailyExpectedAsync(uid);
+        await InsertDailyAsync(s.VersionId, uid, Day07, SubmissionStatus.Submitted);
+
+        var o = await OverviewAsync(uid, new[] { "Employee" },
+            new UnifiedSubmissionFilter(PeriodKey: W28Key, Cadence: SubmissionCadenceFilter.All, PageSize: 1000));
+
+        var actual = Assert.Single(Daily(o, uid),
+            x => x.RowKind == SubmissionRowKind.ExistingSubmission && x.PeriodKey == Day07);
+        Assert.True(actual.HasSubmission);
+        Assert.DoesNotContain(Daily(o, uid),
+            x => x.RowKind == SubmissionRowKind.ExpectedMissingSubmission && x.PeriodKey == Day07);
+    }
+
+    // ===== 45) مفتاح يوميّ قديم (6-7-2026 ⇒ 07-06) داخل الدورة يُطابَق باليوم المنطقيّ لا بمدى نصّيّ ISO =====
+    // ⇒ يظهر بمفتاحه الخام ولا يُولَّد له «متوقّع مفقود» لليوم المنطقيّ 2026-07-06 (تحت فلتر W28Key).
+    [Fact]
+    public async Task D45_CycleKeyFilter_LegacyDailyKey_MatchedByCanonicalDay_NoFalseExpected()
+    {
+        var (_, uid) = await TestAuth.CreateUserAsync(_factory, "Employee");
+        var s = await SeedDailyExpectedAsync(uid);
+        await InsertDailyAsync(s.VersionId, uid, "6-7-2026", SubmissionStatus.Submitted); // يوم منطقيّ 07-06 داخل W28.
+
+        var o = await OverviewAsync(uid, new[] { "Employee" },
+            new UnifiedSubmissionFilter(PeriodKey: W28Key, Cadence: SubmissionCadenceFilter.Daily, PageSize: 1000));
+
+        var actual = Assert.Single(Daily(o, uid),
+            x => x.RowKind == SubmissionRowKind.ExistingSubmission);
+        Assert.Equal("6-7-2026", actual.PeriodKey); // المفتاح الخام لم يُعَد كتابته.
+        // لا «متوقّع مفقود» لليوم المنطقيّ 2026-07-06 (المطابقة على اليوم لا على مدى نصّيّ يُسقِط الصيغ القديمة).
+        Assert.DoesNotContain(Daily(o, uid),
+            x => x.RowKind == SubmissionRowKind.ExpectedMissingSubmission && x.PeriodKey == "2026-07-06");
+    }
+
+    // ===== 46) انحدار: التسليم الأسبوعيّ الفعليّ ما زال يُطابَق بالتساوي النصّيّ تحت فلتر مفتاح الدورة =====
+    [Fact]
+    public async Task D46_CycleKeyFilter_WeeklyActual_StillMatchedByExactKey()
+    {
+        var (_, uid) = await TestAuth.CreateUserAsync(_factory, "Employee");
+        var s = await SeedWeeklyExpectedAsync(uid);
+        await InsertWeeklyAsync(s.VersionId, uid, W28Key, SubmissionStatus.Submitted);
+
+        var o = await OverviewAsync(uid, new[] { "Employee" },
+            new UnifiedSubmissionFilter(PeriodKey: W28Key, PageSize: 1000));
+
+        var weekly = Assert.Single(o.Items,
+            x => x.SubmitterId == uid && x.PeriodType == PeriodType.Weekly
+                 && x.RowKind == SubmissionRowKind.ExistingSubmission);
+        Assert.Equal(W28Key, weekly.PeriodKey);
+        // لا «متوقّع مفقود» أسبوعيّ زائف لنفس الدورة (التسليم الفعليّ يكبته عبر existingKeys).
+        Assert.DoesNotContain(o.Items,
+            x => x.SubmitterId == uid && x.PeriodType == PeriodType.Weekly
+                 && x.RowKind == SubmissionRowKind.ExpectedMissingSubmission && x.PeriodKey == W28Key);
     }
 }

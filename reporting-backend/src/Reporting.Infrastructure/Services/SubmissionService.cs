@@ -299,12 +299,35 @@ public class SubmissionService : ISubmissionService
             return Result<SubmissionDto>.Failure(string.Join("، ", gridErrors), "submission.grid_invalid");
 
         var me = await _db.Users.FirstOrDefaultAsync(u => u.Id == submission.SubmitterId, ct);
-        // APPROVAL-FALLBACK-R1: تحديد أول معتمِد عبر سلسلة احتياطية بدل الاعتماد على المدير المباشر وحده.
-        // الترتيب: قائد فريق المقدّم ← المدير المباشر (ManagerId) ← أول مدير عام نشط ← أول Admin/CEO نشط.
-        // لا يُغلق التقرير لمجرد غياب قائد الفريق أو المدير طالما وُجد بديل أعلى، مع تفادي اعتماد المقدّم لنفسه.
-        var firstApproverId = me is null
-            ? (Guid?)null
-            : await ResolveFirstApproverAsync(me.Id, me.TeamId, me.ManagerId, ct);
+        // ROLE-AWARE-PERSONAL-REPORT-SUBMISSION-ACCESS-R1: تجاوز صريح لمعتمِد التقارير له الأولوية القصوى
+        // على السلسلة الاحتياطية بأكملها. إن ضُبط ReportApproverOverrideUserId لصاحب التسليم ⇒ يجب أن يكون
+        // مستخدِمًا موجودًا ونشطًا وليس صاحب التسليم؛ عندها يصبح هو المعتمِد المبدئي وCurrentApproverId مباشرةً
+        // دون خطوة قائد فريق/مدير قبله. إن كان التجاوز غير صالح (غير موجود/غير نشط/صاحب التقرير نفسه) ⇒ خطأ
+        // إعداد صريح `approval.override_invalid` مع تدقيق، بلا تجاهل صامت وبلا سقوط للمسار القديم.
+        // الأولوية: التجاوز الصريح ← المسار الحالي (ResolveFirstApproverAsync) ← الاحتياطي القائم.
+        Guid? firstApproverId;
+        if (me?.ReportApproverOverrideUserId is Guid overrideApproverId)
+        {
+            if (overrideApproverId == submission.SubmitterId
+                || !await IsActiveUserAsync(overrideApproverId, ct))
+            {
+                await _audit.LogAsync(_currentUser.UserId, "submission.approver_override_invalid",
+                    nameof(ReportSubmission), submission.Id, ct: ct);
+                return Result<SubmissionDto>.Failure(
+                    "إعداد معتمِد التقارير غير صالح (المستخدم غير موجود أو غير نشط أو هو صاحب التقرير).",
+                    "approval.override_invalid");
+            }
+            firstApproverId = overrideApproverId;
+        }
+        else
+        {
+            // APPROVAL-FALLBACK-R1: تحديد أول معتمِد عبر سلسلة احتياطية بدل الاعتماد على المدير المباشر وحده.
+            // الترتيب: قائد فريق المقدّم ← المدير المباشر (ManagerId) ← أول مدير عام نشط ← أول Admin/CEO نشط.
+            // لا يُغلق التقرير لمجرد غياب قائد الفريق أو المدير طالما وُجد بديل أعلى، مع تفادي اعتماد المقدّم لنفسه.
+            firstApproverId = me is null
+                ? (Guid?)null
+                : await ResolveFirstApproverAsync(me.Id, me.TeamId, me.ManagerId, ct);
+        }
 
         submission.Status = SubmissionStatus.Submitted;
         submission.SubmittedAtUtc = DateTime.UtcNow;
@@ -814,7 +837,23 @@ public class SubmissionService : ISubmissionService
 
         // فلاتر العرض الموحّد على الصفوف الفعليّة (تنطبق أيضًا لاحقًا على الصفّ المتوقّع).
         if (filter.Status is not null) q = q.Where(s => s.Status == filter.Status);
-        if (periodKeyFilter is not null) q = q.Where(s => s.PeriodKey == periodKeyFilter);
+        // SUBMISSION-OVERVIEW-DAILY-CYCLEKEY-R1 (Phase 8): مفتاح فلتر الفترة قد يكون مفتاح دورة
+        // أسبوعيّة (YYYY-Www). المطابقة بالتساوي النصّيّ تُسقِط التسليمات اليوميّة الفعليّة (مفاتيحها
+        // YYYY-MM-DD أو صيغ قديمة) الواقعة داخل الدورة، فتُولَّد لها صفوف «متوقّع مفقود» زائفة.
+        // الحلّ (الخيار 1): عند مفتاح دورة صالح، تُطابَق التسليمات اليوميّة بيومها المنطقيّ داخل نطاق
+        // الدورة (CanonicalDay ∈ CycleRange) بتنقية في الذاكرة أدناه، بينما تبقى الأسبوعيّة بالتساوي.
+        var cycleKeyFilter = periodKeyFilter is not null
+            && ReportingCalendarPolicy.IsValidCycleKey(periodKeyFilter)
+                ? periodKeyFilter : null;
+        if (periodKeyFilter is not null)
+        {
+            if (cycleKeyFilter is not null)
+                // الأسبوعيّ يُطابَق نصّيًّا في القاعدة؛ اليوميّ يُجلَب ثم يُنقَّح منطقيًّا في الذاكرة أدناه.
+                q = q.Where(s => (s.PeriodType == PeriodType.Weekly && s.PeriodKey == periodKeyFilter)
+                                 || s.PeriodType == PeriodType.Daily);
+            else
+                q = q.Where(s => s.PeriodKey == periodKeyFilter);
+        }
         if (filter.SubmitterId is not null) q = q.Where(s => s.SubmitterId == filter.SubmitterId);
         if (filter.TeamId is not null) q = q.Where(s => s.TeamId == filter.TeamId);
         if (filter.DepartmentId is not null) q = q.Where(s => s.DepartmentId == filter.DepartmentId);
@@ -842,6 +881,18 @@ public class SubmissionService : ISubmissionService
                 s.CurrentApproverId
             })
             .ToListAsync(ct);
+
+        // SUBMISSION-OVERVIEW-DAILY-CYCLEKEY-R1: تنقية منطقيّة للتسليمات اليوميّة عند فلتر مفتاح دورة —
+        // تُستبقى فقط الصفوف اليوميّة التي يقع يومها المنطقيّ داخل نطاق الدورة (تغطّي الصيغ غير القياسية
+        // مثل 6-7-2026 التي يتعذّر مطابقتها نصّيًّا في القاعدة). الأسبوعيّة مُطابَقة نصّيًّا مسبقًا فتمرّ.
+        if (cycleKeyFilter is not null)
+        {
+            var (cycleStart, cycleEnd) = ReportingCalendarPolicy.CycleRange(cycleKeyFilter);
+            actualRaw = actualRaw.Where(r =>
+                r.PeriodType != PeriodType.Daily
+                || (ReportingCalendarPolicy.TryCanonicalDay(r.PeriodKey, out var cd)
+                    && cd >= cycleStart && cd <= cycleEnd)).ToList();
+        }
 
         // تسميات دفعيّة (أسماء المُرسِلين/الفِرَق/الإدارات) + الأدوار الأساسيّة لاشتقاق موعد الاستحقاق (بلا N+1).
         var submitterIds = actualRaw.Select(r => r.SubmitterId).Distinct().ToList();

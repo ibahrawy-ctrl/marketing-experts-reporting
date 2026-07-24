@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Reporting.Application.Common;
 using Reporting.Application.Reports;
+using Reporting.Application.Templates;
 using Reporting.Domain.Entities.Org;
 using Reporting.Domain.Entities.Submissions;
 using Reporting.Domain.Entities.Templates;
@@ -101,7 +102,8 @@ public class ExpectedSubmissionStatusResolverTests
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var resolver = new ExpectedSubmissionStatusResolver(db, new FixedClock(Fixed));
+        var templates = scope.ServiceProvider.GetRequiredService<IReportTemplateService>();
+        var resolver = new ExpectedSubmissionStatusResolver(db, new FixedClock(Fixed), templates);
         var results = await resolver.ResolveAsync(new ExpectedStatusQuery(new[] { userId }, new[] { key }, null));
         return results.FirstOrDefault();
     }
@@ -243,7 +245,8 @@ public class ExpectedSubmissionStatusResolverTests
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var resolver = new ExpectedSubmissionStatusResolver(db, new FixedClock(Fixed));
+        var templates = scope.ServiceProvider.GetRequiredService<IReportTemplateService>();
+        var resolver = new ExpectedSubmissionStatusResolver(db, new FixedClock(Fixed), templates);
         var proj = await resolver.ResolveManagementAsync(PastKey(), new[] { u1, u2 });
 
         Assert.Equal(2, proj.Expected);
@@ -267,7 +270,8 @@ public class ExpectedSubmissionStatusResolverTests
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var resolver = new ExpectedSubmissionStatusResolver(db, new FixedClock(Fixed));
+        var templates = scope.ServiceProvider.GetRequiredService<IReportTemplateService>();
+        var resolver = new ExpectedSubmissionStatusResolver(db, new FixedClock(Fixed), templates);
         var self = await resolver.ResolveSelfAsync(uid, new[] { CurrentKey(), PastKey() });
 
         Assert.NotNull(self.CurrentCycle);
@@ -279,5 +283,58 @@ public class ExpectedSubmissionStatusResolverTests
         Assert.True(hist.IsHistorical);
         Assert.True(hist.IsActionable);
         Assert.Equal(ExpectedSubmissionStatus.OverdueNotSubmitted, hist.Status);
+    }
+
+    /// <summary>يضيف استثناءً صريحًا على مستوى الموظّف (Employee/Exclude) للقالب المرتبط بالإصدار.</summary>
+    private async Task ExcludeUserFromTemplateAsync(Guid versionId, Guid userId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var templateId = await db.ReportTemplateVersions
+            .Where(v => v.Id == versionId).Select(v => v.ReportTemplateId).FirstAsync();
+        db.ReportTemplateAssignments.Add(new ReportTemplateAssignment
+        {
+            ReportTemplateId = templateId,
+            ScopeType = TemplateAssignmentScope.Employee,
+            ScopeId = userId,
+            Kind = TemplateAssignmentKind.Exclude,
+            IsActive = true
+        });
+        await db.SaveChangesAsync();
+    }
+
+    // ===== عقد الاستحقاق المركزي (REPORT-EXPECTED-ENTITLEMENT-CONTRACT-R1) — PHASE 7 =====
+    // يُثبِت أنّ التوقّع مُقيَّد بحارس الإسناد المركزي نفسه (IsTemplateAssignedToUserAsync) مصدر
+    // CanSubmit الوحيد؛ فيُمنَع منطقيًّا Expected=true مع CanSubmit=false.
+
+    // (سلبيّ) قالب أساسي أسبوعيّ مرتبط بالمسمّى، لكن يوجد استثناء صريح Employee/Exclude لهذا
+    // (المستخدم، القالب) ⇒ لا يستطيع الإنشاء ⇒ يجب ألّا يُولَّد صفّ «متوقّع» إطلاقًا.
+    [Fact]
+    public async Task Entitlement_EmployeeExclude_ProducesNoExpectedRow()
+    {
+        var (_, uid) = await TestAuth.CreateUserAsync(_factory, "Employee");
+        var vid = await SetupAsync(uid, EarlyAnchor);
+        // ضبط أوّليّ: بلا استثناء ⇒ التوقّع قائم (ضابط قبليّ داخل نفس الاختبار).
+        var before = await ResolveOneAsync(uid, CurrentKey());
+        Assert.NotNull(before);
+        Assert.True(before!.IsExpected);
+
+        await ExcludeUserFromTemplateAsync(vid, uid);
+
+        var after = await ResolveOneAsync(uid, CurrentKey());
+        // العقد: لا صفّ متوقّع (المستخدم مُستثنى ⇒ CanSubmit=false ⇒ Expected مستحيل).
+        Assert.Null(after);
+    }
+
+    // (إيجابيّ — ضابط) مستخدم مرتبط بالمسمّى فقط بلا أيّ استثناء ⇒ يبقى متوقَّعًا (Expected=true).
+    [Fact]
+    public async Task Entitlement_JobRoleOnly_RemainsExpected()
+    {
+        var (_, uid) = await TestAuth.CreateUserAsync(_factory, "Employee");
+        await SetupAsync(uid, EarlyAnchor);
+        var r = await ResolveOneAsync(uid, CurrentKey());
+        Assert.NotNull(r);
+        Assert.True(r!.IsExpected);
+        Assert.Equal(ExpectedSubmissionStatus.NotStartedWithinDeadline, r.Status);
     }
 }

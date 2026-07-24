@@ -73,7 +73,11 @@ export const MODULES: NavModule[] = [
     label: 'التقارير',
     icon: 'reports',
     tabs: [
-      { to: '/app/submissions', label: 'التقارير المقدَّمة', keywords: 'تقرير تسليم' },
+      // ROLE-AWARE-PERSONAL-REPORT-SUBMISSION-ACCESS-R1: مساران متوازيان — «تقاريري» الشخصيّ (لكل
+      // مصادَق عليه: إنشاء/مسودة/إرسال/متابعة) و«تقارير الفريق» الإداريّ (لمن له عرض الفريق). لا يخفي
+      // أحدهما الآخر ولا يستبدله. الحماية الفعلية مفروضة خادميًّا.
+      { to: '/app/my-reports', label: 'تقاريري', keywords: 'تقريري إنشاء مسودة إرسال تسليم' },
+      { to: '/app/submissions', label: 'تقارير الفريق', roles: EXEC_VIEW, keywords: 'تقرير تسليم كل التقارير الفريق' },
       { to: '/app/report-calendar', label: 'تقويم التقارير', keywords: 'مواعيد جدول' },
       { to: '/app/compliance', label: 'متابعة الالتزام بالتقارير', roles: COMPLETION },
       { to: '/app/workflows', label: 'مسارات الاعتماد', roles: EXEC_VIEW, keywords: 'اعتماد موافقة' },

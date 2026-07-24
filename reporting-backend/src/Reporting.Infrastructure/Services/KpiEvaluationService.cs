@@ -220,7 +220,17 @@ public class KpiEvaluationService : IKpiEvaluationService
 
         // إسناد مُراجِع إلزاميّ (ADMIN-GOVERNANCE-R1، تصحيح #6): المدير الأعلى للمُدخِل ثم GM ثم CEO ثم Admin (break-glass).
         // لا يجوز أن يكون المُراجِع هو الموضوع أو المُدخِل. نضمن عدم بقاء تقييم بلا مُراجِع.
-        var reviewerId = await ResolveReviewerAsync(e, ct);
+        // ROLE-AWARE-PERSONAL-REPORT-SUBMISSION-ACCESS-R1: تجاوز مراجِع KPI الصريح له الأولوية القصوى؛
+        // وإن كان غير صالح لا نتجاهله بصمت بل نُرجِع خطأ إعداد واضحًا.
+        var (reviewerOutcome, reviewerId) = await ResolveReviewerWithOverrideAsync(e, ct);
+        if (reviewerOutcome == ReviewerResolution.InvalidOverride)
+        {
+            await _audit.LogAsync(_currentUser.UserId, "kpi.reviewer_override_invalid",
+                nameof(KpiEvaluation), e.Id, ct: ct);
+            return Result<KpiEvaluationDto>.Failure(
+                "إعداد مراجِع KPI غير صالح (المستخدم غير موجود أو غير نشط أو هو الموضوع أو المُدخِل).",
+                "kpi.reviewer_override_invalid");
+        }
         if (reviewerId is not Guid reviewer)
             return Result<KpiEvaluationDto>.Failure(
                 "تعذّر إسناد مُراجِع لهذا التقييم؛ لا يوجد مسؤول أعلى متاح للمراجعة.", "kpi_eval.no_reviewer.conflict");
@@ -429,8 +439,21 @@ public class KpiEvaluationService : IKpiEvaluationService
         var snapshot = BuildSnapshot(e);
 
         // إعادة إسناد مُراجِع إن لم يكن معيَّنًا (توافق خلفيّ للسجلّات القديمة).
+        // ROLE-AWARE-PERSONAL-REPORT-SUBMISSION-ACCESS-R1: يُطبَّق تجاوز مراجِع KPI الصريح هنا أيضًا،
+        // وإن كان غير صالح لا نتجاهله بصمت بل نُرجِع خطأ إعداد واضحًا.
         if (e.ReviewerId is null)
-            e.ReviewerId = await ResolveReviewerAsync(e, ct);
+        {
+            var (reopenOutcome, reopenReviewerId) = await ResolveReviewerWithOverrideAsync(e, ct);
+            if (reopenOutcome == ReviewerResolution.InvalidOverride)
+            {
+                await _audit.LogAsync(_currentUser.UserId, "kpi.reviewer_override_invalid",
+                    nameof(KpiEvaluation), e.Id, ct: ct);
+                return Result<KpiEvaluationDto>.Failure(
+                    "إعداد مراجِع KPI غير صالح (المستخدم غير موجود أو غير نشط أو هو الموضوع أو المُدخِل).",
+                    "kpi.reviewer_override_invalid");
+            }
+            e.ReviewerId = reopenReviewerId;
+        }
 
         e.Status = KpiEvaluationStatus.UnderReview;
         e.ReviewedAtUtc = null;
@@ -799,15 +822,79 @@ public class KpiEvaluationService : IKpiEvaluationService
     }
 
     /// <summary>
-    /// إسناد مُراجِع: سلسلة المدير الأعلى انطلاقًا من المُدخِل ثم GM ثم CEO ثم Admin (break-glass).
-    /// يستبعد الموضوع والمُدخِل ويشترط أن يكون المُراجِع نشطًا. يضمن قدر الإمكان عدم إرجاع null.
+    /// نتيجة محاولة إسناد المُراجِع: تمييز صريح بين النجاح، وتجاوز صريح غير صالح (خطأ إعداد لا يُتجاهَل
+    /// بصمت)، وعدم توفّر أيّ مُراجِع (ROLE-AWARE-PERSONAL-REPORT-SUBMISSION-ACCESS-R1).
+    /// </summary>
+    private enum ReviewerResolution { Resolved, InvalidOverride, NoReviewer }
+
+    /// <summary>
+    /// إسناد مُراجِع KPI مع مراعاة التجاوز الصريح (ROLE-AWARE-PERSONAL-REPORT-SUBMISSION-ACCESS-R1):
+    /// إن كان لموضوع التقييم KpiReviewerOverrideUserId مضبوطًا ⇒ له الأولوية القصوى، ويُقبَل فقط إن كان
+    /// المستخدم موجودًا ونشطًا وليس الموضوع نفسه وليس المُدخِل (Evaluator)؛ خلاف ذلك يُرجَع InvalidOverride
+    /// (خطأ إعداد صريح لا سقوط صامت). إن كان التجاوز NULL ⇒ يُفوَّض الأمر إلى ResolveReviewerAsync الحاليّ
+    /// دون أيّ تغيير في سلوكه. لا يمسّ ManagerId/TeamId ولا الهيكل التنظيمي.
+    /// </summary>
+    private async Task<(ReviewerResolution Outcome, Guid? ReviewerId)> ResolveReviewerWithOverrideAsync(
+        KpiEvaluation e, CancellationToken ct)
+    {
+        var overrideId = await _db.Users.AsNoTracking()
+            .Where(u => u.Id == e.SubjectUserId)
+            .Select(u => u.KpiReviewerOverrideUserId)
+            .FirstOrDefaultAsync(ct);
+        if (overrideId is Guid ovr)
+        {
+            var isSubject = ovr == e.SubjectUserId;
+            var isEvaluator = e.EvaluatorId is Guid evId && ovr == evId;
+            var isActive = !isSubject && !isEvaluator
+                && await _db.Users.AsNoTracking().AnyAsync(u => u.Id == ovr && u.IsActive, ct);
+            return isActive
+                ? (ReviewerResolution.Resolved, ovr)
+                : (ReviewerResolution.InvalidOverride, (Guid?)null);
+        }
+
+        var resolved = await ResolveReviewerAsync(e, ct);
+        return resolved is Guid r
+            ? (ReviewerResolution.Resolved, r)
+            : (ReviewerResolution.NoReviewer, (Guid?)null);
+    }
+
+    /// <summary>
+    /// إسناد مُراجِع KPI (ROLE-AWARE-PERSONAL-REPORT-R1 — Phase 6): يتبع سلسلة اعتماد الموضوع نفسها
+    /// المستخدَمة في اعتماد التقارير (APPROVAL-FALLBACK-R1)، مُوجَّهة بالبيانات لا بالهويّات المضمّنة:
+    /// (1) قائد فريق الموضوع (ما لم يكن الموضوع BypassTeamLeaderApproval=true والفريق/القائد نشط) ثم
+    /// المدير المباشر للموضوع (ManagerId نشط). بذلك من ضُبط ManagerId له إلى مسؤول بعينه (+Bypass لقائد
+    /// الفريق) تُوجَّه مراجعة KPI إلى ذلك المسؤول مباشرةً بلا مرحلة وسيطة. يستبعد الموضوع والمُدخِل دائمًا.
+    /// ثمّ (2) صعود سلسلة مدير المُدخِل (السلوك السابق) و(3) تصعيد بالدور GM←CEO←Admin كاحتياطيّ يضمن
+    /// قدر الإمكان عدم إرجاع null. يشترط أن يكون المُراجِع نشطًا في كل الحالات.
     /// </summary>
     private async Task<Guid?> ResolveReviewerAsync(KpiEvaluation e, CancellationToken ct)
     {
         var exclude = new HashSet<Guid> { e.SubjectUserId };
         if (e.EvaluatorId is Guid ev) exclude.Add(ev);
 
-        // 1) صعود سلسلة المدير انطلاقًا من المُدخِل (المُقيّم).
+        // 1) سلسلة اعتماد الموضوع (مطابِقة لتوجيه اعتماد التقارير، مُوجَّهة بالبيانات):
+        //    قائد فريق الموضوع (ما لم يكن Bypass) ← المدير المباشر للموضوع.
+        var subject = await _db.Users.AsNoTracking()
+            .Where(u => u.Id == e.SubjectUserId)
+            .Select(u => new { u.TeamId, u.ManagerId, u.BypassTeamLeaderApproval })
+            .FirstOrDefaultAsync(ct);
+        if (subject is not null)
+        {
+            if (!subject.BypassTeamLeaderApproval && subject.TeamId is Guid stid)
+            {
+                var tlId = await _db.Teams.AsNoTracking()
+                    .Where(t => t.Id == stid && t.IsActive)
+                    .Select(t => t.TeamLeaderId).FirstOrDefaultAsync(ct);
+                if (tlId is Guid tl && !exclude.Contains(tl)
+                    && await _db.Users.AsNoTracking().AnyAsync(u => u.Id == tl && u.IsActive, ct))
+                    return tl;
+            }
+            if (subject.ManagerId is Guid smgr && !exclude.Contains(smgr)
+                && await _db.Users.AsNoTracking().AnyAsync(u => u.Id == smgr && u.IsActive, ct))
+                return smgr;
+        }
+
+        // 2) صعود سلسلة المدير انطلاقًا من المُدخِل (المُقيّم) — احتياطيّ.
         var visited = new HashSet<Guid>();
         Guid? cursor = e.EvaluatorId;
         while (cursor is Guid cid && visited.Add(cid))

@@ -116,6 +116,9 @@ it('وحدات الشريط الجانبي وتبويبات وحدة التقا�
   // وحدات رئيسية في الشريط الجانبي.
   expect(screen.getByText('الرئيسية')).toBeInTheDocument();
   // تبويبات وحدة التقارير النشطة (اللصيقة بالمسمّى الحرفي في navConfig).
-  expect(screen.getByText('التقارير المقدَّمة')).toBeInTheDocument();
+  // ROLE-AWARE-PERSONAL-REPORT-SUBMISSION-ACCESS-R1: مساران متوازيان — «تقاريري» الشخصيّ (لكل مصادَق
+  // عليه) و«تقارير الفريق» الإداريّ (EXEC_VIEW). الأدمن يرى كليهما دون أن يستبدل أحدهما الآخر.
+  expect(screen.getByText('تقاريري')).toBeInTheDocument();
+  expect(screen.getByText('تقارير الفريق')).toBeInTheDocument();
   expect(screen.getByText('تقويم التقارير')).toBeInTheDocument();
 });

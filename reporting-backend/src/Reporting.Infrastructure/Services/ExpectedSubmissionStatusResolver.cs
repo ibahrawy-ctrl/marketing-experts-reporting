@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Reporting.Application.Common;
 using Reporting.Application.Reports;
+using Reporting.Application.Templates;
 using Reporting.Domain.Common;
 using Reporting.Domain.Enums;
 using Reporting.Infrastructure.Persistence;
@@ -18,13 +19,15 @@ public sealed class ExpectedSubmissionStatusResolver : IExpectedSubmissionStatus
 {
     private readonly AppDbContext _db;
     private readonly ISystemClock _clock;
+    private readonly IReportTemplateService _templates;
 
     private static readonly TimeSpan Riyadh = ReportingCalendarPolicy.RiyadhOffset;
 
-    public ExpectedSubmissionStatusResolver(AppDbContext db, ISystemClock clock)
+    public ExpectedSubmissionStatusResolver(AppDbContext db, ISystemClock clock, IReportTemplateService templates)
     {
         _db = db;
         _clock = clock;
+        _templates = templates;
     }
 
     public async Task<IReadOnlyList<ExpectedCycleResult>> ResolveAsync(ExpectedStatusQuery query, CancellationToken ct = default)
@@ -140,12 +143,24 @@ public sealed class ExpectedSubmissionStatusResolver : IExpectedSubmissionStatus
         var currentCycleKey = ReportingCalendarPolicy.CycleKeyFor(ReportingCalendarPolicy.RiyadhDate(now.UtcDateTime));
         var currentCycleStart = ReportingCalendarPolicy.CycleRange(currentCycleKey).Start;
 
+        // REPORT-EXPECTED-ENTITLEMENT-CONTRACT-R1 (عقد الاستحقاق المركزي): لا يُولَّد صفّ «متوقّع»
+        // لقالب لا يستطيع المستخدم إنشاء تقرير به فعليًّا. نمرّ بنفس حارس الإسناد المركزي — لكن بنسخته
+        // المُجمَّعة (ResolveAssignedTemplatesForUsersAsync، عدد استعلامات ثابت لا N+1) المطابقة حرفيًّا
+        // لمنطق IsTemplateAssignedToUserAsync ذاته — فيُستبعَد من التوقّع أيّ (مستخدم، قالب) مُستثنى عبر
+        // إسناد Employee/Team/Department. يضمن ثبات العقد: يُمنَع منطقيًّا Expected=true مع CanSubmit=false.
+        var assignedByUser = await _templates.ResolveAssignedTemplatesForUsersAsync(
+            users.Select(x => x.Id).ToList(), ct);
+
         var results = new List<ExpectedCycleResult>(users.Count * keys.Count);
 
         foreach (var u in users)
         {
             if (u.JobRoleId is not Guid userJobRole) continue;
             if (!templateByJobRole.TryGetValue(userJobRole, out var tpl)) continue; // لا قالب مطالبة ⇒ خارج المسار.
+
+            // بوّابة الاستحقاق: القالب يجب أن يكون ضمن قوالب المستخدم المُسنَدة فعليًّا (= CanSubmit).
+            if (!(assignedByUser.TryGetValue(u.Id, out var assignedTpls) && assignedTpls.Contains(tpl.Id)))
+                continue;
 
             var role = RoleAccess.PrimaryRole(rolesByUser.GetValueOrDefault(u.Id) ?? new List<string>());
 

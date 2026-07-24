@@ -154,8 +154,9 @@ public class UnifiedSubmissionOverviewTests
         var currentUser = new TestCurrentUser(actorId, roles);
         var scopeResolver = new ScopeResolver(db, currentUser);
         var grants = new ReportViewGrantService(db, currentUser, scope.ServiceProvider.GetRequiredService<IAuditService>());
-        var expected = new ExpectedSubmissionStatusResolver(db, clock);
-        // notifications/audit/access/templates غير مستخدمة في GetOverviewAsync (مسار قراءة فقط).
+        var templates = new ReportTemplateService(db, currentUser, scopeResolver, null!);
+        var expected = new ExpectedSubmissionStatusResolver(db, clock, templates);
+        // notifications/audit/access غير مستخدمة في GetOverviewAsync (مسار قراءة فقط).
         var svc = new SubmissionService(db, currentUser, null!, null!, scopeResolver, null!, null!, grants, expected, clock);
         var result = await svc.GetOverviewAsync(filter);
         Assert.True(result.Succeeded, result.Error);
@@ -1095,7 +1096,8 @@ public class UnifiedSubmissionOverviewTests
         var currentUser = new TestCurrentUser(actorId, roles);
         var scopeResolver = new ScopeResolver(db, currentUser);
         var grants = new ReportViewGrantService(db, currentUser, null!); // ResolveGrantedSubmitterIdsAsync قراءة فقط (لا تدقيق)
-        var expected = new ExpectedSubmissionStatusResolver(db, clock);
+        var templates = new ReportTemplateService(db, currentUser, scopeResolver, null!);
+        var expected = new ExpectedSubmissionStatusResolver(db, clock, templates);
         var svc = new SubmissionService(db, currentUser, null!, null!, scopeResolver, null!, null!, grants, expected, clock);
 
         counter.Reset();

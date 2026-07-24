@@ -152,6 +152,10 @@ const APP_ROUTES: { path: string; element: ReactNode; roles?: Role[] }[] = [
   { path: '/app/my-kpi', element: <MyKpiPage /> },
   { path: '/app/employees/:userId/kpi', element: <EmployeeKpiPage /> },
   { path: '/app/submissions', element: <SubmissionsPage /> },
+  // ROLE-AWARE-PERSONAL-REPORT-SUBMISSION-ACCESS-R1: سطح «تقاريري» الشخصيّ الموازي — متاح لكل مصادَق
+  // عليه (لا بوابة أدوار)، يُثبّت العرض على تقارير المستخدم نفسه (إنشاء/مسودة/إرسال/متابعة). لا يستبدل
+  // سطح الفريق /app/submissions ولا يخفيه عن القادة/الإدارة.
+  { path: '/app/my-reports', element: <SubmissionsPage personalOnly /> },
   // الإجازات والاستئذانات (V1.0.1): متاح لكل مصادَق عليه — النطاق والدور مفروضان خادمًا.
   { path: '/app/leave-requests', element: <LeaveRequestsPage /> },
   // خدمات الموظف (V1.1): الأرصدة وطلبات الموارد البشرية — متاح لكل مصادَق عليه (النطاق مفروض خادمًا).

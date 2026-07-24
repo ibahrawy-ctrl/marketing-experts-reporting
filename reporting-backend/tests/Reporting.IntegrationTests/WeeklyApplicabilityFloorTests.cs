@@ -182,7 +182,8 @@ public class WeeklyApplicabilityFloorTests
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var resolver = new ExpectedSubmissionStatusResolver(db, new FixedClock(Fixed));
+        var templates = scope.ServiceProvider.GetRequiredService<IReportTemplateService>();
+        var resolver = new ExpectedSubmissionStatusResolver(db, new FixedClock(Fixed), templates);
         var proj = await resolver.ResolveManagementAsync(PreFloorCycleKey(), new[] { uid });
 
         Assert.Equal(0, proj.Expected);
@@ -411,7 +412,8 @@ public class WeeklyApplicabilityFloorTests
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var resolver = new ExpectedSubmissionStatusResolver(db, new FixedClock(Fixed));
+        var templates = scope.ServiceProvider.GetRequiredService<IReportTemplateService>();
+        var resolver = new ExpectedSubmissionStatusResolver(db, new FixedClock(Fixed), templates);
         var results = await resolver.ResolveAsync(new ExpectedStatusQuery(new[] { userId }, new[] { key }, null));
         return results.FirstOrDefault();
     }
