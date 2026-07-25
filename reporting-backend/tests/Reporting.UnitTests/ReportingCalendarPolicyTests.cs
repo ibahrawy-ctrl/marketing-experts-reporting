@@ -313,4 +313,134 @@ public class ReportingCalendarPolicyTests
         Assert.Equal(prev, ReportingCalendarPolicy.PreviousDayKey(date));
         Assert.Equal(next, ReportingCalendarPolicy.NextDayKey(date));
     }
+
+    // ===== سريان سبت المبيعات (SALES-DAILY-SATURDAY-APPLICABILITY-HOTFIX-R1) — القسم D7 =====
+
+    // (D7-1) الأرضية الثابتة = 2026-07-25 وهي **سبت** (لا التزام سبتٍ قبلها لأيّ دور).
+    [Fact]
+    public void SalesSaturdayApplicabilityFloor_Is_2026_07_25_Saturday()
+    {
+        Assert.Equal(new DateOnly(2026, 7, 25), ReportingCalendarPolicy.SalesSaturdayApplicabilityFloor);
+        Assert.Equal(DayOfWeek.Saturday, ReportingCalendarPolicy.SalesSaturdayApplicabilityFloor.DayOfWeek);
+        // الأرضية داخل دورة W31 (السبت الافتتاحيّ لها).
+        Assert.Equal("2026-W31", ReportingCalendarPolicy.CycleKeyFor(ReportingCalendarPolicy.SalesSaturdayApplicabilityFloor));
+    }
+
+    // (D7-2) تفعيل السبت مقصور على المسمّيات اليومية القانونيّة (SALES_B2B/SALES_B2C) — غيرهم/فارغ/null = false.
+    [Theory]
+    [InlineData("SALES_B2B", true)]
+    [InlineData("SALES_B2C", true)]
+    [InlineData("CONTENT_WRITER", false)]
+    [InlineData("SEO_SPECIALIST", false)]
+    [InlineData("MEDIA_BUYER", false)]
+    [InlineData("sales_b2b", false)] // حسّاس لحالة الأحرف (لا تطبيع)
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public void SaturdayEnabledForJobRole_OnlyForSalesDailyRoles(string? code, bool expected)
+    {
+        Assert.Equal(expected, ReportingCalendarPolicy.SaturdayEnabledForJobRole(code));
+    }
+
+    // (D7-3) عقد أيّام العمل مُدرِكًا للسبت: الجمعة محجوبة دائمًا؛ الأحد→الخميس متوقَّعة دائمًا؛
+    // السبت متوقَّع ⟺ (مبيعات) و(≥ الأرضية) — لا أثر رجعيّ.
+    [Theory]
+    // الجمعة: محجوبة للجميع بصرف النظر عن التفعيل.
+    [InlineData(2026, 7, 31, true, false)]
+    [InlineData(2026, 7, 31, false, false)]
+    // السبت قبل الأرضية (2026-07-18): غير متوقَّع حتى لمبيعات (لا رجعيّة).
+    [InlineData(2026, 7, 18, true, false)]
+    [InlineData(2026, 7, 18, false, false)]
+    // السبت على الأرضية (2026-07-25): متوقَّع لمبيعات فقط.
+    [InlineData(2026, 7, 25, true, true)]
+    [InlineData(2026, 7, 25, false, false)]
+    // السبت بعد الأرضية (2026-08-01): متوقَّع لمبيعات فقط.
+    [InlineData(2026, 8, 1, true, true)]
+    [InlineData(2026, 8, 1, false, false)]
+    // الأحد→الخميس: متوقَّعة دائمًا بصرف النظر عن التفعيل.
+    [InlineData(2026, 7, 26, true, true)]   // أحد
+    [InlineData(2026, 7, 26, false, true)]
+    [InlineData(2026, 7, 30, true, true)]   // خميس
+    [InlineData(2026, 7, 30, false, true)]
+    public void IsDailyExpectedBusinessDay_SaturdayAware(int y, int m, int d, bool saturdayEnabled, bool expected)
+    {
+        Assert.Equal(expected, ReportingCalendarPolicy.IsDailyExpectedBusinessDay(new DateOnly(y, m, d), saturdayEnabled));
+    }
+
+    // (D7-3-b) الصيغة صفريّة-الوسائط تُطابق حرفيًّا سلوك غير-المبيعات (السبت عطلة دائمًا).
+    [Fact]
+    public void IsDailyExpectedBusinessDay_ZeroArg_Equals_NonSales()
+    {
+        var salesFloorSaturday = new DateOnly(2026, 7, 25);
+        Assert.False(ReportingCalendarPolicy.IsDailyExpectedBusinessDay(salesFloorSaturday));
+        Assert.False(ReportingCalendarPolicy.IsDailyExpectedBusinessDay(salesFloorSaturday, saturdayEnabled: false));
+        Assert.True(ReportingCalendarPolicy.IsDailyExpectedBusinessDay(salesFloorSaturday, saturdayEnabled: true));
+    }
+
+    // (D7-4) العطلة مُدرِكة للسبت: لمبيعات السبت ≥ الأرضية **ليس** عطلة؛ لغير المبيعات عطلة؛ الجمعة عطلة دائمًا.
+    [Fact]
+    public void IsDailyHoliday_SaturdayAware()
+    {
+        var saturdayOnFloor = new DateOnly(2026, 7, 25);
+        Assert.False(ReportingCalendarPolicy.IsDailyHoliday(saturdayOnFloor, saturdayEnabled: true));  // يوم عمل لمبيعات
+        Assert.True(ReportingCalendarPolicy.IsDailyHoliday(saturdayOnFloor, saturdayEnabled: false));  // عطلة لغير مبيعات
+        var saturdayBeforeFloor = new DateOnly(2026, 7, 18);
+        Assert.True(ReportingCalendarPolicy.IsDailyHoliday(saturdayBeforeFloor, saturdayEnabled: true)); // عطلة (رجعيّة ممنوعة)
+        var friday = new DateOnly(2026, 7, 31);
+        Assert.True(ReportingCalendarPolicy.IsDailyHoliday(friday, saturdayEnabled: true));  // الجمعة عطلة دائمًا
+        Assert.True(ReportingCalendarPolicy.IsDailyHoliday(friday, saturdayEnabled: false));
+    }
+
+    // (D7-5) DailyExpectedDates لدورة W31 (السبت 25 → الجمعة 31) لمبيعات = **6 أيّام**:
+    // السبت 25 + الأحد 26 → الخميس 30، مستبعِدةً الجمعة 31.
+    [Fact]
+    public void DailyExpectedDates_W31_Sales_SixDays_IncludesSaturday_ExcludesFriday()
+    {
+        var today = new DateOnly(2026, 8, 10); // بعد نهاية الدورة ⇒ كامل النافذة
+        var dates = ReportingCalendarPolicy.DailyExpectedDates("2026-W31", today, saturdayEnabled: true);
+        Assert.Equal(6, dates.Count);
+        Assert.Equal(new DateOnly(2026, 7, 25), dates[0]);  // السبت (الأرضية)
+        Assert.Equal(new DateOnly(2026, 7, 30), dates[^1]); // الخميس
+        Assert.Contains(new DateOnly(2026, 7, 25), dates);
+        Assert.DoesNotContain(new DateOnly(2026, 7, 31), dates); // الجمعة
+        Assert.All(dates, d => Assert.NotEqual(DayOfWeek.Friday, d.DayOfWeek));
+    }
+
+    // (D7-6) لا أثر رجعيّ: W30 (السبت 18 → الجمعة 24) لمبيعات = **5 أيّام** فقط (يبقى السبت 18 مستبعَدًا).
+    [Fact]
+    public void DailyExpectedDates_W30_Sales_FiveDays_NoRetroactiveSaturday()
+    {
+        var today = new DateOnly(2026, 8, 10);
+        var dates = ReportingCalendarPolicy.DailyExpectedDates("2026-W30", today, saturdayEnabled: true);
+        Assert.Equal(5, dates.Count);
+        Assert.DoesNotContain(new DateOnly(2026, 7, 18), dates); // السبت قبل الأرضية
+        Assert.DoesNotContain(new DateOnly(2026, 7, 24), dates); // الجمعة
+        Assert.Equal(new DateOnly(2026, 7, 19), dates[0]);  // الأحد
+        Assert.Equal(new DateOnly(2026, 7, 23), dates[^1]); // الخميس
+    }
+
+    // (D7-7) الصيغة صفريّة-السبت (غير المبيعات) على W31 = **5 أيّام** (يُستبعَد السبت 25).
+    [Fact]
+    public void DailyExpectedDates_W31_NonSales_FiveDays_ExcludesSaturday()
+    {
+        var today = new DateOnly(2026, 8, 10);
+        var dates = ReportingCalendarPolicy.DailyExpectedDates("2026-W31", today);
+        Assert.Equal(5, dates.Count);
+        Assert.DoesNotContain(new DateOnly(2026, 7, 25), dates); // السبت غير متوقَّع لغير المبيعات
+        Assert.DoesNotContain(new DateOnly(2026, 7, 31), dates); // الجمعة
+        Assert.Equal(new DateOnly(2026, 7, 26), dates[0]);  // الأحد
+        Assert.Equal(new DateOnly(2026, 7, 30), dates[^1]); // الخميس
+    }
+
+    // (D7-8) صيغة المسمّى الوظيفيّ تشتقّ التفعيل: مبيعات ⇒ 6، غير-مبيعات/null ⇒ 5.
+    [Theory]
+    [InlineData("SALES_B2B", 6)]
+    [InlineData("SALES_B2C", 6)]
+    [InlineData("CONTENT_WRITER", 5)]
+    [InlineData(null, 5)]
+    public void DailyExpectedDates_W31_ByJobRole_DerivesSaturdayEnablement(string? code, int expectedCount)
+    {
+        var today = new DateOnly(2026, 8, 10);
+        var dates = ReportingCalendarPolicy.DailyExpectedDates("2026-W31", today, code);
+        Assert.Equal(expectedCount, dates.Count);
+    }
 }

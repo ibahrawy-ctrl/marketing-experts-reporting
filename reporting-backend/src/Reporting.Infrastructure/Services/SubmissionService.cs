@@ -942,9 +942,11 @@ public class SubmissionService : ISubmissionService
                 // يوم عطلة أو قبل الأرضيّة أو حالة مُرسَلة/مُغلقة: يبقى مرئيًّا بحالته الفعليّة دون عقوبة تأخّر.
                 var dayApplicable = ApplicabilityFloorPolicy.IsDailyDateApplicable(
                     dueDate, ApplicabilityFloorPolicy.OrganizationalReportingLaunchFloor);
-                // DAILY-BUSINESS-DAY-COMPLIANCE-R1: تفويض «يوم العمل» للسياسة المركزيّة الوحيدة
-                // (الأحد→الخميس فقط) بدل تكرار منطق الجمعة/السبت داخل الخدمة. مصدر واحد للحقيقة.
-                var isBusinessDay = ReportingCalendarPolicy.IsDailyExpectedBusinessDay(dueDate);
+                // DAILY-BUSINESS-DAY-COMPLIANCE-R1 + SALES-DAILY-SATURDAY-APPLICABILITY-HOTFIX-R1: تفويض
+                // «يوم العمل» للسياسة المركزيّة الوحيدة. الصفوف اليوميّة **مبيعات حصريًّا** (Daily ⟺ SALES_B2B/B2C)
+                // ⇒ saturdayEnabled:true: السبت ابتداءً من الأرضية 2026-07-25 يوم عمل (يؤهَّل للتأخّر إن مسودّة/مُعاد)،
+                // والسبت **قبل** الأرضية يبقى غير يوم عمل (لا عقوبة تأخّر رجعيّة) — كلاهما محسوم داخل السياسة.
+                var isBusinessDay = ReportingCalendarPolicy.IsDailyExpectedBusinessDay(dueDate, saturdayEnabled: true);
                 var overdueEligible = r.Status is SubmissionStatus.Draft or SubmissionStatus.Returned;
                 var dueAt = new DateTimeOffset(dueDate.Year, dueDate.Month, dueDate.Day, 23, 59, 59, ReportingCalendarPolicy.RiyadhOffset);
                 isOverdue = dayApplicable && isBusinessDay && overdueEligible && now > dueAt;
@@ -1220,11 +1222,12 @@ public class SubmissionService : ISubmissionService
         return result;
     }
 
-    // DAILY-BUSINESS-DAY-COMPLIANCE-R1 §4: أيّام التقرير اليوميّة المتوقَّعة داخل دورة —
-    // تفويض إلى المصدر المركزيّ الوحيد ReportingCalendarPolicy.DailyExpectedDates
-    // (أرضيّة الإطلاق + استبعاد الجمعة/السبت + عدم تجاوز اليوم). لا تكرار للعقد لكل خدمة.
+    // DAILY-BUSINESS-DAY-COMPLIANCE-R1 §4 + SALES-DAILY-SATURDAY-APPLICABILITY-HOTFIX-R1: أيّام التقرير
+    // اليوميّة المتوقَّعة داخل دورة — تفويض إلى المصدر المركزيّ الوحيد ReportingCalendarPolicy.DailyExpectedDates
+    // (أرضيّة الإطلاق + استبعاد الجمعة + عدم تجاوز اليوم). المرشّحون كلهم **مبيعات** (dailyRoleIds = SALES_B2B/B2C)
+    // ⇒ saturdayEnabled:true فيُدرَج السبت المتوقَّع ابتداءً من الأرضية 2026-07-25 (الجمعة تبقى محجوبة).
     private static List<DateOnly> DailyExpectedDates(string cycleKey, DateOnly today) =>
-        ReportingCalendarPolicy.DailyExpectedDates(cycleKey, today);
+        ReportingCalendarPolicy.DailyExpectedDates(cycleKey, today, saturdayEnabled: true);
 
     // مجموعة معرّفات المستخدمين ذوي الدورية اليوميّة (مبيعات) داخل النطاق، مُشتقّة من رمز المسمّى الوظيفيّ
     // عبر ReportCadencePolicy.ExpectedCadence (لا من DefaultPeriodType للقالب). تُستخدَم لاستبعادهم من صفوف

@@ -523,11 +523,12 @@ public class ReportReminderService : IReportReminderService
         return list.ToHashSet();
     }
 
-    // DAILY-BUSINESS-DAY-COMPLIANCE-R1 §4: يُفوَّض بالكامل إلى مصدر الحقيقة المركزيّ
-    // (ReportingCalendarPolicy.DailyExpectedDates = نافذة الدورة Sat→Fri + أرضيّة الإطلاق + الأحد→الخميس).
-    // بهذا يزول الخلل السابق (كان التذكير بلا أرضيّة إطلاق ويستعمل WeekRange الخميس→الأربعاء).
+    // DAILY-BUSINESS-DAY-COMPLIANCE-R1 §4 + SALES-DAILY-SATURDAY-APPLICABILITY-HOTFIX-R1:
+    // يُفوَّض بالكامل إلى مصدر الحقيقة المركزيّ (ReportingCalendarPolicy.DailyExpectedDates = نافذة الدورة
+    // Sat→Fri + أرضيّة الإطلاق + الأحد→الخميس). التذكير اليوميّ **مبيعات حصريًّا** (Daily ⟺ SALES_B2B/B2C)
+    // ⇒ saturdayEnabled:true فيُذكَّر بالسبت المتوقَّع ابتداءً من الأرضية 2026-07-25 (الجمعة تبقى محجوبة).
     private static List<DateOnly> DailyExpectedDates(string cycleKey, DateOnly today) =>
-        ReportingCalendarPolicy.DailyExpectedDates(cycleKey, today);
+        ReportingCalendarPolicy.DailyExpectedDates(cycleKey, today, saturdayEnabled: true);
 
     private static string NormalizeWeekKey(string? weekKey) =>
         ReportCalendarPolicy.IsWeekKey(weekKey) ? weekKey!.Trim() : ReportCalendarPolicy.WeekKeyFor(ReportCalendarPolicy.RiyadhToday());

@@ -143,6 +143,16 @@ public class ReportingCalendarCycleService : IReportingCalendarCycleService
         var roleLabel = Roles.DisplayAr(role);
         var today = ReportingCalendarPolicy.RiyadhToday();
 
+        // SALES-DAILY-SATURDAY-APPLICABILITY-HOTFIX-R1: هل هذا المستخدم من المبيعات (SALES_B2B/B2C)؟
+        // يُشتقّ تفعيل السبت من رمز مسمّاه الوظيفيّ خادميًّا (لا من الواجهة). لغير المبيعات = false
+        // ⇒ السبت يبقى عطلة أسبوعية في التقويم كما كان (بلا أثر). لمبيعات، السبت ابتداءً من الأرضية 2026-07-25
+        // يصبح يوم عمل قابلًا للاختيار/التسليم في التقويم (يطابق المتوقّع/الالتزام).
+        var myJobRoleCode = await _db.Users.AsNoTracking()
+            .Where(u => u.Id == userId && u.JobRoleId != null)
+            .Join(_db.JobRoles, u => u.JobRoleId, j => j.Id, (u, j) => j.Code)
+            .FirstOrDefaultAsync(ct);
+        var saturdayEnabled = ReportingCalendarPolicy.SaturdayEnabledForJobRole(myJobRoleCode);
+
         // نقطة الارتكاز: تاريخ مُرسَل اختياريّ (للتنقّل)، وإلّا اليوم. لا نثق بمفتاح غير صالح بنيويًّا.
         DateOnly anchor;
         if (string.IsNullOrWhiteSpace(anchorDate))
@@ -194,7 +204,7 @@ public class ReportingCalendarCycleService : IReportingCalendarCycleService
         {
             var key = ReportingCalendarPolicy.DayKey(date);
             byKey.TryGetValue(key, out var flags);
-            days.Add(BuildDay(date, today, flags));
+            days.Add(BuildDay(date, today, flags, saturdayEnabled));
         }
 
         var currentDayKey = ReportingCalendarPolicy.DayKey(today);
@@ -205,12 +215,15 @@ public class ReportingCalendarCycleService : IReportingCalendarCycleService
     private readonly record struct DayStatusFlags(bool Submitted, bool Draft, bool Returned);
 
     // ===== بناء صفّ يوم واحد (حالة واحدة حصرًا لكل يوم) =====
-    private static ReportingDayDto BuildDay(DateOnly date, DateOnly today, DayStatusFlags flags)
+    // SALES-DAILY-SATURDAY-APPLICABILITY-HOTFIX-R1: <paramref name="saturdayEnabled"/> يُمرَّر من دور
+    // المستخدم (مبيعات ⇒ true). حين true يصبح السبت ابتداءً من الأرضية 2026-07-25 يوم عمل (ليس عطلة)،
+    // وحين false يبقى السبت عطلة أسبوعية كما كان (غير المبيعات دون تغيير). الجمعة عطلة دائمًا للجميع.
+    private static ReportingDayDto BuildDay(DateOnly date, DateOnly today, DayStatusFlags flags, bool saturdayEnabled)
     {
         var isToday = date == today;
         var isPast = date < today;
         var isFuture = date > today;
-        var isHoliday = ReportingCalendarPolicy.IsDailyHoliday(date);
+        var isHoliday = ReportingCalendarPolicy.IsDailyHoliday(date, saturdayEnabled);
 
         var isSelectable = !isHoliday && !isFuture;
         var isOpenForDraft = isSelectable;
@@ -225,7 +238,10 @@ public class ReportingCalendarCycleService : IReportingCalendarCycleService
         {
             status = "Holiday";
             statusLabel = "عطلة أسبوعية";
-            lockReason = "لا تقارير يومية في العطلة الأسبوعية (الجمعة/السبت).";
+            // للمبيعات تكون العطلة اليوميّة = الجمعة فقط (السبت يوم عمل من الأرضية)؛ لغيرهم = الجمعة والسبت.
+            lockReason = saturdayEnabled
+                ? "لا تقارير يومية في العطلة الأسبوعية (الجمعة)."
+                : "لا تقارير يومية في العطلة الأسبوعية (الجمعة/السبت).";
         }
         else if (isFuture)
         {

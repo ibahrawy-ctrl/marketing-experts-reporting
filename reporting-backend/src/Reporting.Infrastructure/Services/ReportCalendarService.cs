@@ -202,12 +202,14 @@ public class ReportCalendarService : IReportCalendarService
 
         var candidates = await ExpectedReportersAsync(PeriodType.Daily, scope, ct);
 
-        // DAILY-BUSINESS-DAY-COMPLIANCE-R1 §4: الأيام المتوقَّعة = **أيام العمل فقط** (الأحد→الخميس)
-        // ضمن الدورة حتى تاريخه، مقيَّدةً بأرضية الإطلاق المؤسّسيّة — عبر المصدر المركزيّ الوحيد
-        // ReportingCalendarPolicy.DailyExpectedDates. لا عدّ خام لأيام الدورة (كان يُدخِل الجمعة/السبت).
+        // DAILY-BUSINESS-DAY-COMPLIANCE-R1 §4 + SALES-DAILY-SATURDAY-APPLICABILITY-HOTFIX-R1:
+        // الأيام المتوقَّعة = **أيام العمل فقط** ضمن الدورة حتى تاريخه، مقيَّدةً بأرضية الإطلاق المؤسّسيّة —
+        // عبر المصدر المركزيّ الوحيد ReportingCalendarPolicy.DailyExpectedDates. هذا التقرير **مبيعات حصريًّا**
+        // (المرشّحون كلهم يوميّون = SALES_B2B/SALES_B2C عبر ExpectedReportersAsync(PeriodType.Daily))، لذا
+        // saturdayEnabled:true ⇒ يُدرَج السبت المتوقَّع ابتداءً من الأرضية 2026-07-25 (الجمعة تبقى محجوبة).
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var elapsedEnd = today < weekEnd ? today : weekEnd;
-        var expectedDates = ReportingCalendarPolicy.DailyExpectedDates(key, today);
+        var expectedDates = ReportingCalendarPolicy.DailyExpectedDates(key, today, saturdayEnabled: true);
         var expectedDaySet = expectedDates.ToHashSet();
         var expectedDays = expectedDates.Count;
 

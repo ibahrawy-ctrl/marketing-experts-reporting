@@ -273,22 +273,59 @@ public static class ReportingCalendarPolicy
             key.Trim(), CanonicalDayFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out day);
     }
 
+    // ===== سريان السبت لموظّفي المبيعات (SALES-DAILY-SATURDAY-APPLICABILITY-HOTFIX-R1) =====
+    // قرار تشغيليّ معتمَد: اعتبارًا من **2026-07-25 (سبت)** يصبح السبت يوم عمل متوقَّع/مُلتزَم به
+    // لموظّفي **المبيعات فقط** (SALES_B2B/SALES_B2C) — أي الالتزام يمتدّ من السبت إلى الخميس، وتبقى
+    // **الجمعة** محجوبة دائمًا وللجميع. **لا أثر رجعيّ**: أيّ سبت **قبل** الأرضية يبقى غير متوقَّع (لا
+    // يُصنَّف Missing/Overdue) لكنه يظل محفوظًا ومرئيًّا كتقرير فعليّ. **غير المبيعات لا يتغيّر إطلاقًا**
+    // (الأحد→الخميس، الجمعة+السبت عطلة). تفعيل السبت يُشتقّ من **مجموعة المسمّيات اليومية القانونيّة نفسها**
+    // <see cref="ReportCadencePolicy.DailyJobRoleCodes"/> (مصدر واحد، لا قائمة موازية).
+
+    /// <summary>أرضية سريان السبت للمبيعات: 2026-07-25 (سبت). لا التزام سبتٍ قبلها لأيّ دور.</summary>
+    public static readonly DateOnly SalesSaturdayApplicabilityFloor = new(2026, 7, 25);
+
+    /// <summary>
+    /// هل السبت مُفعَّل كيوم عمل متوقَّع لهذا المسمّى الوظيفيّ؟ = المسمّيات اليومية القانونيّة
+    /// (SALES_B2B/SALES_B2C) حصرًا؛ يفوّض إلى <see cref="ReportCadencePolicy.DailyJobRoleCodes"/> (لا قائمة ثانية).
+    /// </summary>
+    public static bool SaturdayEnabledForJobRole(string? jobRoleCode) =>
+        jobRoleCode is not null && ReportCadencePolicy.DailyJobRoleCodes.Contains(jobRoleCode);
+
     /// <summary>
     /// **مصدر الحقيقة الوحيد** لعقد أيام العمل اليومية المتوقَّعة (DAILY-BUSINESS-DAY-COMPLIANCE-R1 §4):
     /// يوم منطبق للتوقّع اليوميّ ⟺ **الأحد→الخميس** (أيّ ليس جمعة ولا سبت).
-    /// كل السطوح (التقرير/الاستحقاق/التقويم/الدورة/التذكير/التسليم/التجميع) يجب أن تفوّض إلى هذه الدالّة
-    /// بدل تكرار استبعاد الجمعة/السبت لكل خدمة على حدة.
+    /// **الصيغة صفريّة الوسائط تحافظ حرفيًّا على سلوك غير-المبيعات** (السبت عطلة دائمًا) عبر التفويض
+    /// بـ<paramref>saturdayEnabled=false</paramref>. كل السطوح تفوّض إلى هذه الدالّة بدل تكرار الاستبعاد.
     /// </summary>
     public static bool IsDailyExpectedBusinessDay(DateOnly date) =>
-        date.DayOfWeek is not (DayOfWeek.Friday or DayOfWeek.Saturday);
+        IsDailyExpectedBusinessDay(date, saturdayEnabled: false);
 
     /// <summary>
-    /// هل اليوم عطلة أسبوعية (الجمعة **أو السبت**) بحسب سياسة **التوقّع/الالتزام** اليومي؟
-    /// معكوس <see cref="IsDailyExpectedBusinessDay"/> تمامًا — لا يدخل التوقّع/الالتزام.
-    /// **لا تُستخدَم في بوابة إنشاء التقرير** (تلك تخصّها <see cref="IsDailySubmissionBlockedDay"/>).
+    /// عقد أيام العمل اليومية المتوقَّعة **مُدرِكًا لسريان سبت المبيعات**:
+    /// الجمعة محجوبة دائمًا؛ الأحد→الخميس متوقَّعة دائمًا؛ **السبت** متوقَّع ⟺
+    /// (<paramref name="saturdayEnabled"/> = مبيعات) **و** التاريخ ≥ <see cref="SalesSaturdayApplicabilityFloor"/>.
+    /// حين <paramref name="saturdayEnabled"/>=false ⇒ السبت عطلة دائمًا (سلوك غير-المبيعات الأصليّ حرفيًّا).
+    /// </summary>
+    public static bool IsDailyExpectedBusinessDay(DateOnly date, bool saturdayEnabled) => date.DayOfWeek switch
+    {
+        DayOfWeek.Friday => false,
+        DayOfWeek.Saturday => saturdayEnabled && date >= SalesSaturdayApplicabilityFloor,
+        _ => true, // الأحد→الخميس
+    };
+
+    /// <summary>
+    /// هل اليوم عطلة أسبوعية بحسب سياسة **التوقّع/الالتزام** اليومي؟ معكوس <see cref="IsDailyExpectedBusinessDay(DateOnly)"/>.
+    /// الصيغة صفريّة الوسائط = سلوك غير-المبيعات (الجمعة+السبت عطلة). **لا تُستخدَم في بوابة إنشاء التقرير**.
     /// </summary>
     public static bool IsDailyHoliday(DateOnly date) =>
         !IsDailyExpectedBusinessDay(date);
+
+    /// <summary>
+    /// هل اليوم عطلة أسبوعية مُدرِكًا لسريان سبت المبيعات؟ معكوس <see cref="IsDailyExpectedBusinessDay(DateOnly, bool)"/>:
+    /// لمبيعات، السبت ≥ الأرضية **ليس** عطلة (يوم عمل)؛ الجمعة تبقى عطلة دائمًا.
+    /// </summary>
+    public static bool IsDailyHoliday(DateOnly date, bool saturdayEnabled) =>
+        !IsDailyExpectedBusinessDay(date, saturdayEnabled);
 
     /// <summary>
     /// **بوابة إنشاء التقرير اليومي** (DAILY-BUSINESS-DAY-COMPLIANCE-R1 — قرار إنشاء يوم السبت):
@@ -304,19 +341,35 @@ public static class ReportingCalendarPolicy
     /// **الأيام اليومية المتوقَّعة** لدورة (Sat→Fri) حتى «اليوم» (شامل الحدّ الأدنى المؤسّسي):
     /// نافذة الدورة = <see cref="CycleRange"/> (لا WeekRange الخميس→الأربعاء)، مقيَّدة بـ
     /// <see cref="ApplicabilityFloorPolicy.IsDailyDateApplicable"/> (أرضية الإطلاق) و
-    /// <see cref="IsDailyExpectedBusinessDay"/> (الأحد→الخميس). مصدر مشترك لكل سطوح «المتوقّع».
+    /// <see cref="IsDailyExpectedBusinessDay(DateOnly)"/> (الأحد→الخميس). الصيغة صفريّة-السبت
+    /// = سلوك غير-المبيعات حرفيًّا (لا سبت متوقَّع). مصدر مشترك لكل سطوح «المتوقّع».
     /// </summary>
-    public static List<DateOnly> DailyExpectedDates(string cycleKey, DateOnly today)
+    public static List<DateOnly> DailyExpectedDates(string cycleKey, DateOnly today) =>
+        DailyExpectedDates(cycleKey, today, saturdayEnabled: false);
+
+    /// <summary>
+    /// **الأيام اليومية المتوقَّعة** لدورة مُدرِكًا لسريان سبت المبيعات: نفس المنطق مع تفويض تصنيف السبت
+    /// إلى <see cref="IsDailyExpectedBusinessDay(DateOnly, bool)"/> (السبت متوقَّع لمبيعات ابتداءً من الأرضية).
+    /// الجمعة تبقى محجوبة والأحد→الخميس متوقَّعة كما هي؛ الأرضية المؤسّسية للإطلاق تُطبَّق دائمًا.
+    /// </summary>
+    public static List<DateOnly> DailyExpectedDates(string cycleKey, DateOnly today, bool saturdayEnabled)
     {
         var (start, end) = CycleRange(cycleKey);
         var cap = today < end ? today : end;
         var floor = ApplicabilityFloorPolicy.OrganizationalReportingLaunchFloor;
         var dates = new List<DateOnly>();
         for (var d = start; d <= cap; d = d.AddDays(1))
-            if (ApplicabilityFloorPolicy.IsDailyDateApplicable(d, floor) && IsDailyExpectedBusinessDay(d))
+            if (ApplicabilityFloorPolicy.IsDailyDateApplicable(d, floor) && IsDailyExpectedBusinessDay(d, saturdayEnabled))
                 dates.Add(d);
         return dates;
     }
+
+    /// <summary>
+    /// صيغة مُريحة تشتقّ تفعيل السبت من المسمّى الوظيفيّ عبر <see cref="SaturdayEnabledForJobRole"/>
+    /// (SALES_B2B/SALES_B2C ⇒ السبت متوقَّع من الأرضية؛ غيرهم ⇒ سلوك غير-المبيعات).
+    /// </summary>
+    public static List<DateOnly> DailyExpectedDates(string cycleKey, DateOnly today, string? jobRoleCode) =>
+        DailyExpectedDates(cycleKey, today, SaturdayEnabledForJobRole(jobRoleCode));
 
     /// <summary>«الثلاثاء 14 يوليو 2026».</summary>
     public static string ArFullDateLabel(DateOnly date) =>

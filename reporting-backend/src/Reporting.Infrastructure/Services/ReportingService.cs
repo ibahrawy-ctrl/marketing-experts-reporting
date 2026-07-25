@@ -538,10 +538,12 @@ public class ReportingService : IReportingService
     /// الجمعة والسبت عطلة نهاية الأسبوع السعودية)، حتى «اليوم» بتوقيت الرياض كحدّ أقصى (لا تُحتسب أيام مستقبلية).
     /// وتُستبعَد أيضًا أيّ أيام قبل أرضيّة الإطلاق المنظّميّة (4 يوليو 2026) — لا توقّع يوميّ قبل الأرضيّة.
     /// </summary>
-    // DAILY-BUSINESS-DAY-COMPLIANCE-R1 §4: يُفوَّض بالكامل إلى مصدر الحقيقة المركزيّ
-    // (ReportingCalendarPolicy.DailyExpectedDates = نافذة الدورة Sat→Fri + أرضيّة الإطلاق + الأحد→الخميس).
+    // DAILY-BUSINESS-DAY-COMPLIANCE-R1 §4 + SALES-DAILY-SATURDAY-APPLICABILITY-HOTFIX-R1:
+    // يُفوَّض بالكامل إلى مصدر الحقيقة المركزيّ (ReportingCalendarPolicy.DailyExpectedDates = نافذة الدورة
+    // Sat→Fri + أرضيّة الإطلاق + الأحد→الخميس). المرشّحون اليوميّون كلهم **مبيعات** (Daily ⟺ SALES_B2B/B2C)
+    // ⇒ saturdayEnabled:true فيُدرَج السبت المتوقَّع ابتداءً من الأرضية 2026-07-25 (الجمعة تبقى محجوبة).
     private static List<DateOnly> DailyExpectedDates(string cycleKey, DateOnly today) =>
-        ReportingCalendarPolicy.DailyExpectedDates(cycleKey, today);
+        ReportingCalendarPolicy.DailyExpectedDates(cycleKey, today, saturdayEnabled: true);
 
     /// <summary>
     /// تقييم التزام أسبوع تشغيلي واحد لمجموعة مرشّحين. الأسبوعي = وحدة متوقَّعة واحدة لكلّ مرشّح وفق موعد دوره
