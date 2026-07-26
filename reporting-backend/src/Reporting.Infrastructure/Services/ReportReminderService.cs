@@ -30,6 +30,7 @@ public class ReportReminderService : IReportReminderService
     private readonly IEmailNotificationService _email;
     private readonly EmailNotificationOptions _options;
     private readonly AppOptions _app;
+    private readonly ISystemClock _clock;
     private readonly ILogger<ReportReminderService> _logger;
 
     // حالات «أُرسِل التقرير» — مطابقة لـ RPT-DUE1/ReportingService.
@@ -52,14 +53,22 @@ public class ReportReminderService : IReportReminderService
         IEmailNotificationService email,
         IOptions<EmailNotificationOptions> options,
         IOptions<AppOptions> app,
+        ISystemClock clock,
         ILogger<ReportReminderService> logger)
     {
         _db = db;
         _email = email;
         _options = options.Value;
         _app = app.Value;
+        _clock = clock;
         _logger = logger;
     }
+
+    /// <summary>
+    /// EMAIL-NOTIFICATIONS-ROLE-AWARE-SCHEDULE-FIX-R1 — «اليوم» بتوقيت الرياض من ساعة قابلة للحقن.
+    /// كان يُقرأ سابقًا من الساكن <c>ReportCalendarPolicy.RiyadhToday()</c> في ثلاثة مواضع، فتعذّرت محاكاة أيام الأسبوع.
+    /// </summary>
+    private DateOnly RiyadhToday() => ReportCalendarPolicy.RiyadhDate(_clock.UtcNow.UtcDateTime);
 
     public async Task<ReportReminderRunResult> GenerateAsync(ReportReminderRunOptions options, CancellationToken ct = default)
     {
@@ -97,7 +106,7 @@ public class ReportReminderService : IReportReminderService
     // ===== النوعان 1 (أسبوعي مستحق) و2 (يومي مستحق) — غير متأخّرة =====
     private async Task EmitDueRemindersAsync(string key, string weekLabel, IReadOnlyList<DueEval> evals, Accumulator acc, CancellationToken ct)
     {
-        var today = ReportCalendarPolicy.RiyadhToday();
+        var today = RiyadhToday();
         var link = BuildLink("/app/submissions");
 
         foreach (var e in evals.Where(e => !e.HasSubmission))
@@ -120,8 +129,14 @@ public class ReportReminderService : IReportReminderService
             }
             else
             {
-                // أسبوعيّ مستحقّ ولم يتأخّر بعد (ضمن المهلة).
-                if (e.Overdue) continue;
+                // EMAIL-NOTIFICATIONS-ROLE-AWARE-SCHEDULE-FIX-R1 — أهليّة اليوم حسب دور المستلِم.
+                // العقد: الموظّف=الأربعاء، قائد الفريق=الخميس، المدير=الأحد، المدير العام/الرئيس التنفيذي/مدير النظام=الاثنين
+                // (مشتقّة من ReportCalendarPolicy.DueDateForRole = بداية الدورة + RoleDueOffset).
+                // كان الحارس السابق `if (e.Overdue) continue;` بحدّ أعلى فقط بلا حدّ أدنى، فيُصدِر التذكير منذ اليوم صفر
+                // من الدورة (السبت) لكلّ الأدوار. المساواة التامّة تُغلق الطرفين معًا: لا قبل يوم الدور ولا بعده
+                // (وما بعده يُغطّيه النوع 3 report-overdue).
+                if (e.DueDate != today) continue;
+                var dueKey = e.DueDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
                 var subject = "تذكير بتقريرك الأسبوعي";
                 var body = string.Join("\n", new[]
                 {
@@ -130,8 +145,10 @@ public class ReportReminderService : IReportReminderService
                     $"الموعد المتوقّع للتسليم: {e.DueDate:yyyy-MM-dd}.",
                     "يمكنك تسجيل تقريرك عبر الرابط أدناه — نقدّر لك حرصك."
                 });
+                // مفتاح الترابط يحمل تاريخ الاستحقاق حسب الدور: رسالة في يوم خاطئ لا تستطيع حجز مفتاح
+                // الموعد الصحيح، ويبقى منع التكرار سليمًا (نفس الدورة + نفس الدور + نفس المستلِم ⇒ نفس المفتاح).
                 await EnqueueAsync(acc, "report-weekly-due", c.UserId,
-                    $"report-weekly-due:{key}:{c.UserId}", subject, body, link, ct);
+                    $"report-weekly-due:{key}:{dueKey}:{c.UserId}", subject, body, link, ct);
             }
         }
     }
@@ -385,7 +402,7 @@ public class ReportReminderService : IReportReminderService
     private async Task<List<DueEval>> EvaluateAsync(string key, IReadOnlyList<DueCandidate> candidates, DateOnly? restrictDate, CancellationToken ct)
     {
         if (candidates.Count == 0) return new List<DueEval>();
-        var today = ReportCalendarPolicy.RiyadhToday();
+        var today = RiyadhToday();
         var weekly = candidates.Where(c => c.Cadence != PeriodType.Daily).ToList();
         var daily = candidates.Where(c => c.Cadence == PeriodType.Daily).ToList();
         var evals = new List<DueEval>(candidates.Count);
@@ -472,7 +489,7 @@ public class ReportReminderService : IReportReminderService
                                  && cd >= start && cd <= end)).ToList();
         if (raw.Count == 0) return new List<PendingReview>();
 
-        var today = ReportCalendarPolicy.RiyadhToday();
+        var today = RiyadhToday();
         var approverIds = raw.Select(s => s.ApproverId).Distinct().ToList();
         var names = await UserNamesAsync(approverIds, ct);
         var approverRoles = await UserPrimaryRolesAsync(approverIds, ct);
@@ -530,8 +547,8 @@ public class ReportReminderService : IReportReminderService
     private static List<DateOnly> DailyExpectedDates(string cycleKey, DateOnly today) =>
         ReportingCalendarPolicy.DailyExpectedDates(cycleKey, today, saturdayEnabled: true);
 
-    private static string NormalizeWeekKey(string? weekKey) =>
-        ReportCalendarPolicy.IsWeekKey(weekKey) ? weekKey!.Trim() : ReportCalendarPolicy.WeekKeyFor(ReportCalendarPolicy.RiyadhToday());
+    private string NormalizeWeekKey(string? weekKey) =>
+        ReportCalendarPolicy.IsWeekKey(weekKey) ? weekKey!.Trim() : ReportCalendarPolicy.WeekKeyFor(RiyadhToday());
 
     private string BuildLink(string path)
     {

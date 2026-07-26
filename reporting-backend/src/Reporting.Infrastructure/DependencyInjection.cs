@@ -56,6 +56,7 @@ public static class DependencyInjection
         services.Configure<FileStorageOptions>(configuration.GetSection(FileStorageOptions.SectionName));
         services.Configure<EmailNotificationOptions>(configuration.GetSection(EmailNotificationOptions.SectionName));
         services.Configure<AppOptions>(configuration.GetSection(AppOptions.SectionName));
+        services.Configure<ReportReminderSchedulerOptions>(configuration.GetSection(ReportReminderSchedulerOptions.SectionName));
 
         services.AddHttpContextAccessor();
         services.AddSingleton<ISystemClock, SystemClock>();
@@ -74,6 +75,7 @@ public static class DependencyInjection
         services.AddScoped<IEmailControlService, EmailControlService>();
         services.AddHostedService<EmailOutboxDispatcher>();
         services.AddHostedService<SubmissionReminderService>();
+        services.AddHostedService<ReportReminderSchedulerService>();
         services.AddScoped<IAuditService, AuditService>();
         services.AddScoped<IReportingService, ReportingService>();
         services.AddScoped<IReportingAggregationService, ReportingAggregationService>();
