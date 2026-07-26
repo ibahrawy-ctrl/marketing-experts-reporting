@@ -246,16 +246,35 @@ public class RoleAwarePersonalReportOverrideTests
         Assert.Equal("kpi.reviewer_override_invalid", code);
     }
 
+    /// <summary>
+    /// KPI-REVIEWER-OVERRIDE-R1 — تغيير عقد متعمَّد: كان التجاوز المساوي للمُقيّم يُعدّ خطأ إعداد،
+    /// وصار يعني أنّ المُدخِل نفسه هو المُراجِع الصريح المعيَّن للموظّف ⇒ اعتماد مباشر عند الإرسال
+    /// بلا سقوط إلى سلسلة المدير وبلا رفض. (التجاوز المساوي للموضوع أو لمستخدم غير نشط يبقى خطأ إعداد.)
+    /// </summary>
     [Fact]
-    public async Task Kpi_Override_EqualsEvaluator_ConfigError()
+    public async Task Kpi_Override_EqualsEvaluator_ApprovesDirectly()
     {
         _ = await BuildOrgAsync();
+        var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var mgr = await TestAuth.CreateUserAsync(_factory, Roles.Manager);
         var subject = await TestAuth.CreateUserAsync(_factory, Roles.Employee, mgr.UserId);
         await SetKpiReviewerOverrideAsync(subject.UserId, mgr.UserId); // = المُقيّم
 
-        var code = await SubmitKpiExpectingErrorAsync(mgr.Client, subject.UserId, "2026-W20");
-        Assert.Equal("kpi.reviewer_override_invalid", code);
+        var (templateId, manualId, autoId) = await PublishKpiAsync(admin);
+        var ev = await (await mgr.Client.PostAsJsonAsync("/api/kpi-evaluations",
+            new CreateKpiEvaluationRequest(templateId, subject.UserId, PeriodType.Weekly, "2026-W20")))
+            .ReadAsync<KpiEvaluationDto>();
+        await mgr.Client.PutAsJsonAsync($"/api/kpi-evaluations/{ev!.Id}/results",
+            new SaveKpiResultsRequest(new[]
+            {
+                new KpiResultInput(manualId, null, 80m, null),
+                new KpiResultInput(autoId, 80m, null, null),
+            }));
+        var submitted = (await (await mgr.Client.PostAsync($"/api/kpi-evaluations/{ev.Id}/submit", null))
+            .ReadAsync<KpiEvaluationDto>())!;
+
+        Assert.Equal(KpiEvaluationStatus.Approved, submitted.Status);
+        Assert.Equal(mgr.UserId, submitted.ReviewerId);
     }
 
     // ===== أدوات =====

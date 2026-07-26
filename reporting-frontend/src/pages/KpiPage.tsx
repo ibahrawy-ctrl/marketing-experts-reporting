@@ -19,6 +19,7 @@ import type {
   KpiCalcMethod,
   KpiEvaluationDto,
   KpiEvaluationListItemDto,
+  KpiEvaluationLookupDto,
   KpiEvaluationReviewEventDto,
   KpiTemplateDto,
   KpiResultDto,
@@ -101,19 +102,22 @@ export default function KpiPage() {
 
 function KpiList({ isManagement, onOpen, hideTitle, subjectFilter }: { isManagement: boolean; onOpen: (id: string) => void; hideTitle?: boolean; subjectFilter?: string | null }) {
   const qc = useQueryClient();
-  // عند تمرير subjectFilter نطلب تقييمات موظّف واحد فقط (subjectUserId). النطاق والصلاحية يُفرَضان خادميًّا.
+  const [kpiTemplateId, setKpiTemplateId] = useState('');
+  const [subjectUserId, setSubjectUserId] = useState('');
+  // KPI-REVIEWER-OVERRIDE-R1: الفلترة تتبع اختيار النموذج فعليًّا — عند اختيار موظّف في النموذج
+  // تُحصر القائمة بتقييماته وحده. subjectFilter (من ?subject=) يبقى له الأسبقية عند الدخول من صفحة الموظّف.
+  const listSubjectId = subjectFilter || subjectUserId || null;
+  // النطاق والصلاحية يُفرَضان خادميًّا في كل الأحوال.
   const { data: items, isLoading, isError, refetch } = useQuery({
-    queryKey: ['kpi-evaluations', subjectFilter ?? 'all'],
+    queryKey: ['kpi-evaluations', listSubjectId ?? 'all'],
     queryFn: async () =>
       (await api.get<KpiEvaluationListItemDto[]>(
         '/kpi-evaluations',
-        subjectFilter ? { params: { subjectUserId: subjectFilter } } : undefined,
+        listSubjectId ? { params: { subjectUserId: listSubjectId } } : undefined,
       )).data,
   });
   // كل العناصر تخصّ الموظّف نفسه عند الحصر، فنشتقّ اسمه من أوّل عنصر لعرضه في الشريط التوضيحي.
   const subjectName = items?.[0]?.subjectName;
-  const [kpiTemplateId, setKpiTemplateId] = useState('');
-  const [subjectUserId, setSubjectUserId] = useState('');
   // حارس الدورية: تقييم KPI أسبوعي فقط في المرحلة الحالية — لا يُتاح اختيار دورية أخرى.
   const periodType: PeriodType = 'Weekly';
   // افتراضيًّا الأسبوع التشغيلي الحالي (الخميس→الأربعاء) المطابق لمنطق الخادم، فلا يُضطر المستخدم لنسخ الصيغة يدويًّا.
@@ -153,6 +157,18 @@ function KpiList({ isManagement, onOpen, hideTitle, subjectFilter }: { isManagem
   // الخادم يُطبّق أولوية اختيار القالب: قالب متخصص واحد لدور الموظّف، وإلا العام فقط.
   // فإن أُرجِع قالب واحد فقط نختاره تلقائيًّا (قيمة مُشتقّة) لتبسيط الإنشاء وتأكيد أنه القالب المناسب.
   const effectiveTemplateId = kpiTemplateId || (templates?.length === 1 ? templates[0].id : '');
+
+  // KPI-REVIEWER-OVERRIDE-R1: بحث قرائيّ صرف عن تقييم قائم لهذا (الموظّف + القالب + الفترة) قبل الإنشاء.
+  // لا ينشئ سجلًّا ولا يعدّل شيئًا، ويمنع ازدواج التقييم ويُظهر التقييم التاريخيّ للاطّلاع.
+  const { data: lookup, isFetching: lookupLoading } = useQuery({
+    queryKey: ['kpi-evaluation-lookup', subjectUserId, effectiveTemplateId, periodKey],
+    queryFn: async () =>
+      (await api.get<KpiEvaluationLookupDto>('/kpi-evaluations/lookup', {
+        params: { subjectUserId, kpiTemplateId: effectiveTemplateId, periodKey },
+      })).data,
+    enabled: isManagement && !!subjectUserId && !!effectiveTemplateId && !!periodKey,
+  });
+  const existingEvaluation = lookup?.found ? lookup.evaluation : null;
 
   const create = useMutation({
     mutationFn: () => api.post<KpiEvaluationDto>('/kpi-evaluations', { kpiTemplateId: effectiveTemplateId, subjectUserId, periodType, periodKey }),
@@ -241,12 +257,26 @@ function KpiList({ isManagement, onOpen, hideTitle, subjectFilter }: { isManagem
                   onChange={(key) => { setErr(null); setPeriodKey(key); }}
                 />
               </Field>
+              {existingEvaluation && (
+                <div className="mt-3">
+                  <Alert tone="gold">
+                    يوجد تقييم قائم لهذا الموظّف في هذه الدورة ({formatPeriod(existingEvaluation.periodKey)}):{' '}
+                    النتيجة <span className="font-semibold">{existingEvaluation.totalScore ?? 'لم تُحتسب'}</span>{' '}
+                    والحالة <span className="font-semibold">{kpiEvaluationStatusLabel[existingEvaluation.status]}</span>.
+                    لن يُنشأ تقييم جديد — افتح التقييم القائم للاطّلاع أو الاستكمال.
+                  </Alert>
+                </div>
+              )}
               <div className="mt-3">
                 <Button
-                  disabled={!effectiveTemplateId || !subjectUserId || !periodKey || create.isPending}
-                  onClick={() => { setErr(null); create.mutate(); }}
+                  disabled={!effectiveTemplateId || !subjectUserId || !periodKey || create.isPending || lookupLoading}
+                  onClick={() => {
+                    setErr(null);
+                    if (existingEvaluation) { onOpen(existingEvaluation.id); return; }
+                    create.mutate();
+                  }}
                 >
-                  إنشاء تقييم
+                  {existingEvaluation ? 'فتح التقييم القائم' : 'إنشاء تقييم'}
                 </Button>
               </div>
             </div>

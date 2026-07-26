@@ -9,6 +9,13 @@ public interface IKpiEvaluationService
 
     /// <summary>قائمة الموظّفين الذين يحقّ للمستخدم الحالي إنشاء تقييم KPI لهم (مرؤوسوه المباشرون، أو الكل للأدمن).</summary>
     Task<Result<EvaluatableSubjectsDto>> GetEvaluatableSubjectsAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// KPI-REVIEWER-OVERRIDE-R1 — بحث قرائيّ صرف عن تقييم قائم بـ(الموظّف + القالب/الإصدار + مفتاح الفترة)
+    /// بلا أيّ أثر جانبيّ: لا إنشاء ولا تعديل. يُرجِع Found=false إن لم يوجد تقييم مطابق.
+    /// </summary>
+    Task<Result<KpiEvaluationLookupDto>> LookupAsync(KpiEvaluationLookupQuery query, CancellationToken ct = default);
+
     Task<Result<KpiEvaluationDto>> GetAsync(Guid evaluationId, CancellationToken ct = default);
     Task<Result<KpiEvaluationDto>> SaveResultsAsync(Guid evaluationId, SaveKpiResultsRequest request, CancellationToken ct = default);
     Task<Result<KpiEvaluationDto>> SubmitAsync(Guid evaluationId, CancellationToken ct = default);

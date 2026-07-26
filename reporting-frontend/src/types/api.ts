@@ -1313,6 +1313,12 @@ export interface KpiEvaluationDto {
   canReopen: boolean;
 }
 
+// KPI-REVIEWER-OVERRIDE-R1: نتيجة البحث القرائيّ عن تقييم قائم (بلا إنشاء).
+export interface KpiEvaluationLookupDto {
+  found: boolean;
+  evaluation: KpiEvaluationDto | null;
+}
+
 // ADMIN-GOVERNANCE-R1: جسم إجراء المراجعة (السبب إلزاميّ في الإجراءات التي تتطلّبه).
 export interface KpiReviewActionRequest {
   reason?: string;

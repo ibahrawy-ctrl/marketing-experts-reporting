@@ -203,6 +203,16 @@ public record KpiEvaluationListItemDto(
 
 public record CreateKpiEvaluationRequest(Guid KpiTemplateId, Guid SubjectUserId, PeriodType PeriodType, string PeriodKey);
 
+// KPI-REVIEWER-OVERRIDE-R1 — بحث قرائيّ صرف عن تقييم قائم (الموظّف + القالب/الإصدار + مفتاح الفترة).
+// لا يُنشئ سجلًّا إطلاقًا ولا يُعدّل أيّ حقل؛ Found=false تعني عدم وجود تقييم مطابق.
+public record KpiEvaluationLookupQuery(
+    Guid SubjectUserId,
+    string PeriodKey,
+    Guid? KpiTemplateId = null,
+    Guid? KpiTemplateVersionId = null);
+
+public record KpiEvaluationLookupDto(bool Found, KpiEvaluationDto? Evaluation);
+
 // نطاق إنشاء التقييم أضيق من نطاق العرض: الأشخاص الذين يحقّ للمستخدم الحالي تقييمهم.
 // = مرؤوسوه المباشرون فقط (ManagerId == المُقيّم)، أو كل الموظّفين إن كان أدمن (IsAdminOverride).
 public record EvaluatableSubjectDto(Guid Id, string FullName, string Email);
