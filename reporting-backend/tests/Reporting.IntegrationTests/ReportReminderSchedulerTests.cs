@@ -38,15 +38,35 @@ public class ReportReminderSchedulerTests
             Options.Create(options),
             NullLogger<ReportReminderSchedulerService>.Instance);
 
-    private static ReportReminderSchedulerOptions EnabledAt(string hours) => new()
+    /// <summary>
+    /// SPLIT-DELIVERY-WINDOWS-R1 — كلّ الفئات في ساعة واحدة (يُحاكي السلوك القديم لأغراض هذه الاختبارات).
+    /// </summary>
+    private static ReportReminderSchedulerOptions EnabledAt(int hour) => new()
     {
         Enabled = true,
-        RunAtRiyadhHours = hours,
         PollMinutes = 15,
-        IncludeDue = true,
-        IncludeOverdue = true,
-        IncludeReviewOverdue = true
+        WeeklyDueHour = hour,
+        DailyDueHour = hour,
+        OverdueHour = hour,
+        SummaryHour = hour,
+        ReviewHour = hour
     };
+
+    /// <summary>SPLIT-DELIVERY-WINDOWS-R1 — لا ساعة مضبوطة لأيّ فئة (أو خارج 0–23) ⇒ لا جدولة إطلاقًا.</summary>
+    private static ReportReminderSchedulerOptions EnabledWithNoValidHours() => new()
+    {
+        Enabled = true,
+        PollMinutes = 15,
+        WeeklyDueHour = null,
+        DailyDueHour = 99,
+        OverdueHour = -3,
+        SummaryHour = null,
+        ReviewHour = 24
+    };
+
+    /// <summary>كلّ الفئات (لتشغيل مباشر يحاكي السلوك القديم).</summary>
+    private static readonly ReminderCategorySet AllCategories =
+        new(WeeklyDue: true, DailyDue: true, Overdue: true, Summaries: true, ReviewOverdue: true);
 
     /// <summary>لحظة UTC يقابلها في الرياض (UTC+3) اليومُ نفسه والساعةُ المطلوبة.</summary>
     private static DateTime UtcForRiyadhHour(int riyadhHour) =>
@@ -103,7 +123,7 @@ public class ReportReminderSchedulerTests
         var (_, userId) = await TestAuth.CreateUserAsync(_factory, "Employee");
         await SetupReportingRoleAsync(userId);
 
-        var options = EnabledAt("8");
+        var options = EnabledAt(8);
         options.Enabled = false;
         var scheduler = NewScheduler(options);
 
@@ -117,20 +137,20 @@ public class ReportReminderSchedulerTests
     [Fact]
     public async Task Tick_OutsideConfiguredHour_DoesNotRun()
     {
-        var scheduler = NewScheduler(EnabledAt("8"));
+        var scheduler = NewScheduler(EnabledAt(8));
 
         var result = await scheduler.TickAsync(UtcForRiyadhHour(9));
 
         Assert.Null(result);
     }
 
-    // ===== 3) قائمة ساعات فارغة/غير صالحة ⇒ لا تشغيل =====
+    // ===== 3) لا ساعة صالحة لأيّ فئة ⇒ لا تشغيل =====
     [Fact]
     public async Task Tick_WithEmptyOrInvalidHours_DoesNotRun()
     {
-        var scheduler = NewScheduler(EnabledAt("   ,99,-3"));
+        var scheduler = NewScheduler(EnabledWithNoValidHours());
 
-        Assert.Empty(EnabledAt("   ,99,-3").ParsedRunAtRiyadhHours);
+        Assert.Empty(EnabledWithNoValidHours().ScheduledHours);
         Assert.Null(await scheduler.TickAsync(UtcForRiyadhHour(8)));
         Assert.Null(await scheduler.TickAsync(UtcForRiyadhHour(13)));
     }
@@ -139,7 +159,7 @@ public class ReportReminderSchedulerTests
     [Fact]
     public async Task Tick_AtConfiguredRiyadhHour_RunsForCurrentRiyadhCycle()
     {
-        var scheduler = NewScheduler(EnabledAt("8"));
+        var scheduler = NewScheduler(EnabledAt(8));
 
         var result = await scheduler.TickAsync(UtcForRiyadhHour(8));
 
@@ -152,7 +172,7 @@ public class ReportReminderSchedulerTests
     [Fact]
     public async Task Tick_SameSlotTwice_RunsOnlyOnce()
     {
-        var scheduler = NewScheduler(EnabledAt("8"));
+        var scheduler = NewScheduler(EnabledAt(8));
         var slot = UtcForRiyadhHour(8);
 
         Assert.NotNull(await scheduler.TickAsync(slot));
@@ -160,11 +180,14 @@ public class ReportReminderSchedulerTests
         Assert.Null(await scheduler.TickAsync(slot.AddMinutes(45)));
     }
 
-    // ===== 6) ساعة ثانية مضبوطة في اليوم نفسه ⇒ فتحة مستقلّة تعمل =====
+    // ===== 6) نافذتان مختلفتان في اليوم نفسه ⇒ فتحتان مستقلّتان تعملان =====
     [Fact]
     public async Task Tick_SecondConfiguredHourSameDay_RunsAgain()
     {
-        var scheduler = NewScheduler(EnabledAt("8,13"));
+        // SPLIT-DELIVERY-WINDOWS-R1: الأسبوعيّ/التأخّر/الملخّصات/المراجعة عند 8، واليوميّ وحده عند 13.
+        var options = EnabledAt(8);
+        options.DailyDueHour = 13;
+        var scheduler = NewScheduler(options);
 
         Assert.NotNull(await scheduler.TickAsync(UtcForRiyadhHour(8)));
         Assert.Null(await scheduler.TickAsync(UtcForRiyadhHour(8)));
@@ -181,7 +204,7 @@ public class ReportReminderSchedulerTests
         var slot = UtcForRiyadhHour(8);
 
         // النسخة الأولى: تُولّد فعلًا.
-        var first = await NewScheduler(EnabledAt("8")).TickAsync(slot);
+        var first = await NewScheduler(EnabledAt(8)).TickAsync(slot);
         Assert.NotNull(first);
         Assert.True(first!.Created >= 1, "يجب أن يُنشئ التشغيل الأول صفًّا واحدًا على الأقلّ للمستخدم الجديد.");
 
@@ -189,7 +212,7 @@ public class ReportReminderSchedulerTests
         Assert.True(afterFirst >= 1);
 
         // نسخة جديدة تمامًا = محاكاة إعادة التشغيل (القفل الذاكريّ مفقود ⇒ يُعاد الاستدعاء فعلًا).
-        var second = await NewScheduler(EnabledAt("8")).TickAsync(slot);
+        var second = await NewScheduler(EnabledAt(8)).TickAsync(slot);
         Assert.NotNull(second);
 
         // الضمان الحقيقيّ في القاعدة: لا صفّ جديد ولا بريد.
@@ -203,7 +226,7 @@ public class ReportReminderSchedulerTests
     [Fact]
     public async Task RunOnce_DerivesCycleFromRiyadhCalendar()
     {
-        var result = await NewScheduler(EnabledAt("8")).RunOnceAsync();
+        var result = await NewScheduler(EnabledAt(8)).RunOnceAsync(AllCategories);
 
         Assert.Equal(ReportCalendarPolicy.WeekKeyFor(ReportCalendarPolicy.RiyadhToday()), result.WeekKey);
     }

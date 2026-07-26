@@ -78,10 +78,9 @@ public class ReportReminderSchedulerService : BackgroundService
     {
         if (!_options.Enabled) return null;
 
-        var hours = _options.ParsedRunAtRiyadhHours;
-        if (hours.Count == 0)
+        if (_options.ScheduledHours.Count == 0)
         {
-            _logger.LogWarning("ReportReminderScheduler enabled but RunAtRiyadhHours is empty; nothing scheduled");
+            _logger.LogWarning("ReportReminderScheduler enabled but no category hour is configured; nothing scheduled");
             return null;
         }
 
@@ -89,13 +88,15 @@ public class ReportReminderSchedulerService : BackgroundService
             .Add(ReportCalendarPolicy.RiyadhOffset);
         var slot = (Date: DateOnly.FromDateTime(riyadhNow), Hour: riyadhNow.Hour);
 
-        if (!hours.Contains(slot.Hour)) return null;
+        // SPLIT-DELIVERY-WINDOWS-R1: لكلّ فئة ساعتها؛ الساعة التي لا تُطابِق أيّ فئة لا تُشغِّل شيئًا.
+        var categories = _options.CategoriesForHour(slot.Hour);
+        if (categories.IsEmpty) return null;
         if (_lastRunSlot == slot) return null;
 
         // نُثبّت الفتحة قبل التنفيذ حتى لا تتسبّب دورة فاشلة في إعادة محاولة لا نهائية داخل نفس الساعة.
         _lastRunSlot = slot;
 
-        return await RunOnceAsync(ct);
+        return await RunOnceAsync(categories, ct);
     }
 
     /// <summary>
@@ -112,7 +113,7 @@ public class ReportReminderSchedulerService : BackgroundService
     /// عدم التكرار محفوظ: كلّ مفاتيح الترابط تحمل مفتاح الدورة (وتذكير الأسبوعيّ يحمل أيضًا يوم استحقاق الدور)،
     /// فتكرار تشغيل الدورة السابقة يوميًّا يُرجِع Duplicate ولا يُنشئ صفًّا جديدًا.
     /// </summary>
-    public async Task<ReportReminderRunResult> RunOnceAsync(CancellationToken ct = default)
+    public async Task<ReportReminderRunResult> RunOnceAsync(ReminderCategorySet categories, CancellationToken ct = default)
     {
         using var scope = _scopeFactory.CreateScope();
         var generator = scope.ServiceProvider.GetRequiredService<IReportReminderService>();
@@ -122,24 +123,27 @@ public class ReportReminderSchedulerService : BackgroundService
         var currentKey = ReportCalendarPolicy.WeekKeyFor(today);
         var previousKey = ReportCalendarPolicy.WeekKeyFor(ReportCalendarPolicy.WeekStart(today).AddDays(-7));
 
-        var previous = await RunForCycleAsync(generator, previousKey, ct);
-        var current = await RunForCycleAsync(generator, currentKey, ct);
+        var previous = await RunForCycleAsync(generator, previousKey, categories, ct);
+        var current = await RunForCycleAsync(generator, currentKey, categories, ct);
 
         return Merge(current, previous);
     }
 
-    private async Task<ReportReminderRunResult> RunForCycleAsync(IReportReminderService generator, string cycleKey, CancellationToken ct)
+    private async Task<ReportReminderRunResult> RunForCycleAsync(
+        IReportReminderService generator, string cycleKey, ReminderCategorySet categories, CancellationToken ct)
     {
         var result = await generator.GenerateAsync(new ReportReminderRunOptions(
             WeekKey: cycleKey,
             Date: null,
-            IncludeDue: _options.IncludeDue,
-            IncludeOverdue: _options.IncludeOverdue,
-            IncludeReviewOverdue: _options.IncludeReviewOverdue), ct);
+            IncludeWeeklyDue: categories.WeeklyDue,
+            IncludeDailyDue: categories.DailyDue,
+            IncludeOverdue: categories.Overdue,
+            IncludeOverdueSummaries: categories.Summaries,
+            IncludeReviewOverdue: categories.ReviewOverdue), ct);
 
         _logger.LogInformation(
-            "ReportReminderScheduler ran for {WeekKey} mode={Mode} wouldGenerate={WouldGenerate} created={Created} duplicate={Duplicate} noEmail={NoEmail} disabled={Disabled}",
-            result.WeekKey, result.Mode, result.WouldGenerate, result.Created,
+            "ReportReminderScheduler ran for {WeekKey} categories={Categories} mode={Mode} wouldGenerate={WouldGenerate} created={Created} duplicate={Duplicate} noEmail={NoEmail} disabled={Disabled}",
+            result.WeekKey, categories.ToString(), result.Mode, result.WouldGenerate, result.Created,
             result.SkippedDuplicate, result.SkippedNoEmail, result.SkippedDisabled);
 
         return result;

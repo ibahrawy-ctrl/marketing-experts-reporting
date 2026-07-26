@@ -27,8 +27,10 @@ public class ReportRemindersController : ApiControllerBase
         var options = new ReportReminderRunOptions(
             WeekKey: req.WeekKey,
             Date: req.Date,
-            IncludeDue: req.IncludeDue,
+            IncludeWeeklyDue: req.IncludeDue && req.IncludeWeeklyDue,
+            IncludeDailyDue: req.IncludeDue && req.IncludeDailyDue,
             IncludeOverdue: req.IncludeOverdue,
+            IncludeOverdueSummaries: req.IncludeOverdue && req.IncludeOverdueSummaries,
             IncludeReviewOverdue: req.IncludeReviewOverdue);
 
         var result = await _service.GenerateAsync(options, ct);
@@ -36,10 +38,19 @@ public class ReportRemindersController : ApiControllerBase
     }
 }
 
-/// <summary>جسم طلب توليد تذكيرات التقارير (كلّها اختيارية بقيم افتراضية آمنة).</summary>
+/// <summary>
+/// جسم طلب توليد تذكيرات التقارير (كلّها اختيارية بقيم افتراضية آمنة).
+///
+/// EMAIL-NOTIFICATIONS-SPLIT-DELIVERY-WINDOWS-R1 — البوابتان الأصليّتان بقيتا كما هما (مفاتيح رئيسية):
+/// <see cref="IncludeDue"/> يحكم نوعَي الاستحقاق معًا، و<see cref="IncludeOverdue"/> يحكم التنبيه الفرديّ والملخّصات معًا.
+/// أُضيفت ثلاث بوابات تنقيح اختيارية تسمح بمحاكاة نافذة واحدة يدويًّا (مثلًا اليوميّ وحده) دون كسر أيّ مستهلك قائم.
+/// </summary>
 public record GenerateReportRemindersRequest(
     string? WeekKey = null,
     DateOnly? Date = null,
     bool IncludeDue = true,
     bool IncludeOverdue = true,
-    bool IncludeReviewOverdue = true);
+    bool IncludeReviewOverdue = true,
+    bool IncludeWeeklyDue = true,
+    bool IncludeDailyDue = true,
+    bool IncludeOverdueSummaries = true);

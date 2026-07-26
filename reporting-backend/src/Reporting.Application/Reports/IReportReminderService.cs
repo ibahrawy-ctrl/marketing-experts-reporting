@@ -19,12 +19,25 @@ public interface IReportReminderService
     Task<ReportReminderRunResult> GenerateAsync(ReportReminderRunOptions options, CancellationToken ct = default);
 }
 
-/// <summary>خيارات توليد تذكيرات التقارير.</summary>
+/// <summary>
+/// خيارات توليد تذكيرات التقارير.
+///
+/// EMAIL-NOTIFICATIONS-SPLIT-DELIVERY-WINDOWS-R1 — فُصِلت فئات التذكير إلى خمس بوابات مستقلّة
+/// بدل ثلاث، كي يستطيع المجدول تشغيل فئة واحدة في نافذتها الزمنية دون بقيّة الفئات:
+/// - <paramref name="IncludeWeeklyDue"/> → report-weekly-due (حسب يوم استحقاق الدور).
+/// - <paramref name="IncludeDailyDue"/> → report-daily-due (مبيعات حصريًّا: SALES_B2B/SALES_B2C).
+/// - <paramref name="IncludeOverdue"/> → report-overdue (التنبيه الفرديّ بالتأخّر).
+/// - <paramref name="IncludeOverdueSummaries"/> → ملخّصات التأخّر (فريق/إدارة/تنفيذيّ).
+/// - <paramref name="IncludeReviewOverdue"/> → تنبيهات تأخّر/تعليق المراجعة.
+/// كانت <c>IncludeDue</c> السابقة تجمع الأسبوعيّ واليوميّ معًا فتعذّر فصل نافذتيهما.
+/// </summary>
 public record ReportReminderRunOptions(
     string? WeekKey = null,
     DateOnly? Date = null,
-    bool IncludeDue = true,
+    bool IncludeWeeklyDue = true,
+    bool IncludeDailyDue = true,
     bool IncludeOverdue = true,
+    bool IncludeOverdueSummaries = true,
     bool IncludeReviewOverdue = true);
 
 /// <summary>حصيلة تشغيل مولّد التذكيرات (عدّادات إجمالية + تفصيل حسب نوع الحدث).</summary>

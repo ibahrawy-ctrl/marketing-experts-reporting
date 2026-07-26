@@ -83,15 +83,19 @@ public class ReportReminderService : IReportReminderService
         var reviews = await ResolvePendingReviewsAsync(key, ct);
 
         // ===== تذكيرات الاستحقاق (لم يحن التأخّر بعد) — النوعان 1 و2 =====
-        if (options.IncludeDue)
+        // SPLIT-DELIVERY-WINDOWS-R1: بوابتان مستقلّتان (أسبوعيّ/يوميّ) كي تُشغَّل كلٌّ في نافذتها.
+        if (options.IncludeWeeklyDue || options.IncludeDailyDue)
         {
-            await EmitDueRemindersAsync(key, weekLabel, evals, acc, ct);
+            await EmitDueRemindersAsync(key, weekLabel, evals, acc,
+                options.IncludeWeeklyDue, options.IncludeDailyDue, ct);
         }
 
         // ===== تنبيهات التأخّر — الأنواع 3 و4 و5 و6 =====
-        if (options.IncludeOverdue)
+        // SPLIT-DELIVERY-WINDOWS-R1: التنبيه الفرديّ (3) والملخّصات (4/5/6) لكلٍّ بوابته وساعته.
+        if (options.IncludeOverdue || options.IncludeOverdueSummaries)
         {
-            await EmitOverdueRemindersAsync(key, weekLabel, evals, acc, ct);
+            await EmitOverdueRemindersAsync(key, weekLabel, evals, acc,
+                options.IncludeOverdue, options.IncludeOverdueSummaries, ct);
         }
 
         // ===== تنبيهات تأخّر/تعليق المراجعة — الأنواع 7 و8 و9 =====
@@ -104,7 +108,8 @@ public class ReportReminderService : IReportReminderService
     }
 
     // ===== النوعان 1 (أسبوعي مستحق) و2 (يومي مستحق) — غير متأخّرة =====
-    private async Task EmitDueRemindersAsync(string key, string weekLabel, IReadOnlyList<DueEval> evals, Accumulator acc, CancellationToken ct)
+    private async Task EmitDueRemindersAsync(string key, string weekLabel, IReadOnlyList<DueEval> evals, Accumulator acc,
+        bool includeWeeklyDue, bool includeDailyDue, CancellationToken ct)
     {
         var today = RiyadhToday();
         var link = BuildLink("/app/submissions");
@@ -114,6 +119,8 @@ public class ReportReminderService : IReportReminderService
             var c = e.Candidate;
             if (c.Cadence == PeriodType.Daily)
             {
+                // SPLIT-DELIVERY-WINDOWS-R1: نافذة اليوميّ مستقلّة (16:00 الرياض افتراضًا).
+                if (!includeDailyDue) continue;
                 // يوميّ مستحقّ اليوم (لم يتأخّر بعد).
                 if (e.DueDate != today) continue;
                 var dateKey = e.DueDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
@@ -129,6 +136,8 @@ public class ReportReminderService : IReportReminderService
             }
             else
             {
+                // SPLIT-DELIVERY-WINDOWS-R1: نافذة الأسبوعيّ مستقلّة (09:00 الرياض افتراضًا).
+                if (!includeWeeklyDue) continue;
                 // EMAIL-NOTIFICATIONS-ROLE-AWARE-SCHEDULE-FIX-R1 — أهليّة اليوم حسب دور المستلِم.
                 // العقد: الموظّف=الأربعاء، قائد الفريق=الخميس، المدير=الأحد، المدير العام/الرئيس التنفيذي/مدير النظام=الاثنين
                 // (مشتقّة من ReportCalendarPolicy.DueDateForRole = بداية الدورة + RoleDueOffset).
@@ -154,13 +163,16 @@ public class ReportReminderService : IReportReminderService
     }
 
     // ===== النوع 3 (تأخّر تقرير الموظّف) + ملخّصات التأخّر 4/5/6 =====
-    private async Task EmitOverdueRemindersAsync(string key, string weekLabel, IReadOnlyList<DueEval> evals, Accumulator acc, CancellationToken ct)
+    private async Task EmitOverdueRemindersAsync(string key, string weekLabel, IReadOnlyList<DueEval> evals, Accumulator acc,
+        bool includeIndividual, bool includeSummaries, CancellationToken ct)
     {
         var submissionsLink = BuildLink("/app/submissions");
         var complianceLink = BuildLink("/app/compliance");
 
         // --- النوع 3: تنبيه فرديّ لكل موظّف متأخّر (أسبوعيّ = صفّ واحد؛ يوميّ = صفّ لكل يوم متأخّر) ---
-        foreach (var e in evals.Where(e => !e.HasSubmission && e.Overdue))
+        foreach (var e in includeIndividual
+            ? evals.Where(e => !e.HasSubmission && e.Overdue)
+            : Enumerable.Empty<DueEval>())
         {
             var c = e.Candidate;
             var subject = "تنبيه بتأخر تقريرك";
@@ -190,6 +202,9 @@ public class ReportReminderService : IReportReminderService
                     subject, body, submissionsLink, ct);
             }
         }
+
+        // --- الملخّصات (4/5/6) لها نافذتها المستقلّة — SPLIT-DELIVERY-WINDOWS-R1 ---
+        if (!includeSummaries) return;
 
         // --- المرشّحون المتأخّرون المميَّزون (لأي فترة) لبناء الملخّصات ---
         var overdueByUser = evals
