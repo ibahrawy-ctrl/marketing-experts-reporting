@@ -28,11 +28,18 @@ namespace Reporting.IntegrationTests;
 /// <see cref="ReportReminderSchedulerOptions.CategoriesForHour"/> الحقيقيّة ثمّ تُمرَّر كما هي إلى
 /// <see cref="ReportReminderService"/> — فما يُمنَع في نافذة لا يُنشئ أيّ صفّ إطلاقًا.
 ///
-/// كلّ الاختبارات تحقن <see cref="ISystemClock"/> ثابتة ⇒ محاكاة اليوم والساعة حتميّة بلا اعتماد على
-/// ساعة النظام. القاعدة مشتركة ⇒ العدّ دائمًا بمفاتيح ترابط مستخدمين مُنشأين حديثًا داخل سنة محاكاة معزولة.
+/// عزل الاختبارات (تحصين ضدّ الترتيب على قاعدة <c>reporting_test</c> المشتركة الدائمة):
+///   (1) لكلّ اختبار **دورة محاكاة خاصّة به** (سنة مرساة مستقلّة) ⇒ مفاتيح الترابط لا تتقاطع بين الاختبارات إطلاقًا.
+///   (2) كلّ عدّ وكلّ توكيد محصور بـ**مستخدمي الاختبار نفسه** وبمفاتيح ترابطه هو — لا عدّادات على مستوى الشركة
+///       (العدّادات العامّة تلتقط مستخدمين متراكمين من فئات اختبار أخرى فتصير غير حتميّة).
+///   (3) **تنظيف مضمون** في <see cref="DisposeAsync"/>: تُحذف صفوف الإشعارات والقوالب وإصداراتها والإدارات
+///       والمسمّيات المُنشأة هنا، ويُفَكّ ارتباط مستخدمي الاختبار بالمسمّى/الإدارة ⇒ يصيرون خاملين تمامًا
+///       فلا يُنتِجون صفوفًا في أيّ تشغيل لاحق.
+///
+/// كلّ الاختبارات تحقن <see cref="ISystemClock"/> ثابتة ⇒ محاكاة اليوم والساعة حتميّة بلا اعتماد على ساعة النظام.
 /// </summary>
 [Collection("Integration")]
-public class SplitDeliveryWindowsTests
+public class SplitDeliveryWindowsTests : IAsyncLifetime
 {
     private readonly CustomWebApplicationFactory _factory;
 
@@ -56,12 +63,33 @@ public class SplitDeliveryWindowsTests
         }
     }
 
-    // ===== دورة محاكاة معزولة (سنة مستقلّة عن بقيّة ملفّات الاختبار) =====
-    private static readonly DateOnly CycleStart = ReportCalendarPolicy.WeekStart(new DateOnly(2028, 5, 17));
-    private static string CycleKey => ReportCalendarPolicy.WeekKeyFor(CycleStart);
+    // ===== دورة محاكاة معزولة لكلّ اختبار =====
 
-    /// <summary>يوم من دورة المحاكاة (0 = السبت … 6 = الجمعة)، ويجوز تجاوز 6 للدورة التالية.</summary>
-    private static DateOnly Day(int offsetFromCycleStart) => CycleStart.AddDays(offsetFromCycleStart);
+    /// <summary>
+    /// دورة محاكاة (السبت→الجمعة) مشتقّة من سنة مرساة مستقلّة لكلّ اختبار. المرساة في مايو دائمًا
+    /// ⇒ الدورة وسابقتها ولاحقتها كلّها داخل السنة نفسها، فبادئة السنة تكفي لعزل فضاء المفاتيح.
+    /// </summary>
+    private sealed class SimCycle
+    {
+        public SimCycle(int anchorYear) => Start = ReportCalendarPolicy.WeekStart(new DateOnly(anchorYear, 5, 17));
+
+        /// <summary>سبت بداية الدورة المرساة.</summary>
+        public DateOnly Start { get; }
+
+        /// <summary>مفتاح الدورة المرساة (YYYY-Www).</summary>
+        public string Key => ReportCalendarPolicy.WeekKeyFor(Start);
+
+        /// <summary>يوم من دورة المحاكاة (0 = السبت … 6 = الجمعة)، ويجوز تجاوز 6 للدورة التالية.</summary>
+        public DateOnly Day(int offsetFromStart) => Start.AddDays(offsetFromStart);
+
+        /// <summary>بادئة فضاء المحاكاة — كلّ مفاتيح هذه الدورة (دورةً ويومًا) تحملها.</summary>
+        public string YearSegment => $"{Start.Year}-";
+    }
+
+    private SimCycle _cycle = new(2041);
+
+    /// <summary>يحجز دورة المحاكاة الخاصّة بهذا الاختبار. يُستدعى في أوّل سطر من كلّ اختبار.</summary>
+    private SimCycle UseCycle(int anchorYear) => _cycle = new SimCycle(anchorYear);
 
     private static string DayKey(DateOnly day) => day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
@@ -118,43 +146,78 @@ public class SplitDeliveryWindowsTests
             IncludeOverdueSummaries: categories.Summaries,
             IncludeReviewOverdue: categories.ReviewOverdue);
 
+    // ===== سجلّ ما أُنشئ (للتنظيف المضمون) =====
+
+    private readonly List<Guid> _userIds = new();
+    private readonly List<Guid> _jobRoleIds = new();
+    private readonly List<Guid> _templateIds = new();
+    private readonly List<Guid> _departmentIds = new();
+
+    /// <summary>قالب المبيعات المشترك داخل هذا الاختبار (المسمّى SALES_* مشترك عالميًّا، أمّا القالب فمِلك الاختبار).</summary>
+    private Guid? _sharedCadenceTemplateId;
+
     // ===== مساعدات إنشاء =====
 
     private async Task<Guid> CreateReportingUserAsync(string identityRole, string? cadenceCode = null)
     {
         var (_, userId) = await TestAuth.CreateUserAsync(_factory, identityRole);
+        _userIds.Add(userId);
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        JobRole? jobRole = cadenceCode is null ? null : await db.JobRoles.FirstOrDefaultAsync(j => j.Code == cadenceCode);
-        if (jobRole is null)
+        Guid jobRoleId;
+        var needsTemplate = true;
+
+        if (cadenceCode is null)
         {
-            jobRole = new JobRole { NameAr = $"مسمّى {Guid.NewGuid():N}", Code = cadenceCode };
+            // مسمّى خاصّ بهذا المستخدم وحده ⇒ يُحذف في التنظيف.
+            var jobRole = new JobRole { NameAr = $"مسمّى {Guid.NewGuid():N}" };
             db.JobRoles.Add(jobRole);
+            await db.SaveChangesAsync();
+            jobRoleId = jobRole.Id;
+            _jobRoleIds.Add(jobRoleId);
+        }
+        else
+        {
+            // رمز الوتيرة (SALES_*) مقيَّد بفهرس فريد ⇒ get-or-create ولا يُحذف، ويكفيه قالب واحد لكلّ الاختبار.
+            var jobRole = await db.JobRoles.FirstOrDefaultAsync(j => j.Code == cadenceCode);
+            if (jobRole is null)
+            {
+                jobRole = new JobRole { NameAr = cadenceCode, Code = cadenceCode, IsActive = true };
+                db.JobRoles.Add(jobRole);
+                await db.SaveChangesAsync();
+            }
+            jobRoleId = jobRole.Id;
+            needsTemplate = _sharedCadenceTemplateId is null;
         }
 
-        var template = new ReportTemplate
+        if (needsTemplate)
         {
-            Title = $"قالب {Guid.NewGuid():N}",
-            JobRoleId = jobRole.Id,
-            Classification = TemplateClassification.Primary,
-            DefaultPeriodType = PeriodType.Weekly,
-            IsActive = true,
-            Status = TemplateStatus.Published,
-            OwnerId = userId
-        };
-        db.ReportTemplates.Add(template);
-        db.ReportTemplateVersions.Add(new ReportTemplateVersion
-        {
-            ReportTemplateId = template.Id,
-            VersionNumber = 1,
-            IsPublished = true,
-            PublishedAtUtc = DateTime.UtcNow
-        });
+            var template = new ReportTemplate
+            {
+                Title = $"قالب {Guid.NewGuid():N}",
+                JobRoleId = jobRoleId,
+                Classification = TemplateClassification.Primary,
+                DefaultPeriodType = PeriodType.Weekly,
+                IsActive = true,
+                Status = TemplateStatus.Published,
+                OwnerId = userId
+            };
+            db.ReportTemplates.Add(template);
+            db.ReportTemplateVersions.Add(new ReportTemplateVersion
+            {
+                ReportTemplateId = template.Id,
+                VersionNumber = 1,
+                IsPublished = true,
+                PublishedAtUtc = DateTime.UtcNow
+            });
+            _templateIds.Add(template.Id);
+            if (cadenceCode is not null) _sharedCadenceTemplateId = template.Id;
+        }
 
         var user = await db.Users.FirstAsync(u => u.Id == userId);
-        user.JobRoleId = jobRole.Id;
+        user.JobRoleId = jobRoleId;
         await db.SaveChangesAsync();
         return userId;
     }
@@ -180,9 +243,10 @@ public class SplitDeliveryWindowsTests
             u.DepartmentId = dept.Id;
         }
         await db.SaveChangesAsync();
+        _departmentIds.Add(dept.Id);
     }
 
-    // ===== مساعدات عدّ =====
+    // ===== مساعدات عدّ (كلّها محصورة بمستخدمي هذا الاختبار وبسنة محاكاته) =====
 
     private async Task<int> CountByKeyAsync(string correlationKey)
     {
@@ -191,17 +255,15 @@ public class SplitDeliveryWindowsTests
         return await db.EmailNotifications.AsNoTracking().CountAsync(n => n.CorrelationKey == correlationKey);
     }
 
-    /// <summary>بادئة فضاء المحاكاة: مفاتيح الدورة واليوم كلّها تبدأ بسنة المحاكاة ⇒ عزل عن الدورة الجارية.</summary>
-    private static readonly string SimulationSegment = $"{CycleStart.Year}-";
-
     private async Task<int> CountByEventAsync(string eventType, Guid userId)
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var prefix = $"{eventType}:{SimulationSegment}";
-        var suffix = $":{userId}";
+        var prefix = $"{eventType}:{_cycle.YearSegment}";
+        // الفلترة تبدأ بـ RecipientUserId (مفهرس) ثمّ تُضيَّق بسنة المحاكاة —
+        // الفلترة النصّية وحدها تمسح الجدول المشترك بالكامل (ملايين الصفوف المتراكمة).
         return await db.EmailNotifications.AsNoTracking().CountAsync(n =>
-            n.CorrelationKey != null && n.CorrelationKey.StartsWith(prefix) && n.CorrelationKey.EndsWith(suffix));
+            n.RecipientUserId == userId && n.CorrelationKey.StartsWith(prefix));
     }
 
     private Task<int> CountWeeklyDueAsync(Guid userId) => CountByEventAsync("report-weekly-due", userId);
@@ -212,10 +274,37 @@ public class SplitDeliveryWindowsTests
     private static string OverdueKey(string cycleKey, Guid userId) =>
         $"report-overdue:{cycleKey}:{userId}:{DelayType.EmployeeReportNotSubmitted}";
 
+    /// <summary>
+    /// إجماليّ صفوف الإشعارات **الخاصّة بهذا الاختبار وحده**: مفاتيح تحمل سنة محاكاته ومعرّف أحد مستخدميه.
+    /// هذا بديل العدّادات على مستوى الشركة — تلك تلتقط مستخدمين متراكمين من فئات أخرى فتصير غير حتميّة.
+    /// </summary>
+    private async Task<int> CountOwnSimulationRowsAsync()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var segment = $":{_cycle.YearSegment}";
+        var ids = _userIds.ToList();
+        if (ids.Count == 0) return 0;
+        return await db.EmailNotifications.AsNoTracking().CountAsync(n =>
+            n.RecipientUserId != null && ids.Contains(n.RecipientUserId.Value)
+            && n.CorrelationKey.Contains(segment));
+    }
+
+    /// <summary>كلّ صفوف المستخدم أيًّا كان فضاء المفاتيح (يُستعمل لإثبات «لا شيء إطلاقًا»).</summary>
+    private async Task<int> CountAllForUserAsync(Guid userId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return await db.EmailNotifications.AsNoTracking()
+            .CountAsync(n => n.RecipientUserId == userId);
+    }
+
     // ===== 1) الأحد 09:00 — أسبوعيّ للمديرين + تأخّر وملخّصات، و0 تذكير يوميّ =====
     [Fact]
     public async Task Sunday_At09_WeeklyManagersAndOverdueAndSummaries_NoDailyDue()
     {
+        var cycle = UseCycle(2041);
+
         var emp = await CreateReportingUserAsync("Employee");
         var tl = await CreateReportingUserAsync("TeamLeader");
         var mgr = await CreateReportingUserAsync("Manager");
@@ -223,7 +312,7 @@ public class SplitDeliveryWindowsTests
         var sales = await CreateSalesUserAsync();
         await CreateDepartmentWithManagerAsync(mgr, emp);
 
-        var sunday = Day(8); // الأحد التالي = يوم استحقاق المدير للدورة السابقة
+        var sunday = cycle.Day(8); // الأحد التالي = يوم استحقاق المدير للدورة السابقة
 
         await RunWindowAsync(sunday, 9);
 
@@ -234,8 +323,8 @@ public class SplitDeliveryWindowsTests
         Assert.Equal(0, await CountWeeklyDueAsync(tl));
 
         // التأخّر الفرديّ والملخّصات مسموحان في نافذة 09.
-        Assert.Equal(1, await CountByKeyAsync(OverdueKey(CycleKey, emp)));
-        Assert.Equal(1, await CountByKeyAsync($"report-department-overdue-summary:{CycleKey}:{mgr}"));
+        Assert.Equal(1, await CountByKeyAsync(OverdueKey(cycle.Key, emp)));
+        Assert.Equal(1, await CountByKeyAsync($"report-department-overdue-summary:{cycle.Key}:{mgr}"));
 
         // اليوميّ ممنوع في نافذة 09 — لا صفّ إطلاقًا.
         Assert.Equal(0, await CountDailyDueAsync(sales));
@@ -246,12 +335,14 @@ public class SplitDeliveryWindowsTests
     [Fact]
     public async Task Sunday_At16_DailySalesOnly_NoWeeklyDue()
     {
+        var cycle = UseCycle(2042);
+
         var emp = await CreateReportingUserAsync("Employee");
         var mgr = await CreateReportingUserAsync("Manager");
         await CreateDepartmentWithManagerAsync(mgr, emp);
         var salesTeam = await CreateSalesUsersAsync(5);
 
-        var sunday = Day(8);
+        var sunday = cycle.Day(8);
 
         await RunWindowAsync(sunday, 16);
 
@@ -265,14 +356,16 @@ public class SplitDeliveryWindowsTests
         // الأسبوعيّ والتأخّر والملخّصات ممنوعة في نافذة 16.
         Assert.Equal(0, await CountWeeklyDueAsync(mgr));
         Assert.Equal(0, await CountWeeklyDueAsync(emp));
-        Assert.Equal(0, await CountByKeyAsync(OverdueKey(CycleKey, emp)));
-        Assert.Equal(0, await CountByKeyAsync($"report-department-overdue-summary:{CycleKey}:{mgr}"));
+        Assert.Equal(0, await CountByKeyAsync(OverdueKey(cycle.Key, emp)));
+        Assert.Equal(0, await CountByKeyAsync($"report-department-overdue-summary:{cycle.Key}:{mgr}"));
     }
 
     // ===== 3) الاثنين 09:00 — أسبوعيّ للتنفيذيين فقط، و0 تذكير يوميّ =====
     [Fact]
     public async Task Monday_At09_WeeklyExecutivesOnly_NoDailyDue()
     {
+        var cycle = UseCycle(2043);
+
         var emp = await CreateReportingUserAsync("Employee");
         var tl = await CreateReportingUserAsync("TeamLeader");
         var mgr = await CreateReportingUserAsync("Manager");
@@ -281,7 +374,7 @@ public class SplitDeliveryWindowsTests
         var admin = await CreateReportingUserAsync("Admin");
         var sales = await CreateSalesUserAsync();
 
-        var monday = Day(9); // الاثنين التالي = يوم استحقاق التنفيذيين للدورة السابقة
+        var monday = cycle.Day(9); // الاثنين التالي = يوم استحقاق التنفيذيين للدورة السابقة
 
         await RunWindowAsync(monday, 9);
 
@@ -300,11 +393,13 @@ public class SplitDeliveryWindowsTests
     [Fact]
     public async Task Monday_At16_DailySalesOnly()
     {
+        var cycle = UseCycle(2044);
+
         var gm = await CreateReportingUserAsync("GeneralManager");
         var ceo = await CreateReportingUserAsync("CEO");
         var sales = await CreateSalesUserAsync();
 
-        var monday = Day(9);
+        var monday = cycle.Day(9);
 
         await RunWindowAsync(monday, 16);
 
@@ -320,13 +415,15 @@ public class SplitDeliveryWindowsTests
     [Fact]
     public async Task Friday_BothWindows_NoDailyDue_AndNoWeeklyDue()
     {
+        var cycle = UseCycle(2045);
+
         var emp = await CreateReportingUserAsync("Employee");
         var tl = await CreateReportingUserAsync("TeamLeader");
         var mgr = await CreateReportingUserAsync("Manager");
         var gm = await CreateReportingUserAsync("GeneralManager");
         var sales = await CreateSalesUserAsync();
 
-        var friday = Day(6);
+        var friday = cycle.Day(6);
 
         await RunWindowAsync(friday, 9);
         await RunWindowAsync(friday, 16);
@@ -343,11 +440,13 @@ public class SplitDeliveryWindowsTests
     [Fact]
     public async Task Saturday_At16_DailySalesOnly()
     {
+        var cycle = UseCycle(2046);
+
         var emp = await CreateReportingUserAsync("Employee");
         var tl = await CreateReportingUserAsync("TeamLeader");
         var sales = await CreateSalesUserAsync();
 
-        var saturday = Day(0);
+        var saturday = cycle.Day(0);
 
         await RunWindowAsync(saturday, 16);
 
@@ -358,61 +457,72 @@ public class SplitDeliveryWindowsTests
         Assert.Equal(0, await CountWeeklyDueAsync(sales));
     }
 
-    // ===== 7) إعادة التشغيل داخل النافذة نفسها ⇒ created=0 وكلّ الرسائل مُكرّرة =====
+    // ===== 7) إعادة التشغيل داخل النافذة نفسها ⇒ لا صفّ جديد لمستخدمي الاختبار وكلّ رسائلهم مُكرّرة =====
     [Fact]
     public async Task SameWindowRerun_CreatesNothing_AndCountsDuplicates()
     {
+        var cycle = UseCycle(2047);
+
         var emp = await CreateReportingUserAsync("Employee");
         var mgr = await CreateReportingUserAsync("Manager");
         await CreateDepartmentWithManagerAsync(mgr, emp);
         var sales = await CreateSalesUserAsync();
 
-        var sunday = Day(8);
+        var sunday = cycle.Day(8);
 
-        // نافذة 09: التشغيل الأول يُنشئ فعلًا، والثاني لا يُنشئ شيئًا.
-        var first09 = await RunWindowAsync(sunday, 9);
-        Assert.True(first09.Created >= 1);
+        // نافذة 09: التشغيل الأول يُنشئ فعلًا لمستخدمي هذا الاختبار.
+        await RunWindowAsync(sunday, 9);
+        var ownAfterFirst09 = await CountOwnSimulationRowsAsync();
+        Assert.True(ownAfterFirst09 >= 1, "يجب أن تُنشئ نافذة 09 صفًّا واحدًا على الأقلّ لمستخدمي هذا الاختبار.");
         var weeklyAfterFirst = await CountWeeklyDueAsync(mgr);
+        Assert.Equal(1, weeklyAfterFirst);
 
+        // إعادة التشغيل في النافذة نفسها: لا صفّ جديد، وكلّ رسائل الاختبار تُصنَّف مُكرّرة.
         var second09 = await RunWindowAsync(sunday, 9);
-        Assert.Equal(0, second09.Created);
-        Assert.True(second09.Duplicate >= first09.Created);
+        Assert.Equal(ownAfterFirst09, await CountOwnSimulationRowsAsync());
+        Assert.True(second09.Duplicate >= ownAfterFirst09,
+            "يجب أن تُحتسَب كلّ رسائل مستخدمي هذا الاختبار كمُكرّرة عند إعادة التشغيل.");
         Assert.Equal(weeklyAfterFirst, await CountWeeklyDueAsync(mgr));
 
         // نافذة 16: نفس السلوك تمامًا، مستقلّة عن نافذة 09.
-        var first16 = await RunWindowAsync(sunday, 16);
-        Assert.True(first16.Created >= 1);
-        var dailyAfterFirst = await CountDailyDueAsync(sales);
-        Assert.Equal(1, dailyAfterFirst);
+        await RunWindowAsync(sunday, 16);
+        var ownAfterFirst16 = await CountOwnSimulationRowsAsync();
+        Assert.True(ownAfterFirst16 > ownAfterFirst09, "يجب أن تُضيف نافذة 16 رسالة المبيعات اليوميّة.");
+        Assert.Equal(1, await CountDailyDueAsync(sales));
 
         var second16 = await RunWindowAsync(sunday, 16);
-        Assert.Equal(0, second16.Created);
-        Assert.True(second16.Duplicate >= first16.Created);
-        Assert.Equal(dailyAfterFirst, await CountDailyDueAsync(sales));
+        Assert.Equal(ownAfterFirst16, await CountOwnSimulationRowsAsync());
+        Assert.True(second16.Duplicate >= 1);
+        Assert.Equal(1, await CountDailyDueAsync(sales));
     }
 
     // ===== 8) تشغيل 09:00 لا يحجز مفتاح رسالة اليوميّ الخاصّة بـ16:00 =====
     [Fact]
     public async Task Run_At09_DoesNotSquat_DailyDueKeyOf16()
     {
+        var cycle = UseCycle(2048);
+
         var sales = await CreateSalesUserAsync();
-        var sunday = Day(8);
+        var sunday = cycle.Day(8);
         var dailyKey = $"report-daily-due:{DayKey(sunday)}:{sales}";
 
         await RunWindowAsync(sunday, 9);
         Assert.Equal(0, await CountByKeyAsync(dailyKey));   // لم يُحجَز المفتاح
+        Assert.Equal(0, await CountDailyDueAsync(sales));
 
-        var at16 = await RunWindowAsync(sunday, 16);
-        Assert.True(at16.Created >= 1);                      // ولا Duplicate كاذب
-        Assert.Equal(1, await CountByKeyAsync(dailyKey));
+        await RunWindowAsync(sunday, 16);
+        Assert.Equal(1, await CountByKeyAsync(dailyKey));   // أُنشئ فعلًا — ولا Duplicate كاذب
+        Assert.Equal(1, await CountDailyDueAsync(sales));
     }
 
     // ===== 9) وضع DryRun لا يستدعي قناة SMTP إطلاقًا (نافذة 16) =====
     [Fact]
     public async Task DryRun_InDailyWindow_DoesNotCallSmtpSender()
     {
+        var cycle = UseCycle(2049);
+
         var sales = await CreateSalesUserAsync();
-        var sunday = Day(8);
+        var sunday = cycle.Day(8);
         var categories = ProductionWindows().CategoriesForHour(16);
         var spy = new CountingEmailSender();
 
@@ -435,12 +545,12 @@ public class SplitDeliveryWindowsTests
         }
 
         // أُنشئ الصفّ فعلًا (المسار عمل) لكن بلا أيّ استدعاء إرسال.
-        Assert.Equal(1, await CountByKeyAsync($"report-daily-due:{DayKey(sunday)}:{sales}"));
+        var key = $"report-daily-due:{DayKey(sunday)}:{sales}";
+        Assert.Equal(1, await CountByKeyAsync(key));
         Assert.Equal(0, spy.SendCount);
 
         using var verifyScope = _factory.Services.CreateScope();
         var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var key = $"report-daily-due:{DayKey(sunday)}:{sales}";
         var row = await verifyDb.EmailNotifications.AsNoTracking().FirstAsync(n => n.CorrelationKey == key);
         Assert.Equal(EmailNotificationStatus.DryRun, row.Status);
         Assert.Null(row.SentAt);
@@ -450,6 +560,8 @@ public class SplitDeliveryWindowsTests
     [Fact]
     public async Task SchedulerDisabled_GeneratesNoRowsInAnyWindow()
     {
+        UseCycle(2050);
+
         var sales = await CreateSalesUserAsync();
         var emp = await CreateReportingUserAsync("Employee");
 
@@ -473,12 +585,55 @@ public class SplitDeliveryWindowsTests
     private static DateTime UtcForRiyadhHourToday(int riyadhHour) =>
         DateTime.UtcNow.Date.AddHours(riyadhHour).Add(-ReportCalendarPolicy.RiyadhOffset);
 
-    private async Task<int> CountAllForUserAsync(Guid userId)
+    // ===== التنظيف المضمون =====
+
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    /// <summary>
+    /// يمحو كلّ أثر لهذا الاختبار من القاعدة المشتركة الدائمة، بالترتيب الذي يحترم المفاتيح الأجنبية:
+    /// صفوف الإشعارات ⇐ فكّ ارتباط المستخدمين بالمسمّى/الإدارة ⇐ إصدارات القوالب ⇐ القوالب ⇐ الإدارات ⇐ المسمّيات.
+    /// حسابات Identity تبقى (كبقيّة الحزمة) لكنّها تصير **خاملة تمامًا**: بلا مسمّى ⇒ لا تقرير متوقَّع منها أبدًا.
+    /// أفضل-جهد: فشل التنظيف لا يجوز أن يُفشِل اختبارًا ناجحًا.
+    /// </summary>
+    public async Task DisposeAsync()
     {
-        using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var needle = userId.ToString();
-        return await db.EmailNotifications.AsNoTracking()
-            .CountAsync(n => n.CorrelationKey != null && n.CorrelationKey.Contains(needle));
+        try
+        {
+            using var scope = _factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var users = _userIds.ToList();
+            if (users.Count > 0)
+            {
+                await db.EmailNotifications
+                    .Where(n => n.RecipientUserId != null && users.Contains(n.RecipientUserId.Value))
+                    .ExecuteDeleteAsync();
+
+                await db.Users.Where(u => users.Contains(u.Id))
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(u => u.JobRoleId, u => (Guid?)null)
+                        .SetProperty(u => u.DepartmentId, u => (Guid?)null)
+                        .SetProperty(u => u.TeamId, u => (Guid?)null));
+            }
+
+            var templates = _templateIds.ToList();
+            if (templates.Count > 0)
+            {
+                await db.ReportTemplateVersions.Where(v => templates.Contains(v.ReportTemplateId)).ExecuteDeleteAsync();
+                await db.ReportTemplates.Where(t => templates.Contains(t.Id)).ExecuteDeleteAsync();
+            }
+
+            var departments = _departmentIds.ToList();
+            if (departments.Count > 0)
+                await db.Set<Department>().Where(d => departments.Contains(d.Id)).ExecuteDeleteAsync();
+
+            var jobRoles = _jobRoleIds.ToList();
+            if (jobRoles.Count > 0)
+                await db.JobRoles.Where(j => jobRoles.Contains(j.Id)).ExecuteDeleteAsync();
+        }
+        catch
+        {
+            // التنظيف أفضل-جهد بحكم مشاركة القاعدة؛ لا يُسقِط نتيجة الاختبار.
+        }
     }
 }
