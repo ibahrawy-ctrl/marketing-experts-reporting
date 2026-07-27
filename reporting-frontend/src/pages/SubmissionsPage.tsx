@@ -20,6 +20,8 @@ import {
 } from '../lib/format';
 import { WeeklyCycleCalendarPicker } from '../components/WeeklyCycleCalendarPicker';
 import { DailyCalendarPicker } from '../components/DailyCalendarPicker';
+import { resolvePresentationProfile } from '../lib/reportPresentationProfiles';
+import { PresentationProfileReport } from '../components/PresentationProfileReport';
 import { normalizeDigits, sanitizeNumericInput, isNumericGridColumn } from '../lib/numericNormalizer';
 import type {
   SubmissionListItem,
@@ -890,7 +892,7 @@ function SubmissionDetail({ id, onBack }: { id: string; onBack: () => void }) {
     const update = (patch: Partial<FieldValueInput>) =>
       setDraft((prev) => ({ ...prev, [f.templateFieldId]: { ...cur, ...patch } }));
     if (!sub.canEdit) {
-      return <ProjectRepeatableDisplay key={f.templateFieldId} config={rcfg} entries={entries} projects={allProjects ?? []} />;
+      return <ProjectRepeatableDisplay key={f.templateFieldId} config={rcfg} entries={entries} projects={allProjects ?? []} templateTitle={sub.templateTitle} />;
     }
     return (
       <div key={f.templateFieldId}>
@@ -1585,12 +1587,20 @@ export function isModerationVocab1(config: ProjectRepeatableConfig): boolean {
 
 // ===== قسم المشاريع المتكرر: عرض للقراءة فقط مجمّع حسب المشروع =====
 export function ProjectRepeatableDisplay({
-  config, entries, projects,
+  config, entries, projects, templateTitle = '',
 }: {
   config: ProjectRepeatableConfig;
   entries: ProjectRepeatableEntry[];
   projects: ProjectDto[];
+  templateTitle?: string;
 }) {
+  // AMR-OUTPUT-REDESIGN-R1: إن طابق القالب ميفولة عرض (Presentation Profile) نصيّره بالمصيّر
+  // المدفوع بالميتاداتا (مخرَج قراريّ). القوالب بلا Profile تبقى على المصيّر العامّ القائم (fallback).
+  const profile = resolvePresentationProfile(config.fields, templateTitle);
+  if (profile) {
+    return <PresentationProfileReport profile={profile} config={config} entries={entries} projects={projects} />;
+  }
+
   if (entries.length === 0)
     return <p className="rounded-lg border border-line bg-offwhite px-3 py-2 text-sm">—</p>;
 
