@@ -764,7 +764,7 @@ export function validateRepeatableNumber(sf: RepeatableSubField, raw: string): s
   return null;
 }
 
-function SubmissionDetail({ id, onBack }: { id: string; onBack: () => void }) {
+export function SubmissionDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const qc = useQueryClient();
   const { user, hasAnyRole } = useAuth();
   const canAdminDelete = hasAnyRole('Admin', 'CEO', 'GeneralManager');
@@ -883,6 +883,15 @@ function SubmissionDetail({ id, onBack }: { id: string; onBack: () => void }) {
       f.fieldType !== 'SectionHeader' &&
       !NUMERIC_TYPES.includes(f.fieldType),
   );
+
+  // هل ينطبق Profile عرض على هذا التقرير؟ (وضع القراءة فقط — نموذج الإدخال لا يتغيّر إطلاقًا).
+  // عند الانطباق يُعاد ترتيب الصفحة إلى Client-first: تفاصيل العملاء والمشروعات أولًا،
+  // ثمّ النظرة العامة (الملخّص الأسبوعي + أبرز التحديات). القوالب بلا Profile تبقى بالترتيب القائم.
+  const hasPresentationProfile =
+    !sub.canEdit &&
+    prsFields.some(
+      (f) => resolvePresentationProfile(parseRepeatableConfig(f.configJson).fields, sub.templateTitle) != null,
+    );
 
   // عرض قسم المشاريع المتكرر (جسم التقرير) — تحرير أو قراءة.
   const renderPRS = (f: SubmissionFieldValueDto) => {
@@ -1115,40 +1124,65 @@ function SubmissionDetail({ id, onBack }: { id: string; onBack: () => void }) {
           {actionBar && <div className="mt-4">{actionBar}</div>}
         </Card>
       ) : (
-        // العرض Project-first: (1) نظرة عامة (2) Scorecard رقمي مطويّ ثانوي (3) جسم المشاريع.
+        // العرض Project-first. بلا Profile: (1) نظرة عامة (2) Scorecard (3) جسم المشاريع.
+        // مع Profile (Client-first): (1) تفاصيل العملاء والمشروعات (2) نظرة عامة (3) Scorecard.
         <>
-          {overviewFields.length > 0 && (
-            <Card>
-              <h2 className="mb-3 font-semibold text-navy">نظرة عامة</h2>
-              <div className="space-y-3">{overviewFields.map((f) => renderField(f))}</div>
-            </Card>
-          )}
+          {(() => {
+            const overviewCard = overviewFields.length > 0 && (
+              <Card key="overview">
+                <h2 className="mb-3 font-semibold text-navy">نظرة عامة</h2>
+                <div className="space-y-3">{overviewFields.map((f) => renderField(f))}</div>
+              </Card>
+            );
 
-          {scorecardFields.length > 0 && (
-            <Card>
-              <details>
-                <summary className="cursor-pointer select-none font-semibold text-navy">
-                  🔢 مؤشرات الأداء (KPI){' '}
-                  <span className="text-xs font-normal text-ink-2">— اضغط للعرض/الطي</span>
-                </summary>
-                <p className="mt-2 mb-3 text-xs text-ink-2">
-                  مؤشرات رقمية للتجميع والاحتساب — ليست جزءًا من جسم التقرير.
+            const scorecardCard = scorecardFields.length > 0 && (
+              <Card key="scorecard">
+                <details>
+                  <summary className="cursor-pointer select-none font-semibold text-navy">
+                    🔢 مؤشرات الأداء (KPI){' '}
+                    <span className="text-xs font-normal text-ink-2">— اضغط للعرض/الطي</span>
+                  </summary>
+                  <p className="mt-2 mb-3 text-xs text-ink-2">
+                    مؤشرات رقمية للتجميع والاحتساب — ليست جزءًا من جسم التقرير.
+                  </p>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {scorecardFields.map((f) => renderField(f))}
+                  </div>
+                </details>
+              </Card>
+            );
+
+            const projectsCard = (
+              <Card key="projects">
+                <h2 className="mb-1 font-semibold text-navy">
+                  {hasPresentationProfile ? 'تفاصيل العملاء والمشروعات' : '📁 تفاصيل المشاريع / العملاء'}
+                </h2>
+                <p className="mb-3 text-xs text-ink-2">
+                  جسم التقرير — كل مشروع/عميل في بطاقة مستقلّة تحوي كل التفاصيل والجداول.
                 </p>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {scorecardFields.map((f) => renderField(f))}
-                </div>
-              </details>
-            </Card>
-          )}
+                <div className="space-y-4">{prsFields.map((f) => renderPRS(f))}</div>
+                {!hasPresentationProfile && actionBar && (
+                  <div className="mt-4 border-t border-line pt-4">{actionBar}</div>
+                )}
+              </Card>
+            );
 
-          <Card>
-            <h2 className="mb-1 font-semibold text-navy">📁 تفاصيل المشاريع / العملاء</h2>
-            <p className="mb-3 text-xs text-ink-2">
-              جسم التقرير — كل مشروع/عميل في بطاقة مستقلّة تحوي كل التفاصيل والجداول.
-            </p>
-            <div className="space-y-4">{prsFields.map((f) => renderPRS(f))}</div>
-            {actionBar && <div className="mt-4 border-t border-line pt-4">{actionBar}</div>}
-          </Card>
+            // شريط الإجراءات في وضع الـProfile يُعرض بعد كل الأقسام (لا داخل بطاقة المشاريع).
+            return hasPresentationProfile ? (
+              <>
+                {projectsCard}
+                {overviewCard}
+                {scorecardCard}
+                {actionBar && <Card key="actions">{actionBar}</Card>}
+              </>
+            ) : (
+              <>
+                {overviewCard}
+                {scorecardCard}
+                {projectsCard}
+              </>
+            );
+          })()}
         </>
       )}
 
