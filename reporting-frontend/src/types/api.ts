@@ -3005,6 +3005,63 @@ export interface ManualReminderDryRunResultDto {
   recipients: RecipientPreviewRowDto[];
 }
 
+// ===== EMAIL-CONTROL-CENTER-LIVE-MODE-STATUS-R1 (الحالة التشغيليّة الحيّة — قراءة فقط، Admin فقط) =====
+// مصدر الحقيقة للوضع = EmailNotifications:Mode حصرًا. العلم القديم Email:Enabled يُعرَض للشفافيّة فقط.
+// بلا أيّ سرّ: لا كلمة مرور ولا طولها ولا بصمتها ولا سلسلة اتّصال — الاعتماد قيمة منطقيّة واحدة فقط.
+
+export type EmailControlStatusSeverity = 'Critical' | 'Warning' | 'Info';
+
+export interface EmailControlStatusWarningDto {
+  severity: EmailControlStatusSeverity;
+  code: string;
+  message: string;
+}
+
+export interface EmailControlCenterStatusDto {
+  // 1) الحالة التشغيليّة الحاليّة
+  mode: string;
+  isLiveSendingEnabled: boolean;
+  // 2) جدول التشغيل
+  schedulerEnabled: boolean;
+  pollMinutes: number;
+  dailyDueHour: number | null;
+  weeklyDueHour: number | null;
+  overdueHour: number | null;
+  summaryHour: number | null;
+  reviewHour: number | null;
+  timeZoneId: string;
+  timeZoneLabel: string;
+  environmentName: string;
+  // 3) جاهزيّة SMTP (بلا أسرار)
+  smtpConfigured: boolean;
+  smtpHost: string | null;
+  smtpPort: number | null;
+  usesTls: boolean;
+  senderAddress: string | null;
+  credentialConfigured: boolean;
+  // 4) إعدادات التوافق القديمة
+  legacyEmailEnabled: boolean;
+  legacyFlagIsAuthoritative: boolean;
+  // 5) العدّادات
+  totalNotifications: number;
+  historicalDryRunCount: number;
+  enabledCount: number;
+  sentCount: number;
+  pendingCount: number;
+  processingCount: number;
+  failedCount: number;
+  outboxCount: number;
+  // 6) آخر نشاط
+  lastNotificationCreatedAtUtc: string | null;
+  lastSentAtUtc: string | null;
+  lastFailureAtUtc: string | null;
+  /** آخر إشعار مُسجَّل من فئة مجدوَلة — ليس «آخر تشغيل للمجدول» (لا يوجد تتبّع تشغيل مُخزَّن). */
+  lastScheduledNotificationCreatedAtUtc: string | null;
+  // 7) وقت القراءة والتنبيهات
+  checkedAtUtc: string;
+  warnings: EmailControlStatusWarningDto[];
+}
+
 // ===== محرّك التجميع الرقمي للمبيعات (ERDS Phase 4) — B2C-UAT-FIXPACK الجزء 4 =====
 // عرض تجميعي قراءة فقط للمدير: النطاق مفروض خادميًّا عبر IScopeResolver (يرى فريقه فقط، لا يتعدّى صلاحيّته).
 export interface AggregationFilter {

@@ -73,6 +73,7 @@ public static class DependencyInjection
         services.AddScoped<IEmailSender, MailKitEmailSender>();
         services.AddScoped<IEmailNotificationService, EmailNotificationService>();
         services.AddScoped<IEmailControlService, EmailControlService>();
+        services.AddScoped<IEmailControlStatusService, EmailControlStatusService>();
         services.AddHostedService<EmailOutboxDispatcher>();
         services.AddHostedService<SubmissionReminderService>();
         services.AddHostedService<ReportReminderSchedulerService>();

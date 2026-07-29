@@ -1,5 +1,7 @@
 // مركز التحكم بالبريد (EMAIL-CONTROL-CENTER-R1) — قوالب/قواعد/تذكير يدويّ + سجلّ.
-// النظام في وضع DryRun فقط: لا إرسال فعليّ، لا SMTP. الكتابة للأدمن حصرًا (سياسة EmailControlManage).
+// الكتابة للأدمن حصرًا (سياسة EmailControlManage).
+// وضع تشغيل النظام (Enabled/DryRun/Disabled) لا يُكتَب هنا ولا يُفترَض: يُقرأ حيًّا من
+// GET /email-control/status ويُعرَض في لوحة الحالة أعلى الصفحة (EMAIL-CONTROL-CENTER-LIVE-MODE-STATUS-R1).
 // تبويب «السجل» يعيد استخدام شاشة سجلّ إشعارات البريد القائمة (سياستها المنفصلة).
 import { useMemo, useState } from 'react';
 import {
@@ -23,6 +25,7 @@ import { SectionTitle } from '../components/dashboard';
 import { roleLabel } from '../lib/format';
 import { apiErrorMessage } from '../lib/api';
 import EmailNotificationsPage from './EmailNotificationsPage';
+import EmailControlStatusPanel from '../components/EmailControlStatusPanel';
 import type {
   EmailTemplateDto,
   UpdateEmailTemplateRequest,
@@ -57,7 +60,10 @@ const modeLabel: Record<string, string> = {
   Enabled: 'مُفعّل',
 };
 
-// R1: يُسمح فقط بـ DryRun/Disabled في الواجهة (Enabled محجوب — لا إرسال فعليّ).
+// وضع التسليم المسموح على مستوى **القالب/القاعدة** (حقلا defaultMode و mode).
+// هذا ليس وضع تشغيل النظام: الخادم يرفض القيمة Enabled هنا بكود email_control.mode_invalid
+// (EmailControlService.AllowedModes)، لذا لا تُضاف Enabled دون تغيير العقد الخادميّ أوّلًا.
+// وضع تشغيل النظام الحقيقيّ يُقرأ من EmailNotifications:Mode ويُعرَض في لوحة الحالة أعلى الصفحة.
 const ALLOWED_MODES = ['DryRun', 'Disabled'];
 
 const scopeTypeLabel: Record<RecipientScopeType, string> = {
@@ -81,12 +87,11 @@ export default function EmailControlCenterPage() {
     <div className="space-y-6">
       <SectionTitle
         title="مركز التحكم بالبريد"
-        hint="إدارة قوالب البريد وقواعده، ومعاينة المستقبِلين، وتذكير يدويّ — كلها في وضع DryRun (بلا إرسال فعليّ)."
+        hint="الحالة التشغيليّة الحيّة، وإدارة قوالب البريد وقواعده، ومعاينة المستقبِلين، وتذكير يدويّ (محاكاة)."
       />
 
-      <Alert tone="gold">
-        النظام يعمل في وضع تجريبي (DryRun): كل الرسائل تُسجَّل ولا تُرسَل فعليًّا. لا يوجد إرسال بريد حقيقيّ في هذه المرحلة.
-      </Alert>
+      {/* لوحة الحالة التشغيليّة الحيّة — قراءة فقط، مصدر الوضع EmailNotifications:Mode حصرًا. */}
+      <EmailControlStatusPanel />
 
       {/* التبويبات */}
       <div className="flex flex-wrap gap-2 border-b border-line">
