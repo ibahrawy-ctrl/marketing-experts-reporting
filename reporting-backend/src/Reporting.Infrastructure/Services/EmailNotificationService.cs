@@ -18,6 +18,12 @@ namespace Reporting.Infrastructure.Services;
 /// </summary>
 public class EmailNotificationService : IEmailNotificationService
 {
+    /// <summary>
+    /// EMAIL-DRYRUN-DEDUPLICATION-ISOLATION-R1 — سابقة فضاء أسماء مفاتيح المحاكاة.
+    /// صفوف DryRun تُخزَّن بمفتاح مُنمَّط كي لا تحجز مفتاح التسليم الفعليّ في وضع Enabled.
+    /// </summary>
+    public const string DryRunCorrelationKeyPrefix = "dryrun:";
+
     private readonly AppDbContext _db;
     private readonly IEmailSender _sender;
     private readonly EmailNotificationOptions _options;
@@ -549,12 +555,23 @@ public class EmailNotificationService : IEmailNotificationService
                 return ReportReminderOutcome.Disabled;
             }
 
+            // EMAIL-DRYRUN-DEDUPLICATION-ISOLATION-R1
+            // صفوف DryRun محاكاة لا تسليم، فيجب ألّا تحجز مفتاح التسليم الفعليّ.
+            // نعزلها في فضاء أسماء خاصّ بها، ونُبقي مفاتيح Enabled قانونيّة كما هي
+            // كي تظلّ الصفوف المُرسَلة فعليًّا حاجزةً لأيّ إرسال مكرّر.
+            // ملاحظة تصميمية: الفحص يبقى على المفتاح وحده بلا شرط Mode، لأنّ الفهرس
+            // الفريد في القاعدة مبنيّ على العمود وحده؛ أيّ فحص يتخطّى صفًّا قائمًا
+            // سينتهي إلى انتهاك الفهرس (23505) بدل الإرسال.
+            var effectiveCorrelationKey = _options.Mode == EmailNotificationMode.DryRun
+                ? DryRunCorrelationKeyPrefix + correlationKey
+                : correlationKey;
+
             // منع التكرار عبر مفتاح الترابط.
             var exists = await _db.EmailNotifications.AsNoTracking()
-                .AnyAsync(n => n.CorrelationKey == correlationKey, ct);
+                .AnyAsync(n => n.CorrelationKey == effectiveCorrelationKey, ct);
             if (exists)
             {
-                _logger.LogDebug("EmailNotification duplicate skipped for {CorrelationKey}", correlationKey);
+                _logger.LogDebug("EmailNotification duplicate skipped for {CorrelationKey}", effectiveCorrelationKey);
                 return ReportReminderOutcome.Duplicate;
             }
 
@@ -578,7 +595,7 @@ public class EmailNotificationService : IEmailNotificationService
                 BodyHtml = html,
                 BodyText = body,
                 Mode = _options.Mode,
-                CorrelationKey = correlationKey,
+                CorrelationKey = effectiveCorrelationKey,
                 CreatedByUserId = createdByUserId
             };
 

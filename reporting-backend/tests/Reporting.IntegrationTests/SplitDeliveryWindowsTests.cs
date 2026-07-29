@@ -252,7 +252,11 @@ public class SplitDeliveryWindowsTests : IAsyncLifetime
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        return await db.EmailNotifications.AsNoTracking().CountAsync(n => n.CorrelationKey == correlationKey);
+        // EMAIL-DRYRUN-DEDUPLICATION-ISOLATION-R1: صفوف المحاكاة تُخزَّن بمفتاح معزول (بادئة dryrun:)
+        // ⇒ يُطابَق المفتاح المنطقيّ بصيغتيه: الأصليّة (التسليم) والمعزولة (المحاكاة).
+        var sim = EmailNotificationService.DryRunCorrelationKeyPrefix + correlationKey;
+        return await db.EmailNotifications.AsNoTracking()
+            .CountAsync(n => n.CorrelationKey == correlationKey || n.CorrelationKey == sim);
     }
 
     private async Task<int> CountByEventAsync(string eventType, Guid userId)
@@ -263,7 +267,8 @@ public class SplitDeliveryWindowsTests : IAsyncLifetime
         // الفلترة تبدأ بـ RecipientUserId (مفهرس) ثمّ تُضيَّق بسنة المحاكاة —
         // الفلترة النصّية وحدها تمسح الجدول المشترك بالكامل (ملايين الصفوف المتراكمة).
         return await db.EmailNotifications.AsNoTracking().CountAsync(n =>
-            n.RecipientUserId == userId && n.CorrelationKey.StartsWith(prefix));
+            // EMAIL-DRYRUN-DEDUPLICATION-ISOLATION-R1: Contains بدل StartsWith لعزل بادئة المحاكاة.
+            n.RecipientUserId == userId && n.CorrelationKey.Contains(prefix));
     }
 
     private Task<int> CountWeeklyDueAsync(Guid userId) => CountByEventAsync("report-weekly-due", userId);
@@ -551,7 +556,10 @@ public class SplitDeliveryWindowsTests : IAsyncLifetime
 
         using var verifyScope = _factory.Services.CreateScope();
         var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var row = await verifyDb.EmailNotifications.AsNoTracking().FirstAsync(n => n.CorrelationKey == key);
+        // EMAIL-DRYRUN-DEDUPLICATION-ISOLATION-R1: المفتاح المخزَّن في وضع المحاكاة معزول بالبادئة.
+        var simKey = EmailNotificationService.DryRunCorrelationKeyPrefix + key;
+        var row = await verifyDb.EmailNotifications.AsNoTracking()
+            .FirstAsync(n => n.CorrelationKey == key || n.CorrelationKey == simKey);
         Assert.Equal(EmailNotificationStatus.DryRun, row.Status);
         Assert.Null(row.SentAt);
     }

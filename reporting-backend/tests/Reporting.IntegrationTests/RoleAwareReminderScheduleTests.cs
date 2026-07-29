@@ -146,8 +146,10 @@ public class RoleAwareReminderScheduleTests
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var prefix = $"{eventType}:{SimulationSegment}";
         var suffix = $":{userId}";
+        // EMAIL-DRYRUN-DEDUPLICATION-ISOLATION-R1: صفوف المحاكاة تُخزَّن بمفتاح معزول (بادئة dryrun:)
+        // ⇒ يُطابَق المفتاح المنطقيّ بـ Contains بدل StartsWith كي يشمل الفضاءين.
         return await db.EmailNotifications.AsNoTracking().CountAsync(n =>
-            n.CorrelationKey != null && n.CorrelationKey.StartsWith(prefix) && n.CorrelationKey.EndsWith(suffix));
+            n.CorrelationKey != null && n.CorrelationKey.Contains(prefix) && n.CorrelationKey.EndsWith(suffix));
     }
 
     private async Task<int> CountWeeklyDueAsync(Guid userId) => await CountByEventAsync("report-weekly-due", userId);
@@ -468,7 +470,8 @@ public class RoleAwareReminderScheduleTests
         var prefix = "report-weekly-due:";
         var suffix = $":{emp}";
         var rows = await verifyDb.EmailNotifications.AsNoTracking()
-            .Where(n => n.CorrelationKey != null && n.CorrelationKey.StartsWith(prefix) && n.CorrelationKey.EndsWith(suffix))
+            // EMAIL-DRYRUN-DEDUPLICATION-ISOLATION-R1: Contains بدل StartsWith لعزل بادئة المحاكاة.
+            .Where(n => n.CorrelationKey != null && n.CorrelationKey.Contains(prefix) && n.CorrelationKey.EndsWith(suffix))
             .ToListAsync();
         Assert.NotEmpty(rows);
         Assert.All(rows, r =>
@@ -498,6 +501,10 @@ public class RoleAwareReminderScheduleTests
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        return await db.EmailNotifications.AsNoTracking().CountAsync(n => n.CorrelationKey == correlationKey);
+        // EMAIL-DRYRUN-DEDUPLICATION-ISOLATION-R1: يُطابَق المفتاح المنطقيّ بصيغتيه
+        // (الأصليّة للتسليم، والمعزولة بالبادئة dryrun: للمحاكاة).
+        var sim = EmailNotificationService.DryRunCorrelationKeyPrefix + correlationKey;
+        return await db.EmailNotifications.AsNoTracking()
+            .CountAsync(n => n.CorrelationKey == correlationKey || n.CorrelationKey == sim);
     }
 }

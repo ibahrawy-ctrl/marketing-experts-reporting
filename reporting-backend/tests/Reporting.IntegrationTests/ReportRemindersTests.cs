@@ -11,6 +11,7 @@ using Reporting.Domain.Entities.System;
 using Reporting.Domain.Entities.Templates;
 using Reporting.Domain.Enums;
 using Reporting.Infrastructure.Persistence;
+using Reporting.Infrastructure.Services;
 using Xunit;
 
 namespace Reporting.IntegrationTests;
@@ -112,18 +113,29 @@ public class ReportRemindersTests
         return (await res.ReadAsync<ReportReminderRunResult>())!;
     }
 
+    /// <summary>
+    /// EMAIL-DRYRUN-DEDUPLICATION-ISOLATION-R1 — صفوف المحاكاة (DryRun) تُخزَّن بمفتاح معزول
+    /// (بادئة <c>dryrun:</c>) كي لا تحجز مفتاح التسليم الفعليّ. هذه الاختبارات تعمل بوضع المحاكاة،
+    /// لذا يُطابَق المفتاح المنطقيّ بصيغتيه: الأصليّة (التسليم) والمعزولة (المحاكاة).
+    /// </summary>
+    private static string SimKey(string correlationKey) =>
+        EmailNotificationService.DryRunCorrelationKeyPrefix + correlationKey;
+
     private async Task<int> CountByKeyAsync(string correlationKey)
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        return await db.EmailNotifications.CountAsync(n => n.CorrelationKey == correlationKey);
+        var sim = SimKey(correlationKey);
+        return await db.EmailNotifications.CountAsync(n => n.CorrelationKey == correlationKey || n.CorrelationKey == sim);
     }
 
     private async Task<EmailNotification?> FirstByKeyAsync(string correlationKey)
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        return await db.EmailNotifications.AsNoTracking().FirstOrDefaultAsync(n => n.CorrelationKey == correlationKey);
+        var sim = SimKey(correlationKey);
+        return await db.EmailNotifications.AsNoTracking()
+            .FirstOrDefaultAsync(n => n.CorrelationKey == correlationKey || n.CorrelationKey == sim);
     }
 
     /// <summary>
@@ -138,7 +150,7 @@ public class ReportRemindersTests
         var suffix = $":{userId}";
         return await db.EmailNotifications.CountAsync(n =>
             n.CorrelationKey != null &&
-            n.CorrelationKey.StartsWith(prefix) &&
+            n.CorrelationKey.Contains(prefix) &&
             n.CorrelationKey.EndsWith(suffix));
     }
 
@@ -293,7 +305,7 @@ public class ReportRemindersTests
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var count = await db.EmailNotifications.CountAsync(n =>
-            n.CorrelationKey.StartsWith("report-overdue:") && n.CorrelationKey.EndsWith(suffix));
+            n.CorrelationKey.Contains("report-overdue:") && n.CorrelationKey.EndsWith(suffix));
         // أيّام العمل بعد الأرضية في W28 = 05,06,07,08,09 = 5 (السبت 04 والجمعة 10 مستبعدان).
         Assert.Equal(5, count);
     }

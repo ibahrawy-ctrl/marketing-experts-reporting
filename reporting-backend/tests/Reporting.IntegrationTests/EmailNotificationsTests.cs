@@ -298,7 +298,9 @@ public class EmailNotificationsTests
         var row = Assert.Single(await RowsForEntityAsync(f, itemId));
         Assert.Equal(recip, row.RecipientUserId);
         Assert.Equal("تم إسناد بند حوكمة جديد إليك", row.Subject);
-        Assert.Equal($"governance-item-created:{itemId}:{recip}", row.CorrelationKey);
+        // EMAIL-DRYRUN-DEDUPLICATION-ISOLATION-R1: صفّ المحاكاة يُخزَّن بمفتاح معزول (بادئة dryrun:)
+        // كي لا يحجز مفتاح التسليم الفعليّ عند التحوّل لاحقًا إلى Enabled.
+        Assert.Equal($"{EmailNotificationService.DryRunCorrelationKeyPrefix}governance-item-created:{itemId}:{recip}", row.CorrelationKey);
     }
 
     [Fact]
@@ -312,7 +314,7 @@ public class EmailNotificationsTests
 
         var row = Assert.Single(await RowsForEntityAsync(f, actionItemId));
         Assert.Equal("governance-action-item-assigned", row.EventType);
-        Assert.Equal($"governance-action-item-assigned:{actionItemId}:{recip}", row.CorrelationKey);
+        Assert.Equal($"{EmailNotificationService.DryRunCorrelationKeyPrefix}governance-action-item-assigned:{actionItemId}:{recip}", row.CorrelationKey);
     }
 
     [Fact]
