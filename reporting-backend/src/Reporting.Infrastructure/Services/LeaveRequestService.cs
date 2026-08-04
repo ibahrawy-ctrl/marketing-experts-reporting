@@ -599,6 +599,33 @@ public class LeaveRequestService : ILeaveRequestService
 
         AddEvent(entity.Id, uid, action, step, from, toStatus, comment);
 
+        // طيّ خطوة المدير تشغيليًّا عند غياب مدير تشغيليّ بديل (P2 — LEAVE-WORKFLOW-DEADLOCK-HOTFIX):
+        // إن اعتُمدت خطوة قائد الفريق بنجاح وكان المُعتمِد نفسه هو المدير المباشر لمقدّم الطلب، فسيمنعه
+        // حارس «عدم تصرّف الشخص نفسه في خطوتين» (أعلاه) من اعتماد خطوة المدير لاحقًا. لكنّ هذا التطابق
+        // الاسميّ وحده لا يعني جمودًا: خطوة المدير scope-based، وقد يوجد مديرٌ تشغيليّ أعلى داخل الشجرة
+        // الإدارية للموظّف يمكنه اعتمادها طبيعيًّا. لذلك نطوي الخطوة *فقط* حين لا يوجد أيّ مدير تشغيليّ بديل
+        // داخل الشجرة (جمود بنيويّ حقيقي). عندئذٍ ننقل الطلب إلى ManagerApproved/Hr في المعاملة ذاتها دون
+        // تلفيق قرار يدويّ منفصل، ونسجّل المدير كمُعتمِد لهذه الخطوة (فهو مديره المباشر فعلًا)، ونضيف حدث
+        // تدقيق مميّزًا يوثّق أنّ الطيّ آليّ لغياب مدير تشغيليّ بديل — وأنّ أدوار الشركة/الحوكمة العامة
+        // (Admin/CEO/GM/CeoSupport) لا تُعتبر بديلًا تشغيليًّا حسب P2. إن وُجد مدير تشغيليّ بديل ⇒ لا طيّ،
+        // يبقى المسار الطبيعي TeamLeaderApproved/Manager (يحفظ ضمانة T-WF2). الطلبات القديمة لا تتغيّر.
+        if (step == LeaveRequestStep.TeamLeader && toStatus == LeaveRequestStatus.TeamLeaderApproved)
+        {
+            var requesterManagerId = await _db.Users.Where(u => u.Id == entity.RequesterUserId)
+                .Select(u => u.ManagerId).FirstOrDefaultAsync(ct);
+            if (requesterManagerId == uid
+                && !await HasOperationalManagerAlternativeAsync(entity.RequesterUserId, uid, ct))
+            {
+                entity.Status = LeaveRequestStatus.ManagerApproved;
+                entity.CurrentStep = LeaveRequestStep.Hr;
+                entity.ManagerReviewerId = uid;
+                entity.ManagerDecisionAtUtc = now;
+                AddEvent(entity.Id, uid, "manager_step_auto_folded_no_operational_manager", LeaveRequestStep.Manager,
+                    LeaveRequestStatus.TeamLeaderApproved, LeaveRequestStatus.ManagerApproved,
+                    "طيّ خطوة المدير تلقائيًّا: المُعتمِد هو المدير المباشر لمقدّم الطلب ولا يوجد مدير تشغيليّ بديل داخل شجرته الإدارية يمكنه اعتماد الخطوة (أدوار الشركة/الحوكمة العامة لا تُعدّ بديلًا تشغيليًّا). انتقل الطلب مباشرةً إلى الاعتماد النهائي (HR) دون قرار مدير يدويّ ثانٍ.");
+            }
+        }
+
         // الخصم التلقائي من الرصيد عند الاعتماد النهائي — في نفس المعاملة، idempotent عبر (RelatedRequestId, Source).
         if (toStatus == LeaveRequestStatus.HrApproved)
             await ApplyApprovalDeductionAsync(entity, uid, ct);
@@ -606,8 +633,9 @@ public class LeaveRequestService : ILeaveRequestService
         await _db.SaveChangesAsync(ct);
         await _audit.LogAsync(uid, auditAction, nameof(LeaveRequest), entity.Id, ct: ct);
 
-        // إشعار صاحب الطلب بكل قرار.
-        var title = toStatus switch
+        // إشعار صاحب الطلب بكل قرار. نعتمد الحالة الفعليّة للطلب (entity.Status) لا toStatus كي
+        // يعكس العنوانُ الطيَّ الآليّ لخطوة المدير (ManagerApproved). للمسارات غير المطويّة entity.Status == toStatus.
+        var title = entity.Status switch
         {
             LeaveRequestStatus.HrApproved => "اعتُمد طلبك نهائيًّا",
             LeaveRequestStatus.TeamLeaderRejected or LeaveRequestStatus.ManagerRejected
@@ -620,7 +648,9 @@ public class LeaveRequestService : ILeaveRequestService
         // إشعارات بريد (EMAIL-OPERATIONAL-NOTIFICATIONS-R1، DryRun) — بعد نجاح القرار، محميّة داخليًّا.
         try
         {
-            switch (toStatus)
+            // نعتمد الحالة الفعليّة (entity.Status) لا toStatus: عند طيّ خطوة المدير آليًّا تصبح الحالة
+            // ManagerApproved ⇒ يجب إشعار HR. للمسارات غير المطويّة entity.Status == toStatus (بلا تغيير سلوك).
+            switch (entity.Status)
             {
                 // الوصول لمرحلة الموارد البشرية (اعتماد المدير ⇒ الخطوة التالية Hr): إشعار مستخدمي HR.
                 case LeaveRequestStatus.ManagerApproved:
@@ -708,6 +738,47 @@ public class LeaveRequestService : ILeaveRequestService
         if (!scope.Contains(entity.RequesterUserId))
             return Result<LeaveRequestDto>.Failure("الطلب خارج نطاق صلاحيتك.", "auth.forbidden");
         return null;
+    }
+
+    /// <summary>
+    /// يحدّد هل يوجد «مدير تشغيليّ بديل» يمكنه اعتماد خطوة المدير للطلب (P2 — قرار طيّ خطوة المدير).
+    /// يصعد سلسلة ManagerId التصاعدية من مقدّم الطلب باحثًا عن أوّل مستخدم:
+    ///  (1) نشط IsActive، و(2) مختلف عن مُعتمِد خطوة قائد الفريق (<paramref name="excludeUserId"/>)،
+    ///  و(3) يحمل دور Manager فعليًّا. أيّ مدير على السلسلة التصاعدية يشمل نطاقه (department = شجرة
+    /// المرؤوسين) الموظّفَ بنيويًّا، فوجوده = بديل تشغيليّ حقيقيّ لخطوة المدير (scope-based).
+    /// أدوار الشركة/الحوكمة العامة (Admin/CEO/GeneralManager/CeoSupport) لا تُعدّ بديلًا تشغيليًّا حسب P2
+    /// (لأنها ليست دور Manager، فلا يلتقطها هذا البحث حتى لو ظهرت على السلسلة). يمنع الحلقات في ManagerId،
+    /// ويتعامل بأمان مع ManagerId المفقود أو المستخدم غير النشط. يعيد true إن وُجد بديل (⇒ لا طيّ)، وإلا false.
+    /// </summary>
+    private async Task<bool> HasOperationalManagerAlternativeAsync(Guid requesterUserId, Guid excludeUserId, CancellationToken ct)
+    {
+        var managerRoleId = await _db.Roles.Where(r => r.Name == Roles.Manager)
+            .Select(r => r.Id).FirstOrDefaultAsync(ct);
+        if (managerRoleId == Guid.Empty) return false; // لا دور Manager معرّف ⇒ لا بديل تشغيليّ
+
+        var visited = new HashSet<Guid> { requesterUserId };
+        var currentId = requesterUserId;
+        while (true)
+        {
+            var managerId = await _db.Users.Where(u => u.Id == currentId)
+                .Select(u => u.ManagerId).FirstOrDefaultAsync(ct);
+            if (managerId is not Guid mid) return false; // نهاية السلسلة الإدارية
+            if (!visited.Add(mid)) return false;         // حلقة في ManagerId ⇒ توقّف آمن
+
+            if (mid != excludeUserId) // لا يُعدّ مُعتمِد خطوة قائد الفريق بديلًا لنفسه
+            {
+                var isActive = await _db.Users.Where(u => u.Id == mid)
+                    .Select(u => u.IsActive).FirstOrDefaultAsync(ct);
+                if (isActive)
+                {
+                    var isManager = await _db.UserRoles
+                        .AnyAsync(ur => ur.UserId == mid && ur.RoleId == managerRoleId, ct);
+                    if (isManager) return true; // مدير تشغيليّ بديل داخل الشجرة
+                }
+            }
+
+            currentId = mid; // اصعد خطوةً في السلسلة
+        }
     }
 
     private void AddEvent(Guid leaveRequestId, Guid actorId, string action, LeaveRequestStep step,
