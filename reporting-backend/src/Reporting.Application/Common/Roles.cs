@@ -80,6 +80,22 @@ public static class Roles
     };
 
     /// <summary>
+    /// الأدوار المخوّلة برؤية طابور الحوكمة «معلّقة عند قادة الفرق» (LEAVE-TL-PENDING-GOVERNANCE-R1):
+    /// Admin / CEO / GM / HR. طابور قراءة-فقط على مستوى الشركة يُظهِر الطلبات المعلّقة عند خطوة قائد الفريق
+    /// بلا أيّ سلطة قرار — منفصل تمامًا عن LeaveReviewers (طابور «بانتظار قراري»). لا يشمل Manager أو
+    /// TeamLeader أو Employee أو Viewer.
+    /// CeoSupport مُستبعَد عمدًا: سياسة الحوكمة القائمة في وحدة الإجازات لا تسمح له برؤية تفاصيل أيّ طلب
+    /// إجازة — LeaveRequestService.CanViewAsync يقصر الرؤية على LeaveFinalApprovers (HR/Admin/CEO/GM) أو
+    /// Management ضمن النطاق، وCeoSupport ليس في أيّ منهما. إدراجه هنا كان سيمنحه رؤية بيانات إجازات على
+    /// مستوى الشركة لا يملكها اليوم في أيّ سطح ⇒ توسيع صلاحية خارج نطاق هذه التذكرة. إضافته تحتاج قرار
+    /// حوكمة مستقلًّا يشمل CanViewAsync أيضًا.
+    /// </summary>
+    public static readonly string[] LeaveGovernanceReaders =
+    {
+        Admin, Ceo, GeneralManager, Hr
+    };
+
+    /// <summary>
     /// الأدوار المخوّلة بتعديل المسمّى الوظيفي للموظف (JobRoleId) عبر السطح المخصّص فقط:
     /// Admin / CeoSupport / HR / GM / CEO. لا تشمل Manager أو TeamLeader أو Employee.
     /// مستقلة تمامًا عن صلاحية إعادة تعيين كلمة المرور (UserPasswordReset) وعن AdminOnly لبقية إدارة المستخدم.
@@ -401,6 +417,11 @@ public static class Policies
 
     // رؤية طابور المراجعة «بانتظار قراري» للإجازات — اتحاد الإدارة + الموارد البشرية (Roles.LeaveReviewers).
     public const string LeaveReview = "LeaveReview";
+
+    // رؤية طابور الحوكمة «معلّقة عند قادة الفرق» (LEAVE-TL-PENDING-GOVERNANCE-R1) — قراءة-فقط على مستوى
+    // الشركة لأدوار الحوكمة (Roles.LeaveGovernanceReaders = Admin/CEO/GM/HR). لا يمنح أيّ سلطة قرار،
+    // ومنفصل تمامًا عن LeaveReview (الذي يقود لطابور اتخاذ القرار). Manager/TeamLeader/Employee/CeoSupport = محجوب.
+    public const string LeaveGovernanceRead = "LeaveGovernanceRead";
 
     // إعادة تعيين كلمة مرور المستخدم بواسطة جهة مخوّلة — Admin + CEO + CeoSupport (GOV-R1).
     // عمدًا لا تشمل HR/GM/Manager/TeamLeader. حساب Admin لا يُعاد ضبط كلمته إلا بفاعل Admin (حارس الخدمة لم يتغيّر).

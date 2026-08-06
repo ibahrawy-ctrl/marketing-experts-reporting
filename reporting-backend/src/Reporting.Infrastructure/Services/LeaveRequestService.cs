@@ -127,6 +127,212 @@ public class LeaveRequestService : ILeaveRequestService
             rows.Select(r => MapList(r, names)).ToList());
     }
 
+    // ===== LEAVE-TL-PENDING-GOVERNANCE-R1 — طابور الحوكمة «معلّقة عند قادة الفرق» (قراءة-فقط) =====
+    // عتبة تحوّل الطلب من «معلّق» إلى «يحتاج متابعة» قبل تاريخ البداية (ساعات، بتوقيت الرياض المشتقّ من CreatedAtUtc).
+    // ثابت مُوثَّق قابل للضبط — بلا هجرة ولا مجدول ولا حالة مخزَّنة.
+    private const int AttentionAfterHours = 24;
+
+    public async Task<Result<TeamLeaderPendingGovernanceResultDto>> GetTeamLeaderPendingGovernanceAsync(
+        TeamLeaderPendingGovernanceQuery query, CancellationToken ct = default)
+    {
+        if (_currentUser.UserId is not Guid)
+            return Result<TeamLeaderPendingGovernanceResultDto>.Failure("غير مصرّح.", "auth.unauthenticated");
+        if (!_currentUser.IsInAnyRole(Roles.LeaveGovernanceReaders))
+            return Result<TeamLeaderPendingGovernanceResultDto>.Failure(
+                "لا صلاحية لعرض طابور الحوكمة.", "auth.forbidden");
+
+        // (أ) الأساس: كل طلب معلّق عند خطوة قائد الفريق على مستوى الشركة — بلا نطاق شخصيّ وبلا استثناء المُقدِّم،
+        // ومستقلّ تمامًا عن GetPendingAsync. (الملغى/المحذوف ناعمًا يخرج تلقائيًّا لأن حالته لن تكون Submitted.)
+        var rows = await _db.LeaveRequests.AsNoTracking()
+            .Where(r => r.Status == LeaveRequestStatus.Submitted && r.CurrentStep == LeaveRequestStep.TeamLeader)
+            .ToListAsync(ct);
+
+        if (rows.Count == 0)
+            return Result<TeamLeaderPendingGovernanceResultDto>.Success(
+                new TeamLeaderPendingGovernanceResultDto(
+                    new List<TeamLeaderPendingGovernanceItemDto>(), 0, query.Page, query.PageSize,
+                    new TeamLeaderPendingGovernanceCountersDto(0, 0, 0, 0, 0, 0)));
+
+        var requestIds = rows.Select(r => r.Id).ToList();
+        var employeeIds = rows.Select(r => r.RequesterUserId).Distinct().ToList();
+
+        // (ب) بيانات الموظفين (اسم/نشاط/فريق/إدارة).
+        var employees = await _db.Users.AsNoTracking()
+            .Where(u => employeeIds.Contains(u.Id))
+            .Select(u => new { u.Id, u.FullName, u.IsActive, u.TeamId, u.DepartmentId })
+            .ToListAsync(ct);
+        var empById = employees.ToDictionary(e => e.Id);
+
+        // (ج) الفِرق (اسم/إدارة/قائد الفريق) لفرق الموظفين المعلَّقة طلباتهم.
+        var teamIds = employees.Where(e => e.TeamId is Guid).Select(e => e.TeamId!.Value).Distinct().ToList();
+        var teams = await _db.Teams.AsNoTracking()
+            .Where(t => teamIds.Contains(t.Id))
+            .Select(t => new { t.Id, t.NameAr, t.DepartmentId, t.TeamLeaderId })
+            .ToListAsync(ct);
+        var teamById = teams.ToDictionary(t => t.Id);
+
+        // (د) الإدارات (اسم) — من إدارات الموظفين وإدارات الفِرق.
+        var deptIds = employees.Where(e => e.DepartmentId is Guid).Select(e => e.DepartmentId!.Value)
+            .Concat(teams.Select(t => t.DepartmentId)).Distinct().ToList();
+        var depts = await _db.Departments.AsNoTracking()
+            .Where(d => deptIds.Contains(d.Id))
+            .Select(d => new { d.Id, d.NameAr })
+            .ToListAsync(ct);
+        var deptNameById = depts.ToDictionary(d => d.Id, d => d.NameAr);
+
+        // (هـ) قادة الفِرق (اسم/نشاط).
+        var tlIds = teams.Where(t => t.TeamLeaderId is Guid).Select(t => t.TeamLeaderId!.Value).Distinct().ToList();
+        var tlUsers = await _db.Users.AsNoTracking()
+            .Where(u => tlIds.Contains(u.Id))
+            .Select(u => new { u.Id, u.FullName, u.IsActive })
+            .ToListAsync(ct);
+        var tlById = tlUsers.ToDictionary(u => u.Id);
+
+        // (و) عدّاد حركات الرصيد المرتبطة بكل طلب — إثبات صفريّة الخصم (لا يُفترَض وجودها لطلب معلّق).
+        var ledgerRows = await _db.EmployeeBalanceLedger.AsNoTracking()
+            .Where(l => l.RelatedRequestId != null && requestIds.Contains(l.RelatedRequestId!.Value))
+            .Select(l => l.RelatedRequestId!.Value)
+            .ToListAsync(ct);
+        var ledgerCountById = ledgerRows.GroupBy(id => id).ToDictionary(g => g.Key, g => g.Count());
+
+        // (ز) آخر حدث لكل طلب (نوع/وقت) — تجميع في الذاكرة (المجموعة صغيرة بطبيعتها).
+        var eventRows = await _db.LeaveRequestEvents.AsNoTracking()
+            .Where(e => requestIds.Contains(e.LeaveRequestId))
+            .Select(e => new { e.LeaveRequestId, e.Action, e.CreatedAtUtc })
+            .ToListAsync(ct);
+        var lastEventById = eventRows
+            .GroupBy(e => e.LeaveRequestId)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(e => e.CreatedAtUtc).First());
+
+        var today = ReportCalendarPolicy.RiyadhToday();
+
+        // (ح) بناء الصفوف المشتقّة + التصنيف.
+        var items = new List<TeamLeaderPendingGovernanceItemDto>(rows.Count);
+        foreach (var r in rows)
+        {
+            empById.TryGetValue(r.RequesterUserId, out var emp);
+            var teamId = emp?.TeamId;
+            teamById.TryGetValue(teamId ?? Guid.Empty, out var team);
+
+            Guid? tlUserId = team?.TeamLeaderId;
+            var missingTl = tlUserId is null;
+            tlById.TryGetValue(tlUserId ?? Guid.Empty, out var tl);
+
+            Guid? deptId = team?.DepartmentId ?? emp?.DepartmentId;
+            string? deptName = deptId is Guid dId && deptNameById.TryGetValue(dId, out var dn) ? dn : null;
+
+            var requestedUnits = r.Type == LeaveRequestType.Permission
+                ? 1
+                : (r.EndDate.DayNumber - r.StartDate.DayNumber) + 1;
+
+            var createdRiyadh = ReportCalendarPolicy.RiyadhDate(r.CreatedAtUtc);
+            var daysPending = today.DayNumber - createdRiyadh.DayNumber;
+            var daysUntilStart = r.StartDate.DayNumber - today.DayNumber;
+            var startedAlready = r.StartDate <= today;
+            var endedAlready = r.EndDate < today;
+            var hoursPending = (DateTime.UtcNow - r.CreatedAtUtc).TotalHours;
+
+            LeaveGovernanceDelayStatus delay;
+            string delayReason;
+            if (endedAlready)
+            {
+                delay = LeaveGovernanceDelayStatus.ExpiredUnresolved;
+                delayReason = "انتهت مدة الطلب ولم يُبتّ عند قائد الفريق.";
+            }
+            else if (startedAlready)
+            {
+                delay = LeaveGovernanceDelayStatus.Critical;
+                delayReason = "بدأ موعد الطلب والطلب ما زال معلّقًا عند قائد الفريق.";
+            }
+            else if (hoursPending > AttentionAfterHours)
+            {
+                delay = LeaveGovernanceDelayStatus.Attention;
+                delayReason = $"مضى أكثر من {AttentionAfterHours} ساعة على التقديم دون بتّ قائد الفريق.";
+            }
+            else
+            {
+                delay = LeaveGovernanceDelayStatus.Pending;
+                delayReason = "بانتظار بتّ قائد الفريق ضمن عتبة المتابعة.";
+            }
+
+            var ledgerCount = ledgerCountById.GetValueOrDefault(r.Id, 0);
+            lastEventById.TryGetValue(r.Id, out var lastEvt);
+
+            items.Add(new TeamLeaderPendingGovernanceItemDto(
+                r.Id, r.Type, r.RequesterUserId, emp?.FullName ?? string.Empty,
+                deptId, deptName, teamId, team?.NameAr,
+                tlUserId, tl?.FullName,
+                r.CreatedAtUtc, r.StartDate, r.EndDate, requestedUnits,
+                r.Status, r.CurrentStep,
+                lastEvt?.Action, lastEvt?.CreatedAtUtc,
+                daysPending, daysUntilStart, startedAlready, endedAlready,
+                delay, delayReason,
+                ledgerCount > 0, ledgerCount,
+                emp?.IsActive ?? false, tl?.IsActive ?? false, missingTl));
+        }
+
+        // (ط) الفلاتر (كلها في الذاكرة على المجموعة الصغيرة المشتقّة).
+        IEnumerable<TeamLeaderPendingGovernanceItemDto> filtered = items;
+        if (!query.IncludeInactive)
+            filtered = filtered.Where(i => i.IsEmployeeActive);
+        if (query.TeamLeaderId is Guid qtl)
+            filtered = filtered.Where(i => i.TeamLeaderUserId == qtl);
+        if (query.DepartmentId is Guid qd)
+            filtered = filtered.Where(i => i.DepartmentId == qd);
+        if (query.TeamId is Guid qt)
+            filtered = filtered.Where(i => i.TeamId == qt);
+        if (query.RequestType is LeaveRequestType qrt)
+            filtered = filtered.Where(i => i.RequestType == qrt);
+        if (query.DelayStatus is LeaveGovernanceDelayStatus qds)
+            filtered = filtered.Where(i => i.DelayStatus == qds);
+        if (query.StartDateFrom is DateOnly sdf)
+            filtered = filtered.Where(i => i.StartDate >= sdf);
+        if (query.StartDateTo is DateOnly sdt)
+            filtered = filtered.Where(i => i.StartDate <= sdt);
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            var term = query.Search.Trim();
+            filtered = filtered.Where(i =>
+                i.EmployeeName.Contains(term, StringComparison.OrdinalIgnoreCase)
+                || (i.TeamName != null && i.TeamName.Contains(term, StringComparison.OrdinalIgnoreCase))
+                || (i.TeamLeaderName != null && i.TeamLeaderName.Contains(term, StringComparison.OrdinalIgnoreCase))
+                || (i.DepartmentName != null && i.DepartmentName.Contains(term, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        var matched = filtered.ToList();
+
+        // (ي) العدّادات على كامل المطابقة (قبل الترقيم).
+        var counters = new TeamLeaderPendingGovernanceCountersDto(
+            matched.Count,
+            matched.Count(i => i.DelayStatus == LeaveGovernanceDelayStatus.Attention),
+            matched.Count(i => i.DelayStatus == LeaveGovernanceDelayStatus.Critical),
+            matched.Count(i => i.DelayStatus == LeaveGovernanceDelayStatus.ExpiredUnresolved),
+            matched.Count(i => i.MissingTeamLeaderAssignment),
+            matched.Count == 0 ? 0 : matched.Max(i => i.DaysPending));
+
+        // (ك) الترتيب: ExpiredUnresolved ← Critical ← Attention ← Pending، ثمّ الأقدم فالأحدث ضمن كل تصنيف.
+        static int SortRank(LeaveGovernanceDelayStatus s) => s switch
+        {
+            LeaveGovernanceDelayStatus.ExpiredUnresolved => 0,
+            LeaveGovernanceDelayStatus.Critical => 1,
+            LeaveGovernanceDelayStatus.Attention => 2,
+            _ => 3
+        };
+        var ordered = matched
+            .OrderBy(i => SortRank(i.DelayStatus))
+            .ThenBy(i => i.CreatedAtUtc)
+            .ToList();
+
+        // (ل) الترقيم.
+        var page = query.Page < 1 ? 1 : query.Page;
+        var pageSize = query.PageSize < 1 ? 25 : query.PageSize;
+        var paged = ordered.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+
+        // قراءة-فقط بحتة: لا SaveChanges ولا تدقيق ولا إشعار ولا أثر جانبيّ.
+        return Result<TeamLeaderPendingGovernanceResultDto>.Success(
+            new TeamLeaderPendingGovernanceResultDto(paged, matched.Count, page, pageSize, counters));
+    }
+
     public async Task<Result<LeaveRequestDto>> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
         if (_currentUser.UserId is not Guid uid)

@@ -2045,6 +2045,56 @@ export interface LeaveRequestListItemDto {
   isPotentialUnpaidLeave: boolean;
   createdAtUtc: string;
 }
+// ===== LEAVE-TL-PENDING-GOVERNANCE-R1 — طابور الحوكمة «معلّقة عند قادة الفرق» (قراءة-فقط) =====
+// نموذج قراءة على مستوى الشركة يُظهِر الطلبات العالقة عند خطوة قائد الفريق (Status=Submitted, CurrentStep=TeamLeader).
+// لا يمنح أيّ سلطة قرار ولا يكتب شيئًا (بلا اعتماد/رفض/إعادة توجيه/تعديل/خصم/رصيد/إشعار).
+export type LeaveGovernanceDelayStatus = 'Pending' | 'Attention' | 'Critical' | 'ExpiredUnresolved';
+export interface TeamLeaderPendingGovernanceItemDto {
+  requestId: string;
+  requestType: LeaveRequestType;
+  employeeUserId: string;
+  employeeName: string;
+  departmentId: string | null;
+  departmentName: string | null;
+  teamId: string | null;
+  teamName: string | null;
+  teamLeaderUserId: string | null;
+  teamLeaderName: string | null;
+  createdAtUtc: string;
+  startDate: string;
+  endDate: string;
+  requestedUnits: number;
+  currentStatus: LeaveRequestStatus;
+  currentStep: LeaveRequestStep;
+  lastEventType: string | null;
+  lastEventAtUtc: string | null;
+  daysPending: number;
+  daysUntilStart: number;
+  startedAlready: boolean;
+  endedAlready: boolean;
+  delayStatus: LeaveGovernanceDelayStatus;
+  delayReason: string;
+  hasLedger: boolean;
+  ledgerCount: number;
+  isEmployeeActive: boolean;
+  isTeamLeaderActive: boolean;
+  missingTeamLeaderAssignment: boolean;
+}
+export interface TeamLeaderPendingGovernanceCountersDto {
+  totalPending: number;
+  attention: number;
+  critical: number;
+  expiredUnresolved: number;
+  missingTeamLeader: number;
+  oldestPendingDays: number;
+}
+export interface TeamLeaderPendingGovernanceResultDto {
+  items: TeamLeaderPendingGovernanceItemDto[];
+  total: number;
+  page: number;
+  pageSize: number;
+  counters: TeamLeaderPendingGovernanceCountersDto;
+}
 export interface CreateLeaveRequestRequest {
   type: LeaveRequestType;
   startDate: string;
