@@ -1895,6 +1895,125 @@ export interface UpsertClientBrandProfileRequest {
   notes?: string | null;
 }
 
+// ===== Client Documents & External Links (CPW-R1B2) =====
+// ملاحظة أمنيّة: لا يصل مسار التخزين (StorageKey) إلى الواجهة إطلاقًا — التنزيل عبر نقطة نهاية محكومة فقط.
+export type DocumentLifecycleStatus = 'Draft' | 'Current' | 'Superseded' | 'Archived';
+export type DocumentScanStatus = 'Pending' | 'NotScanned' | 'Clean' | 'Rejected' | 'Failed';
+
+export interface ClientDocumentDto {
+  id: string;
+  clientId: string;
+  title: string;
+  description: string | null;
+  categoryCode: string;
+  tags: string | null;
+  confidentialityCode: string | null;
+  lifecycleStatus: DocumentLifecycleStatus;
+  approvalStatusCode: string;
+  versionCount: number;
+  uploadedByUserId: string;
+  uploadedByName: string | null;
+  isArchived: boolean;
+  archivedAtUtc: string | null;
+  archiveReason: string | null;
+  currentVersionId: string | null;
+  currentVersionNo: number | null;
+  currentFileName: string | null;
+  currentContentType: string | null;
+  currentSizeBytes: number | null;
+  currentScanStatus: DocumentScanStatus | null;
+  currentForceAttachment: boolean;
+  createdAtUtc: string;
+  updatedAtUtc: string | null;
+}
+
+export interface ClientDocumentVersionDto {
+  id: string;
+  clientDocumentId: string;
+  versionNo: number;
+  originalFileName: string;
+  contentType: string;
+  sizeBytes: number;
+  sha256: string;
+  scanStatus: DocumentScanStatus;
+  scanEngine: string;
+  scannedAtUtc: string | null;
+  scanDetail: string | null;
+  uploadedByUserId: string;
+  uploadedByName: string | null;
+  changeNote: string | null;
+  isCurrent: boolean;
+  createdAtUtc: string;
+}
+
+export interface ClientDocumentDetailDto {
+  document: ClientDocumentDto;
+  versions: ClientDocumentVersionDto[];
+}
+
+export interface ClientStorageUsageDto {
+  clientId: string;
+  usedBytes: number;
+  quotaBytes: number;
+  remainingBytes: number;
+  documentCount: number;
+  versionCount: number;
+  maxUploadSizeBytes: number;
+  allowedExtensions: string[];
+  scanEngine: string;
+  scannerConfigured: boolean;
+}
+
+export interface ClientDocumentsFilter {
+  categoryCode?: string;
+  confidentialityCode?: string;
+  lifecycleStatus?: DocumentLifecycleStatus;
+  search?: string;
+  includeArchived?: boolean;
+}
+
+export interface UpdateClientDocumentRequest {
+  title: string;
+  categoryCode: string;
+  description?: string | null;
+  tags?: string | null;
+  confidentialityCode?: string | null;
+  lifecycleStatus?: DocumentLifecycleStatus | null;
+  approvalStatusCode?: string | null;
+}
+
+export interface ArchiveClientDocumentRequest {
+  reason?: string | null;
+}
+
+export interface DeleteClientDocumentRequest {
+  reason: string;
+}
+
+export interface ClientExternalLinkDto {
+  id: string;
+  clientId: string;
+  title: string;
+  url: string;
+  categoryCode: string;
+  description: string | null;
+  isActive: boolean;
+  sortOrder: number;
+  createdByUserId: string;
+  createdByName: string | null;
+  createdAtUtc: string;
+  updatedAtUtc: string | null;
+}
+
+export interface CreateClientExternalLinkRequest {
+  title: string;
+  url: string;
+  categoryCode: string;
+  description?: string | null;
+  sortOrder?: number;
+}
+export type UpdateClientExternalLinkRequest = CreateClientExternalLinkRequest;
+
 export interface ProjectDto {
   id: string;
   clientId: string;
