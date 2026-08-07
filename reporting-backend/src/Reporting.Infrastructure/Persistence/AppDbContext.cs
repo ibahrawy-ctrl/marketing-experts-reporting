@@ -45,6 +45,11 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
     public DbSet<ClientDigitalChannel> ClientDigitalChannels => Set<ClientDigitalChannel>();
     public DbSet<ClientBrandProfile> ClientBrandProfiles => Set<ClientBrandProfile>();
 
+    // خدمة المستندات — أوّل ارتباط مورد: العميل (CPW-R1B2)
+    public DbSet<ClientDocument> ClientDocuments => Set<ClientDocument>();
+    public DbSet<ClientDocumentVersion> ClientDocumentVersions => Set<ClientDocumentVersion>();
+    public DbSet<ClientExternalLink> ClientExternalLinks => Set<ClientExternalLink>();
+
     // كتالوج الدورات (مصدر أسماء دورات مبيعات B2C)
     public DbSet<Course> Courses => Set<Course>();
 
