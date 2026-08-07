@@ -12,6 +12,7 @@ using Reporting.Application.Courses;
 using Reporting.Application.Dashboard;
 using Reporting.Application.Development;
 using Reporting.Application.Directory;
+using Reporting.Application.Documents;
 using Reporting.Application.EmployeeServices;
 using Reporting.Application.Governance;
 using Reporting.Application.Kpi;
@@ -99,6 +100,11 @@ public static class DependencyInjection
         services.AddScoped<IClientContactService, ClientContactService>();
         services.AddScoped<IClientDigitalChannelService, ClientDigitalChannelService>();
         services.AddScoped<IClientBrandService, ClientBrandService>();
+        // خدمة المستندات (CPW-R1B2) — التخزين مفرد بلا حالة، ومحرّك الفحص «لا شيء» (C-01).
+        services.AddSingleton<IFileStorage, LocalFileStorage>();
+        services.AddSingleton<IDocumentScanner, NullDocumentScanner>();
+        services.AddScoped<IClientDocumentService, ClientDocumentService>();
+        services.AddScoped<IClientExternalLinkService, ClientExternalLinkService>();
         services.AddScoped<IProjectService, ProjectService>();
         services.AddScoped<IProjectWorkstreamService, ProjectWorkstreamService>();
         services.AddScoped<IWorkstreamDeliverableService, WorkstreamDeliverableService>();

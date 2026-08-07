@@ -331,17 +331,20 @@ public class ClientService : IClientService
         var risks = await _db.Risks.CountAsync(r => r.ClientId == clientId, ct);
         var notes = await _db.ManagementNotes.CountAsync(
             n => n.EntityType == ManagementNoteEntityType.Client && n.EntityId == clientId, ct);
-        return BuildDeleteGuard(projects, reports, risks, notes).reason;
+        // المستندات تحمل ملفّات فعليّة على القرص ⇒ الحذف النهائيّ ممنوع كي لا تبقى ملفّات يتيمة (CPW-R1B2).
+        var documents = await _db.ClientDocuments.CountAsync(d => d.ClientId == clientId, ct);
+        return BuildDeleteGuard(projects, reports, risks, notes, documents).reason;
     }
 
     // قاعدة موحّدة لبناء حالة/سبب منع الحذف من العدّادات.
-    private static (bool canHardDelete, string? reason) BuildDeleteGuard(int projects, int reports, int risks, int notes)
+    private static (bool canHardDelete, string? reason) BuildDeleteGuard(int projects, int reports, int risks, int notes, int documents)
     {
         var parts = new List<string>();
         if (projects > 0) parts.Add($"{projects} مشروعًا");
         if (reports > 0) parts.Add($"{reports} تقريرًا");
         if (risks > 0) parts.Add($"{risks} مخاطرة");
         if (notes > 0) parts.Add($"{notes} ملاحظة إدارية");
+        if (documents > 0) parts.Add($"{documents} مستندًا");
         if (parts.Count == 0) return (true, null);
         return (false, "لا يمكن الحذف النهائي — مرتبط بـ " + string.Join("، ", parts) + ". استخدم الأرشفة بدلًا من ذلك.");
     }
@@ -369,13 +372,18 @@ public class ClientService : IClientService
             : await _db.ManagementNotes.Where(n => n.EntityType == ManagementNoteEntityType.Client && ids.Contains(n.EntityId))
                 .GroupBy(n => n.EntityId).Select(g => new { g.Key, Count = g.Count() })
                 .ToDictionaryAsync(x => x.Key, x => x.Count, ct);
+        var documentsByClient = ids.Count == 0 ? new Dictionary<Guid, int>()
+            : await _db.ClientDocuments.Where(d => ids.Contains(d.ClientId))
+                .GroupBy(d => d.ClientId).Select(g => new { g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.Key, x => x.Count, ct);
 
         return clients.Select(c =>
         {
             var cps = projects.Where(p => p.ClientId == c.Id).ToList();
             var (canHardDelete, reason) = BuildDeleteGuard(
                 cps.Count, reportsByClient.GetValueOrDefault(c.Id),
-                risksByClient.GetValueOrDefault(c.Id), notesByClient.GetValueOrDefault(c.Id));
+                risksByClient.GetValueOrDefault(c.Id), notesByClient.GetValueOrDefault(c.Id),
+                documentsByClient.GetValueOrDefault(c.Id));
             return new ClientDto(
                 c.Id, c.Name, c.Status, c.AccountManagerId,
                 c.AccountManagerId is Guid aid ? amNames.GetValueOrDefault(aid) : null,
