@@ -76,7 +76,12 @@ public class KpiTests
         Assert.Equal(KpiTrend.Unknown, sub1.Trend);
         Assert.True(sub1.IsBelowTarget);
 
-        // الفترة الثانية — درجة 65 ⇒ اتجاه صاعد
+        // اعتماد الفترة الأولى عبر مُصعَّد (Admin ليس المُدخِل/المُقيّم ولا الموضوع) ⇒ تدخل النتائج النهائية
+        var approved1 = await (await admin.PostAsync($"/api/kpi-evaluations/{ev1.Id}/approve", null))
+            .ReadAsync<KpiEvaluationDto>();
+        Assert.Equal(KpiEvaluationStatus.Approved, approved1!.Status);
+
+        // الفترة الثانية — درجة 65 ⇒ اتجاه صاعد (مقارنةً بالفترة الأولى المعتمَدة)
         var ev2 = await (await manager.PostAsJsonAsync("/api/kpi-evaluations",
             new CreateKpiEvaluationRequest(templateId, subjectId, PeriodType.Weekly, "2026-W02")))
             .ReadAsync<KpiEvaluationDto>();
@@ -92,8 +97,8 @@ public class KpiTests
         Assert.Equal(KpiTrend.Up, sub2.Trend);
         Assert.False(sub2.IsBelowTarget);
 
-        // الاعتماد
-        var approved = await (await manager.PostAsync($"/api/kpi-evaluations/{ev2.Id}/approve", null))
+        // الاعتماد عبر مُصعَّد (Admin)
+        var approved = await (await admin.PostAsync($"/api/kpi-evaluations/{ev2.Id}/approve", null))
             .ReadAsync<KpiEvaluationDto>();
         Assert.Equal(KpiEvaluationStatus.Approved, approved!.Status);
     }

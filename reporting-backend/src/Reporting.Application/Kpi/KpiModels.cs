@@ -163,7 +163,31 @@ public record KpiEvaluationDto(
     bool IsBelowTarget,
     DateTime? SubmittedAtUtc,
     bool CanEdit,
-    IReadOnlyList<KpiResultDto> Results);
+    IReadOnlyList<KpiResultDto> Results,
+    // مراجعة حوكميّة (ADMIN-GOVERNANCE-R1) — المُراجِع المعيَّن وقراره.
+    Guid? ReviewerId = null,
+    string? ReviewerName = null,
+    DateTime? ReviewedAtUtc = null,
+    string? ReviewNote = null,
+    // القدرات السياقيّة للمستخدم الحالي على هذا التقييم (لإظهار/إخفاء أزرار الواجهة؛ الفرض النهائيّ خادميّ).
+    bool CanReview = false,
+    bool CanFlag = false,
+    bool CanAdminDelete = false,
+    bool CanReopen = false);
+
+/// <summary>طلب إجراء مراجعة على تقييم KPI: السبب إلزاميّ لطلب التعديل/الرفض/التعليق/الإشارة/طلب إعادة الفتح/إعادة الفتح/الحذف.</summary>
+public record KpiReviewActionRequest(string? Reason = null);
+
+/// <summary>عنصر في سجلّ حوكمة مراجعة تقييم KPI (شاشة الخط الزمنيّ في الحوكمة).</summary>
+public record KpiEvaluationReviewEventDto(
+    Guid Id,
+    string Action,
+    Guid ActorId,
+    string? ActorName,
+    string? FromStatus,
+    string? ToStatus,
+    string? Reason,
+    DateTime CreatedAtUtc);
 
 public record KpiEvaluationListItemDto(
     Guid Id,

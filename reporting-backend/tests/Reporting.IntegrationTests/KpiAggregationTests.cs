@@ -36,8 +36,12 @@ public class KpiAggregationTests
         return (created.Id, manual!.Id, auto!.Id);
     }
 
-    /// <summary>ينشئ تقييمًا أسبوعيًّا للموظّف بدرجة محدَّدة (manual=auto=score) ويُرسله ⇒ TotalScore=score.</summary>
-    private static async Task SubmitWeeklyScoreAsync(
+    /// <summary>
+    /// ينشئ تقييمًا أسبوعيًّا للموظّف بدرجة محدَّدة (manual=auto=score)، يُرسله (⇒ UnderReview)،
+    /// ثم يعتمده عبر مُراجِع مُصعَّد (CEO؛ ليس المُقيّم ولا الموضوع) ⇒ Status=Approved كي يدخل التجميع
+    /// (التجميع يقرأ التقييمات المعتمَدة فقط).
+    /// </summary>
+    private async Task SubmitWeeklyScoreAsync(
         HttpClient evaluator, Guid templateId, Guid subjectId, Guid manualId, Guid autoId,
         string weekKey, decimal score)
     {
@@ -53,6 +57,11 @@ public class KpiAggregationTests
         var submitted = await (await evaluator.PostAsync($"/api/kpi-evaluations/{ev.Id}/submit", null))
             .ReadAsync<KpiEvaluationDto>();
         Assert.Equal(score, submitted!.TotalScore);
+
+        var (ceo, _) = await TestAuth.CreateUserAsync(_factory, "CEO");
+        var approved = await (await ceo.PostAsync($"/api/kpi-evaluations/{ev.Id}/approve", null))
+            .ReadAsync<KpiEvaluationDto>();
+        Assert.Equal(KpiEvaluationStatus.Approved, approved!.Status);
     }
 
     // §14.14 — الأسبوع وحدة الأساس: التجميع يقرأ التقييمات الأسبوعية.

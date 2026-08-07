@@ -148,8 +148,9 @@ public class KpiEvaluationService : IKpiEvaluationService
         var ownerCheck = ResourceGuard.EnsureOwnerOrElevated(_currentUser, e.EvaluatorId ?? Guid.Empty);
         if (!ownerCheck.Succeeded) return Result<KpiEvaluationDto>.Failure(ownerCheck.Error!, ownerCheck.ErrorCode!);
 
-        if (e.Status is not (KpiEvaluationStatus.Draft or KpiEvaluationStatus.InProgress))
-            return Result<KpiEvaluationDto>.Failure("لا يمكن تعديل تقييم بعد إرساله.", "kpi_eval.locked.conflict");
+        // يُسمح بالتعديل قبل الإرسال (Draft/InProgress) أو بعد طلب تعديل من المراجع (NeedsRevision).
+        if (e.Status is not (KpiEvaluationStatus.Draft or KpiEvaluationStatus.InProgress or KpiEvaluationStatus.NeedsRevision))
+            return Result<KpiEvaluationDto>.Failure("لا يمكن تعديل تقييم في حالته الحاليّة.", "kpi_eval.locked.conflict");
 
         var metricIds = await _db.KpiMetrics.Where(m => m.KpiTemplateVersionId == e.KpiTemplateVersionId)
             .Select(m => m.Id).ToListAsync(ct);
@@ -184,7 +185,8 @@ public class KpiEvaluationService : IKpiEvaluationService
         var ownerCheck = ResourceGuard.EnsureOwnerOrElevated(_currentUser, e.EvaluatorId ?? Guid.Empty);
         if (!ownerCheck.Succeeded) return Result<KpiEvaluationDto>.Failure(ownerCheck.Error!, ownerCheck.ErrorCode!);
 
-        if (e.Status is not (KpiEvaluationStatus.Draft or KpiEvaluationStatus.InProgress))
+        // يُسمح بالإرسال أوّل مرّة (Draft/InProgress) أو إعادة الإرسال بعد طلب تعديل (NeedsRevision).
+        if (e.Status is not (KpiEvaluationStatus.Draft or KpiEvaluationStatus.InProgress or KpiEvaluationStatus.NeedsRevision))
             return Result<KpiEvaluationDto>.Failure("التقييم في حالة لا تسمح بالإرسال.", "kpi_eval.not_submittable.conflict");
 
         var metrics = await _db.KpiMetrics.Where(m => m.KpiTemplateVersionId == e.KpiTemplateVersionId)
@@ -208,16 +210,31 @@ public class KpiEvaluationService : IKpiEvaluationService
             weighted += score * metric.Weight;
         }
 
+        // إسناد مُراجِع إلزاميّ (ADMIN-GOVERNANCE-R1، تصحيح #6): المدير الأعلى للمُدخِل ثم GM ثم CEO ثم Admin (break-glass).
+        // لا يجوز أن يكون المُراجِع هو الموضوع أو المُدخِل. نضمن عدم بقاء تقييم بلا مُراجِع.
+        var reviewerId = await ResolveReviewerAsync(e, ct);
+        if (reviewerId is not Guid reviewer)
+            return Result<KpiEvaluationDto>.Failure(
+                "تعذّر إسناد مُراجِع لهذا التقييم؛ لا يوجد مسؤول أعلى متاح للمراجعة.", "kpi_eval.no_reviewer.conflict");
+
+        var fromStatus = e.Status;
         var totalScore = Math.Round(weighted / 100m, 2);
         e.TotalScore = totalScore;
         e.Trend = await ComputeTrendAsync(e, totalScore, ct);
-        e.Status = KpiEvaluationStatus.Submitted;
+        e.Status = KpiEvaluationStatus.UnderReview;
+        e.ReviewerId = reviewer;
+        e.ReviewedAtUtc = null;
+        e.ReviewNote = null;
         e.SubmittedAtUtc = DateTime.UtcNow;
         e.UpdatedAtUtc = DateTime.UtcNow;
+        AddReviewEvent(e, "Submitted", fromStatus, KpiEvaluationStatus.UnderReview, null, BuildSnapshot(e));
         await _db.SaveChangesAsync(ct);
 
+        // إشعار المُراجِع المعيَّن + إعلام الموظّف بأنّ تقييمه قيد المراجعة.
+        await _notifications.NotifyAsync(reviewer, "kpi.review_requested",
+            "تقييم KPI بانتظار مراجعتك", null, "/app/kpi-review", ct);
         await _notifications.NotifyAsync(e.SubjectUserId, "kpi.submitted",
-            "تم احتساب مؤشرات أدائك", null, "/app/my-kpi", ct);
+            "تم احتساب مؤشرات أدائك وهي قيد المراجعة", null, "/app/my-kpi", ct);
         await _audit.LogAsync(_currentUser.UserId, "kpi.submitted", nameof(KpiEvaluation), e.Id, ct: ct);
 
         return Result<KpiEvaluationDto>.Success(await BuildDtoAsync(evaluationId, ct));
@@ -225,20 +242,22 @@ public class KpiEvaluationService : IKpiEvaluationService
 
     public async Task<Result<KpiEvaluationDto>> ApproveAsync(Guid evaluationId, CancellationToken ct = default)
     {
-        var e = await _db.KpiEvaluations.FirstOrDefaultAsync(x => x.Id == evaluationId, ct);
+        var e = await _db.KpiEvaluations.Include(x => x.Results).FirstOrDefaultAsync(x => x.Id == evaluationId, ct);
         if (e is null) return Result<KpiEvaluationDto>.Failure("التقييم غير موجود.", "kpi_eval.not_found");
 
-        if (!_currentUser.IsInAnyRole(Roles.Management))
-            return Result<KpiEvaluationDto>.Failure("لا تملك صلاحية اعتماد التقييم.", "auth.forbidden");
-        // منع IDOR: المعتمِد لا يعتمد إلا تقييمات أنشأها أو ضمن نطاق رؤيته.
-        var approveScope = await _scope.ResolveAsync(ct);
-        if (_currentUser.UserId != e.EvaluatorId && !approveScope.Contains(e.SubjectUserId))
-            return Result<KpiEvaluationDto>.Failure("هذا التقييم خارج نطاق إشرافك.", "auth.forbidden");
-        if (e.Status != KpiEvaluationStatus.Submitted)
-            return Result<KpiEvaluationDto>.Failure("لا يمكن اعتماد تقييم إلا بعد إرساله.", "kpi_eval.not_approvable.conflict");
+        var gate = EnsureCanReview(e);
+        if (gate is Result<KpiEvaluationDto> denied) return denied;
 
+        // يُعتمَد من UnderReview (المسار الجديد) أو Submitted (توافق خلفيّ للسجلّات القديمة).
+        if (e.Status is not (KpiEvaluationStatus.UnderReview or KpiEvaluationStatus.Submitted))
+            return Result<KpiEvaluationDto>.Failure("لا يمكن اعتماد تقييم إلا وهو قيد المراجعة.", "kpi_eval.not_approvable.conflict");
+
+        var fromStatus = e.Status;
+        var snapshot = BuildSnapshot(e);
         e.Status = KpiEvaluationStatus.Approved;
+        e.ReviewedAtUtc = DateTime.UtcNow;
         e.UpdatedAtUtc = DateTime.UtcNow;
+        AddReviewEvent(e, "Approved", fromStatus, KpiEvaluationStatus.Approved, null, snapshot);
         await _db.SaveChangesAsync(ct);
 
         await _notifications.NotifyAsync(e.SubjectUserId, "kpi.approved",
@@ -246,6 +265,232 @@ public class KpiEvaluationService : IKpiEvaluationService
         await _audit.LogAsync(_currentUser.UserId, "kpi.approved", nameof(KpiEvaluation), e.Id, ct: ct);
 
         return Result<KpiEvaluationDto>.Success(await BuildDtoAsync(evaluationId, ct));
+    }
+
+    // ── ADMIN-GOVERNANCE-R1: معالجة مراجعة تقييمات KPI ──
+
+    public async Task<Result<KpiEvaluationDto>> RequestRevisionAsync(Guid evaluationId, KpiReviewActionRequest request, CancellationToken ct = default)
+    {
+        var reason = (request?.Reason ?? string.Empty).Trim();
+        if (reason.Length == 0)
+            return Result<KpiEvaluationDto>.Failure("سبب طلب التعديل إلزاميّ.", "kpi_eval.reason_required");
+
+        var e = await _db.KpiEvaluations.Include(x => x.Results).FirstOrDefaultAsync(x => x.Id == evaluationId, ct);
+        if (e is null) return Result<KpiEvaluationDto>.Failure("التقييم غير موجود.", "kpi_eval.not_found");
+
+        var gate = EnsureCanReview(e);
+        if (gate is Result<KpiEvaluationDto> denied) return denied;
+
+        if (e.Status is not (KpiEvaluationStatus.UnderReview or KpiEvaluationStatus.Submitted))
+            return Result<KpiEvaluationDto>.Failure("طلب التعديل متاح للتقييم قيد المراجعة فقط.", "kpi_eval.not_reviewable.conflict");
+
+        var fromStatus = e.Status;
+        var snapshot = BuildSnapshot(e);
+        e.Status = KpiEvaluationStatus.NeedsRevision;
+        e.ReviewedAtUtc = DateTime.UtcNow;
+        e.ReviewNote = reason;
+        e.UpdatedAtUtc = DateTime.UtcNow;
+        AddReviewEvent(e, "RequestRevision", fromStatus, KpiEvaluationStatus.NeedsRevision, reason, snapshot);
+        await _db.SaveChangesAsync(ct);
+
+        if (e.EvaluatorId is Guid ev)
+            await _notifications.NotifyAsync(ev, "kpi.needs_revision",
+                "طُلب تعديل تقييم KPI", reason, "/app/kpi", ct);
+        await _audit.LogAsync(_currentUser.UserId, "kpi.needs_revision", nameof(KpiEvaluation), e.Id,
+            JsonSerializer.Serialize(new { reason }), ct: ct);
+
+        return Result<KpiEvaluationDto>.Success(await BuildDtoAsync(evaluationId, ct));
+    }
+
+    public async Task<Result<KpiEvaluationDto>> RejectAsync(Guid evaluationId, KpiReviewActionRequest request, CancellationToken ct = default)
+    {
+        var reason = (request?.Reason ?? string.Empty).Trim();
+        if (reason.Length == 0)
+            return Result<KpiEvaluationDto>.Failure("سبب الرفض إلزاميّ.", "kpi_eval.reason_required");
+
+        var e = await _db.KpiEvaluations.Include(x => x.Results).FirstOrDefaultAsync(x => x.Id == evaluationId, ct);
+        if (e is null) return Result<KpiEvaluationDto>.Failure("التقييم غير موجود.", "kpi_eval.not_found");
+
+        var gate = EnsureCanReview(e);
+        if (gate is Result<KpiEvaluationDto> denied) return denied;
+
+        if (e.Status is not (KpiEvaluationStatus.UnderReview or KpiEvaluationStatus.Submitted))
+            return Result<KpiEvaluationDto>.Failure("الرفض متاح للتقييم قيد المراجعة فقط.", "kpi_eval.not_reviewable.conflict");
+
+        var fromStatus = e.Status;
+        var snapshot = BuildSnapshot(e);
+        e.Status = KpiEvaluationStatus.Rejected;
+        e.ReviewedAtUtc = DateTime.UtcNow;
+        e.ReviewNote = reason;
+        e.UpdatedAtUtc = DateTime.UtcNow;
+        AddReviewEvent(e, "Reject", fromStatus, KpiEvaluationStatus.Rejected, reason, snapshot);
+        await _db.SaveChangesAsync(ct);
+
+        if (e.EvaluatorId is Guid ev)
+            await _notifications.NotifyAsync(ev, "kpi.rejected", "رُفض تقييم KPI", reason, "/app/kpi", ct);
+        await _audit.LogAsync(_currentUser.UserId, "kpi.rejected", nameof(KpiEvaluation), e.Id,
+            JsonSerializer.Serialize(new { reason }), ct: ct);
+
+        return Result<KpiEvaluationDto>.Success(await BuildDtoAsync(evaluationId, ct));
+    }
+
+    public async Task<Result<KpiEvaluationDto>> CommentAsync(Guid evaluationId, KpiReviewActionRequest request, CancellationToken ct = default)
+    {
+        var reason = (request?.Reason ?? string.Empty).Trim();
+        if (reason.Length == 0)
+            return Result<KpiEvaluationDto>.Failure("نصّ التعليق إلزاميّ.", "kpi_eval.reason_required");
+
+        var e = await _db.KpiEvaluations.FirstOrDefaultAsync(x => x.Id == evaluationId, ct);
+        if (e is null) return Result<KpiEvaluationDto>.Failure("التقييم غير موجود.", "kpi_eval.not_found");
+
+        // التعليق متاح للمراجع المختصّ أو لِمن يملك صلاحية الإشارة (HR)، بشرط إمكانيّة العرض.
+        if (!_currentUser.IsInAnyRole(Roles.KpiReviewers) && !_currentUser.IsInAnyRole(Roles.KpiReviewFlaggers))
+            return Result<KpiEvaluationDto>.Failure("لا تملك صلاحية التعليق على المراجعة.", "auth.forbidden");
+        if (!await CanViewAsync(e, ct))
+            return Result<KpiEvaluationDto>.Failure("هذا التقييم خارج نطاق صلاحيتك.", "auth.forbidden");
+
+        AddReviewEvent(e, "Comment", e.Status, e.Status, reason, null);
+        await _db.SaveChangesAsync(ct);
+        await _audit.LogAsync(_currentUser.UserId, "kpi.review_comment", nameof(KpiEvaluation), e.Id,
+            JsonSerializer.Serialize(new { reason }), ct: ct);
+
+        return Result<KpiEvaluationDto>.Success(await BuildDtoAsync(evaluationId, ct));
+    }
+
+    public async Task<Result<KpiEvaluationDto>> FlagForReviewAsync(Guid evaluationId, KpiReviewActionRequest request, CancellationToken ct = default)
+    {
+        var reason = (request?.Reason ?? string.Empty).Trim();
+        if (reason.Length == 0)
+            return Result<KpiEvaluationDto>.Failure("سبب الإشارة إلزاميّ.", "kpi_eval.reason_required");
+
+        var e = await _db.KpiEvaluations.FirstOrDefaultAsync(x => x.Id == evaluationId, ct);
+        if (e is null) return Result<KpiEvaluationDto>.Failure("التقييم غير موجود.", "kpi_eval.not_found");
+        if (!_currentUser.IsInAnyRole(Roles.KpiReviewFlaggers))
+            return Result<KpiEvaluationDto>.Failure("لا تملك صلاحية الإشارة للمراجعة.", "auth.forbidden");
+
+        // لا تغيير للحالة — إشارة توثيقيّة تُخطر Admin/GM/CEO فقط.
+        AddReviewEvent(e, "Flag", e.Status, e.Status, reason, null);
+        await _db.SaveChangesAsync(ct);
+
+        var recipients = await UsersInRolesAsync(Roles.AdminReportKpiDeleters, ct);
+        await _notifications.NotifyManyAsync(recipients, "kpi.flagged", "تمّت الإشارة لتقييم KPI للمراجعة", reason, "/app/kpi", ct);
+        await _audit.LogAsync(_currentUser.UserId, "kpi.flagged", nameof(KpiEvaluation), e.Id,
+            JsonSerializer.Serialize(new { reason }), ct: ct);
+
+        return Result<KpiEvaluationDto>.Success(await BuildDtoAsync(evaluationId, ct));
+    }
+
+    public async Task<Result<KpiEvaluationDto>> RequestReopenAsync(Guid evaluationId, KpiReviewActionRequest request, CancellationToken ct = default)
+    {
+        var reason = (request?.Reason ?? string.Empty).Trim();
+        if (reason.Length == 0)
+            return Result<KpiEvaluationDto>.Failure("سبب طلب إعادة الفتح إلزاميّ.", "kpi_eval.reason_required");
+
+        var e = await _db.KpiEvaluations.FirstOrDefaultAsync(x => x.Id == evaluationId, ct);
+        if (e is null) return Result<KpiEvaluationDto>.Failure("التقييم غير موجود.", "kpi_eval.not_found");
+        if (!_currentUser.IsInAnyRole(Roles.KpiReviewFlaggers))
+            return Result<KpiEvaluationDto>.Failure("لا تملك صلاحية طلب إعادة الفتح.", "auth.forbidden");
+
+        // لا تغيير للحالة ولا منح إعادة فتح فعليّة — طلب يُخطر Admin/GM/CEO فقط.
+        AddReviewEvent(e, "RequestReopen", e.Status, e.Status, reason, null);
+        await _db.SaveChangesAsync(ct);
+
+        var recipients = await UsersInRolesAsync(Roles.AdminReportKpiDeleters, ct);
+        await _notifications.NotifyManyAsync(recipients, "kpi.reopen_requested", "طلب إعادة فتح تقييم KPI", reason, "/app/kpi", ct);
+        await _audit.LogAsync(_currentUser.UserId, "kpi.reopen_requested", nameof(KpiEvaluation), e.Id,
+            JsonSerializer.Serialize(new { reason }), ct: ct);
+
+        return Result<KpiEvaluationDto>.Success(await BuildDtoAsync(evaluationId, ct));
+    }
+
+    public async Task<Result<KpiEvaluationDto>> ReopenForRevisionAsync(Guid evaluationId, KpiReviewActionRequest request, CancellationToken ct = default)
+    {
+        var reason = (request?.Reason ?? string.Empty).Trim();
+        if (reason.Length == 0)
+            return Result<KpiEvaluationDto>.Failure("سبب إعادة الفتح إلزاميّ.", "kpi_eval.reason_required");
+
+        var e = await _db.KpiEvaluations.Include(x => x.Results).FirstOrDefaultAsync(x => x.Id == evaluationId, ct);
+        if (e is null) return Result<KpiEvaluationDto>.Failure("التقييم غير موجود.", "kpi_eval.not_found");
+        if (!_currentUser.IsInAnyRole(Roles.AdminReportKpiDeleters))
+            return Result<KpiEvaluationDto>.Failure("إعادة الفتح من صلاحية Admin/CEO/GM فقط.", "auth.forbidden");
+
+        if (e.Status is not (KpiEvaluationStatus.Approved or KpiEvaluationStatus.Rejected or KpiEvaluationStatus.NeedsRevision))
+            return Result<KpiEvaluationDto>.Failure("إعادة الفتح متاحة للتقييم المعتمَد أو المرفوض أو المطلوب تعديله فقط.", "kpi_eval.not_reopenable.conflict");
+
+        var fromStatus = e.Status;
+        var snapshot = BuildSnapshot(e);
+
+        // إعادة إسناد مُراجِع إن لم يكن معيَّنًا (توافق خلفيّ للسجلّات القديمة).
+        if (e.ReviewerId is null)
+            e.ReviewerId = await ResolveReviewerAsync(e, ct);
+
+        e.Status = KpiEvaluationStatus.UnderReview;
+        e.ReviewedAtUtc = null;
+        e.ReviewNote = reason;
+        e.UpdatedAtUtc = DateTime.UtcNow;
+        AddReviewEvent(e, "Reopen", fromStatus, KpiEvaluationStatus.UnderReview, reason, snapshot);
+        await _db.SaveChangesAsync(ct);
+
+        if (e.EvaluatorId is Guid ev)
+            await _notifications.NotifyAsync(ev, "kpi.reopened", "أُعيد فتح تقييم KPI للمراجعة", reason, "/app/kpi", ct);
+        await _audit.LogAsync(_currentUser.UserId, "kpi.reopened", nameof(KpiEvaluation), e.Id,
+            JsonSerializer.Serialize(new { reason }), ct: ct);
+
+        return Result<KpiEvaluationDto>.Success(await BuildDtoAsync(evaluationId, ct));
+    }
+
+    public async Task<Result<KpiEvaluationDto>> AdminDeleteAsync(Guid evaluationId, KpiReviewActionRequest request, CancellationToken ct = default)
+    {
+        var reason = (request?.Reason ?? string.Empty).Trim();
+        if (reason.Length == 0)
+            return Result<KpiEvaluationDto>.Failure("سبب الحذف الإداريّ إلزاميّ.", "kpi_eval.reason_required");
+
+        var e = await _db.KpiEvaluations.Include(x => x.Results).FirstOrDefaultAsync(x => x.Id == evaluationId, ct);
+        if (e is null) return Result<KpiEvaluationDto>.Failure("التقييم غير موجود.", "kpi_eval.not_found");
+        if (!_currentUser.IsInAnyRole(Roles.AdminReportKpiDeleters))
+            return Result<KpiEvaluationDto>.Failure("الحذف الإداريّ من صلاحية Admin/CEO/GM فقط.", "auth.forbidden");
+        if (e.IsDeleted)
+            return Result<KpiEvaluationDto>.Failure("هذا التقييم محذوف مسبقًا.", "kpi_eval.already_deleted.conflict");
+
+        var fromStatus = e.Status;
+        var snapshot = BuildSnapshot(e);
+        e.IsDeleted = true;
+        e.DeletedAtUtc = DateTime.UtcNow;
+        e.DeletedByUserId = _currentUser.UserId;
+        e.DeletionReason = reason;
+        e.UpdatedAtUtc = DateTime.UtcNow;
+        // ملاحظة (تصحيح #10): كل تجميعات KPI تُحتسب حيًّا من الاستعلامات، ويستبعد المحذوف تلقائيًّا عبر Global Query Filter؛
+        // لا توجد إجماليّات مخزّنة مؤقّتة تحتاج إعادة احتساب.
+        AddReviewEvent(e, "AdminDeleted", fromStatus, null, reason, snapshot);
+        await _db.SaveChangesAsync(ct);
+
+        await _audit.LogAsync(_currentUser.UserId, "kpi.admin_deleted", nameof(KpiEvaluation), e.Id,
+            JsonSerializer.Serialize(new { reason, previousStatus = fromStatus.ToString() }), ct: ct);
+
+        return Result<KpiEvaluationDto>.Success(await BuildDtoAsync(evaluationId, ct));
+    }
+
+    public async Task<Result<IReadOnlyList<KpiEvaluationReviewEventDto>>> ListReviewEventsAsync(Guid evaluationId, CancellationToken ct = default)
+    {
+        // شاشات الحوكمة تعرض حتى المحذوف إداريًّا — نتجاوز Global Query Filter لجلب التقييم.
+        var e = await _db.KpiEvaluations.IgnoreQueryFilters().AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == evaluationId, ct);
+        if (e is null) return Result<IReadOnlyList<KpiEvaluationReviewEventDto>>.Failure("التقييم غير موجود.", "kpi_eval.not_found");
+        if (!await CanViewAsync(e, ct))
+            return Result<IReadOnlyList<KpiEvaluationReviewEventDto>>.Failure("لا تملك صلاحية عرض سجلّ المراجعة.", "auth.forbidden");
+
+        var events = await _db.KpiEvaluationReviewEvents.AsNoTracking()
+            .Where(x => x.KpiEvaluationId == evaluationId)
+            .OrderBy(x => x.CreatedAtUtc)
+            .Select(x => new { x.Id, x.Action, x.ActorId, x.FromStatus, x.ToStatus, x.Reason, x.CreatedAtUtc })
+            .ToListAsync(ct);
+
+        var names = await UserNamesAsync(events.Select(x => x.ActorId), ct);
+        var dtos = events.Select(x => new KpiEvaluationReviewEventDto(
+            x.Id, x.Action, x.ActorId, names.GetValueOrDefault(x.ActorId),
+            x.FromStatus, x.ToStatus, x.Reason, x.CreatedAtUtc)).ToList();
+
+        return Result<IReadOnlyList<KpiEvaluationReviewEventDto>>.Success(dtos);
     }
 
     public async Task<Result<IReadOnlyList<KpiEvaluationListItemDto>>> ListAsync(KpiEvaluationFilter filter, CancellationToken ct = default)
@@ -329,12 +574,12 @@ public class KpiEvaluationService : IKpiEvaluationService
         if (request.SubjectUserId is Guid sid && userId != sid && !scope.Contains(sid))
             return Result<KpiAggregateDto>.Failure("هذا الموظّف خارج نطاق صلاحيتك.", "auth.forbidden");
 
+        // قاعدة النتائج النهائيّة (تصحيح #7): يدخل التجميع فقط ما كان Approved وغير محذوف
+        // (المحذوف مستبعَد تلقائيًّا عبر Global Query Filter). Submitted/UnderReview/NeedsRevision/Rejected/Closed مستبعَدة.
         var q = _db.KpiEvaluations.AsNoTracking()
             .Where(e => e.PeriodType == PeriodType.Weekly
                         && e.TotalScore != null
-                        && (e.Status == KpiEvaluationStatus.Submitted
-                            || e.Status == KpiEvaluationStatus.Approved
-                            || e.Status == KpiEvaluationStatus.Closed));
+                        && e.Status == KpiEvaluationStatus.Approved);
 
         if (!scope.SeesAll)
         {
@@ -523,6 +768,111 @@ public class KpiEvaluationService : IKpiEvaluationService
             new KpiFinanceExportDto(filter.Year, filter.Quarter, label, from, to, status, rows.Count, rows));
     }
 
+    // ── مساعِدات المراجعة الحوكميّة (ADMIN-GOVERNANCE-R1) ──
+
+    /// <summary>
+    /// حارس معالجة المراجعة: يجب أن يكون المستخدم مُراجِعًا مخوّلًا، وليس الموضوع ولا المُدخِل،
+    /// وأن يكون المُراجِع المعيَّن (ReviewerId) أو تصعيدًا أعلى (Admin/CEO/GM). يُرجِع null عند السماح.
+    /// </summary>
+    private Result<KpiEvaluationDto>? EnsureCanReview(KpiEvaluation e)
+    {
+        if (!_currentUser.IsInAnyRole(Roles.KpiReviewers))
+            return Result<KpiEvaluationDto>.Failure("لا تملك صلاحية معالجة مراجعة التقييم.", "auth.forbidden");
+        var uid = _currentUser.UserId;
+        if (uid == e.SubjectUserId)
+            return Result<KpiEvaluationDto>.Failure("لا يمكنك مراجعة تقييمك الخاصّ.", "auth.forbidden");
+        if (uid == e.EvaluatorId)
+            return Result<KpiEvaluationDto>.Failure("لا يمكن لمُدخِل التقييم مراجعته.", "auth.forbidden");
+        var isElevated = _currentUser.IsInAnyRole(Roles.AdminReportKpiDeleters); // Admin/CEO/GM
+        if (!isElevated && e.ReviewerId != uid)
+            return Result<KpiEvaluationDto>.Failure(
+                "المراجعة من صلاحية المُراجِع المعيَّن أو تصعيد أعلى (Admin/CEO/GM) فقط.", "auth.forbidden");
+        return null;
+    }
+
+    /// <summary>
+    /// إسناد مُراجِع: سلسلة المدير الأعلى انطلاقًا من المُدخِل ثم GM ثم CEO ثم Admin (break-glass).
+    /// يستبعد الموضوع والمُدخِل ويشترط أن يكون المُراجِع نشطًا. يضمن قدر الإمكان عدم إرجاع null.
+    /// </summary>
+    private async Task<Guid?> ResolveReviewerAsync(KpiEvaluation e, CancellationToken ct)
+    {
+        var exclude = new HashSet<Guid> { e.SubjectUserId };
+        if (e.EvaluatorId is Guid ev) exclude.Add(ev);
+
+        // 1) صعود سلسلة المدير انطلاقًا من المُدخِل (المُقيّم).
+        var visited = new HashSet<Guid>();
+        Guid? cursor = e.EvaluatorId;
+        while (cursor is Guid cid && visited.Add(cid))
+        {
+            var managerId = await _db.Users.AsNoTracking()
+                .Where(u => u.Id == cid).Select(u => u.ManagerId).FirstOrDefaultAsync(ct);
+            if (managerId is Guid m && !exclude.Contains(m))
+            {
+                var active = await _db.Users.AsNoTracking().AnyAsync(u => u.Id == m && u.IsActive, ct);
+                if (active) return m;
+            }
+            cursor = managerId;
+        }
+
+        // 2) تصعيد بالدور: GM ثم CEO ثم Admin (break-glass) — أوّل مستخدم نشط بالدور غير مستبعَد.
+        foreach (var role in new[] { Roles.GeneralManager, Roles.Ceo, Roles.Admin })
+        {
+            var candidate = await FirstActiveUserInRoleAsync(role, exclude, ct);
+            if (candidate is Guid c) return c;
+        }
+        return null;
+    }
+
+    private async Task<Guid?> FirstActiveUserInRoleAsync(string roleName, HashSet<Guid> exclude, CancellationToken ct)
+    {
+        var roleId = await _db.Roles.Where(r => r.Name == roleName).Select(r => r.Id).FirstOrDefaultAsync(ct);
+        if (roleId == Guid.Empty) return null;
+        var excludeList = exclude.ToList();
+        var id = await (from ur in _db.UserRoles
+                        join u in _db.Users on ur.UserId equals u.Id
+                        where ur.RoleId == roleId && u.IsActive && !excludeList.Contains(u.Id)
+                        orderby u.FullName
+                        select (Guid?)u.Id).FirstOrDefaultAsync(ct);
+        return id;
+    }
+
+    private async Task<List<Guid>> UsersInRolesAsync(string[] roles, CancellationToken ct)
+    {
+        var roleIds = await _db.Roles.Where(r => r.Name != null && roles.Contains(r.Name))
+            .Select(r => r.Id).ToListAsync(ct);
+        if (roleIds.Count == 0) return new List<Guid>();
+        return await (from ur in _db.UserRoles
+                      join u in _db.Users on ur.UserId equals u.Id
+                      where roleIds.Contains(ur.RoleId) && u.IsActive
+                      select u.Id).Distinct().ToListAsync(ct);
+    }
+
+    private void AddReviewEvent(KpiEvaluation e, string action, KpiEvaluationStatus? from,
+        KpiEvaluationStatus? to, string? reason, string? snapshotJson)
+    {
+        _db.KpiEvaluationReviewEvents.Add(new KpiEvaluationReviewEvent
+        {
+            KpiEvaluationId = e.Id,
+            Action = action,
+            ActorId = _currentUser.UserId ?? Guid.Empty,
+            FromStatus = from?.ToString(),
+            ToStatus = to?.ToString(),
+            PreviousValuesJson = snapshotJson,
+            Reason = reason
+        });
+    }
+
+    /// <summary>لقطة قيَم التقييم قبل التغيير (تصحيح #4): الحالة/الدرجة/الاتجاه/المراجع + كل نتائج المؤشرات.</summary>
+    private static string BuildSnapshot(KpiEvaluation e) => JsonSerializer.Serialize(new
+    {
+        status = e.Status.ToString(),
+        totalScore = e.TotalScore,
+        trend = e.Trend.ToString(),
+        reviewerId = e.ReviewerId,
+        reviewedAtUtc = e.ReviewedAtUtc,
+        results = e.Results.Select(r => new { r.KpiMetricId, r.RawValue, r.Score, r.Weight }).ToList()
+    });
+
     private static string Csv(string value)
     {
         if (string.IsNullOrEmpty(value)) return string.Empty;
@@ -585,14 +935,13 @@ public class KpiEvaluationService : IKpiEvaluationService
         var templateId = await _db.KpiTemplateVersions.Where(v => v.Id == e.KpiTemplateVersionId)
             .Select(v => v.KpiTemplateId).FirstAsync(ct);
 
+        // الاتجاه يُقارَن بآخر تقييم معتمَد فقط (تصحيح #7) — غير المعتمَد لا يُعدّ نتيجة نهائيّة.
         var priorScore = await _db.KpiEvaluations.AsNoTracking()
             .Where(x => x.SubjectUserId == e.SubjectUserId
                         && x.Id != e.Id
                         && string.Compare(x.PeriodKey, e.PeriodKey) < 0
                         && x.TotalScore != null
-                        && (x.Status == KpiEvaluationStatus.Submitted
-                            || x.Status == KpiEvaluationStatus.Approved
-                            || x.Status == KpiEvaluationStatus.Closed))
+                        && x.Status == KpiEvaluationStatus.Approved)
             .Join(_db.KpiTemplateVersions, x => x.KpiTemplateVersionId, v => v.Id, (x, v) => new { x, v.KpiTemplateId })
             .Where(j => j.KpiTemplateId == templateId)
             .OrderByDescending(j => j.x.PeriodKey)
@@ -630,7 +979,8 @@ public class KpiEvaluationService : IKpiEvaluationService
 
     private async Task<KpiEvaluationDto> BuildDtoAsync(Guid id, CancellationToken ct)
     {
-        var e = await _db.KpiEvaluations.AsNoTracking().Include(x => x.Results)
+        // نتجاوز Global Query Filter كي يعمل بناء الـDTO حتى بعد الحذف الإداريّ الناعم (لشاشة الحوكمة/تأكيد الحذف).
+        var e = await _db.KpiEvaluations.IgnoreQueryFilters().AsNoTracking().Include(x => x.Results)
             .FirstAsync(x => x.Id == id, ct);
 
         var version = await _db.KpiTemplateVersions
@@ -651,17 +1001,34 @@ public class KpiEvaluationService : IKpiEvaluationService
 
         var ids = new List<Guid> { e.SubjectUserId };
         if (e.EvaluatorId is Guid ev) ids.Add(ev);
+        if (e.ReviewerId is Guid rv) ids.Add(rv);
         var names = await UserNamesAsync(ids, ct);
 
-        var canEdit = (e.Status is KpiEvaluationStatus.Draft or KpiEvaluationStatus.InProgress)
+        // التعديل متاح قبل الإرسال أو بعد طلب تعديل (NeedsRevision) لصاحب الإدخال أو الأدمن.
+        var canEdit = (e.Status is KpiEvaluationStatus.Draft or KpiEvaluationStatus.InProgress or KpiEvaluationStatus.NeedsRevision)
                       && (_currentUser.UserId == e.EvaluatorId || _currentUser.IsInRole(Roles.Admin));
         var isBelowTarget = e.TotalScore is decimal s && s < AlertThreshold;
+
+        // القدرات السياقيّة (لإظهار/إخفاء أزرار الواجهة؛ الفرض النهائيّ خادميّ في كل دالّة).
+        var uid = _currentUser.UserId;
+        var isElevated = _currentUser.IsInAnyRole(Roles.AdminReportKpiDeleters); // Admin/CEO/GM
+        var reviewable = e.Status is KpiEvaluationStatus.UnderReview or KpiEvaluationStatus.Submitted;
+        var canReview = reviewable && _currentUser.IsInAnyRole(Roles.KpiReviewers)
+                        && uid != e.SubjectUserId && uid != e.EvaluatorId
+                        && (isElevated || e.ReviewerId == uid);
+        var canFlag = _currentUser.IsInAnyRole(Roles.KpiReviewFlaggers);
+        var canAdminDelete = isElevated && !e.IsDeleted;
+        var canReopen = isElevated && e.Status is KpiEvaluationStatus.Approved
+                        or KpiEvaluationStatus.Rejected or KpiEvaluationStatus.NeedsRevision;
 
         return new KpiEvaluationDto(e.Id, e.KpiTemplateVersionId, version.Title, version.Cadence,
             e.SubjectUserId, names.GetValueOrDefault(e.SubjectUserId, string.Empty),
             e.EvaluatorId, e.EvaluatorId is Guid evx ? names.GetValueOrDefault(evx) : null,
             e.TeamId, e.DepartmentId, e.PeriodType, e.PeriodKey, e.Status, e.TotalScore, e.Trend,
-            isBelowTarget, e.SubmittedAtUtc, canEdit, resultDtos);
+            isBelowTarget, e.SubmittedAtUtc, canEdit, resultDtos,
+            e.ReviewerId, e.ReviewerId is Guid rvx ? names.GetValueOrDefault(rvx) : null,
+            e.ReviewedAtUtc, e.ReviewNote,
+            canReview, canFlag, canAdminDelete, canReopen);
     }
 
     private async Task<Dictionary<Guid, string>> UserNamesAsync(IEnumerable<Guid> ids, CancellationToken ct)

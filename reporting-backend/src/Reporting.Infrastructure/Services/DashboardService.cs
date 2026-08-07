@@ -60,8 +60,11 @@ public class DashboardService : IDashboardService
         var needsAction = subs.Count(s =>
             s == SubmissionStatus.Draft || s == SubmissionStatus.Returned || s == SubmissionStatus.Escalated);
 
+        // ADMIN-GOVERNANCE-R1: لا يدخل التقييم النتائج النهائية إلا إذا كان معتمَدًا (Approved).
+        // المحذوف إداريًّا (IsDeleted) مستبعَد تلقائيًّا عبر الفلتر العالميّ.
         var kpiAvg = await _db.KpiEvaluations
-            .Where(e => scopeIds.Contains(e.SubjectUserId) && e.PeriodKey == key && e.TotalScore != null)
+            .Where(e => scopeIds.Contains(e.SubjectUserId) && e.PeriodKey == key
+                        && e.TotalScore != null && e.Status == KpiEvaluationStatus.Approved)
             .Select(e => e.TotalScore!.Value)
             .ToListAsync(ct);
         decimal? kpiAverage = kpiAvg.Count > 0 ? Math.Round(kpiAvg.Average(), 1) : null;
@@ -77,7 +80,8 @@ public class DashboardService : IDashboardService
 
         // ودجة اتجاه KPI: متوسط الدرجة لكل فترة (آخر 8 فترات) ضمن النطاق.
         var trend = await _db.KpiEvaluations
-            .Where(e => scopeIds.Contains(e.SubjectUserId) && e.TotalScore != null)
+            .Where(e => scopeIds.Contains(e.SubjectUserId) && e.TotalScore != null
+                        && e.Status == KpiEvaluationStatus.Approved)
             .GroupBy(e => e.PeriodKey)
             .Select(g => new { PeriodKey = g.Key, Avg = g.Average(x => x.TotalScore!.Value) })
             .OrderByDescending(x => x.PeriodKey)
@@ -135,7 +139,8 @@ public class DashboardService : IDashboardService
         if (subject is null) return Result<KpiTrendDto>.Failure("المستخدم غير موجود.", "user.not_found");
 
         var points = await _db.KpiEvaluations
-            .Where(e => e.SubjectUserId == target && e.TotalScore != null)
+            .Where(e => e.SubjectUserId == target && e.TotalScore != null
+                        && e.Status == KpiEvaluationStatus.Approved)
             .GroupBy(e => e.PeriodKey)
             .Select(g => new { PeriodKey = g.Key, Avg = g.Average(x => x.TotalScore!.Value) })
             .OrderByDescending(x => x.PeriodKey)
@@ -165,9 +170,10 @@ public class DashboardService : IDashboardService
             .Select(u => new { u.Id, u.FullName })
             .ToListAsync(ct);
 
-        // متوسط KPI لكل عضو (كل الفترات) + اتجاه آخر فترتين.
+        // متوسط KPI لكل عضو (كل الفترات) + اتجاه آخر فترتين. معتمَد فقط (ADMIN-GOVERNANCE-R1).
         var kpis = await _db.KpiEvaluations
-            .Where(e => scopeIds.Contains(e.SubjectUserId) && e.TotalScore != null)
+            .Where(e => scopeIds.Contains(e.SubjectUserId) && e.TotalScore != null
+                        && e.Status == KpiEvaluationStatus.Approved)
             .Select(e => new { e.SubjectUserId, e.PeriodKey, Score = e.TotalScore!.Value })
             .ToListAsync(ct);
 
@@ -349,7 +355,8 @@ public class DashboardService : IDashboardService
             })
             .ToListAsync(ct);
 
-        var scored = kpiRows.Where(k => k.TotalScore != null).ToList();
+        // النتائج النهائية (آخر درجة/المتوسط) من المعتمَد فقط (ADMIN-GOVERNANCE-R1)؛ قائمة التقييمات أدناه تعرض كل الحالات مع شارتها.
+        var scored = kpiRows.Where(k => k.TotalScore != null && k.Status == KpiEvaluationStatus.Approved).ToList();
         decimal? lastKpiScore = scored.Count > 0 ? scored[0].TotalScore : null;
         string? lastKpiPeriod = scored.Count > 0 ? scored[0].PeriodKey : null;
         string lastKpiTrend = scored.Count > 0 ? scored[0].Trend.ToString() : "Unknown";

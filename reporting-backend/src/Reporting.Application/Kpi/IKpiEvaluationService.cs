@@ -34,4 +34,49 @@ public interface IKpiEvaluationService
     /// kpi.finance_exported (بلا أسماء/درجات). قراءة فقط، لا تغيّر أيّ تقييم.
     /// </summary>
     Task<Result<byte[]>> ExportFinanceCsvAsync(KpiFinanceExportFilter filter, CancellationToken ct = default);
+
+    // ── ADMIN-GOVERNANCE-R1: مسار مراجعة/اعتماد تقييمات KPI ──
+
+    /// <summary>
+    /// طلب مراجعة (NeedsRevision): يعيد التقييم من UnderReview إلى NeedsRevision مع سبب إلزاميّ،
+    /// يُنشئ حدث مراجعة + لقطة، يُخطر المُقيّم لإعادة الإدخال. لا يُغيّر الدرجة. صلاحية المراجع المختصّ.
+    /// </summary>
+    Task<Result<KpiEvaluationDto>> RequestRevisionAsync(Guid evaluationId, KpiReviewActionRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// رفض نهائيّ (Rejected): يعيد التقييم من UnderReview إلى Rejected مع سبب إلزاميّ،
+    /// يُنشئ حدث مراجعة + لقطة، يُخطر المُقيّم. صلاحية المراجع المختصّ. لا يدخل النتائج النهائية.
+    /// </summary>
+    Task<Result<KpiEvaluationDto>> RejectAsync(Guid evaluationId, KpiReviewActionRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// تعليق مراجعة (لا يُغيّر الحالة): يُنشئ حدث مراجعة Comment مع نصّ إلزاميّ + تدقيق. للمراجع أو HR (Flag).
+    /// </summary>
+    Task<Result<KpiEvaluationDto>> CommentAsync(Guid evaluationId, KpiReviewActionRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// تمييز للمراجعة (Flag) من HR: لا يُغيّر الحالة، يُنشئ حدث مراجعة Flag + يُخطر Admin/GM/CEO. لا يمنح HR اعتمادًا.
+    /// </summary>
+    Task<Result<KpiEvaluationDto>> FlagForReviewAsync(Guid evaluationId, KpiReviewActionRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// طلب إعادة فتح (Request Reopen) من HR: سبب إلزاميّ، لا يُغيّر الحالة، يُنشئ حدث مراجعة + تدقيق
+    /// ويُخطر Admin/GM/CEO. لا يمنح HR صلاحية إعادة الفتح الفعليّة.
+    /// </summary>
+    Task<Result<KpiEvaluationDto>> RequestReopenAsync(Guid evaluationId, KpiReviewActionRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// إعادة فتح للتعديل (Reopen): من Approved/Rejected/NeedsRevision إلى UnderReview بصلاحية Admin/CEO/GM،
+    /// سبب إلزاميّ، يُنشئ حدث مراجعة + لقطة + تدقيق. يعيد إسناد المراجع إن لزم.
+    /// </summary>
+    Task<Result<KpiEvaluationDto>> ReopenForRevisionAsync(Guid evaluationId, KpiReviewActionRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// حذف إداريّ ناعم لتقييم KPI (Admin/CEO/GM فقط): IsDeleted=true + سبب إلزاميّ + تدقيق + حدث مراجعة.
+    /// يُخرج التقييم من كل التجميعات (Global Query Filter). لا حذف فيزيائيّ.
+    /// </summary>
+    Task<Result<KpiEvaluationDto>> AdminDeleteAsync(Guid evaluationId, KpiReviewActionRequest request, CancellationToken ct = default);
+
+    /// <summary>سجلّ أحداث المراجعة لتقييم KPI (Timeline)، حسب صلاحية العرض.</summary>
+    Task<Result<IReadOnlyList<KpiEvaluationReviewEventDto>>> ListReviewEventsAsync(Guid evaluationId, CancellationToken ct = default);
 }
