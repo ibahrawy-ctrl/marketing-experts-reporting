@@ -530,9 +530,9 @@ public enum BalanceSource
 {
     /// <summary>رصيد افتتاحي يدوي لسنة محددة.</summary>
     OpeningBalance = 0,
-    /// <summary>خصم آلي عند اعتماد إجازة نهائيًّا (HrApproved).</summary>
+    /// <summary>خصم آلي عند اعتماد إجازة من قائد الفريق (LEAVE-DEDUCTION-ON-TL-APPROVAL-R1) — مرّة واحدة لكلّ طلب.</summary>
     ApprovedLeave = 1,
-    /// <summary>خصم آلي عند اعتماد إذن نهائيًّا (HrApproved).</summary>
+    /// <summary>خصم آلي عند اعتماد إذن من قائد الفريق (LEAVE-DEDUCTION-ON-TL-APPROVAL-R1) — مرّة واحدة لكلّ طلب.</summary>
     ApprovedPermission = 2,
     /// <summary>تعديل يدوي من الإدارة/HR (بسبب إلزامي + Audit).</summary>
     ManualAdjustment = 3,

@@ -321,20 +321,34 @@ public class LeaveWorkflowDeadlockHotfixTests
         Assert.Equal(LeaveRequestStatus.ManagerRejected, rejected.Status);
     }
 
-    // ===== 11) رفض HR بعد الطيّ ⇒ HrRejected بلا خصم. =====
+    // ===== 11) رفض HR بعد الطيّ ⇒ HrRejected، والرصيد يعود كما كان بلا أثر صافٍ. =====
+    // LEAVE-DEDUCTION-ON-TL-APPROVAL-R1: صار الخصم يقع عند اعتماد قائد الفريق (وهو ما يطوي خطوة المدير هنا)،
+    // ثمّ يستوجب رفضُ HR اللاحق عكسًا واحدًا. النتيجة الصافية أمام الموظّف لم تتغيّر (365) لكنّ السجلّ
+    // صار يوثّق الحركتين (خصم + عكس) بدل ألّا يوثّق شيئًا — وهذا هو المطلوب (السجلّ لا يُحذف منه).
     [Fact]
-    public async Task Deadlock_HrReject_AfterFold_NoDeduction()
+    public async Task Deadlock_HrReject_AfterFold_DebitReversed_NetZero()
     {
         var org = await BuildOrgAsync();
         var created = await OkAsync(await CreateLeaveAsync(org.Emp.C, new(2026, 11, 5), new(2026, 11, 7)));
         await OkAsync(await TlApproveAsync(org.TlMgr.C, created.Id));
 
+        // الخصم وقع فورًا عند اعتماد قائد الفريق (قبل رفض HR).
+        var mid = await LedgerAsync(org.Admin, org.Emp.Id);
+        Assert.Single(mid.Entries.Where(e =>
+            e.Source == BalanceSource.ApprovedLeave && e.Direction == BalanceDirection.Debit));
+        Assert.Equal(362, mid.AnnualLeave.Remaining);
+
         var rejected = await OkAsync(await HrRejectAsync(org.Gm.C, created.Id, "مرفوض نهائيًّا"));
         Assert.Equal(LeaveRequestStatus.HrRejected, rejected.Status);
 
         var ledger = await LedgerAsync(org.Admin, org.Emp.Id);
-        Assert.DoesNotContain(ledger.Entries, e => e.Source == BalanceSource.ApprovedLeave);
-        Assert.Equal(365, ledger.AnnualLeave.Remaining);
+        var debit = Assert.Single(ledger.Entries.Where(e =>
+            e.Source == BalanceSource.ApprovedLeave && e.Direction == BalanceDirection.Debit));
+        var reversal = Assert.Single(ledger.Entries.Where(e =>
+            e.Source == BalanceSource.Reversal && e.Direction == BalanceDirection.Credit
+            && e.RelatedRequestId == created.Id));
+        Assert.Equal(debit.Amount, reversal.Amount);
+        Assert.Equal(365, ledger.AnnualLeave.Remaining); // الأثر الصافي = صفر
     }
 
     // ===== 12) حارس اعتماد الذات صامد: مقدّم الطلب لا يعتمد طلبه (حتى لو كان قائد فريق/مدير). =====

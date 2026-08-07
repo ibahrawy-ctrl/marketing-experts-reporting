@@ -91,6 +91,7 @@ public static class DependencyInjection
         services.AddScoped<IGovernanceActionItemService, GovernanceActionItemService>();
         services.AddScoped<IManagementNoteService, ManagementNoteService>();
         services.AddScoped<ILeaveRequestService, LeaveRequestService>();
+        services.AddScoped<ILeaveBalanceLifecycleService, LeaveBalanceLifecycleService>();
         services.AddScoped<IBalanceService, BalanceService>();
         services.AddScoped<IEmployeeServiceRequestService, EmployeeServiceRequestService>();
         services.AddScoped<IDevelopmentService, DevelopmentService>();

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Reporting.Application.Audit;
 using Reporting.Application.Common;
 using Reporting.Application.Leave;
@@ -24,9 +25,11 @@ public class LeaveRequestService : ILeaveRequestService
     private readonly IAuditService _audit;
     private readonly INotificationService _notifications;
     private readonly IEmailNotificationService _emailNotifications;
+    private readonly ILeaveBalanceLifecycleService _balanceLifecycle;
 
     public LeaveRequestService(AppDbContext db, ICurrentUser currentUser, IScopeResolver scope,
-        IAuditService audit, INotificationService notifications, IEmailNotificationService emailNotifications)
+        IAuditService audit, INotificationService notifications, IEmailNotificationService emailNotifications,
+        ILeaveBalanceLifecycleService balanceLifecycle)
     {
         _db = db;
         _currentUser = currentUser;
@@ -34,6 +37,7 @@ public class LeaveRequestService : ILeaveRequestService
         _audit = audit;
         _notifications = notifications;
         _emailNotifications = emailNotifications;
+        _balanceLifecycle = balanceLifecycle;
     }
 
     /// <summary>مُعرّفات مستخدمي الموارد البشرية النشطين (Role="HR") — لإشعارات وصول الطلب لمرحلة HR.</summary>
@@ -566,7 +570,13 @@ public class LeaveRequestService : ILeaveRequestService
         entity.CancelledAtUtc = DateTime.UtcNow;
         entity.UpdatedAtUtc = DateTime.UtcNow;
         AddEvent(entity.Id, uid, "cancelled", LeaveRequestStep.Employee, from, LeaveRequestStatus.Cancelled, null);
-        await _db.SaveChangesAsync(ct);
+
+        // LEAVE-DEDUCTION-ON-TL-APPROVAL-R1 — الإلغاء بعد وقوع الخصم يستوجب عكسًا واحدًا في المعاملة ذاتها.
+        // إن أُلغي قبل أيّ اعتماد فلا خصم ⇒ NoDebitToReverse ⇒ صفر حركة. وإن سبق عكسٌ (إلغاء بعد إعادة
+        // للتعديل مثلًا) فالنتيجة AlreadyApplied ⇒ لا عكس ثانٍ.
+        await _balanceLifecycle.ReverseDebitAsync(entity, uid, "عكس خصم الرصيد لإلغاء الطلب من مقدّمه.", ct);
+
+        if (await SaveWithLedgerConcurrencyGuardAsync(ct) is { } conflict) return conflict;
         await _audit.LogAsync(uid, "leave_request.cancelled", nameof(LeaveRequest), entity.Id, ct: ct);
 
         return Result<LeaveRequestDto>.Success(await BuildAsync(entity, uid, ct));
@@ -631,7 +641,14 @@ public class LeaveRequestService : ILeaveRequestService
         entity.ReturnReason = request.Reason.Trim();
         entity.UpdatedAtUtc = DateTime.UtcNow;
         AddEvent(entity.Id, uid, "returned", step, from, LeaveRequestStatus.ReturnedForEdit, request.Reason.Trim());
-        await _db.SaveChangesAsync(ct);
+
+        // LEAVE-DEDUCTION-ON-TL-APPROVAL-R1 (القاعدة 8) — الإعادة للتعديل تُبطِل دورة الاعتماد: الطلب يخرج
+        // من مسار المراجعة إلى الموظّف ولا يملك النظام مسار إعادة تقديم لنفس السجلّ (مخرجه الوحيد الإلغاء)
+        // ⇒ ترك الخصم قائمًا يعني حجز رصيد لطلب لا يمكن أن يُعتمَد أبدًا. لذلك يُعكَس الخصم مرّة واحدة.
+        await _balanceLifecycle.ReverseDebitAsync(entity, uid,
+            "عكس خصم الرصيد لإعادة الطلب للتعديل (إبطال دورة الاعتماد).", ct);
+
+        if (await SaveWithLedgerConcurrencyGuardAsync(ct) is { } conflict) return conflict;
         await _audit.LogAsync(uid, "leave_request.returned", nameof(LeaveRequest), entity.Id, ct: ct);
         await _notifications.NotifyAsync(entity.RequesterUserId, "leave_request.returned",
             "أُعيد طلب الإجازة/الاستئذان للتعديل", request.Reason.Trim(), "/app/leave-requests", ct);
@@ -666,9 +683,9 @@ public class LeaveRequestService : ILeaveRequestService
         AddEvent(entity.Id, uid, "revoked", LeaveRequestStep.Completed, from, LeaveRequestStatus.Cancelled, request.Reason.Trim());
 
         // عكس الخصم الآلي بإضافة حركة Credit معاكسة (لا حذف للحركة الأصلية) — في نفس المعاملة، idempotent.
-        await ApplyRevocationReversalAsync(entity, uid, request.Reason.Trim(), ct);
+        await _balanceLifecycle.ReverseDebitAsync(entity, uid, request.Reason.Trim(), ct);
 
-        await _db.SaveChangesAsync(ct);
+        if (await SaveWithLedgerConcurrencyGuardAsync(ct) is { } conflict) return conflict;
         await _audit.LogAsync(uid, "leave_request.revoked", nameof(LeaveRequest), entity.Id,
             JsonSerializer.Serialize(new { leaveRequestId = entity.Id, entity.Type }), ct: ct);
         await _notifications.NotifyAsync(entity.RequesterUserId, "leave_request.revoked",
@@ -832,11 +849,28 @@ public class LeaveRequestService : ILeaveRequestService
             }
         }
 
-        // الخصم التلقائي من الرصيد عند الاعتماد النهائي — في نفس المعاملة، idempotent عبر (RelatedRequestId, Source).
-        if (toStatus == LeaveRequestStatus.HrApproved)
-            await ApplyApprovalDeductionAsync(entity, uid, ct);
+        // LEAVE-DEDUCTION-ON-TL-APPROVAL-R1 — الخصم يقع عند اعتماد قائد الفريق، والعكس عند رفض لاحق.
+        // يُستدعى الخصم عند **كلّ** انتقال اعتماد لا عند TeamLeaderApproved وحده: فالطلب قد يبدأ عند خطوة
+        // المدير أصلًا (تخطّي خطوة قائد الفريق في CreateAsync لغياب قائد فعليّ أو لكون المُنشئ هو القائد/HR)
+        // فيقع الخصم عندئذٍ عند أوّل اعتماد حقيقيّ. والاستدعاء idempotent عبر (RelatedRequestId, Source)
+        // فيصير بلا أثر عند اعتماد المدير أو الموارد البشرية لاحقًا ⇒ خصم واحد لكلّ طلب مهما تعدّدت الخطوات.
+        if (toStatus is LeaveRequestStatus.TeamLeaderApproved
+            or LeaveRequestStatus.ManagerApproved
+            or LeaveRequestStatus.HrApproved)
+        {
+            await _balanceLifecycle.ApplyDebitOnTeamLeaderApprovalAsync(entity, uid, ct);
+        }
+        // رفض لاحق بعد وقوع الخصم ⇒ عكس واحد يُعيد الرصيد مرّة واحدة. وإن لم يقع خصم (رفض قائد الفريق
+        // قبل أيّ اعتماد) فالنتيجة NoDebitToReverse ولا تُكتب أيّ حركة.
+        else if (toStatus is LeaveRequestStatus.TeamLeaderRejected
+            or LeaveRequestStatus.ManagerRejected
+            or LeaveRequestStatus.HrRejected)
+        {
+            await _balanceLifecycle.ReverseDebitAsync(entity, uid,
+                rejectionReason ?? "عكس خصم الرصيد لرفض الطلب بعد اعتماد سابق.", ct);
+        }
 
-        await _db.SaveChangesAsync(ct);
+        if (await SaveWithLedgerConcurrencyGuardAsync(ct) is { } conflict) return conflict;
         await _audit.LogAsync(uid, auditAction, nameof(LeaveRequest), entity.Id, ct: ct);
 
         // إشعار صاحب الطلب بكل قرار. نعتمد الحالة الفعليّة للطلب (entity.Status) لا toStatus كي
@@ -1002,80 +1036,36 @@ public class LeaveRequestService : ILeaveRequestService
         });
     }
 
-    // ===== الخصم/العكس الآلي للرصيد (V1.1) =====
+    // ===== الخصم/العكس الآلي للرصيد =====
+    // نُقل المنطق كاملًا إلى ILeaveBalanceLifecycleService (LEAVE-DEDUCTION-ON-TL-APPROVAL-R1):
+    // مسؤوليّة واحدة، والخصم صار عند اعتماد قائد الفريق لا عند الاعتماد النهائي.
 
     /// <summary>
-    /// يسجّل حركة خصم (Debit) عند الاعتماد النهائي: الإجازة = عدد الأيام على رصيد الإجازات؛
-    /// الاستئذان = وحدة السياسة (افتراضيًّا Count=1) على رصيد الأذونات. idempotent عبر (RelatedRequestId, Source).
-    /// السنة من تاريخ بداية الطلب. لا يرمي عند الرصيد السالب (مسموح بتحذير).
+    /// يحفظ المعاملة ويترجم انتهاك الفهرس الفريد الجزئيّ (RelatedRequestId, Source) في دفتر الأرصدة
+    /// — الناتج عن سباق تزامنيّ بين معاملتين تحاولان كتابة الحركة نفسها — إلى فشل عمليّ نظيف
+    /// بدل خطأ 500. القاعدة تضمن حركةً واحدة على الأكثر لكلّ (طلب، مصدر)، والمعاملة الخاسرة تُلغى
+    /// كاملةً ⇒ لا حالة جزئيّة ولا خصم مزدوج ولا رصيد سالب من تكرار تقنيّ.
+    /// تُرجِع null عند النجاح، أو نتيجة فشل جاهزة عند السباق.
     /// </summary>
-    private async Task ApplyApprovalDeductionAsync(LeaveRequest entity, Guid actor, CancellationToken ct)
+    private async Task<Result<LeaveRequestDto>?> SaveWithLedgerConcurrencyGuardAsync(CancellationToken ct)
     {
-        var (balanceType, source) = entity.Type == LeaveRequestType.Leave
-            ? (BalanceType.AnnualLeave, BalanceSource.ApprovedLeave)
-            : (BalanceType.Permission, BalanceSource.ApprovedPermission);
-
-        var exists = await _db.EmployeeBalanceLedger
-            .AnyAsync(e => e.RelatedRequestId == entity.Id && e.Source == source, ct);
-        if (exists) return; // idempotent — لا تكرار للخصم لنفس الطلب
-
-        decimal amount;
-        if (entity.Type == LeaveRequestType.Leave)
+        try
         {
-            amount = (entity.EndDate.DayNumber - entity.StartDate.DayNumber) + 1; // أيام شاملة
+            await _db.SaveChangesAsync(ct);
+            return null;
         }
-        else
+        catch (DbUpdateException ex) when (IsLedgerDuplicateViolation(ex))
         {
-            var jobRoleId = await _db.Users.Where(u => u.Id == entity.RequesterUserId)
-                .Select(u => u.JobRoleId).FirstOrDefaultAsync(ct);
-            var policy = await ResolvePolicyAsync(entity.StartDate.Year, jobRoleId, ct);
-            // الوحدة الافتراضية Count = إذن واحد. (الساعات مدعومة في السياسة لكنها ليست وحدة V1.1 الافتراضية.)
-            amount = 1;
-            _ = policy; // السياسة تُحلّ للحدود/الوحدة مستقبلًا؛ V1.1 تعتمد Count=1.
+            return Result<LeaveRequestDto>.Failure(
+                "تعذّر إتمام العملية لتزامن قرار آخر على الطلب نفسه. أعد المحاولة.",
+                "leave_request.concurrent_decision.conflict");
         }
-
-        _db.EmployeeBalanceLedger.Add(new EmployeeBalanceLedger
-        {
-            EmployeeId = entity.RequesterUserId,
-            BalanceType = balanceType,
-            Amount = amount,
-            Direction = BalanceDirection.Debit,
-            Source = source,
-            RelatedRequestId = entity.Id,
-            Year = entity.StartDate.Year,
-            CreatedBy = actor
-        });
     }
 
-    /// <summary>
-    /// يعكس الخصم الآلي بحركة Credit معاكسة (Source=Reversal) مطابِقة في المقدار والنوع والسنة، دون حذف الأصلية.
-    /// idempotent عبر (RelatedRequestId, Reversal). إن لم يوجد خصم أصلي لا يفعل شيئًا.
-    /// </summary>
-    private async Task ApplyRevocationReversalAsync(LeaveRequest entity, Guid actor, string reason, CancellationToken ct)
-    {
-        var alreadyReversed = await _db.EmployeeBalanceLedger
-            .AnyAsync(e => e.RelatedRequestId == entity.Id && e.Source == BalanceSource.Reversal, ct);
-        if (alreadyReversed) return; // idempotent — عكس واحد لكل طلب
-
-        var original = await _db.EmployeeBalanceLedger
-            .Where(e => e.RelatedRequestId == entity.Id && e.Direction == BalanceDirection.Debit
-                && (e.Source == BalanceSource.ApprovedLeave || e.Source == BalanceSource.ApprovedPermission))
-            .FirstOrDefaultAsync(ct);
-        if (original is null) return; // لا خصم لعكسه
-
-        _db.EmployeeBalanceLedger.Add(new EmployeeBalanceLedger
-        {
-            EmployeeId = original.EmployeeId,
-            BalanceType = original.BalanceType,
-            Amount = original.Amount,
-            Direction = BalanceDirection.Credit,
-            Source = BalanceSource.Reversal,
-            RelatedRequestId = entity.Id,
-            Year = original.Year,
-            Notes = reason,
-            CreatedBy = actor
-        });
-    }
+    /// <summary>يميّز انتهاك التفرّد (SQLSTATE 23505) على فهرس دفتر الأرصدة عن أيّ فشل حفظ آخر.</summary>
+    private static bool IsLedgerDuplicateViolation(DbUpdateException ex)
+        => ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } pg
+            && (pg.TableName == "employee_balance_ledger" || pg.ConstraintName?.Contains("employee_balance_ledger") == true);
 
     private async Task<BalancePolicy?> ResolvePolicyAsync(int year, Guid? jobRoleId, CancellationToken ct)
     {
