@@ -123,7 +123,7 @@ export default function ProjectDetailPage() {
             <Info label="العميل" value={p.clientName ?? '—'} />
             <Info label="نوع الخدمة" value={serviceTypeLabel[p.serviceType]} />
             <Info label="الفريق المسؤول" value={p.ownerTeamName ?? '—'} />
-            <Info label="مدير الحساب" value={p.accountManagerName ?? '—'} />
+            <Info label="مدير العميل" value={p.accountManagerName ?? '—'} />
             <Info label="تاريخ البداية" value={formatDate(p.startDate)} />
             <Info label="تاريخ النهاية" value={formatDate(p.endDate)} />
             <Info label="تاريخ الإضافة" value={formatDate(p.createdAtUtc)} />
@@ -1046,7 +1046,7 @@ function EditProjectForm({
             ))}
           </Select>
         </Field>
-        <Field label="مدير الحساب">
+        <Field label="مدير العميل">
           <Select value={accountManagerId} onChange={(e) => setAccountManagerId(e.target.value)}>
             <option value="">— بدون —</option>
             {(users.data ?? []).map((u) => (

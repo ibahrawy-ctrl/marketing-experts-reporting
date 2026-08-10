@@ -71,6 +71,10 @@ import {
   documentLifecycleTone,
   documentScanStatusLabel,
   documentScanStatusTone,
+  documentVisibilityLabel,
+  DOCUMENT_VISIBILITY_TYPES,
+  defaultVisibilityForCategory,
+  roleLabel,
   formatBytes,
 } from '../lib/format';
 import { apiErrorMessage } from '../lib/api';
@@ -92,6 +96,8 @@ import type {
   ClientExternalLinkDto,
   CreateClientExternalLinkRequest,
   DocumentLifecycleStatus,
+  DocumentVisibilityType,
+  Role,
 } from '../types/api';
 
 const SERVICE_TYPES: ServiceType[] = ['Social', 'Seo', 'MediaBuying', 'Website', 'Video', 'Branding', 'Other'];
@@ -235,7 +241,7 @@ function OverviewTab({ client: c, canEdit }: { client: ClientDto; canEdit: boole
           }
         />
         <Info label="بداية العلاقة" value={formatDate(c.relationshipStartDate)} />
-        <Info label="مدير الحساب" value={c.accountManagerName ?? '—'} />
+        <Info label="مدير العميل" value={c.accountManagerName ?? '—'} />
         <Info label="تاريخ الإضافة" value={formatDate(c.createdAtUtc)} />
         <Info label="جهة الاتصال الرئيسية" value={c.mainContactName ?? '—'} />
         <Info label="بيانات الاتصال" value={c.mainContactInfo ?? '—'} />
@@ -1130,7 +1136,7 @@ function EditClientForm({ client, onDone }: { client: ClientDto; onDone: () => v
             ))}
           </Select>
         </Field>
-        <Field label="مدير الحساب">
+        <Field label="مدير العميل">
           <Select value={accountManagerId} onChange={(e) => setAccountManagerId(e.target.value)}>
             <option value="">— بدون —</option>
             {(users.data ?? []).map((u) => (
@@ -1257,7 +1263,7 @@ function CreateProjectForm({ clientId, onDone }: { clientId: string; onDone: () 
             ))}
           </Select>
         </Field>
-        <Field label="مدير الحساب">
+        <Field label="مدير العميل">
           <Select value={accountManagerId} onChange={(e) => setAccountManagerId(e.target.value)}>
             <option value="">— بدون —</option>
             {(users.data ?? []).map((u) => (
@@ -1478,6 +1484,7 @@ function DocumentRow({
               {documentScanStatusLabel[d.currentScanStatus]}
             </Badge>
           )}
+          <Badge tone="muted">{documentVisibilityLabel[d.visibilityType]}</Badge>
           {d.isArchived && <Badge tone="muted">مؤرشف</Badge>}
         </div>
         <div className="flex flex-wrap gap-2">
@@ -1526,6 +1533,16 @@ function DocumentRow({
         <Info label="تاريخ الإضافة" value={formatDate(d.createdAtUtc)} />
         {d.tags && <Info label="الوسوم" value={d.tags} />}
         {d.isArchived && d.archiveReason && <Info label="سبب الأرشفة" value={d.archiveReason} />}
+        {/* قائمتا التصريح لا تُعرَضان إلّا لمن يملك صلاحيّة إدارة رؤية المستندات (§12). */}
+        {d.canManageVisibility && (d.allowedRoles?.length ?? 0) > 0 && (
+          <Info
+            label="الأدوار المصرّح لها"
+            value={d.allowedRoles!.map((r) => roleLabel[r as Role] ?? r).join('، ')}
+          />
+        )}
+        {d.canManageVisibility && (d.allowedUserIds?.length ?? 0) > 0 && (
+          <AllowedUsersInfo userIds={d.allowedUserIds!} />
+        )}
       </dl>
       {d.description && <p className="mt-2 text-xs text-ink-2">{d.description}</p>}
 
@@ -1576,6 +1593,163 @@ function DocumentRow({
   );
 }
 
+// ===== محرّر سياسة رؤية المستند (CPW-R2) =====
+// الخادم هو الفاصل الوحيد في التطبيق؛ ما هنا اختيارٌ وعرضٌ فقط.
+// مجموعات الأدوار مرآةٌ لـ DocumentVisibilityPolicy في الخادم — تُستعمل حصرًا لتحذير «قد لا ترى المستند».
+const VISIBILITY_MANAGEMENT_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'Manager'];
+const VISIBILITY_FINANCE_ROLES: Role[] = ['FinanceManager', 'Accountant'];
+const VISIBILITY_HR_MANAGEMENT_ROLES: Role[] = ['HR', 'Admin', 'CEO', 'GeneralManager'];
+const ALL_ROLE_CODES = Object.keys(roleLabel) as Role[];
+
+/// هل يبقى صاحبُ الأدوار المعطاة قادرًا على رؤية مستندٍ بهذه السياسة؟
+/// `null` = غير محسوم في الواجهة (يعتمد على نطاق العميل/المشروع في الخادم) ⇒ لا تحذير.
+function visibilitySelfAccess(
+  type: DocumentVisibilityType,
+  myRoles: Role[],
+  myUserId: string | undefined,
+  allowedRoles: string[],
+  allowedUserIds: string[],
+): boolean | null {
+  const any = (set: Role[]) => myRoles.some((r) => set.includes(r));
+  switch (type) {
+    case 'ManagementOnly':
+      return any(VISIBILITY_MANAGEMENT_ROLES);
+    case 'ManagementAndFinance':
+      return any(VISIBILITY_MANAGEMENT_ROLES) || any(VISIBILITY_FINANCE_ROLES);
+    case 'FinanceOnly':
+      return any(VISIBILITY_FINANCE_ROLES);
+    case 'HRManagementOnly':
+      return any(VISIBILITY_HR_MANAGEMENT_ROLES);
+    case 'CustomRoles':
+      return allowedRoles.length === 0 ? null : myRoles.some((r) => allowedRoles.includes(r));
+    case 'CustomUsers':
+      return allowedUserIds.length === 0 ? null : !!myUserId && allowedUserIds.includes(myUserId);
+    default:
+      // ClientScoped / ProjectTeam — يعتمدان على نطاق العميل أو المشروع، ولا يُحسمان هنا.
+      return null;
+  }
+}
+
+function DocumentVisibilityEditor({
+  visibilityType,
+  allowedRoles,
+  allowedUserIds,
+  onVisibilityTypeChange,
+  onAllowedRolesChange,
+  onAllowedUserIdsChange,
+}: {
+  visibilityType: DocumentVisibilityType;
+  allowedRoles: string[];
+  allowedUserIds: string[];
+  onVisibilityTypeChange: (v: DocumentVisibilityType) => void;
+  onAllowedRolesChange: (v: string[]) => void;
+  onAllowedUserIdsChange: (v: string[]) => void;
+}) {
+  const { user } = useAuth();
+  const users = useDirectoryUsers();
+  const selfAccess = visibilitySelfAccess(
+    visibilityType,
+    user?.roles ?? [],
+    user?.userId,
+    allowedRoles,
+    allowedUserIds,
+  );
+
+  function toggle(list: string[], value: string, apply: (v: string[]) => void) {
+    apply(list.includes(value) ? list.filter((x) => x !== value) : [...list, value]);
+  }
+
+  return (
+    <div className="md:col-span-2 rounded-lg border border-line bg-white p-3">
+      <h4 className="font-semibold text-navy">من يمكنه رؤية هذا المستند؟</h4>
+      <p className="mt-1 text-xs text-ink-2">
+        الرؤية والتنزيل مرتبطان — من لا يستطيع رؤية المستند لا يستطيع تنزيله.
+      </p>
+      <div className="mt-3 grid gap-4 md:grid-cols-2">
+        <Field label="سياسة الرؤية">
+          <Select
+            value={visibilityType}
+            onChange={(e) => onVisibilityTypeChange(e.target.value as DocumentVisibilityType)}
+          >
+            {DOCUMENT_VISIBILITY_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {documentVisibilityLabel[t]}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      </div>
+
+      {visibilityType === 'CustomRoles' && (
+        <div className="mt-3">
+          <p className="text-xs font-semibold text-navy">الأدوار المصرّح لها</p>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
+            {ALL_ROLE_CODES.map((r) => (
+              <label key={r} className="flex items-center gap-1.5 text-xs text-ink-2">
+                <input
+                  type="checkbox"
+                  checked={allowedRoles.includes(r)}
+                  onChange={() => toggle(allowedRoles, r, onAllowedRolesChange)}
+                />
+                {roleLabel[r]}
+              </label>
+            ))}
+          </div>
+          {allowedRoles.length === 0 && (
+            <p className="mt-2 text-xs text-red-700">اختر دورًا واحدًا على الأقلّ.</p>
+          )}
+        </div>
+      )}
+
+      {visibilityType === 'CustomUsers' && (
+        <div className="mt-3">
+          <p className="text-xs font-semibold text-navy">الأشخاص المصرّح لهم</p>
+          {users.isLoading ? (
+            <LoadingState label="يتم تحميل قائمة المستخدمين…" />
+          ) : (
+            <div className="mt-2 max-h-48 overflow-y-auto rounded-lg border border-line p-2">
+              {(users.data ?? []).map((u) => (
+                <label key={u.id} className="flex items-center gap-1.5 py-0.5 text-xs text-ink-2">
+                  <input
+                    type="checkbox"
+                    checked={allowedUserIds.includes(u.id)}
+                    onChange={() => toggle(allowedUserIds, u.id, onAllowedUserIdsChange)}
+                  />
+                  {u.fullName}
+                </label>
+              ))}
+            </div>
+          )}
+          {allowedUserIds.length === 0 && (
+            <p className="mt-2 text-xs text-red-700">اختر شخصًا واحدًا على الأقلّ.</p>
+          )}
+        </div>
+      )}
+
+      {selfAccess === false && (
+        <div className="mt-3">
+          <Alert tone="gold">
+            تنبيه: السياسة المختارة لا تشمل حسابك — قد لا تتمكّن من رؤية هذا المستند أو تنزيله بعد الحفظ.
+          </Alert>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/// يحوّل معرّفات المستخدمين المصرّح لهم إلى أسماء — لا تُعرَض المعرّفات الخام.
+/// يُركَّب فقط لمن يملك صلاحيّة إدارة الرؤية، فلا يُجلَب الدليل لغيرهم.
+function AllowedUsersInfo({ userIds }: { userIds: string[] }) {
+  const users = useDirectoryUsers();
+  const byId = new Map((users.data ?? []).map((u) => [u.id, u.fullName]));
+  return (
+    <Info
+      label="الأشخاص المصرّح لهم"
+      value={users.isLoading ? '…' : userIds.map((id) => byId.get(id) ?? id).join('، ')}
+    />
+  );
+}
+
 function UploadDocumentForm({
   clientId,
   maxUploadSizeBytes,
@@ -1590,12 +1764,25 @@ function UploadDocumentForm({
   const upload = useUploadClientDocument(clientId);
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
-  const [categoryCode, setCategoryCode] = useState(DOCUMENT_CATEGORY_CODES[0] ?? '');
+  const initialCategory = DOCUMENT_CATEGORY_CODES[0] ?? '';
+  const [categoryCode, setCategoryCode] = useState(initialCategory);
   const [confidentialityCode, setConfidentialityCode] = useState('');
   const [description, setDescription] = useState('');
   const [tags, setTags] = useState('');
   const [changeNote, setChangeNote] = useState('');
   const [err, setErr] = useState<string | null>(null);
+  // سياسة الرؤية (CPW-R2): تتبع افتراضيّ التصنيف حتّى يختار المستخدم سياسةً يدويًّا، فلا تُداس بعدها.
+  const [visibilityType, setVisibilityType] = useState<DocumentVisibilityType>(
+    defaultVisibilityForCategory(initialCategory),
+  );
+  const [visibilityTouched, setVisibilityTouched] = useState(false);
+  const [allowedRoles, setAllowedRoles] = useState<string[]>([]);
+  const [allowedUserIds, setAllowedUserIds] = useState<string[]>([]);
+
+  function changeCategory(code: string) {
+    setCategoryCode(code);
+    if (!visibilityTouched) setVisibilityType(defaultVisibilityForCategory(code));
+  }
 
   async function submit() {
     setErr(null);
@@ -1611,6 +1798,14 @@ function UploadDocumentForm({
       setErr(`حجم الملفّ يتجاوز الحدّ المسموح (${formatBytes(maxUploadSizeBytes)}).`);
       return;
     }
+    if (visibilityType === 'CustomRoles' && allowedRoles.length === 0) {
+      setErr('سياسة «أدوار مخصصة» تتطلّب اختيار دور واحد على الأقلّ.');
+      return;
+    }
+    if (visibilityType === 'CustomUsers' && allowedUserIds.length === 0) {
+      setErr('سياسة «أشخاص محددون» تتطلّب اختيار شخص واحد على الأقلّ.');
+      return;
+    }
     try {
       await upload.mutateAsync({
         file,
@@ -1620,6 +1815,9 @@ function UploadDocumentForm({
         description: description.trim() || undefined,
         tags: tags.trim() || undefined,
         changeNote: changeNote.trim() || undefined,
+        visibilityType,
+        allowedRoles: visibilityType === 'CustomRoles' ? allowedRoles : undefined,
+        allowedUserIds: visibilityType === 'CustomUsers' ? allowedUserIds : undefined,
       });
       onDone();
     } catch (e) {
@@ -1653,7 +1851,7 @@ function UploadDocumentForm({
           <Input value={title} onChange={(e) => setTitle(e.target.value)} />
         </Field>
         <Field label="التصنيف">
-          <Select value={categoryCode} onChange={(e) => setCategoryCode(e.target.value)}>
+          <Select value={categoryCode} onChange={(e) => changeCategory(e.target.value)}>
             {DOCUMENT_CATEGORY_CODES.map((code) => (
               <option key={code} value={code}>
                 {documentCategoryLabel[code]}
@@ -1682,6 +1880,17 @@ function UploadDocumentForm({
             <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
           </Field>
         </div>
+        <DocumentVisibilityEditor
+          visibilityType={visibilityType}
+          allowedRoles={allowedRoles}
+          allowedUserIds={allowedUserIds}
+          onVisibilityTypeChange={(v) => {
+            setVisibilityTouched(true);
+            setVisibilityType(v);
+          }}
+          onAllowedRolesChange={setAllowedRoles}
+          onAllowedUserIdsChange={setAllowedUserIds}
+        />
       </div>
       <div className="mt-3 flex gap-2">
         <Button variant="primary" onClick={submit} disabled={upload.isPending}>
@@ -1773,11 +1982,23 @@ function EditDocumentForm({
   const [description, setDescription] = useState(d.description ?? '');
   const [tags, setTags] = useState(d.tags ?? '');
   const [err, setErr] = useState<string | null>(null);
+  // في التعديل لا يُطبَّق افتراضيّ التصنيف إطلاقًا — تبقى السياسة القائمة حتّى يغيّرها المستخدم صراحةً.
+  const [visibilityType, setVisibilityType] = useState<DocumentVisibilityType>(d.visibilityType);
+  const [allowedRoles, setAllowedRoles] = useState<string[]>(d.allowedRoles ?? []);
+  const [allowedUserIds, setAllowedUserIds] = useState<string[]>(d.allowedUserIds ?? []);
 
   async function submit() {
     setErr(null);
     if (!title.trim()) {
       setErr('عنوان المستند مطلوب.');
+      return;
+    }
+    if (d.canManageVisibility && visibilityType === 'CustomRoles' && allowedRoles.length === 0) {
+      setErr('سياسة «أدوار مخصصة» تتطلّب اختيار دور واحد على الأقلّ.');
+      return;
+    }
+    if (d.canManageVisibility && visibilityType === 'CustomUsers' && allowedUserIds.length === 0) {
+      setErr('سياسة «أشخاص محددون» تتطلّب اختيار شخص واحد على الأقلّ.');
       return;
     }
     try {
@@ -1790,6 +2011,14 @@ function EditDocumentForm({
           lifecycleStatus,
           description: description.trim() || null,
           tags: tags.trim() || null,
+          // من لا يملك صلاحيّة إدارة الرؤية لا يُرسِل السياسة إطلاقًا ⇒ تبقى كما هي على الخادم.
+          ...(d.canManageVisibility
+            ? {
+                visibilityType,
+                allowedRoles: visibilityType === 'CustomRoles' ? allowedRoles : null,
+                allowedUserIds: visibilityType === 'CustomUsers' ? allowedUserIds : null,
+              }
+            : {}),
         },
       });
       onDone();
@@ -1850,6 +2079,16 @@ function EditDocumentForm({
             <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
           </Field>
         </div>
+        {d.canManageVisibility && (
+          <DocumentVisibilityEditor
+            visibilityType={visibilityType}
+            allowedRoles={allowedRoles}
+            allowedUserIds={allowedUserIds}
+            onVisibilityTypeChange={setVisibilityType}
+            onAllowedRolesChange={setAllowedRoles}
+            onAllowedUserIdsChange={setAllowedUserIds}
+          />
+        )}
       </div>
       <div className="mt-3 flex gap-2">
         <Button variant="primary" onClick={submit} disabled={update.isPending}>

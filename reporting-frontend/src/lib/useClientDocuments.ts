@@ -9,6 +9,7 @@ import type {
   ClientStorageUsageDto,
   CreateClientExternalLinkRequest,
   DeleteClientDocumentRequest,
+  DocumentVisibilityType,
   UpdateClientDocumentRequest,
   UpdateClientExternalLinkRequest,
 } from '../types/api';
@@ -58,6 +59,10 @@ export interface UploadClientDocumentInput {
   tags?: string;
   confidentialityCode?: string;
   changeNote?: string;
+  // سياسة الرؤية (CPW-R2). عند الإغفال يطبّق الخادم افتراضيّ التصنيف.
+  visibilityType?: DocumentVisibilityType;
+  allowedRoles?: string[];
+  allowedUserIds?: string[];
 }
 
 function buildUploadForm(input: UploadClientDocumentInput): FormData {
@@ -69,6 +74,10 @@ function buildUploadForm(input: UploadClientDocumentInput): FormData {
   if (input.tags) form.append('Tags', input.tags);
   if (input.confidentialityCode) form.append('ConfidentialityCode', input.confidentialityCode);
   if (input.changeNote) form.append('ChangeNote', input.changeNote);
+  if (input.visibilityType) form.append('VisibilityType', input.visibilityType);
+  // ربط القوائم في multipart يتمّ بتكرار المفتاح نفسه (List<string>/List<Guid>).
+  for (const role of input.allowedRoles ?? []) form.append('AllowedRoles', role);
+  for (const uid of input.allowedUserIds ?? []) form.append('AllowedUserIds', uid);
   return form;
 }
 

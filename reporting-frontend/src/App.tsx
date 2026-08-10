@@ -87,6 +87,10 @@ const PAYROLL_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'HR', 'CeoSuppo
 const KPI_FINANCE_EXPORT_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'HR', 'CeoSupport', 'FinanceManager', 'Accountant'];
 // محفظة مدير الحساب (ACCOUNT-MANAGER-PORTFOLIO) — عرض فقط، تطابق سياسة AccountPortfolioRead بالخادم.
 const ACCOUNT_PORTFOLIO_ROLES: Role[] = ['AccountPortfolioReader', 'Admin'];
+// ملفّ العميل الشامل Client 360 (CPW-R2) — نفس أدوار التنفيذ زائد مدير العميل (AccountPortfolioReader).
+// لا يُوسَّع EXEC_ROLES نفسه كي لا تُفتَح بقيّة الشاشات التنفيذيّة. الرؤية والتحرير مفروضان خادميًّا:
+// القراءة عبر Client.AccountManagerId، والتحرير الأساسيّ يبقى محصورًا بسياسة ClientCoreManagers.
+const CLIENT_360_ROLES: Role[] = [...EXEC_ROLES, 'AccountPortfolioReader'];
 // ورشة الحوكمة العامة (GOV-GOVERNANCE-UX1) — تطابق سياسة GovernanceWorkspaceAccess بالخادم؛ الرؤية مقيّدة داخليًّا حسب الدور.
 const GOVERNANCE_WORKSPACE_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'CeoSupport', 'Manager', 'TeamLeader', 'HR'];
 // التصعيد الفردي (GOV-INDIVIDUAL-ESCALATION1) — تطابق سياسة GovernanceEscalationAccess بالخادم؛ الفرز (واسع/نطاق/HR/موظف) مفروض داخليًّا.
@@ -147,8 +151,8 @@ const APP_ROUTES: { path: string; element: ReactNode; roles?: Role[] }[] = [
   { path: '/app/teams', element: <TeamsPage />, roles: EXEC_ROLES },
   { path: '/app/teams/:teamId', element: <TeamDetailsPage />, roles: EXEC_ROLES },
   // العملاء والمشاريع: متاح لمستوى الإدارة — النطاق ومستوى الرؤية مفروضان خادمًا.
-  { path: '/app/clients', element: <ClientsPage />, roles: EXEC_ROLES },
-  { path: '/app/clients/:clientId', element: <ClientDetailPage />, roles: EXEC_ROLES },
+  { path: '/app/clients', element: <ClientsPage />, roles: CLIENT_360_ROLES },
+  { path: '/app/clients/:clientId', element: <ClientDetailPage />, roles: CLIENT_360_ROLES },
   { path: '/app/projects', element: <ProjectsPage />, roles: EXEC_ROLES },
   { path: '/app/projects/:projectId', element: <ProjectDetailPage />, roles: EXEC_ROLES },
   // محفظة مدير الحساب (مشاريعي) — عرض فقط، النطاق مفروض خادمًا (Project.AccountManagerId == المستخدم).

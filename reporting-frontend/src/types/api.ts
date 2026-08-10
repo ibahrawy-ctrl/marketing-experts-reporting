@@ -1900,6 +1900,17 @@ export interface UpsertClientBrandProfileRequest {
 export type DocumentLifecycleStatus = 'Draft' | 'Current' | 'Superseded' | 'Archived';
 export type DocumentScanStatus = 'Pending' | 'NotScanned' | 'Clean' | 'Rejected' | 'Failed';
 
+// سياسة رؤية المستند (CPW-R2). الخادم هو الفاصل؛ هذه القيم للعرض واختيار السياسة فقط.
+export type DocumentVisibilityType =
+  | 'ClientScoped'
+  | 'ManagementOnly'
+  | 'ManagementAndFinance'
+  | 'FinanceOnly'
+  | 'HRManagementOnly'
+  | 'ProjectTeam'
+  | 'CustomRoles'
+  | 'CustomUsers';
+
 export interface ClientDocumentDto {
   id: string;
   clientId: string;
@@ -1916,6 +1927,11 @@ export interface ClientDocumentDto {
   isArchived: boolean;
   archivedAtUtc: string | null;
   archiveReason: string | null;
+  visibilityType: DocumentVisibilityType;
+  // القائمتان تصلان null لمن لا يملك صلاحيّة إدارة مستندات العميل (لا تُعرَض للجميع).
+  allowedRoles: string[] | null;
+  allowedUserIds: string[] | null;
+  canManageVisibility: boolean;
   currentVersionId: string | null;
   currentVersionNo: number | null;
   currentFileName: string | null;
@@ -1980,6 +1996,10 @@ export interface UpdateClientDocumentRequest {
   confidentialityCode?: string | null;
   lifecycleStatus?: DocumentLifecycleStatus | null;
   approvalStatusCode?: string | null;
+  // سياسة الرؤية (CPW-R2). عند الإغفال تبقى السياسة الحاليّة كما هي (لا يُطبَّق افتراضيّ التصنيف في التعديل).
+  visibilityType?: DocumentVisibilityType | null;
+  allowedRoles?: string[] | null;
+  allowedUserIds?: string[] | null;
 }
 
 export interface ArchiveClientDocumentRequest {

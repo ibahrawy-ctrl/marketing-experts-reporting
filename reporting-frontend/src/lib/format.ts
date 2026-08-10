@@ -53,6 +53,7 @@ import type {
   ActionItemUpdateType,
   DocumentLifecycleStatus,
   DocumentScanStatus,
+  DocumentVisibilityType,
 } from '../types/api';
 
 export const roleLabel: Record<Role, string> = {
@@ -67,7 +68,7 @@ export const roleLabel: Record<Role, string> = {
   Viewer: 'مُطّلع',
   FinanceManager: 'المدير المالي',
   Accountant: 'الحسابات',
-  AccountPortfolioReader: 'محفظة مدير الحساب',
+  AccountPortfolioReader: 'محفظة عملائي',
 };
 
 export const submissionStatusLabel: Record<SubmissionStatus, string> = {
@@ -361,8 +362,55 @@ export const documentCategoryLabel: Record<string, string> = {
   Creative: 'عمل إبداعي',
   Media: 'وسائط',
   Other: 'أخرى',
+  // CPW-R2: تصنيفات مضافة (لم يُحذف أيّ تصنيف قائم).
+  FinancialProposal: 'عرض مالي',
+  TechnicalProposal: 'عرض فنّي',
+  MarketingPlan: 'خطة تسويقية',
+  NDA: 'اتفاقية عدم إفصاح',
 };
 export const DOCUMENT_CATEGORY_CODES = Object.keys(documentCategoryLabel);
+
+// ===== CPW-R2: سياسة رؤية المستند =====
+// الخادم هو الفاصل في التطبيق؛ هذه الخرائط للعرض واختيار السياسة في الواجهة فقط.
+export const documentVisibilityLabel: Record<DocumentVisibilityType, string> = {
+  ClientScoped: 'كل من لديه صلاحية على العميل',
+  ManagementOnly: 'الإدارة فقط',
+  ManagementAndFinance: 'الإدارة والمالية',
+  FinanceOnly: 'المالية فقط',
+  HRManagementOnly: 'الموارد البشرية والإدارة',
+  ProjectTeam: 'فريق المشروع',
+  CustomRoles: 'أدوار مخصصة',
+  CustomUsers: 'أشخاص محددون',
+};
+export const DOCUMENT_VISIBILITY_TYPES = Object.keys(
+  documentVisibilityLabel,
+) as DocumentVisibilityType[];
+
+/// خريطة الافتراضيّات — مرآة لـ DocumentCodeConstants.DefaultVisibilityByCategory (مطابِقة حرفيًّا).
+export const documentDefaultVisibilityByCategory: Record<string, DocumentVisibilityType> = {
+  Contract: 'ManagementAndFinance',
+  Invoice: 'ManagementAndFinance',
+  Quotation: 'ManagementAndFinance',
+  FinancialProposal: 'ManagementAndFinance',
+  TechnicalProposal: 'ProjectTeam',
+  MarketingPlan: 'ProjectTeam',
+  MeetingMinutes: 'ProjectTeam',
+  BrandAsset: 'ProjectTeam',
+  Logo: 'ProjectTeam',
+  Creative: 'ProjectTeam',
+  Media: 'ProjectTeam',
+  NDA: 'ManagementOnly',
+  Legal: 'ManagementOnly',
+  Identity: 'ManagementOnly',
+  Proposal: 'ClientScoped',
+  Report: 'ClientScoped',
+  Presentation: 'ClientScoped',
+  Other: 'ClientScoped',
+};
+
+export function defaultVisibilityForCategory(categoryCode: string): DocumentVisibilityType {
+  return documentDefaultVisibilityByCategory[categoryCode] ?? 'ClientScoped';
+}
 
 export const linkCategoryLabel: Record<string, string> = {
   Drive: 'مساحة تخزين',
