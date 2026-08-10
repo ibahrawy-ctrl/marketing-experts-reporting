@@ -103,6 +103,8 @@ public static class DependencyInjection
         // خدمة المستندات (CPW-R1B2) — التخزين مفرد بلا حالة، ومحرّك الفحص «لا شيء» (C-01).
         services.AddSingleton<IFileStorage, LocalFileStorage>();
         services.AddSingleton<IDocumentScanner, NullDocumentScanner>();
+        // المقيّم المركزيّ لصلاحيّة المستندات (CPW-R2) — مصدر واحد لكلّ مسارات القائمة/العرض/التنزيل.
+        services.AddScoped<IDocumentAccessEvaluator, DocumentAccessEvaluator>();
         services.AddScoped<IClientDocumentService, ClientDocumentService>();
         services.AddScoped<IClientExternalLinkService, ClientExternalLinkService>();
         services.AddScoped<IProjectService, ProjectService>();

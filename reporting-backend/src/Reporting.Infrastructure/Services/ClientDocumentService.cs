@@ -30,6 +30,7 @@ public class ClientDocumentService : IClientDocumentService
     private readonly IAuditService _audit;
     private readonly IFileStorage _storage;
     private readonly IDocumentScanner _scanner;
+    private readonly IDocumentAccessEvaluator _evaluator;
     private readonly FileStorageOptions _options;
 
     public ClientDocumentService(
@@ -39,6 +40,7 @@ public class ClientDocumentService : IClientDocumentService
         IAuditService audit,
         IFileStorage storage,
         IDocumentScanner scanner,
+        IDocumentAccessEvaluator evaluator,
         IOptions<FileStorageOptions> options)
     {
         _db = db;
@@ -47,6 +49,7 @@ public class ClientDocumentService : IClientDocumentService
         _audit = audit;
         _storage = storage;
         _scanner = scanner;
+        _evaluator = evaluator;
         _options = options.Value;
     }
 
@@ -60,9 +63,18 @@ public class ClientDocumentService : IClientDocumentService
         var guard = await AuthorizeReadAsync(clientId, ct);
         if (guard is not null) return Result<IReadOnlyList<ClientDocumentDto>>.Failure(guard.Value.message, guard.Value.code);
 
+        // صلاحيّة العميل أوّلًا (أعلاه) ثمّ سياسة المستند — الفلترة داخل الاستعلام لا بعده.
+        var context = await _evaluator.BuildContextAsync(clientId, ct);
+        var canManage = await CanManageVisibilityAsync(clientId, ct);
+
         var q = _db.ClientDocuments.AsNoTracking()
             .Include(d => d.CurrentVersion)
-            .Where(d => d.ClientId == clientId && !d.IsDeleted);
+            .Where(d => d.ClientId == clientId && !d.IsDeleted)
+            .Where(_evaluator.VisibleFilter(context));
+
+        // قائمتا الأدوار/المستخدمين لا تُحمَّلان إلّا لمن يملك صلاحيّة إدارة المستندات (منع تسرّب §12).
+        if (canManage)
+            q = q.Include(d => d.AllowedRoles).Include(d => d.AllowedUsers);
 
         if (!filter.IncludeArchived) q = q.Where(d => !d.IsArchived);
         if (!string.IsNullOrWhiteSpace(filter.CategoryCode)) q = q.Where(d => d.CategoryCode == filter.CategoryCode);
@@ -77,7 +89,7 @@ public class ClientDocumentService : IClientDocumentService
 
         var rows = await q.OrderByDescending(d => d.CreatedAtUtc).ToListAsync(ct);
         var names = await ResolveNamesAsync(rows.Select(r => r.UploadedByUserId), ct);
-        return Result<IReadOnlyList<ClientDocumentDto>>.Success(rows.Select(r => Map(r, names)).ToList());
+        return Result<IReadOnlyList<ClientDocumentDto>>.Success(rows.Select(r => Map(r, names, canManage)).ToList());
     }
 
     public async Task<Result<ClientDocumentDetailDto>> GetAsync(Guid clientId, Guid documentId, CancellationToken ct = default)
@@ -90,8 +102,17 @@ public class ClientDocumentService : IClientDocumentService
 
         var doc = await _db.ClientDocuments.AsNoTracking()
             .Include(d => d.CurrentVersion)
+            .Include(d => d.AllowedRoles)
+            .Include(d => d.AllowedUsers)
             .FirstOrDefaultAsync(d => d.Id == documentId && d.ClientId == clientId && !d.IsDeleted, ct);
         if (doc is null) return Result<ClientDocumentDetailDto>.Failure("المستند غير موجود.", "client_document.not_found");
+
+        // سياسة المستند بعد صلاحيّة العميل — المنع يعني «غير موجود» قبل تحميل أيّ نسخة أو بيانات وصفيّة.
+        var context = await _evaluator.BuildContextAsync(clientId, ct);
+        if (!_evaluator.Evaluate(doc, context).CanViewMetadata)
+            return Result<ClientDocumentDetailDto>.Failure("المستند غير موجود.", "client_document.not_found");
+
+        var canManage = await CanManageVisibilityAsync(clientId, ct);
 
         var versions = await _db.ClientDocumentVersions.AsNoTracking()
             .Where(v => v.ClientDocumentId == documentId)
@@ -102,7 +123,7 @@ public class ClientDocumentService : IClientDocumentService
         var names = await ResolveNamesAsync(ids, ct);
 
         return Result<ClientDocumentDetailDto>.Success(new ClientDocumentDetailDto(
-            Map(doc, names),
+            Map(doc, names, canManage),
             versions.Select(v => MapVersion(v, names)).ToList()));
     }
 
@@ -160,6 +181,14 @@ public class ClientDocumentService : IClientDocumentService
             VersionCount = 0
         };
 
+        // السياسة الافتراضيّة للتصنيف تُطبَّق عند الإنشاء فقط، وتُتجاوَز باختيار صريح من المستخدم.
+        var visibility = await ApplyVisibilityAsync(
+            document,
+            request.VisibilityType ?? DocumentCodeConstants.DefaultVisibilityFor(request.CategoryCode),
+            request.AllowedRoles, request.AllowedUserIds, uid, ct);
+        if (visibility is not null)
+            return Result<ClientDocumentDetailDto>.Failure(visibility.Value.message, visibility.Value.code);
+
         var stored = await StoreVersionAsync(clientId, document, 1, upload, request.ChangeNote, uid, ct);
         if (!stored.Succeeded)
             return Result<ClientDocumentDetailDto>.Failure(stored.Error!, stored.ErrorCode);
@@ -192,7 +221,7 @@ public class ClientDocumentService : IClientDocumentService
         await _audit.LogAsync(uid, "client_document.created", nameof(ClientDocument), document.Id,
             AuditPayload(document, version), ct: ct);
 
-        return await GetAsync(clientId, document.Id, ct);
+        return await BuildWrittenDetailAsync(clientId, document.Id, ct);
     }
 
     public async Task<Result<ClientDocumentDetailDto>> AddVersionAsync(
@@ -208,8 +237,16 @@ public class ClientDocumentService : IClientDocumentService
         if (auth is not null) return Result<ClientDocumentDetailDto>.Failure(auth.Value.message, auth.Value.code);
 
         var document = await _db.ClientDocuments
+            .Include(d => d.AllowedRoles)
+            .Include(d => d.AllowedUsers)
             .FirstOrDefaultAsync(d => d.Id == documentId && d.ClientId == clientId && !d.IsDeleted, ct);
         if (document is null) return Result<ClientDocumentDetailDto>.Failure("المستند غير موجود.", "client_document.not_found");
+
+        // من لا يرى المستند لا يعدّله — نفس المقيّم، ونفس الردّ «غير موجود».
+        var context = await _evaluator.BuildContextAsync(clientId, ct);
+        if (!_evaluator.Evaluate(document, context).CanViewMetadata)
+            return Result<ClientDocumentDetailDto>.Failure("المستند غير موجود.", "client_document.not_found");
+
         if (document.IsArchived)
             return Result<ClientDocumentDetailDto>.Failure("لا يمكن إضافة نسخة إلى مستند مؤرشف.", "client_document.archived.conflict");
 
@@ -251,7 +288,7 @@ public class ClientDocumentService : IClientDocumentService
         await _audit.LogAsync(uid, "client_document.version_added", nameof(ClientDocument), document.Id,
             AuditPayload(document, version), ct: ct);
 
-        return await GetAsync(clientId, document.Id, ct);
+        return await BuildWrittenDetailAsync(clientId, document.Id, ct);
     }
 
     public async Task<Result<ClientDocumentDto>> UpdateAsync(
@@ -269,8 +306,15 @@ public class ClientDocumentService : IClientDocumentService
 
         var document = await _db.ClientDocuments
             .Include(d => d.CurrentVersion)
+            .Include(d => d.AllowedRoles)
+            .Include(d => d.AllowedUsers)
             .FirstOrDefaultAsync(d => d.Id == documentId && d.ClientId == clientId && !d.IsDeleted, ct);
         if (document is null) return Result<ClientDocumentDto>.Failure("المستند غير موجود.", "client_document.not_found");
+
+        // من لا يرى المستند لا يعدّله — نفس المقيّم، ونفس الردّ «غير موجود».
+        var context = await _evaluator.BuildContextAsync(clientId, ct);
+        if (!_evaluator.Evaluate(document, context).CanViewMetadata)
+            return Result<ClientDocumentDto>.Failure("المستند غير موجود.", "client_document.not_found");
 
         document.Title = request.Title.Trim();
         document.Description = Trim(request.Description);
@@ -279,13 +323,24 @@ public class ClientDocumentService : IClientDocumentService
         document.ConfidentialityCode = Trim(request.ConfidentialityCode);
         if (request.LifecycleStatus is DocumentLifecycleStatus lifecycle) document.LifecycleStatus = lifecycle;
         if (!string.IsNullOrWhiteSpace(request.ApprovalStatusCode)) document.ApprovalStatusCode = request.ApprovalStatusCode.Trim();
+
+        // غياب VisibilityType يُبقي السياسة الحاليّة كما هي — لا تُطبَّق سياسة التصنيف الافتراضيّة عند التعديل.
+        if (request.VisibilityType is DocumentVisibilityType requested)
+        {
+            var visibility = await ApplyVisibilityAsync(
+                document, requested, request.AllowedRoles, request.AllowedUserIds, uid, ct);
+            if (visibility is not null)
+                return Result<ClientDocumentDto>.Failure(visibility.Value.message, visibility.Value.code);
+        }
+
         document.UpdatedAtUtc = DateTime.UtcNow;
 
         await _db.SaveChangesAsync(ct);
         await _audit.LogAsync(uid, "client_document.updated", nameof(ClientDocument), document.Id, ct: ct);
 
         var names = await ResolveNamesAsync(new[] { document.UploadedByUserId }, ct);
-        return Result<ClientDocumentDto>.Success(Map(document, names));
+        // المُعدِّل اجتاز AuthorizeWriteAsync ⇒ يملك إدارة سياسة الرؤية بالتعريف.
+        return Result<ClientDocumentDto>.Success(Map(document, names, true));
     }
 
     public async Task<Result<ClientDocumentDto>> SetArchivedAsync(
@@ -299,8 +354,16 @@ public class ClientDocumentService : IClientDocumentService
 
         var document = await _db.ClientDocuments
             .Include(d => d.CurrentVersion)
+            .Include(d => d.AllowedRoles)
+            .Include(d => d.AllowedUsers)
             .FirstOrDefaultAsync(d => d.Id == documentId && d.ClientId == clientId && !d.IsDeleted, ct);
         if (document is null) return Result<ClientDocumentDto>.Failure("المستند غير موجود.", "client_document.not_found");
+
+        // من لا يرى المستند لا يؤرشفه — نفس المقيّم، ونفس الردّ «غير موجود».
+        var context = await _evaluator.BuildContextAsync(clientId, ct);
+        if (!_evaluator.Evaluate(document, context).CanViewMetadata)
+            return Result<ClientDocumentDto>.Failure("المستند غير موجود.", "client_document.not_found");
+
         if (document.IsArchived == isArchived)
             return Result<ClientDocumentDto>.Failure(
                 isArchived ? "المستند مؤرشف بالفعل." : "المستند غير مؤرشف.",
@@ -318,7 +381,7 @@ public class ClientDocumentService : IClientDocumentService
             nameof(ClientDocument), document.Id, ct: ct);
 
         var names = await ResolveNamesAsync(new[] { document.UploadedByUserId }, ct);
-        return Result<ClientDocumentDto>.Success(Map(document, names));
+        return Result<ClientDocumentDto>.Success(Map(document, names, true));
     }
 
     public async Task<Result<bool>> DeleteAsync(
@@ -335,8 +398,15 @@ public class ClientDocumentService : IClientDocumentService
             return Result<bool>.Failure("حذف المستندات مقصور على الإدارة العليا.", "auth.forbidden");
 
         var document = await _db.ClientDocuments
+            .Include(d => d.AllowedRoles)
+            .Include(d => d.AllowedUsers)
             .FirstOrDefaultAsync(d => d.Id == documentId && d.ClientId == clientId && !d.IsDeleted, ct);
         if (document is null) return Result<bool>.Failure("المستند غير موجود.", "client_document.not_found");
+
+        // من لا يرى المستند لا يحذفه — نفس المقيّم، ونفس الردّ «غير موجود».
+        var context = await _evaluator.BuildContextAsync(clientId, ct);
+        if (!_evaluator.Evaluate(document, context).CanViewMetadata)
+            return Result<bool>.Failure("المستند غير موجود.", "client_document.not_found");
 
         // Tombstone: الصفّ يبقى وكذلك كلّ النسخ والملفّات على القرص.
         document.IsDeleted = true;
@@ -363,8 +433,15 @@ public class ClientDocumentService : IClientDocumentService
         if (guard is not null) return Result<DocumentDownload>.Failure(guard.Value.message, guard.Value.code);
 
         var document = await _db.ClientDocuments.AsNoTracking()
+            .Include(d => d.AllowedRoles)
+            .Include(d => d.AllowedUsers)
             .FirstOrDefaultAsync(d => d.Id == documentId && d.ClientId == clientId && !d.IsDeleted, ct);
         if (document is null) return Result<DocumentDownload>.Failure("المستند غير موجود.", "client_document.not_found");
+
+        // العرض == التنزيل في v1؛ المنع يعني «غير موجود» قبل الوصول إلى أيّ نسخة.
+        var context = await _evaluator.BuildContextAsync(clientId, ct);
+        if (!_evaluator.Evaluate(document, context).CanDownload)
+            return Result<DocumentDownload>.Failure("المستند غير موجود.", "client_document.not_found");
 
         var version = versionId is Guid vid
             ? await _db.ClientDocumentVersions.AsNoTracking()
@@ -402,6 +479,37 @@ public class ClientDocumentService : IClientDocumentService
     }
 
     // ===== المساعدات =====
+
+    /// <summary>
+    /// يبني تفاصيل مستند كُتِب للتوّ من قِبل صاحب صلاحيّة الكتابة (إنشاء/إضافة نسخة).
+    /// <para>
+    /// لا يُعيد تطبيق سياسة الرؤية لأنّ الكاتب قد يختار سياسة تستثنيه هو نفسه
+    /// (مثل <c>FinanceOnly</c> يرفعها مدير)، فإعادة التقييم كانت ستُرجِع 404 على عمليّة ناجحة.
+    /// صلاحيّة الكتابة تحقّقت قبل الاستدعاء، والاستدعاء مقصور على المستند المكتوب في نفس الطلب.
+    /// مسارات القراءة (<see cref="GetAsync"/>/<see cref="ListAsync"/>/التنزيل) تبقى محكومة بالسياسة كاملة.
+    /// </para>
+    /// </summary>
+    private async Task<Result<ClientDocumentDetailDto>> BuildWrittenDetailAsync(
+        Guid clientId, Guid documentId, CancellationToken ct)
+    {
+        var doc = await _db.ClientDocuments.AsNoTracking()
+            .Include(d => d.CurrentVersion)
+            .Include(d => d.AllowedRoles)
+            .Include(d => d.AllowedUsers)
+            .FirstOrDefaultAsync(d => d.Id == documentId && d.ClientId == clientId && !d.IsDeleted, ct);
+        if (doc is null) return Result<ClientDocumentDetailDto>.Failure("المستند غير موجود.", "client_document.not_found");
+
+        var versions = await _db.ClientDocumentVersions.AsNoTracking()
+            .Where(v => v.ClientDocumentId == documentId)
+            .OrderByDescending(v => v.VersionNo)
+            .ToListAsync(ct);
+
+        var names = await ResolveNamesAsync(versions.Select(v => v.UploadedByUserId).Append(doc.UploadedByUserId), ct);
+
+        return Result<ClientDocumentDetailDto>.Success(new ClientDocumentDetailDto(
+            Map(doc, names, true),
+            versions.Select(v => MapVersion(v, names)).ToList()));
+    }
 
     /// <summary>
     /// يتحقّق من الملفّ ويخزّنه ويبني كيان النسخة (دون إضافته للسياق).
@@ -489,6 +597,12 @@ public class ClientDocumentService : IClientDocumentService
             .FirstAsync(c => c.Id == clientId, ct);
         if (client.AccountManagerId == _currentUser.UserId) return null;
 
+        // المالية والموارد البشريّة وظيفتان على مستوى الشركة: تعبران بوّابة العميل في مسار المستندات
+        // حصرًا (CPW-R2). لا تكتسبان «صلاحيّة عميل» ⇒ سياسة المستند وحدها تحكم ما يظهر لهما،
+        // فلا تريان ClientScoped، ولا يمنحهما ذلك أيّ وصول إلى بيانات العميل الأساسيّة.
+        if (_currentUser.IsInAnyRole(DocumentVisibilityPolicy.Finance)
+            || _currentUser.IsInAnyRole(DocumentVisibilityPolicy.HrManagement)) return null;
+
         var vis = await _access.ResolveAsync(ct);
         if (!vis.CanViewClient(clientId)) return ("العميل غير موجود.", "client.not_found");
         return null;
@@ -515,6 +629,94 @@ public class ClientDocumentService : IClientDocumentService
         var readable = await _access.ResolveAsync(ct);
         if (!readable.CanViewClient(clientId)) return ("العميل غير موجود.", "client.not_found");
         return ("لا تملك صلاحية إدارة مستندات هذا العميل.", "auth.forbidden");
+    }
+
+    /// <summary>
+    /// صلاحيّة إدارة سياسة الرؤية = صلاحيّة كتابة مستندات العميل نفسها (لا سياسة منفصلة).
+    /// تُستعمَل لكشف قائمتَي الأدوار/المستخدمين المصرّح لهم في القراءة (§12).
+    /// </summary>
+    private async Task<bool> CanManageVisibilityAsync(Guid clientId, CancellationToken ct)
+        => _currentUser.UserId is Guid uid && await AuthorizeWriteAsync(clientId, uid, ct) is null;
+
+    /// <summary>
+    /// تحقّق سياسة الرؤية (§7): «أدوار محدّدة» تتطلّب دورًا معروفًا واحدًا على الأقلّ،
+    /// و«مستخدمون محدّدون» تتطلّب مستخدمًا واحدًا على الأقلّ. غير المخصّصة تتجاهل القائمتين صراحةً.
+    /// </summary>
+    private static (string message, string code)? ValidateVisibility(
+        DocumentVisibilityType type,
+        IReadOnlyList<string>? roles,
+        IReadOnlyList<Guid>? users,
+        out List<string> canonicalRoles,
+        out List<Guid> allowedUserIds)
+    {
+        canonicalRoles = new List<string>();
+        allowedUserIds = new List<Guid>();
+
+        if (!Enum.IsDefined(typeof(DocumentVisibilityType), type))
+            return ("سياسة الرؤية غير معتمَدة.", "client_document.visibility_invalid");
+
+        if (DocumentVisibilityPolicy.RequiresRoles(type))
+        {
+            foreach (var raw in roles ?? Array.Empty<string>())
+            {
+                var canonical = DocumentVisibilityPolicy.CanonicalRole(raw);
+                if (canonical is null)
+                    return ("اسم دور غير معروف في سياسة الرؤية.", "client_document.visibility_role_invalid");
+                if (!canonicalRoles.Contains(canonical)) canonicalRoles.Add(canonical);
+            }
+            if (canonicalRoles.Count == 0)
+                return ("سياسة «أدوار محدّدة» تتطلّب اختيار دور واحد على الأقلّ.", "client_document.visibility_roles_required");
+        }
+        else if (DocumentVisibilityPolicy.RequiresUsers(type))
+        {
+            foreach (var id in users ?? Array.Empty<Guid>())
+                if (id != Guid.Empty && !allowedUserIds.Contains(id)) allowedUserIds.Add(id);
+            if (allowedUserIds.Count == 0)
+                return ("سياسة «مستخدمون محدّدون» تتطلّب اختيار مستخدم واحد على الأقلّ.", "client_document.visibility_users_required");
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// يطبّق سياسة الرؤية على الكيان: يتحقّق، ثمّ يستبدل قائمتَي الأدوار/المستخدمين استبدالًا كاملًا،
+    /// ويختم بأثر التعديل (من ومتى). القوائم تُفرَّغ حتمًا في السياسات غير المخصّصة.
+    /// </summary>
+    private async Task<(string message, string code)?> ApplyVisibilityAsync(
+        ClientDocument document,
+        DocumentVisibilityType type,
+        IReadOnlyList<string>? roles,
+        IReadOnlyList<Guid>? users,
+        Guid uid,
+        CancellationToken ct)
+    {
+        var invalid = ValidateVisibility(type, roles, users, out var canonicalRoles, out var allowedUserIds);
+        if (invalid is not null) return invalid;
+
+        if (allowedUserIds.Count > 0)
+        {
+            var existing = await _db.Users
+                .Where(u => allowedUserIds.Contains(u.Id) && u.IsActive)
+                .Select(u => u.Id)
+                .ToListAsync(ct);
+            if (existing.Count != allowedUserIds.Count)
+                return ("أحد المستخدمين المختارين غير موجود أو غير نشط.", "client_document.visibility_user_invalid");
+        }
+
+        if (document.AllowedRoles.Count > 0) _db.ClientDocumentAllowedRoles.RemoveRange(document.AllowedRoles);
+        if (document.AllowedUsers.Count > 0) _db.ClientDocumentAllowedUsers.RemoveRange(document.AllowedUsers);
+        document.AllowedRoles.Clear();
+        document.AllowedUsers.Clear();
+
+        foreach (var role in canonicalRoles)
+            document.AllowedRoles.Add(new ClientDocumentAllowedRole { ClientDocumentId = document.Id, RoleName = role });
+        foreach (var userId in allowedUserIds)
+            document.AllowedUsers.Add(new ClientDocumentAllowedUser { ClientDocumentId = document.Id, UserId = userId });
+
+        document.VisibilityType = type;
+        document.VisibilityUpdatedAtUtc = DateTime.UtcNow;
+        document.VisibilityUpdatedByUserId = uid;
+        return null;
     }
 
     private static (string message, string code)? ValidateMetadata(
@@ -553,7 +755,11 @@ public class ClientDocumentService : IClientDocumentService
 
     private static string? Trim(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    private static ClientDocumentDto Map(ClientDocument d, IReadOnlyDictionary<Guid, string> names)
+    /// <summary>
+    /// <paramref name="canManage"/> يتحكّم بكشف قائمتَي الأدوار/المستخدمين المصرّح لهم (§12):
+    /// من لا يملك صلاحيّة إدارة مستندات العميل يحصل على <c>null</c> فيهما لا على قائمة فارغة.
+    /// </summary>
+    private static ClientDocumentDto Map(ClientDocument d, IReadOnlyDictionary<Guid, string> names, bool canManage)
     {
         var current = d.CurrentVersion;
         var forceAttachment = current is not null
@@ -564,6 +770,10 @@ public class ClientDocumentService : IClientDocumentService
             d.LifecycleStatus, d.ApprovalStatusCode, d.VersionCount, d.UploadedByUserId,
             names.TryGetValue(d.UploadedByUserId, out var name) ? name : null,
             d.IsArchived, d.ArchivedAtUtc, d.ArchiveReason,
+            d.VisibilityType,
+            canManage ? d.AllowedRoles.Select(r => r.RoleName).OrderBy(r => r).ToList() : null,
+            canManage ? d.AllowedUsers.Select(a => a.UserId).ToList() : null,
+            canManage,
             d.CurrentVersionId, current?.VersionNo, current?.OriginalFileName, current?.ContentType,
             current?.SizeBytes, current?.ScanStatus, forceAttachment,
             d.CreatedAtUtc, d.UpdatedAtUtc);
