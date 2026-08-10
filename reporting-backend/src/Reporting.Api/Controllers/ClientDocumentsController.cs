@@ -64,7 +64,10 @@ public class ClientDocumentsController : ApiControllerBase
             form.Description,
             form.Tags,
             form.ConfidentialityCode,
-            form.ChangeNote);
+            form.ChangeNote,
+            form.VisibilityType,
+            form.AllowedRoles,
+            form.AllowedUserIds);
 
         return await WithUploadAsync(form.File, upload => _service.CreateAsync(clientId, request, upload, ct));
     }
@@ -150,6 +153,16 @@ public class CreateClientDocumentForm
     public string? Tags { get; set; }
     public string? ConfidentialityCode { get; set; }
     public string? ChangeNote { get; set; }
+
+    /// <summary>سياسة الرؤية (CPW-R2). عند غيابها تُطبَّق السياسة الافتراضيّة للتصنيف.</summary>
+    public DocumentVisibilityType? VisibilityType { get; set; }
+
+    /// <summary>أسماء الأدوار المصرّح لها — تُستعمل فقط مع <c>CustomRoles</c>.</summary>
+    public List<string>? AllowedRoles { get; set; }
+
+    /// <summary>معرّفات المستخدمين المصرّح لهم — تُستعمل فقط مع <c>CustomUsers</c>.</summary>
+    public List<Guid>? AllowedUserIds { get; set; }
+
     public IFormFile? File { get; set; }
 }
 
