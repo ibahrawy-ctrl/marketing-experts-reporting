@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { it, expect, vi, beforeEach } from 'vitest';
 import type {
   ClientDocumentDetailDto,
@@ -41,6 +41,10 @@ const DOC: ClientDocumentDto = {
   currentForceAttachment: false,
   createdAtUtc: '2026-08-01T00:00:00Z',
   updatedAtUtc: null,
+  visibilityType: 'ManagementAndFinance',
+  allowedRoles: null,
+  allowedUserIds: null,
+  canManageVisibility: false,
 };
 
 const USAGE: ClientStorageUsageDto = {
@@ -88,6 +92,7 @@ const linksState: QueryLike<ClientExternalLinkDto[]> = { data: [], isLoading: fa
 
 const downloadDoc = vi.fn().mockResolvedValue(undefined);
 const createLink = vi.fn().mockResolvedValue({});
+const uploadDoc = vi.fn().mockResolvedValue({});
 
 // صلاحية الكتابة: مدير أساسيّ مخوَّل، أو مدير الحساب للعميل (accountManagerId = 'am1').
 let canEditClientCore = true;
@@ -139,7 +144,7 @@ vi.mock('../lib/useClientDocuments', () => ({
   useClientDocuments: () => docsState,
   useClientDocument: () => detailState,
   useClientStorageUsage: () => usageState,
-  useUploadClientDocument: () => ({ mutateAsync: vi.fn().mockResolvedValue({}), isPending: false }),
+  useUploadClientDocument: () => ({ mutateAsync: uploadDoc, isPending: false }),
   useAddClientDocumentVersion: () => ({ mutateAsync: vi.fn().mockResolvedValue({}), isPending: false }),
   useUpdateClientDocument: () => ({ mutateAsync: vi.fn().mockResolvedValue({}), isPending: false }),
   useSetClientDocumentArchived: () => ({ mutateAsync: vi.fn().mockResolvedValue({}), isPending: false }),
@@ -166,6 +171,7 @@ beforeEach(() => {
   linksState.isLoading = false;
   downloadDoc.mockReset().mockResolvedValue(undefined);
   createLink.mockReset().mockResolvedValue({});
+  uploadDoc.mockReset().mockResolvedValue({});
 });
 
 function openDocuments() {
@@ -299,4 +305,178 @@ it('يتحقّق من حقول الرابط الخارجيّ قبل الحفظ',
   fireEvent.click(screen.getByRole('button', { name: 'حفظ' }));
   await waitFor(() => expect(screen.getByText('العنوان الإلكتروني مطلوب.')).toBeInTheDocument());
   expect(createLink).not.toHaveBeenCalled();
+});
+
+// ===== CPW-R2 — سياسة رؤية المستند + رؤية مدير العميل =====
+// الخادم هو الفاصل الوحيد في التطبيق؛ ما يُختبَر هنا سلوك الاختيار والعرض في الواجهة فقط.
+
+function openUpload() {
+  const view = openDocuments();
+  fireEvent.click(screen.getByRole('button', { name: '+ رفع مستند' }));
+  return view;
+}
+
+/// «التصنيف» يظهر أيضًا في شريط ترشيح المستندات ⇒ تُحصَر الاستعلامات داخل نموذج الرفع وحده.
+function uploadForm() {
+  return within(screen.getByText('رفع مستند جديد').closest('div') as HTMLElement);
+}
+
+/// يملأ الحدّ الأدنى المقبول للرفع (ملفّ صالح الحجم + عنوان) كي يصل النموذج إلى استدعاء الرفع.
+function fillValidUpload(container: HTMLElement) {
+  const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
+  const small = new File(['x'.repeat(16)], 'doc.pdf', { type: 'application/pdf' });
+  fireEvent.change(fileInput, { target: { files: [small] } });
+  fireEvent.change(screen.getByLabelText('عنوان المستند'), { target: { value: 'مستند اختبار' } });
+}
+
+it('يعرض محرّر سياسة الرؤية بخياراته الثمانية في نموذج الرفع', () => {
+  openUpload();
+  expect(screen.getByText('من يمكنه رؤية هذا المستند؟')).toBeInTheDocument();
+  const select = screen.getByLabelText('سياسة الرؤية') as HTMLSelectElement;
+  expect(select.options.length).toBe(8);
+  [
+    'كل من لديه صلاحية على العميل',
+    'الإدارة فقط',
+    'الإدارة والمالية',
+    'المالية فقط',
+    'الموارد البشرية والإدارة',
+    'فريق المشروع',
+    'أدوار مخصصة',
+    'أشخاص محددون',
+  ].forEach((label) => {
+    expect([...select.options].some((o) => o.textContent === label)).toBe(true);
+  });
+});
+
+it('يطبّق سياسة الرؤية الافتراضيّة للتصنيف تلقائيًّا عند تغيير التصنيف', () => {
+  const { container } = openUpload();
+  const select = screen.getByLabelText('سياسة الرؤية') as HTMLSelectElement;
+  // «عقد» أوّل تصنيف ⇒ الافتراضيّ «الإدارة والمالية».
+  expect(select.value).toBe('ManagementAndFinance');
+
+  fireEvent.change(uploadForm().getByLabelText('التصنيف'), { target: { value: 'TechnicalProposal' } });
+  expect(select.value).toBe('ProjectTeam');
+
+  fireEvent.change(uploadForm().getByLabelText('التصنيف'), { target: { value: 'NDA' } });
+  expect(select.value).toBe('ManagementOnly');
+
+  fireEvent.change(uploadForm().getByLabelText('التصنيف'), { target: { value: 'Report' } });
+  expect(select.value).toBe('ClientScoped');
+  expect(container).toBeTruthy();
+});
+
+it('لا يدوس على اختيار المستخدم اليدويّ لسياسة الرؤية عند تغيير التصنيف بعده', async () => {
+  const { container } = openUpload();
+  const select = screen.getByLabelText('سياسة الرؤية') as HTMLSelectElement;
+
+  fireEvent.change(select, { target: { value: 'FinanceOnly' } });
+  expect(select.value).toBe('FinanceOnly');
+
+  // التصنيف الجديد افتراضيّه «فريق المشروع» — لكنّ الاختيار اليدويّ يبقى.
+  fireEvent.change(uploadForm().getByLabelText('التصنيف'), { target: { value: 'TechnicalProposal' } });
+  expect(select.value).toBe('FinanceOnly');
+
+  fillValidUpload(container);
+  fireEvent.click(screen.getByRole('button', { name: 'رفع المستند' }));
+  await waitFor(() => expect(uploadDoc).toHaveBeenCalled());
+  expect(uploadDoc.mock.calls[0][0]).toMatchObject({
+    categoryCode: 'TechnicalProposal',
+    visibilityType: 'FinanceOnly',
+  });
+});
+
+it('يفرض اختيار دور واحد على الأقلّ لسياسة «أدوار مخصصة» ثمّ يُرسِل الأدوار المختارة', async () => {
+  const { container } = openUpload();
+  fireEvent.change(screen.getByLabelText('سياسة الرؤية'), { target: { value: 'CustomRoles' } });
+  expect(screen.getByText('الأدوار المصرّح لها')).toBeInTheDocument();
+  expect(screen.getByText('اختر دورًا واحدًا على الأقلّ.')).toBeInTheDocument();
+
+  fillValidUpload(container);
+  fireEvent.click(screen.getByRole('button', { name: 'رفع المستند' }));
+  await waitFor(() =>
+    expect(screen.getByText('سياسة «أدوار مخصصة» تتطلّب اختيار دور واحد على الأقلّ.')).toBeInTheDocument(),
+  );
+  expect(uploadDoc).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByLabelText('المدير المالي'));
+  expect(screen.queryByText('اختر دورًا واحدًا على الأقلّ.')).not.toBeInTheDocument();
+  // المستخدم الحاليّ Admin ⇒ السياسة لا تشمله ⇒ يظهر تنبيه فقد الرؤية.
+  expect(screen.getByText(/السياسة المختارة لا تشمل حسابك/)).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'رفع المستند' }));
+  await waitFor(() => expect(uploadDoc).toHaveBeenCalled());
+  expect(uploadDoc.mock.calls[0][0]).toMatchObject({
+    visibilityType: 'CustomRoles',
+    allowedRoles: ['FinanceManager'],
+  });
+});
+
+it('يفرض اختيار شخص واحد على الأقلّ لسياسة «أشخاص محددون» ثمّ يُرسِل المعرّفات المختارة', async () => {
+  const { container } = openUpload();
+  fireEvent.change(screen.getByLabelText('سياسة الرؤية'), { target: { value: 'CustomUsers' } });
+  expect(screen.getByText('الأشخاص المصرّح لهم')).toBeInTheDocument();
+  expect(screen.getByText('اختر شخصًا واحدًا على الأقلّ.')).toBeInTheDocument();
+
+  fillValidUpload(container);
+  fireEvent.click(screen.getByRole('button', { name: 'رفع المستند' }));
+  await waitFor(() =>
+    expect(screen.getByText('سياسة «أشخاص محددون» تتطلّب اختيار شخص واحد على الأقلّ.')).toBeInTheDocument(),
+  );
+  expect(uploadDoc).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByLabelText('مدير الحساب'));
+  expect(screen.queryByText('اختر شخصًا واحدًا على الأقلّ.')).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'رفع المستند' }));
+  await waitFor(() => expect(uploadDoc).toHaveBeenCalled());
+  expect(uploadDoc.mock.calls[0][0]).toMatchObject({
+    visibilityType: 'CustomUsers',
+    allowedUserIds: ['am1'],
+  });
+});
+
+it('يعرض شارة سياسة الرؤية على صفّ المستند', () => {
+  openDocuments();
+  expect(screen.getByText('الإدارة والمالية')).toBeInTheDocument();
+});
+
+it('لا يعرض المستند المحجوب لأنّ الخادم يُرشِّح القائمة قبل وصولها', () => {
+  // القائمة تأتي مُرشَّحة من الخادم ⇒ المستند المحجوب غير موجود أصلًا في الحمولة.
+  docsState.data = [DOC];
+  openDocuments();
+  expect(screen.getByText('عقد الخدمات')).toBeInTheDocument();
+  expect(screen.queryByText('عرض مالي سرّي')).not.toBeInTheDocument();
+  expect(screen.queryByText('المالية فقط')).not.toBeInTheDocument();
+});
+
+it('لا يكشف قوائم الأدوار/الأشخاص المصرّح لهم إلّا لمن يملك إدارة الرؤية', () => {
+  const withPolicy = {
+    ...DOC,
+    visibilityType: 'CustomRoles' as const,
+    allowedRoles: ['FinanceManager'],
+    allowedUserIds: ['am1'],
+  };
+
+  // بلا صلاحيّة إدارة الرؤية: القائمتان لا تُعرَضان إطلاقًا.
+  docsState.data = [{ ...withPolicy, canManageVisibility: false }];
+  const first = openDocuments();
+  expect(screen.queryByText('الأدوار المصرّح لها')).not.toBeInTheDocument();
+  expect(screen.queryByText('الأشخاص المصرّح لهم')).not.toBeInTheDocument();
+  first.unmount();
+
+  // مع الصلاحيّة: تُعرَضان.
+  docsState.data = [{ ...withPolicy, canManageVisibility: true }];
+  const second = openDocuments();
+  expect(screen.getByText('الأدوار المصرّح لها')).toBeInTheDocument();
+  expect(screen.getByText('الأشخاص المصرّح لهم')).toBeInTheDocument();
+  second.unmount();
+});
+
+it('يعرض ملفّ العميل لمدير العميل دون إظهار أدوات تعديل البيانات الأساسيّة', () => {
+  canEditClientCore = false;
+  currentUserId = 'am1';
+  render(<ClientDetailPage />);
+  expect(screen.getAllByText('عميل تجريبي').length).toBeGreaterThan(0);
+  expect(screen.getAllByText('مدير العميل').length).toBeGreaterThan(0);
+  expect(screen.queryByRole('button', { name: 'تعديل بيانات العميل' })).not.toBeInTheDocument();
 });
