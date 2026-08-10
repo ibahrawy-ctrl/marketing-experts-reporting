@@ -22,6 +22,12 @@ public record ClientDocumentDto(
     bool IsArchived,
     DateTime? ArchivedAtUtc,
     string? ArchiveReason,
+    // سياسة الرؤية (CPW-R2). القائمتان تُملآن فقط لمن يملك صلاحيّة إدارة مستندات العميل،
+    // وتبقيان null لغيره كي لا تتسرّب أسماء الأدوار/المستخدمين المصرّح لهم.
+    DocumentVisibilityType VisibilityType,
+    IReadOnlyList<string>? AllowedRoles,
+    IReadOnlyList<Guid>? AllowedUserIds,
+    bool CanManageVisibility,
     // ملخّص النسخة السارية — بلا StorageKey.
     Guid? CurrentVersionId,
     int? CurrentVersionNo,
@@ -65,19 +71,29 @@ public record ClientDocumentFilter(
     string? Search = null,
     bool IncludeArchived = false);
 
-/// <summary>بيانات إنشاء مستند (تُرفَق مع الملفّ في نفس الطلب).</summary>
+/// <summary>
+/// بيانات إنشاء مستند (تُرفَق مع الملفّ في نفس الطلب).
+/// <c>VisibilityType</c> اختياريّ: عند غيابه تُطبَّق السياسة الافتراضيّة للتصنيف (عند الإنشاء فقط).
+/// </summary>
 public record CreateClientDocumentRequest(
     string Title,
     string CategoryCode,
     string? Description = null,
     string? Tags = null,
     string? ConfidentialityCode = null,
-    string? ChangeNote = null);
+    string? ChangeNote = null,
+    DocumentVisibilityType? VisibilityType = null,
+    IReadOnlyList<string>? AllowedRoles = null,
+    IReadOnlyList<Guid>? AllowedUserIds = null);
 
 /// <summary>بيانات إضافة نسخة جديدة لمستند قائم.</summary>
 public record AddDocumentVersionRequest(string? ChangeNote = null);
 
-/// <summary>تعديل البيانات الوصفيّة فقط (لا يمسّ الملفّات).</summary>
+/// <summary>
+/// تعديل البيانات الوصفيّة فقط (لا يمسّ الملفّات).
+/// <c>VisibilityType</c> اختياريّ: عند غيابه تبقى سياسة الرؤية الحاليّة كما هي
+/// (لا تُطبَّق سياسة التصنيف الافتراضيّة عند التعديل إطلاقًا).
+/// </summary>
 public record UpdateClientDocumentRequest(
     string Title,
     string CategoryCode,
@@ -85,7 +101,10 @@ public record UpdateClientDocumentRequest(
     string? Tags = null,
     string? ConfidentialityCode = null,
     DocumentLifecycleStatus? LifecycleStatus = null,
-    string? ApprovalStatusCode = null);
+    string? ApprovalStatusCode = null,
+    DocumentVisibilityType? VisibilityType = null,
+    IReadOnlyList<string>? AllowedRoles = null,
+    IReadOnlyList<Guid>? AllowedUserIds = null);
 
 /// <summary>سبب الأرشفة أو إلغائها.</summary>
 public record ArchiveClientDocumentRequest(string? Reason = null);

@@ -1,3 +1,5 @@
+using Reporting.Domain.Enums;
+
 namespace Reporting.Application.Documents;
 
 /// <summary>
@@ -10,12 +12,13 @@ namespace Reporting.Application.Documents;
 /// </summary>
 public static class DocumentCodeConstants
 {
-    /// <summary>تصنيفات المستندات المعتمَدة.</summary>
+    /// <summary>تصنيفات المستندات المعتمَدة (CPW-R2: أُضيفت الأربعة الأخيرة، ولم يُحذَف أيّ تصنيف قائم).</summary>
     public static readonly IReadOnlySet<string> DocumentCategories = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
         "Contract", "Proposal", "Invoice", "Quotation", "BrandAsset", "Logo",
         "Presentation", "Report", "Legal", "Identity", "MeetingMinutes",
-        "Creative", "Media", "Other"
+        "Creative", "Media", "Other",
+        "FinancialProposal", "TechnicalProposal", "MarketingPlan", "NDA"
     };
 
     /// <summary>تصنيفات الروابط الخارجيّة المعتمَدة.</summary>
@@ -30,6 +33,45 @@ public static class DocumentCodeConstants
     {
         "Public", "Internal", "Confidential", "Restricted"
     };
+
+    /// <summary>
+    /// خريطة سياسة الرؤية الافتراضيّة لكلّ تصنيف (CPW-R2).
+    /// <b>تُطبَّق عند الإنشاء فقط</b> وحين لا يُرسِل الطالب سياسة صريحة؛
+    /// تغيير التصنيف لاحقًا لا يُعيد ضبط سياسة اختارها المستخدم.
+    /// التصنيف غير المذكور هنا ⇒ <c>ClientScoped</c>.
+    /// </summary>
+    public static readonly IReadOnlyDictionary<string, DocumentVisibilityType> DefaultVisibilityByCategory =
+        new Dictionary<string, DocumentVisibilityType>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Contract"] = DocumentVisibilityType.ManagementAndFinance,
+            ["Invoice"] = DocumentVisibilityType.ManagementAndFinance,
+            ["Quotation"] = DocumentVisibilityType.ManagementAndFinance,
+            ["FinancialProposal"] = DocumentVisibilityType.ManagementAndFinance,
+
+            ["TechnicalProposal"] = DocumentVisibilityType.ProjectTeam,
+            ["MarketingPlan"] = DocumentVisibilityType.ProjectTeam,
+            ["MeetingMinutes"] = DocumentVisibilityType.ProjectTeam,
+            ["BrandAsset"] = DocumentVisibilityType.ProjectTeam,
+            ["Logo"] = DocumentVisibilityType.ProjectTeam,
+            ["Creative"] = DocumentVisibilityType.ProjectTeam,
+            ["Media"] = DocumentVisibilityType.ProjectTeam,
+
+            ["NDA"] = DocumentVisibilityType.ManagementOnly,
+            ["Legal"] = DocumentVisibilityType.ManagementOnly,
+            ["Identity"] = DocumentVisibilityType.ManagementOnly,
+
+            ["Proposal"] = DocumentVisibilityType.ClientScoped,
+            ["Report"] = DocumentVisibilityType.ClientScoped,
+            ["Presentation"] = DocumentVisibilityType.ClientScoped,
+            ["Other"] = DocumentVisibilityType.ClientScoped,
+        };
+
+    /// <summary>السياسة الافتراضيّة للتصنيف (<c>ClientScoped</c> لأيّ تصنيف غير مُعرَّف في الخريطة).</summary>
+    public static DocumentVisibilityType DefaultVisibilityFor(string? categoryCode)
+        => !string.IsNullOrWhiteSpace(categoryCode)
+           && DefaultVisibilityByCategory.TryGetValue(categoryCode.Trim(), out var v)
+            ? v
+            : DocumentVisibilityType.ClientScoped;
 
     public static bool IsValidDocumentCategory(string? code) => Required(DocumentCategories, code);
     public static bool IsValidLinkCategory(string? code) => Required(LinkCategories, code);
