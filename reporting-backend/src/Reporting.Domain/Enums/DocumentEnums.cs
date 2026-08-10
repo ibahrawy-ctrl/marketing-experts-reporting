@@ -15,6 +15,38 @@ public enum DocumentLifecycleStatus
 }
 
 /// <summary>
+/// سياسة رؤية المستند (CPW-R2 — صلاحيات المستندات).
+/// تُخزَّن نصًّا (<c>HasConversion&lt;string&gt;</c>) كي لا تحتاج القيم المستقبليّة إلى هجرة.
+/// السياسة تُطبَّق <b>بعد</b> صلاحية العميل لا بدلًا منها: من لا يرى العميل لا يرى أيّ مستند فيه.
+/// </summary>
+public enum DocumentVisibilityType
+{
+    /// <summary>كلّ من لديه صلاحية على العميل (السلوك السابق — الافتراضيّ للمستندات القائمة).</summary>
+    ClientScoped = 0,
+
+    /// <summary>الإدارة فقط (Admin/CEO/GM/Manager).</summary>
+    ManagementOnly = 1,
+
+    /// <summary>الإدارة والمالية معًا.</summary>
+    ManagementAndFinance = 2,
+
+    /// <summary>المالية فقط (بالإضافة إلى Admin).</summary>
+    FinanceOnly = 3,
+
+    /// <summary>الموارد البشريّة والإدارة العليا.</summary>
+    HRManagementOnly = 4,
+
+    /// <summary>فريق المشروع (مدير العميل + مدير مشروع العميل + فريق المشروع المالك) مع الإدارة.</summary>
+    ProjectTeam = 5,
+
+    /// <summary>أدوار مخصّصة (تُحدَّد في <c>client_document_allowed_roles</c>).</summary>
+    CustomRoles = 6,
+
+    /// <summary>أشخاص محدّدون (يُحدَّدون في <c>client_document_allowed_users</c>).</summary>
+    CustomUsers = 7
+}
+
+/// <summary>
 /// حالة فحص البرمجيّات الخبيثة لنسخة الملفّ (CPW-R1B2 — قرار المالك C-01).
 /// لا يوجد محرّك فحص فعليّ في هذه النسخة ⇒ يُمنع منعًا باتًّا استخدام <c>Clean</c>
 /// ما لم يكن هناك محرّك حقيقيّ نفّذ الفحص وأعاد النتيجة. الحالة الافتراضيّة للملفّات

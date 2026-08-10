@@ -56,5 +56,21 @@ public class ClientDocument : BaseEntity
     public Guid? DeletedByUserId { get; set; }
     public string? DeleteReason { get; set; }
 
+    /// <summary>
+    /// سياسة رؤية المستند (CPW-R2). تُطبَّق <b>بعد</b> صلاحية العميل لا بدلًا منها.
+    /// الافتراضيّ <see cref="DocumentVisibilityType.ClientScoped"/> = السلوك السابق حرفيًّا،
+    /// وهو أيضًا القيمة الافتراضيّة في قاعدة البيانات للمستندات القائمة (بلا Backfill).
+    /// </summary>
+    public DocumentVisibilityType VisibilityType { get; set; } = DocumentVisibilityType.ClientScoped;
+
+    public DateTime? VisibilityUpdatedAtUtc { get; set; }
+    public Guid? VisibilityUpdatedByUserId { get; set; }
+
     public ICollection<ClientDocumentVersion> Versions { get; set; } = new List<ClientDocumentVersion>();
+
+    /// <summary>الأدوار المسموح لها — ذات معنى فقط حين <c>VisibilityType == CustomRoles</c>.</summary>
+    public ICollection<ClientDocumentAllowedRole> AllowedRoles { get; set; } = new List<ClientDocumentAllowedRole>();
+
+    /// <summary>المستخدمون المسموح لهم — ذوو معنى فقط حين <c>VisibilityType == CustomUsers</c>.</summary>
+    public ICollection<ClientDocumentAllowedUser> AllowedUsers { get; set; } = new List<ClientDocumentAllowedUser>();
 }

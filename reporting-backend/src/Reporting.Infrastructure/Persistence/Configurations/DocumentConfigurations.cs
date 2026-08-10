@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Reporting.Domain.Entities.Clients;
+using Reporting.Domain.Enums;
 
 namespace Reporting.Infrastructure.Persistence.Configurations;
 
@@ -26,6 +27,19 @@ public class ClientDocumentConfiguration : IEntityTypeConfiguration<ClientDocume
         b.Property(x => x.ArchiveReason).HasMaxLength(1000);
         b.Property(x => x.DeleteReason).HasMaxLength(1000);
 
+        // CPW-R2 — سياسة الرؤية. نصّيّة بقيمة افتراضيّة في القاعدة ⇒ الصفوف القائمة تصبح ClientScoped بلا Backfill.
+        b.Property(x => x.VisibilityType)
+            .HasConversion<string>()
+            .HasMaxLength(40)
+            .IsRequired()
+            .HasDefaultValue(DocumentVisibilityType.ClientScoped);
+
+        b.HasMany(x => x.AllowedRoles).WithOne(x => x.Document!)
+            .HasForeignKey(x => x.ClientDocumentId).OnDelete(DeleteBehavior.Cascade);
+
+        b.HasMany(x => x.AllowedUsers).WithOne(x => x.Document!)
+            .HasForeignKey(x => x.ClientDocumentId).OnDelete(DeleteBehavior.Cascade);
+
         b.HasOne(x => x.Client).WithMany(x => x.Documents)
             .HasForeignKey(x => x.ClientId).OnDelete(DeleteBehavior.Restrict);
 
@@ -40,6 +54,48 @@ public class ClientDocumentConfiguration : IEntityTypeConfiguration<ClientDocume
         b.HasIndex(x => new { x.ClientId, x.CategoryCode });
         b.HasIndex(x => new { x.ClientId, x.IsArchived, x.IsDeleted })
             .HasDatabaseName("IX_client_documents_ClientId_Visibility");
+
+        b.HasIndex(x => new { x.ClientId, x.VisibilityType })
+            .HasDatabaseName("IX_client_documents_ClientId_VisibilityType");
+    }
+}
+
+/// <summary>
+/// إعداد الأدوار المسموح لها برؤية مستند (CPW-R2). جدول إضافيّ بحتٌ، Cascade من المستند.
+/// فريد على (المستند، الدور) لمنع التكرار.
+/// </summary>
+public class ClientDocumentAllowedRoleConfiguration : IEntityTypeConfiguration<ClientDocumentAllowedRole>
+{
+    public void Configure(EntityTypeBuilder<ClientDocumentAllowedRole> b)
+    {
+        b.ToTable("client_document_allowed_roles");
+        b.HasKey(x => x.Id);
+
+        b.Property(x => x.RoleName).IsRequired().HasMaxLength(64);
+
+        b.HasIndex(x => x.ClientDocumentId);
+        b.HasIndex(x => new { x.ClientDocumentId, x.RoleName })
+            .IsUnique()
+            .HasDatabaseName("IX_client_document_allowed_roles_DocumentId_RoleName");
+    }
+}
+
+/// <summary>
+/// إعداد المستخدمين المسموح لهم برؤية مستند (CPW-R2). جدول إضافيّ بحتٌ، Cascade من المستند،
+/// وبلا FK إلى <c>AspNetUsers</c> اتّساقًا مع نمط المعرّفات المجرّدة في النظام.
+/// </summary>
+public class ClientDocumentAllowedUserConfiguration : IEntityTypeConfiguration<ClientDocumentAllowedUser>
+{
+    public void Configure(EntityTypeBuilder<ClientDocumentAllowedUser> b)
+    {
+        b.ToTable("client_document_allowed_users");
+        b.HasKey(x => x.Id);
+
+        b.HasIndex(x => x.ClientDocumentId);
+        b.HasIndex(x => x.UserId);
+        b.HasIndex(x => new { x.ClientDocumentId, x.UserId })
+            .IsUnique()
+            .HasDatabaseName("IX_client_document_allowed_users_DocumentId_UserId");
     }
 }
 
