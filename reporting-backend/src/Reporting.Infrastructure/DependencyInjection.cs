@@ -109,6 +109,21 @@ public static class DependencyInjection
         services.AddScoped<Application.Services.IServiceCatalogService, ServiceCatalogService>();
         services.AddScoped<Application.ExecutionTaxonomy.IExecutionTaxonomyService, ExecutionTaxonomyService>();
 
+        // ===== Project 360 (CPW-R3 · W4 محرّك الأعمال + W5 سطح الـAPI) =====
+        services.AddScoped<Application.Projects360.IProject360Authorization, Project360Authorization>();
+        // الصحّة المخزَّنة (FINDING-W6-03): تُحقَن في خدمات الطفرة التي تمسّ مدخلات ProjectHealthPolicy،
+        // فوجب تسجيلها قبلها كي لا يفشل بناء الرسم عند أوّل طلب.
+        services.AddScoped<Application.Projects360.IProjectHealthService, ProjectHealthService>();
+        services.AddScoped<Application.Projects360.IProjectStrategyService, ProjectStrategyService>();
+        // النوع الملموس مسجَّل مرّة واحدة ثمّ يُعاد استعماله عبر الواجهة، كي لا تُنشأ نسختان
+        // في الطلب الواحد حين تستدعي لوحة النظرة العامّة بانيَ الأهداف مباشرة (§15).
+        services.AddScoped<ProjectObjectiveService>();
+        services.AddScoped<Application.Projects360.IProjectObjectiveService>(sp => sp.GetRequiredService<ProjectObjectiveService>());
+        services.AddScoped<Application.Projects360.IProjectKpiService, ProjectKpiService>();
+        services.AddScoped<Application.Projects360.IProjectContractDeliverableService, ProjectContractDeliverableService>();
+        services.AddScoped<Application.Projects360.IProjectOverviewService, ProjectOverviewService>();
+        services.AddScoped<Application.Projects360.IProjectGovernanceReadService, ProjectGovernanceReadService>();
+
         return services;
     }
 }
