@@ -134,5 +134,23 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
         b.HasIndex(x => x.Status);
         b.HasIndex(x => x.OwnerTeamId);
         b.HasIndex(x => x.AccountManagerId);
+
+        // ===== CPW-R3 — Project 360 Foundation (§5-2) =====
+        // إعداد **إضافيّ بحت** للأعمدة الاثني عشر الجديدة. لم يُمَسّ أيّ سطر قائم أعلاه.
+        // المراجع (ProjectOwnerId · TeamLeaderId) تبقى Guid? بلا مفتاح أجنبيّ صلب — نفس نمط AccountManagerId.
+        b.Property(x => x.Summary).HasMaxLength(2000);
+        b.Property(x => x.Background).HasMaxLength(4000);
+        b.Property(x => x.BusinessContext).HasMaxLength(4000);
+        b.Property(x => x.ScopeText).HasMaxLength(4000);
+        b.Property(x => x.OutOfScope).HasMaxLength(4000);
+        b.Property(x => x.SuccessDefinition).HasMaxLength(4000);
+
+        b.Property(x => x.ProgressPercent).HasColumnType("numeric(9,2)");
+        b.Property(x => x.HealthPercent).HasColumnType("numeric(9,2)");
+        b.Property(x => x.HealthStatus).HasConversion<string>().HasMaxLength(20);
+
+        b.HasIndex(x => x.HealthStatus);
+        b.HasIndex(x => x.ProjectOwnerId);
+        b.HasIndex(x => x.TeamLeaderId);
     }
 }

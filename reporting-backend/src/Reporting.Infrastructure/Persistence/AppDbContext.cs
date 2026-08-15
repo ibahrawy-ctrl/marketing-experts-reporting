@@ -12,6 +12,7 @@ using Reporting.Domain.Entities.Leave;
 using Reporting.Domain.Entities.Org;
 using Reporting.Domain.Entities.Payroll;
 using Reporting.Domain.Entities.Positions;
+using Reporting.Domain.Entities.Projects360;
 using Reporting.Domain.Entities.Services;
 using Reporting.Domain.Entities.Submissions;
 using Reporting.Domain.Entities.System;
@@ -44,6 +45,14 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
     public DbSet<ClientContact> ClientContacts => Set<ClientContact>();
     public DbSet<ClientDigitalChannel> ClientDigitalChannels => Set<ClientDigitalChannel>();
     public DbSet<ClientBrandProfile> ClientBrandProfiles => Set<ClientBrandProfile>();
+
+    // Project 360 Foundation (CPW-R3) — منفصلة تمامًا عن منظومة مؤشّرات الموظّفين وعن كيانات Workstream.
+    public DbSet<ProjectObjective> ProjectObjectives => Set<ProjectObjective>();
+    public DbSet<ProjectKpi> ProjectKpis => Set<ProjectKpi>();
+    public DbSet<ProjectKpiReading> ProjectKpiReadings => Set<ProjectKpiReading>();
+    public DbSet<ProjectDeliverable> ProjectDeliverables => Set<ProjectDeliverable>();
+    public DbSet<ProjectStrategy> ProjectStrategies => Set<ProjectStrategy>();
+    public DbSet<ProjectStrategyAttribute> ProjectStrategyAttributes => Set<ProjectStrategyAttribute>();
 
     // كتالوج الدورات (مصدر أسماء دورات مبيعات B2C)
     public DbSet<Course> Courses => Set<Course>();

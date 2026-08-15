@@ -79,6 +79,10 @@ public class DecisionConfiguration : IEntityTypeConfiguration<Decision>
         b.HasIndex(x => x.RelatedSubmissionId);
         b.HasIndex(x => x.RelatedRiskId);
         b.HasIndex(x => x.RelatedEscalationId);
+
+        // CPW-R3 · D-05 — ربط القرار بمشروع: فهرس عاديّ بلا مفتاح أجنبيّ، على نمط بقيّة
+        // مراجع القرار أعلاه. القرارات القائمة كلّها تبقى NULL ⟹ صفر Backfill.
+        b.HasIndex(x => x.ProjectId);
     }
 }
 
