@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Reporting.Application.Audit;
 using Reporting.Application.Common;
 using Reporting.Application.ExecutionTaxonomy;
+using Reporting.Application.Projects360;
 using Reporting.Domain.Entities.ExecutionTaxonomy;
 using Reporting.Infrastructure.Persistence;
 
@@ -24,7 +25,8 @@ public class ExecutionTaxonomyService : IExecutionTaxonomyService
     }
 
     // المجالات الثابتة المعروفة (تُدار برمجيًّا — لا إنشاء مجالات جديدة من الواجهة).
-    // الثلاثة عشر الأولى = قوالب التنفيذ v3/v4. الستة الأخيرة = P0 منصّة التنفيذ العامة.
+    // الثلاثة عشر الأولى = قوالب التنفيذ v3/v4. ثمّ الستة = P0 منصّة التنفيذ العامة.
+    // والثلاثة الأخيرة = CPW-R3 Project 360 (W5 · DEC-W4-01) — تُبذَر في ExecutionTaxonomySeeder.
     private static readonly HashSet<string> KnownDomains = new(StringComparer.Ordinal)
     {
         "content_type", "content_goal", "work_status",
@@ -34,6 +36,12 @@ public class ExecutionTaxonomyService : IExecutionTaxonomyService
         // P0 — منصّة التنفيذ العامة
         "workstream_type", "deliverable", "usage_context",
         "workflow_step", "delay_reason", "platform_channel",
+        // CPW-R3 — Project 360: أقسام الاستراتيجيّة · حقولها الشرطيّة · المخرَجات التعاقديّة.
+        // ملاحظة: "contract_deliverable" مجال **مستقلّ** عن "deliverable" (مخرَج تيّار العمل) —
+        // اسمان مختلفان لمفهومين مختلفين، ولا تداخل بين قيمهما.
+        Project360CatalogDomains.StrategySection,
+        Project360CatalogDomains.StrategyField,
+        Project360CatalogDomains.ContractDeliverable,
     };
 
     public async Task<IReadOnlyList<ExecutionTaxonomyDto>> ListAsync(string? domain, bool includeInactive, CancellationToken ct = default)

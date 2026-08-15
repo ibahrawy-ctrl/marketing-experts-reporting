@@ -223,6 +223,69 @@ public static class ExecutionTaxonomySeeder
         new("platform_channel", "messenger", "ماسنجر", "Messenger"),
         new("platform_channel", "website", "موقع إلكتروني", "Website"),
         new("platform_channel", "email", "بريد إلكتروني", "Email"),
+
+        // ==================================================================
+        // CPW-R3 · Project 360 — بذر الكتالوج (W5 · قرار المالك DEC-W4-01)
+        //
+        // الرموز الثمانية والثلاثون **منقولة حرفيًّا** من مصادرها المعتمدة، بلا اختراع رمز واحد:
+        //   · strategy_section (6)      ⟵ ملحق W1-A بند 3 (وهو المصدر الوحيد لها؛ R2 لا يذكرها)
+        //   · strategy_field (14)       ⟵ R2 §9-7 جدول الرموز + §5-3-ج
+        //   · contract_deliverable (18) ⟵ R2 §9-7 جدول الرموز
+        //
+        // **التسميات**: R2 يوجب أن تُرجِع نقطة نهاية المخطَّط «أسماءها العربيّة» (§5-3-ج) لكنّه
+        // **لا يورد أيّ تسمية**. فالتسميات أدناه ترجمة حرفيّة لكلمات الرمز نفسه لا محتوى جديدًا،
+        // ولأنّها بيانات كتالوج قابلة للتحرير من شاشة الإدارة فتعديلها لاحقًا صفر كود وصفر هجرة.
+        // (مسجَّلة بندًا مرفوعًا في تقرير W5.)
+        // ==================================================================
+
+        // ===== أقسام عرض الاستراتيجيّة (strategy_section) — ترتيب W1-A بند 3 حرفيًّا =====
+        // العامّة (تظهر لكلّ أنواع الخدمات): business · audience · brand
+        // المحجوزة لخدمة (تظهر بمطابقة ServiceType): seo · ads · social
+        new("strategy_section", "business", "الأعمال", "Business"),
+        new("strategy_section", "audience", "الجمهور", "Audience"),
+        new("strategy_section", "seo", "تحسين محرّكات البحث", "SEO"),
+        new("strategy_section", "ads", "الإعلانات المدفوعة", "Ads"),
+        new("strategy_section", "brand", "العلامة التجاريّة", "Brand"),
+        new("strategy_section", "social", "التواصل الاجتماعيّ", "Social"),
+
+        // ===== الحقول الاستراتيجيّة المشروطة (strategy_field) =====
+        // الرمز = «رمز القسم . رمز الحقل»، والبادئة هي مصدر قابليّة التطبيق (DEC-W4-02).
+        new("strategy_field", "seo.keywords", "الكلمات المفتاحيّة", "Keywords"),
+        new("strategy_field", "seo.search_intent", "نيّة البحث", "Search Intent"),
+        new("strategy_field", "seo.priority_pages", "الصفحات ذات الأولويّة", "Priority Pages"),
+        new("strategy_field", "seo.competitors", "منافسو البحث", "SEO Competitors"),
+        new("strategy_field", "ads.campaign_goal", "هدف الحملة", "Campaign Goal"),
+        new("strategy_field", "ads.budget", "الميزانيّة", "Budget"),
+        new("strategy_field", "ads.target_audience", "الجمهور المستهدَف", "Target Audience"),
+        new("strategy_field", "ads.channels", "قنوات الإعلان", "Ad Channels"),
+        new("strategy_field", "ads.offer", "العرض الترويجيّ", "Offer"),
+        new("strategy_field", "ads.conversion_goal", "هدف التحويل", "Conversion Goal"),
+        new("strategy_field", "social.content_pillars", "محاور المحتوى", "Content Pillars"),
+        new("strategy_field", "social.publishing_frequency", "تواتر النشر", "Publishing Frequency"),
+        new("strategy_field", "social.brand_voice", "صوت العلامة", "Brand Voice"),
+        new("strategy_field", "social.platforms", "المنصّات", "Platforms"),
+
+        // ===== أنواع المخرَجات التعاقديّة (contract_deliverable) =====
+        // مجال **مستقلّ** عن مجال `deliverable` (مخرَج تيّار العمل) — لا تداخل بين القيمتين.
+        // `landing_page_delivery` بدل `landing_page` تفاديًا للاصطدام برمز قائم (R2 §9-7).
+        new("contract_deliverable", "monthly_content_plan", "خطّة المحتوى الشهريّة", "Monthly Content Plan"),
+        new("contract_deliverable", "monthly_calendar", "التقويم الشهريّ", "Monthly Calendar"),
+        new("contract_deliverable", "posts_package", "حزمة المنشورات", "Posts Package"),
+        new("contract_deliverable", "reels_package", "حزمة الريلز", "Reels Package"),
+        new("contract_deliverable", "stories_package", "حزمة الستوريز", "Stories Package"),
+        new("contract_deliverable", "monthly_report", "التقرير الشهريّ", "Monthly Report"),
+        new("contract_deliverable", "keyword_research_doc", "وثيقة بحث الكلمات المفتاحيّة", "Keyword Research Doc"),
+        new("contract_deliverable", "technical_audit", "التدقيق التقنيّ", "Technical Audit"),
+        new("contract_deliverable", "monthly_seo_report", "تقرير السيو الشهريّ", "Monthly SEO Report"),
+        new("contract_deliverable", "onpage_optimization", "تحسين الصفحات الداخليّة", "On-Page Optimization"),
+        new("contract_deliverable", "brand_strategy", "استراتيجيّة العلامة", "Brand Strategy"),
+        new("contract_deliverable", "brand_identity", "هويّة العلامة", "Brand Identity"),
+        new("contract_deliverable", "logo", "الشعار", "Logo"),
+        new("contract_deliverable", "brand_guidelines", "دليل العلامة", "Brand Guidelines"),
+        new("contract_deliverable", "campaign_structure", "بنية الحملة", "Campaign Structure"),
+        new("contract_deliverable", "creatives_package", "حزمة التصاميم الإعلانيّة", "Creatives Package"),
+        new("contract_deliverable", "landing_page_delivery", "تسليم صفحة الهبوط", "Landing Page Delivery"),
+        new("contract_deliverable", "performance_report", "تقرير الأداء", "Performance Report"),
     };
 
     public static async Task SeedAsync(IServiceProvider services)
