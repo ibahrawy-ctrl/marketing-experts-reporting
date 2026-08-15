@@ -51,6 +51,9 @@ import type {
   ActionItemPriority,
   ActionItemSourceType,
   ActionItemUpdateType,
+  DocumentLifecycleStatus,
+  DocumentScanStatus,
+  DocumentVisibilityType,
 } from '../types/api';
 
 export const roleLabel: Record<Role, string> = {
@@ -65,7 +68,7 @@ export const roleLabel: Record<Role, string> = {
   Viewer: 'مُطّلع',
   FinanceManager: 'المدير المالي',
   Accountant: 'الحسابات',
-  AccountPortfolioReader: 'محفظة مدير الحساب',
+  AccountPortfolioReader: 'محفظة عملائي',
 };
 
 export const submissionStatusLabel: Record<SubmissionStatus, string> = {
@@ -342,6 +345,130 @@ export const accessStatusLabel: Record<string, string> = {
   Revoked: 'مسحوب',
 };
 export const ACCESS_STATUS_CODES = Object.keys(accessStatusLabel);
+
+// ===== CPW-R1B2: مستندات العميل والروابط المهمّة =====
+export const documentCategoryLabel: Record<string, string> = {
+  Contract: 'عقد',
+  Proposal: 'عرض مقترح',
+  Invoice: 'فاتورة',
+  Quotation: 'عرض سعر',
+  BrandAsset: 'أصل هوية',
+  Logo: 'شعار',
+  Presentation: 'عرض تقديمي',
+  Report: 'تقرير',
+  Legal: 'مستند قانوني',
+  Identity: 'مستند تعريفي',
+  MeetingMinutes: 'محضر اجتماع',
+  Creative: 'عمل إبداعي',
+  Media: 'وسائط',
+  Other: 'أخرى',
+  // CPW-R2: تصنيفات مضافة (لم يُحذف أيّ تصنيف قائم).
+  FinancialProposal: 'عرض مالي',
+  TechnicalProposal: 'عرض فنّي',
+  MarketingPlan: 'خطة تسويقية',
+  NDA: 'اتفاقية عدم إفصاح',
+};
+export const DOCUMENT_CATEGORY_CODES = Object.keys(documentCategoryLabel);
+
+// ===== CPW-R2: سياسة رؤية المستند =====
+// الخادم هو الفاصل في التطبيق؛ هذه الخرائط للعرض واختيار السياسة في الواجهة فقط.
+export const documentVisibilityLabel: Record<DocumentVisibilityType, string> = {
+  ClientScoped: 'كل من لديه صلاحية على العميل',
+  ManagementOnly: 'الإدارة فقط',
+  ManagementAndFinance: 'الإدارة والمالية',
+  FinanceOnly: 'المالية فقط',
+  HRManagementOnly: 'الموارد البشرية والإدارة',
+  ProjectTeam: 'فريق المشروع',
+  CustomRoles: 'أدوار مخصصة',
+  CustomUsers: 'أشخاص محددون',
+};
+export const DOCUMENT_VISIBILITY_TYPES = Object.keys(
+  documentVisibilityLabel,
+) as DocumentVisibilityType[];
+
+/// خريطة الافتراضيّات — مرآة لـ DocumentCodeConstants.DefaultVisibilityByCategory (مطابِقة حرفيًّا).
+export const documentDefaultVisibilityByCategory: Record<string, DocumentVisibilityType> = {
+  Contract: 'ManagementAndFinance',
+  Invoice: 'ManagementAndFinance',
+  Quotation: 'ManagementAndFinance',
+  FinancialProposal: 'ManagementAndFinance',
+  TechnicalProposal: 'ProjectTeam',
+  MarketingPlan: 'ProjectTeam',
+  MeetingMinutes: 'ProjectTeam',
+  BrandAsset: 'ProjectTeam',
+  Logo: 'ProjectTeam',
+  Creative: 'ProjectTeam',
+  Media: 'ProjectTeam',
+  NDA: 'ManagementOnly',
+  Legal: 'ManagementOnly',
+  Identity: 'ManagementOnly',
+  Proposal: 'ClientScoped',
+  Report: 'ClientScoped',
+  Presentation: 'ClientScoped',
+  Other: 'ClientScoped',
+};
+
+export function defaultVisibilityForCategory(categoryCode: string): DocumentVisibilityType {
+  return documentDefaultVisibilityByCategory[categoryCode] ?? 'ClientScoped';
+}
+
+export const linkCategoryLabel: Record<string, string> = {
+  Drive: 'مساحة تخزين',
+  Website: 'موقع إلكتروني',
+  SocialProfile: 'حساب تواصل',
+  AdsAccount: 'حساب إعلاني',
+  Analytics: 'تحليلات',
+  DesignBoard: 'لوحة تصميم',
+  ProjectBoard: 'لوحة مشروع',
+  Documentation: 'توثيق',
+  Other: 'أخرى',
+};
+export const LINK_CATEGORY_CODES = Object.keys(linkCategoryLabel);
+
+export const confidentialityLabel: Record<string, string> = {
+  Public: 'عام',
+  Internal: 'داخلي',
+  Confidential: 'سرّي',
+  Restricted: 'مقيّد',
+};
+export const CONFIDENTIALITY_CODES = Object.keys(confidentialityLabel);
+
+export const documentLifecycleLabel: Record<DocumentLifecycleStatus, string> = {
+  Draft: 'مسودة',
+  Current: 'ساري',
+  Superseded: 'مُستبدَل',
+  Archived: 'مؤرشف',
+};
+
+export function documentLifecycleTone(s: DocumentLifecycleStatus): 'success' | 'gold' | 'muted' {
+  return s === 'Current' ? 'success' : s === 'Draft' ? 'gold' : 'muted';
+}
+
+export const documentScanStatusLabel: Record<DocumentScanStatus, string> = {
+  Pending: 'بانتظار الفحص',
+  NotScanned: 'غير مفحوص',
+  Clean: 'نظيف',
+  Rejected: 'مرفوض',
+  Failed: 'فشل الفحص',
+};
+
+export function documentScanStatusTone(s: DocumentScanStatus): 'success' | 'gold' | 'alert' | 'muted' {
+  return s === 'Clean' ? 'success' : s === 'Rejected' || s === 'Failed' ? 'alert' : s === 'Pending' ? 'gold' : 'muted';
+}
+
+// حجم الملفّ بصيغة مقروءة (أساس 1024).
+export function formatBytes(bytes: number | null | undefined): string {
+  if (bytes === null || bytes === undefined) return '—';
+  if (bytes < 1024) return `${bytes} بايت`;
+  const units = ['كيلوبايت', 'ميجابايت', 'جيجابايت'];
+  let value = bytes / 1024;
+  let i = 0;
+  while (value >= 1024 && i < units.length - 1) {
+    value /= 1024;
+    i += 1;
+  }
+  return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[i]}`;
+}
 
 // عرض رمز اختياري بالاسم العربي إن عُرِف، وإلّا الرمز نفسه أو شرطة.
 export function codeLabel(map: Record<string, string>, code: string | null | undefined): string {

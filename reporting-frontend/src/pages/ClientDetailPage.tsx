@@ -19,6 +19,22 @@ import {
   useClientBrand,
   useUpsertClientBrand,
 } from '../lib/useClients';
+import {
+  useClientDocuments,
+  useClientDocument,
+  useClientStorageUsage,
+  useUploadClientDocument,
+  useAddClientDocumentVersion,
+  useUpdateClientDocument,
+  useSetClientDocumentArchived,
+  useDeleteClientDocument,
+  useClientExternalLinks,
+  useCreateClientExternalLink,
+  useUpdateClientExternalLink,
+  useSetClientExternalLinkActive,
+  downloadClientDocument,
+  downloadClientDocumentVersion,
+} from '../lib/useClientDocuments';
 import { useDirectoryUsers, useTeams } from '../lib/useDirectory';
 import { useAuth } from '../lib/auth';
 import { Card, Badge, Button, StatCard, Field, Input, Select, Alert, EmptyState } from '../components/ui';
@@ -45,6 +61,21 @@ import {
   CONTACT_METHOD_CODES,
   PLATFORM_CODES,
   ACCESS_STATUS_CODES,
+  documentCategoryLabel,
+  DOCUMENT_CATEGORY_CODES,
+  linkCategoryLabel,
+  LINK_CATEGORY_CODES,
+  confidentialityLabel,
+  CONFIDENTIALITY_CODES,
+  documentLifecycleLabel,
+  documentLifecycleTone,
+  documentScanStatusLabel,
+  documentScanStatusTone,
+  documentVisibilityLabel,
+  DOCUMENT_VISIBILITY_TYPES,
+  defaultVisibilityForCategory,
+  roleLabel,
+  formatBytes,
 } from '../lib/format';
 import { apiErrorMessage } from '../lib/api';
 import type {
@@ -61,16 +92,32 @@ import type {
   ClientBrandProfileDto,
   UpsertClientBrandProfileRequest,
   LinkedReportRow,
+  ClientDocumentDto,
+  ClientExternalLinkDto,
+  CreateClientExternalLinkRequest,
+  DocumentLifecycleStatus,
+  DocumentVisibilityType,
+  Role,
 } from '../types/api';
 
 const SERVICE_TYPES: ServiceType[] = ['Social', 'Seo', 'MediaBuying', 'Website', 'Video', 'Branding', 'Other'];
 
-type TabKey = 'overview' | 'contacts' | 'channels' | 'brand' | 'projects' | 'reports';
+type TabKey =
+  | 'overview'
+  | 'contacts'
+  | 'channels'
+  | 'brand'
+  | 'documents'
+  | 'links'
+  | 'projects'
+  | 'reports';
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'overview', label: 'الملف' },
   { key: 'contacts', label: 'جهات الاتصال' },
   { key: 'channels', label: 'القنوات الرقمية' },
   { key: 'brand', label: 'البراند' },
+  { key: 'documents', label: 'المستندات' },
+  { key: 'links', label: 'الروابط المهمّة' },
   { key: 'projects', label: 'المشاريع' },
   { key: 'reports', label: 'التقارير' },
 ];
@@ -150,6 +197,8 @@ export default function ClientDetailPage() {
       {tab === 'contacts' && <ContactsTab clientId={c.id} canWrite={canWriteChildren} />}
       {tab === 'channels' && <ChannelsTab clientId={c.id} canWrite={canWriteChildren} />}
       {tab === 'brand' && <BrandTab clientId={c.id} canWrite={canWriteChildren} />}
+      {tab === 'documents' && <DocumentsTab clientId={c.id} canWrite={canWriteChildren} />}
+      {tab === 'links' && <LinksTab clientId={c.id} canWrite={canWriteChildren} />}
       {tab === 'projects' && <ProjectsTab client={c} canManage={canEditClientCore} />}
       {tab === 'reports' && <LinkedReportsCard rows={reportRows} title="تقارير العميل المرتبطة" />}
     </div>
@@ -192,7 +241,7 @@ function OverviewTab({ client: c, canEdit }: { client: ClientDto; canEdit: boole
           }
         />
         <Info label="بداية العلاقة" value={formatDate(c.relationshipStartDate)} />
-        <Info label="مدير الحساب" value={c.accountManagerName ?? '—'} />
+        <Info label="مدير العميل" value={c.accountManagerName ?? '—'} />
         <Info label="تاريخ الإضافة" value={formatDate(c.createdAtUtc)} />
         <Info label="جهة الاتصال الرئيسية" value={c.mainContactName ?? '—'} />
         <Info label="بيانات الاتصال" value={c.mainContactInfo ?? '—'} />
@@ -1087,7 +1136,7 @@ function EditClientForm({ client, onDone }: { client: ClientDto; onDone: () => v
             ))}
           </Select>
         </Field>
-        <Field label="مدير الحساب">
+        <Field label="مدير العميل">
           <Select value={accountManagerId} onChange={(e) => setAccountManagerId(e.target.value)}>
             <option value="">— بدون —</option>
             {(users.data ?? []).map((u) => (
@@ -1214,7 +1263,7 @@ function CreateProjectForm({ clientId, onDone }: { clientId: string; onDone: () 
             ))}
           </Select>
         </Field>
-        <Field label="مدير الحساب">
+        <Field label="مدير العميل">
           <Select value={accountManagerId} onChange={(e) => setAccountManagerId(e.target.value)}>
             <option value="">— بدون —</option>
             {(users.data ?? []).map((u) => (
@@ -1237,6 +1286,1006 @@ function CreateProjectForm({ clientId, onDone }: { clientId: string; onDone: () 
       <div className="mt-3 flex gap-2">
         <Button variant="primary" onClick={submit} disabled={create.isPending || !name.trim()}>
           {create.isPending ? 'جارٍ الحفظ…' : 'حفظ المشروع'}
+        </Button>
+        <Button variant="ghost" onClick={onDone}>
+          إلغاء
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ===== تبويب المستندات (CPW-R1B2) =====
+// التنزيل يمرّ عبر نقطة نهاية مصادَقة فقط، ولا يظهر مسار التخزين إطلاقًا.
+function DocumentsTab({ clientId, canWrite }: { clientId: string; canWrite: boolean }) {
+  const [categoryCode, setCategoryCode] = useState('');
+  const [confidentialityCode, setConfidentialityCode] = useState('');
+  const [lifecycleStatus, setLifecycleStatus] = useState('');
+  const [search, setSearch] = useState('');
+  const [includeArchived, setIncludeArchived] = useState(false);
+  const docs = useClientDocuments(clientId, {
+    categoryCode: categoryCode || undefined,
+    confidentialityCode: confidentialityCode || undefined,
+    lifecycleStatus: (lifecycleStatus || undefined) as DocumentLifecycleStatus | undefined,
+    search: search.trim() || undefined,
+    includeArchived,
+  });
+  const usage = useClientStorageUsage(clientId);
+  const [uploading, setUploading] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  const rows = docs.data ?? [];
+  const u = usage.data;
+
+  return (
+    <Card className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-lg font-bold text-navy">مستندات العميل</h2>
+        {canWrite && (
+          <Button variant={uploading ? 'ghost' : 'primary'} onClick={() => setUploading((v) => !v)}>
+            {uploading ? 'إغلاق' : '+ رفع مستند'}
+          </Button>
+        )}
+      </div>
+
+      {u && (
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard label="المستندات" value={u.documentCount} />
+          <StatCard label="النسخ" value={u.versionCount} />
+          <StatCard label="المستهلَك" value={formatBytes(u.usedBytes)} />
+          <StatCard
+            label="المتبقّي من الحصّة"
+            value={formatBytes(u.remainingBytes)}
+            tone={u.remainingBytes <= 0 ? 'alert' : 'navy'}
+          />
+        </div>
+      )}
+
+      {u && !u.scannerConfigured && (
+        <Alert tone="gold">
+          لا يوجد محرّك فحص فيروسات مُفعَّل ({u.scanEngine}) — الملفّات تُقبَل بحالة «غير مفحوص». تعامَل مع
+          المستندات الواردة بحذر.
+        </Alert>
+      )}
+
+      {err && <Alert tone="alert">{err}</Alert>}
+
+      {canWrite && uploading && (
+        <UploadDocumentForm
+          clientId={clientId}
+          maxUploadSizeBytes={u?.maxUploadSizeBytes}
+          allowedExtensions={u?.allowedExtensions ?? []}
+          onDone={() => setUploading(false)}
+        />
+      )}
+
+      <div className="grid gap-3 md:grid-cols-5">
+        <Field label="التصنيف">
+          <Select value={categoryCode} onChange={(e) => setCategoryCode(e.target.value)}>
+            <option value="">— الكل —</option>
+            {DOCUMENT_CATEGORY_CODES.map((code) => (
+              <option key={code} value={code}>
+                {documentCategoryLabel[code]}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="السرّيّة">
+          <Select value={confidentialityCode} onChange={(e) => setConfidentialityCode(e.target.value)}>
+            <option value="">— الكل —</option>
+            {CONFIDENTIALITY_CODES.map((code) => (
+              <option key={code} value={code}>
+                {confidentialityLabel[code]}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="الحالة">
+          <Select value={lifecycleStatus} onChange={(e) => setLifecycleStatus(e.target.value)}>
+            <option value="">— الكل —</option>
+            {(['Draft', 'Current', 'Superseded', 'Archived'] as DocumentLifecycleStatus[]).map((s) => (
+              <option key={s} value={s}>
+                {documentLifecycleLabel[s]}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="بحث">
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="العنوان أو الوسوم…" />
+        </Field>
+        <label className="flex items-end gap-1.5 pb-2 text-xs text-ink-2">
+          <input
+            type="checkbox"
+            checked={includeArchived}
+            onChange={(e) => setIncludeArchived(e.target.checked)}
+          />
+          إظهار المؤرشفة
+        </label>
+      </div>
+
+      {docs.isLoading ? (
+        <LoadingState label="يتم تحميل المستندات…" />
+      ) : rows.length === 0 ? (
+        <EmptyState title="لا توجد مستندات" description="لم تُرفَع مستندات مطابقة لهذا العميل بعد." />
+      ) : (
+        <div className="space-y-3">
+          {rows.map((d) => (
+            <DocumentRow
+              key={d.id}
+              clientId={clientId}
+              doc={d}
+              canWrite={canWrite}
+              open={openId === d.id}
+              onToggle={() => setOpenId((v) => (v === d.id ? null : d.id))}
+              onError={setErr}
+            />
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function DocumentRow({
+  clientId,
+  doc: d,
+  canWrite,
+  open,
+  onToggle,
+  onError,
+}: {
+  clientId: string;
+  doc: ClientDocumentDto;
+  canWrite: boolean;
+  open: boolean;
+  onToggle: () => void;
+  onError: (msg: string | null) => void;
+}) {
+  const detail = useClientDocument(clientId, open ? d.id : undefined);
+  const setArchived = useSetClientDocumentArchived(clientId);
+  const remove = useDeleteClientDocument(clientId);
+  const [editing, setEditing] = useState(false);
+  const [addingVersion, setAddingVersion] = useState(false);
+
+  async function toggleArchive() {
+    onError(null);
+    const reason = d.isArchived ? undefined : window.prompt('سبب الأرشفة (اختياري):') ?? undefined;
+    try {
+      await setArchived.mutateAsync({ documentId: d.id, archived: !d.isArchived, req: { reason: reason ?? null } });
+    } catch (e) {
+      onError(apiErrorMessage(e, 'تعذّر تغيير حالة الأرشفة.'));
+    }
+  }
+
+  async function softDelete() {
+    onError(null);
+    const reason = window.prompt('سبب الحذف (إلزاميّ) — الحذف منطقيّ ولا يمسّ الملفّ المخزَّن:');
+    if (!reason || !reason.trim()) return;
+    try {
+      await remove.mutateAsync({ documentId: d.id, req: { reason: reason.trim() } });
+    } catch (e) {
+      onError(apiErrorMessage(e, 'تعذّر حذف المستند.'));
+    }
+  }
+
+  return (
+    <div className={`rounded-lg border p-3 text-sm ${d.isArchived ? 'border-line bg-offwhite opacity-70' : 'border-line'}`}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-semibold text-navy">{d.title}</span>
+          <Badge tone={documentLifecycleTone(d.lifecycleStatus)}>{documentLifecycleLabel[d.lifecycleStatus]}</Badge>
+          <Badge tone="navy">{codeLabel(documentCategoryLabel, d.categoryCode)}</Badge>
+          {d.confidentialityCode && (
+            <Badge tone="gold">{codeLabel(confidentialityLabel, d.confidentialityCode)}</Badge>
+          )}
+          {d.currentScanStatus && (
+            <Badge tone={documentScanStatusTone(d.currentScanStatus)}>
+              {documentScanStatusLabel[d.currentScanStatus]}
+            </Badge>
+          )}
+          <Badge tone="muted">{documentVisibilityLabel[d.visibilityType]}</Badge>
+          {d.isArchived && <Badge tone="muted">مؤرشف</Badge>}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {d.currentVersionId && (
+            <Button
+              variant="ghost"
+              onClick={async () => {
+                onError(null);
+                try {
+                  await downloadClientDocument(clientId, d.id, d.currentFileName ?? d.title);
+                } catch (e) {
+                  onError(apiErrorMessage(e, 'تعذّر تنزيل المستند.'));
+                }
+              }}
+            >
+              تنزيل
+            </Button>
+          )}
+          <Button variant="ghost" onClick={onToggle}>
+            {open ? 'إخفاء النسخ' : `النسخ (${d.versionCount})`}
+          </Button>
+          {canWrite && (
+            <>
+              <Button variant="ghost" onClick={() => { setEditing((v) => !v); setAddingVersion(false); }}>
+                تعديل
+              </Button>
+              <Button variant="ghost" onClick={() => { setAddingVersion((v) => !v); setEditing(false); }}>
+                + نسخة
+              </Button>
+              <Button variant="ghost" disabled={setArchived.isPending} onClick={toggleArchive}>
+                {d.isArchived ? 'إلغاء الأرشفة' : 'أرشفة'}
+              </Button>
+              <Button variant="danger" disabled={remove.isPending} onClick={softDelete}>
+                حذف
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+
+      <dl className="mt-2 grid grid-cols-2 gap-2 text-xs text-ink-2 lg:grid-cols-4">
+        <Info label="النسخة الحالية" value={d.currentVersionNo ? `v${d.currentVersionNo}` : '—'} />
+        <Info label="الملفّ" value={d.currentFileName ?? '—'} />
+        <Info label="الحجم" value={formatBytes(d.currentSizeBytes)} />
+        <Info label="رفعه" value={d.uploadedByName ?? '—'} />
+        <Info label="تاريخ الإضافة" value={formatDate(d.createdAtUtc)} />
+        {d.tags && <Info label="الوسوم" value={d.tags} />}
+        {d.isArchived && d.archiveReason && <Info label="سبب الأرشفة" value={d.archiveReason} />}
+        {/* قائمتا التصريح لا تُعرَضان إلّا لمن يملك صلاحيّة إدارة رؤية المستندات (§12). */}
+        {d.canManageVisibility && (d.allowedRoles?.length ?? 0) > 0 && (
+          <Info
+            label="الأدوار المصرّح لها"
+            value={d.allowedRoles!.map((r) => roleLabel[r as Role] ?? r).join('، ')}
+          />
+        )}
+        {d.canManageVisibility && (d.allowedUserIds?.length ?? 0) > 0 && (
+          <AllowedUsersInfo userIds={d.allowedUserIds!} />
+        )}
+      </dl>
+      {d.description && <p className="mt-2 text-xs text-ink-2">{d.description}</p>}
+
+      {canWrite && editing && (
+        <EditDocumentForm clientId={clientId} doc={d} onDone={() => setEditing(false)} />
+      )}
+      {canWrite && addingVersion && (
+        <AddVersionForm clientId={clientId} documentId={d.id} onDone={() => setAddingVersion(false)} />
+      )}
+
+      {open && (
+        <div className="mt-3 rounded-lg bg-offwhite p-3">
+          {detail.isLoading ? (
+            <LoadingState label="يتم تحميل سجلّ النسخ…" />
+          ) : (
+            <ul className="space-y-2 text-xs">
+              {(detail.data?.versions ?? []).map((v) => (
+                <li key={v.id} className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold text-navy">v{v.versionNo}</span>
+                    {v.isCurrent && <Badge tone="success">سارية</Badge>}
+                    <Badge tone={documentScanStatusTone(v.scanStatus)}>{documentScanStatusLabel[v.scanStatus]}</Badge>
+                    <span>{v.originalFileName}</span>
+                    <span className="text-ink-2">{formatBytes(v.sizeBytes)}</span>
+                    <span className="text-ink-2">{formatDate(v.createdAtUtc)}</span>
+                    {v.changeNote && <span className="text-ink-2">— {v.changeNote}</span>}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    onClick={async () => {
+                      onError(null);
+                      try {
+                        await downloadClientDocumentVersion(clientId, d.id, v.id, v.originalFileName);
+                      } catch (e) {
+                        onError(apiErrorMessage(e, 'تعذّر تنزيل النسخة.'));
+                      }
+                    }}
+                  >
+                    تنزيل
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ===== محرّر سياسة رؤية المستند (CPW-R2) =====
+// الخادم هو الفاصل الوحيد في التطبيق؛ ما هنا اختيارٌ وعرضٌ فقط.
+// مجموعات الأدوار مرآةٌ لـ DocumentVisibilityPolicy في الخادم — تُستعمل حصرًا لتحذير «قد لا ترى المستند».
+const VISIBILITY_MANAGEMENT_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'Manager'];
+const VISIBILITY_FINANCE_ROLES: Role[] = ['FinanceManager', 'Accountant'];
+const VISIBILITY_HR_MANAGEMENT_ROLES: Role[] = ['HR', 'Admin', 'CEO', 'GeneralManager'];
+const ALL_ROLE_CODES = Object.keys(roleLabel) as Role[];
+
+/// هل يبقى صاحبُ الأدوار المعطاة قادرًا على رؤية مستندٍ بهذه السياسة؟
+/// `null` = غير محسوم في الواجهة (يعتمد على نطاق العميل/المشروع في الخادم) ⇒ لا تحذير.
+function visibilitySelfAccess(
+  type: DocumentVisibilityType,
+  myRoles: Role[],
+  myUserId: string | undefined,
+  allowedRoles: string[],
+  allowedUserIds: string[],
+): boolean | null {
+  const any = (set: Role[]) => myRoles.some((r) => set.includes(r));
+  switch (type) {
+    case 'ManagementOnly':
+      return any(VISIBILITY_MANAGEMENT_ROLES);
+    case 'ManagementAndFinance':
+      return any(VISIBILITY_MANAGEMENT_ROLES) || any(VISIBILITY_FINANCE_ROLES);
+    case 'FinanceOnly':
+      return any(VISIBILITY_FINANCE_ROLES);
+    case 'HRManagementOnly':
+      return any(VISIBILITY_HR_MANAGEMENT_ROLES);
+    case 'CustomRoles':
+      return allowedRoles.length === 0 ? null : myRoles.some((r) => allowedRoles.includes(r));
+    case 'CustomUsers':
+      return allowedUserIds.length === 0 ? null : !!myUserId && allowedUserIds.includes(myUserId);
+    default:
+      // ClientScoped / ProjectTeam — يعتمدان على نطاق العميل أو المشروع، ولا يُحسمان هنا.
+      return null;
+  }
+}
+
+function DocumentVisibilityEditor({
+  visibilityType,
+  allowedRoles,
+  allowedUserIds,
+  onVisibilityTypeChange,
+  onAllowedRolesChange,
+  onAllowedUserIdsChange,
+}: {
+  visibilityType: DocumentVisibilityType;
+  allowedRoles: string[];
+  allowedUserIds: string[];
+  onVisibilityTypeChange: (v: DocumentVisibilityType) => void;
+  onAllowedRolesChange: (v: string[]) => void;
+  onAllowedUserIdsChange: (v: string[]) => void;
+}) {
+  const { user } = useAuth();
+  const users = useDirectoryUsers();
+  const selfAccess = visibilitySelfAccess(
+    visibilityType,
+    user?.roles ?? [],
+    user?.userId,
+    allowedRoles,
+    allowedUserIds,
+  );
+
+  function toggle(list: string[], value: string, apply: (v: string[]) => void) {
+    apply(list.includes(value) ? list.filter((x) => x !== value) : [...list, value]);
+  }
+
+  return (
+    <div className="md:col-span-2 rounded-lg border border-line bg-white p-3">
+      <h4 className="font-semibold text-navy">من يمكنه رؤية هذا المستند؟</h4>
+      <p className="mt-1 text-xs text-ink-2">
+        الرؤية والتنزيل مرتبطان — من لا يستطيع رؤية المستند لا يستطيع تنزيله.
+      </p>
+      <div className="mt-3 grid gap-4 md:grid-cols-2">
+        <Field label="سياسة الرؤية">
+          <Select
+            value={visibilityType}
+            onChange={(e) => onVisibilityTypeChange(e.target.value as DocumentVisibilityType)}
+          >
+            {DOCUMENT_VISIBILITY_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {documentVisibilityLabel[t]}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      </div>
+
+      {visibilityType === 'CustomRoles' && (
+        <div className="mt-3">
+          <p className="text-xs font-semibold text-navy">الأدوار المصرّح لها</p>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
+            {ALL_ROLE_CODES.map((r) => (
+              <label key={r} className="flex items-center gap-1.5 text-xs text-ink-2">
+                <input
+                  type="checkbox"
+                  checked={allowedRoles.includes(r)}
+                  onChange={() => toggle(allowedRoles, r, onAllowedRolesChange)}
+                />
+                {roleLabel[r]}
+              </label>
+            ))}
+          </div>
+          {allowedRoles.length === 0 && (
+            <p className="mt-2 text-xs text-red-700">اختر دورًا واحدًا على الأقلّ.</p>
+          )}
+        </div>
+      )}
+
+      {visibilityType === 'CustomUsers' && (
+        <div className="mt-3">
+          <p className="text-xs font-semibold text-navy">الأشخاص المصرّح لهم</p>
+          {users.isLoading ? (
+            <LoadingState label="يتم تحميل قائمة المستخدمين…" />
+          ) : (
+            <div className="mt-2 max-h-48 overflow-y-auto rounded-lg border border-line p-2">
+              {(users.data ?? []).map((u) => (
+                <label key={u.id} className="flex items-center gap-1.5 py-0.5 text-xs text-ink-2">
+                  <input
+                    type="checkbox"
+                    checked={allowedUserIds.includes(u.id)}
+                    onChange={() => toggle(allowedUserIds, u.id, onAllowedUserIdsChange)}
+                  />
+                  {u.fullName}
+                </label>
+              ))}
+            </div>
+          )}
+          {allowedUserIds.length === 0 && (
+            <p className="mt-2 text-xs text-red-700">اختر شخصًا واحدًا على الأقلّ.</p>
+          )}
+        </div>
+      )}
+
+      {selfAccess === false && (
+        <div className="mt-3">
+          <Alert tone="gold">
+            تنبيه: السياسة المختارة لا تشمل حسابك — قد لا تتمكّن من رؤية هذا المستند أو تنزيله بعد الحفظ.
+          </Alert>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/// يحوّل معرّفات المستخدمين المصرّح لهم إلى أسماء — لا تُعرَض المعرّفات الخام.
+/// يُركَّب فقط لمن يملك صلاحيّة إدارة الرؤية، فلا يُجلَب الدليل لغيرهم.
+function AllowedUsersInfo({ userIds }: { userIds: string[] }) {
+  const users = useDirectoryUsers();
+  const byId = new Map((users.data ?? []).map((u) => [u.id, u.fullName]));
+  return (
+    <Info
+      label="الأشخاص المصرّح لهم"
+      value={users.isLoading ? '…' : userIds.map((id) => byId.get(id) ?? id).join('، ')}
+    />
+  );
+}
+
+function UploadDocumentForm({
+  clientId,
+  maxUploadSizeBytes,
+  allowedExtensions,
+  onDone,
+}: {
+  clientId: string;
+  maxUploadSizeBytes?: number;
+  allowedExtensions: string[];
+  onDone: () => void;
+}) {
+  const upload = useUploadClientDocument(clientId);
+  const [file, setFile] = useState<File | null>(null);
+  const [title, setTitle] = useState('');
+  const initialCategory = DOCUMENT_CATEGORY_CODES[0] ?? '';
+  const [categoryCode, setCategoryCode] = useState(initialCategory);
+  const [confidentialityCode, setConfidentialityCode] = useState('');
+  const [description, setDescription] = useState('');
+  const [tags, setTags] = useState('');
+  const [changeNote, setChangeNote] = useState('');
+  const [err, setErr] = useState<string | null>(null);
+  // سياسة الرؤية (CPW-R2): تتبع افتراضيّ التصنيف حتّى يختار المستخدم سياسةً يدويًّا، فلا تُداس بعدها.
+  const [visibilityType, setVisibilityType] = useState<DocumentVisibilityType>(
+    defaultVisibilityForCategory(initialCategory),
+  );
+  const [visibilityTouched, setVisibilityTouched] = useState(false);
+  const [allowedRoles, setAllowedRoles] = useState<string[]>([]);
+  const [allowedUserIds, setAllowedUserIds] = useState<string[]>([]);
+
+  function changeCategory(code: string) {
+    setCategoryCode(code);
+    if (!visibilityTouched) setVisibilityType(defaultVisibilityForCategory(code));
+  }
+
+  async function submit() {
+    setErr(null);
+    if (!file) {
+      setErr('اختر ملفًّا للرفع.');
+      return;
+    }
+    if (!title.trim()) {
+      setErr('عنوان المستند مطلوب.');
+      return;
+    }
+    if (maxUploadSizeBytes && file.size > maxUploadSizeBytes) {
+      setErr(`حجم الملفّ يتجاوز الحدّ المسموح (${formatBytes(maxUploadSizeBytes)}).`);
+      return;
+    }
+    if (visibilityType === 'CustomRoles' && allowedRoles.length === 0) {
+      setErr('سياسة «أدوار مخصصة» تتطلّب اختيار دور واحد على الأقلّ.');
+      return;
+    }
+    if (visibilityType === 'CustomUsers' && allowedUserIds.length === 0) {
+      setErr('سياسة «أشخاص محددون» تتطلّب اختيار شخص واحد على الأقلّ.');
+      return;
+    }
+    try {
+      await upload.mutateAsync({
+        file,
+        title: title.trim(),
+        categoryCode,
+        confidentialityCode: confidentialityCode || undefined,
+        description: description.trim() || undefined,
+        tags: tags.trim() || undefined,
+        changeNote: changeNote.trim() || undefined,
+        visibilityType,
+        allowedRoles: visibilityType === 'CustomRoles' ? allowedRoles : undefined,
+        allowedUserIds: visibilityType === 'CustomUsers' ? allowedUserIds : undefined,
+      });
+      onDone();
+    } catch (e) {
+      setErr(apiErrorMessage(e, 'تعذّر رفع المستند.'));
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-orange-200 bg-orange-50/40 p-3">
+      <h3 className="font-semibold text-navy">رفع مستند جديد</h3>
+      {allowedExtensions.length > 0 && (
+        <p className="mt-1 text-xs text-ink-2">
+          الامتدادات المسموحة: {allowedExtensions.join('، ')}
+          {maxUploadSizeBytes ? ` — الحدّ الأقصى ${formatBytes(maxUploadSizeBytes)}` : ''}
+        </p>
+      )}
+      {err && (
+        <div className="mt-2">
+          <Alert tone="alert">{err}</Alert>
+        </div>
+      )}
+      <div className="mt-3 grid gap-4 md:grid-cols-2">
+        <Field label="الملفّ">
+          <input
+            type="file"
+            className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          />
+        </Field>
+        <Field label="عنوان المستند">
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+        </Field>
+        <Field label="التصنيف">
+          <Select value={categoryCode} onChange={(e) => changeCategory(e.target.value)}>
+            {DOCUMENT_CATEGORY_CODES.map((code) => (
+              <option key={code} value={code}>
+                {documentCategoryLabel[code]}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="درجة السرّيّة">
+          <Select value={confidentialityCode} onChange={(e) => setConfidentialityCode(e.target.value)}>
+            <option value="">— بدون —</option>
+            {CONFIDENTIALITY_CODES.map((code) => (
+              <option key={code} value={code}>
+                {confidentialityLabel[code]}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="الوسوم (مفصولة بفواصل)">
+          <Input value={tags} onChange={(e) => setTags(e.target.value)} />
+        </Field>
+        <Field label="ملاحظة النسخة">
+          <Input value={changeNote} onChange={(e) => setChangeNote(e.target.value)} />
+        </Field>
+        <div className="md:col-span-2">
+          <Field label="الوصف">
+            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
+          </Field>
+        </div>
+        <DocumentVisibilityEditor
+          visibilityType={visibilityType}
+          allowedRoles={allowedRoles}
+          allowedUserIds={allowedUserIds}
+          onVisibilityTypeChange={(v) => {
+            setVisibilityTouched(true);
+            setVisibilityType(v);
+          }}
+          onAllowedRolesChange={setAllowedRoles}
+          onAllowedUserIdsChange={setAllowedUserIds}
+        />
+      </div>
+      <div className="mt-3 flex gap-2">
+        <Button variant="primary" onClick={submit} disabled={upload.isPending}>
+          {upload.isPending ? 'جارٍ الرفع…' : 'رفع المستند'}
+        </Button>
+        <Button variant="ghost" onClick={onDone}>
+          إلغاء
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function AddVersionForm({
+  clientId,
+  documentId,
+  onDone,
+}: {
+  clientId: string;
+  documentId: string;
+  onDone: () => void;
+}) {
+  const addVersion = useAddClientDocumentVersion(clientId);
+  const [file, setFile] = useState<File | null>(null);
+  const [changeNote, setChangeNote] = useState('');
+  const [err, setErr] = useState<string | null>(null);
+
+  async function submit() {
+    setErr(null);
+    if (!file) {
+      setErr('اختر ملفًّا للرفع.');
+      return;
+    }
+    try {
+      await addVersion.mutateAsync({ documentId, file, changeNote: changeNote.trim() || undefined });
+      onDone();
+    } catch (e) {
+      setErr(apiErrorMessage(e, 'تعذّر إضافة النسخة.'));
+    }
+  }
+
+  return (
+    <div className="mt-3 rounded-lg border border-line bg-white p-3">
+      <h3 className="font-semibold text-navy">إضافة نسخة أحدث</h3>
+      <p className="mt-1 text-xs text-ink-2">النسخة السابقة تصبح «مُستبدَلة» ولا تُحذف.</p>
+      {err && (
+        <div className="mt-2">
+          <Alert tone="alert">{err}</Alert>
+        </div>
+      )}
+      <div className="mt-3 grid gap-4 md:grid-cols-2">
+        <Field label="الملفّ">
+          <input
+            type="file"
+            className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          />
+        </Field>
+        <Field label="ملاحظة التغيير">
+          <Input value={changeNote} onChange={(e) => setChangeNote(e.target.value)} />
+        </Field>
+      </div>
+      <div className="mt-3 flex gap-2">
+        <Button variant="primary" onClick={submit} disabled={addVersion.isPending}>
+          {addVersion.isPending ? 'جارٍ الرفع…' : 'حفظ النسخة'}
+        </Button>
+        <Button variant="ghost" onClick={onDone}>
+          إلغاء
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function EditDocumentForm({
+  clientId,
+  doc: d,
+  onDone,
+}: {
+  clientId: string;
+  doc: ClientDocumentDto;
+  onDone: () => void;
+}) {
+  const update = useUpdateClientDocument(clientId);
+  const [title, setTitle] = useState(d.title);
+  const [categoryCode, setCategoryCode] = useState(d.categoryCode);
+  const [confidentialityCode, setConfidentialityCode] = useState(d.confidentialityCode ?? '');
+  const [lifecycleStatus, setLifecycleStatus] = useState<DocumentLifecycleStatus>(d.lifecycleStatus);
+  const [description, setDescription] = useState(d.description ?? '');
+  const [tags, setTags] = useState(d.tags ?? '');
+  const [err, setErr] = useState<string | null>(null);
+  // في التعديل لا يُطبَّق افتراضيّ التصنيف إطلاقًا — تبقى السياسة القائمة حتّى يغيّرها المستخدم صراحةً.
+  const [visibilityType, setVisibilityType] = useState<DocumentVisibilityType>(d.visibilityType);
+  const [allowedRoles, setAllowedRoles] = useState<string[]>(d.allowedRoles ?? []);
+  const [allowedUserIds, setAllowedUserIds] = useState<string[]>(d.allowedUserIds ?? []);
+
+  async function submit() {
+    setErr(null);
+    if (!title.trim()) {
+      setErr('عنوان المستند مطلوب.');
+      return;
+    }
+    if (d.canManageVisibility && visibilityType === 'CustomRoles' && allowedRoles.length === 0) {
+      setErr('سياسة «أدوار مخصصة» تتطلّب اختيار دور واحد على الأقلّ.');
+      return;
+    }
+    if (d.canManageVisibility && visibilityType === 'CustomUsers' && allowedUserIds.length === 0) {
+      setErr('سياسة «أشخاص محددون» تتطلّب اختيار شخص واحد على الأقلّ.');
+      return;
+    }
+    try {
+      await update.mutateAsync({
+        documentId: d.id,
+        req: {
+          title: title.trim(),
+          categoryCode,
+          confidentialityCode: confidentialityCode || null,
+          lifecycleStatus,
+          description: description.trim() || null,
+          tags: tags.trim() || null,
+          // من لا يملك صلاحيّة إدارة الرؤية لا يُرسِل السياسة إطلاقًا ⇒ تبقى كما هي على الخادم.
+          ...(d.canManageVisibility
+            ? {
+                visibilityType,
+                allowedRoles: visibilityType === 'CustomRoles' ? allowedRoles : null,
+                allowedUserIds: visibilityType === 'CustomUsers' ? allowedUserIds : null,
+              }
+            : {}),
+        },
+      });
+      onDone();
+    } catch (e) {
+      setErr(apiErrorMessage(e, 'تعذّر حفظ التعديل.'));
+    }
+  }
+
+  return (
+    <div className="mt-3 rounded-lg border border-line bg-white p-3">
+      <h3 className="font-semibold text-navy">تعديل بيانات المستند</h3>
+      <p className="mt-1 text-xs text-ink-2">التعديل على البيانات الوصفيّة فقط — لا يمسّ أيّ ملفّ.</p>
+      {err && (
+        <div className="mt-2">
+          <Alert tone="alert">{err}</Alert>
+        </div>
+      )}
+      <div className="mt-3 grid gap-4 md:grid-cols-2">
+        <Field label="العنوان">
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+        </Field>
+        <Field label="التصنيف">
+          <Select value={categoryCode} onChange={(e) => setCategoryCode(e.target.value)}>
+            {DOCUMENT_CATEGORY_CODES.map((code) => (
+              <option key={code} value={code}>
+                {documentCategoryLabel[code]}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="درجة السرّيّة">
+          <Select value={confidentialityCode} onChange={(e) => setConfidentialityCode(e.target.value)}>
+            <option value="">— بدون —</option>
+            {CONFIDENTIALITY_CODES.map((code) => (
+              <option key={code} value={code}>
+                {confidentialityLabel[code]}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="الحالة">
+          <Select
+            value={lifecycleStatus}
+            onChange={(e) => setLifecycleStatus(e.target.value as DocumentLifecycleStatus)}
+          >
+            {(['Draft', 'Current', 'Superseded', 'Archived'] as DocumentLifecycleStatus[]).map((s) => (
+              <option key={s} value={s}>
+                {documentLifecycleLabel[s]}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="الوسوم">
+          <Input value={tags} onChange={(e) => setTags(e.target.value)} />
+        </Field>
+        <div className="md:col-span-2">
+          <Field label="الوصف">
+            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
+          </Field>
+        </div>
+        {d.canManageVisibility && (
+          <DocumentVisibilityEditor
+            visibilityType={visibilityType}
+            allowedRoles={allowedRoles}
+            allowedUserIds={allowedUserIds}
+            onVisibilityTypeChange={setVisibilityType}
+            onAllowedRolesChange={setAllowedRoles}
+            onAllowedUserIdsChange={setAllowedUserIds}
+          />
+        )}
+      </div>
+      <div className="mt-3 flex gap-2">
+        <Button variant="primary" onClick={submit} disabled={update.isPending}>
+          {update.isPending ? 'جارٍ الحفظ…' : 'حفظ'}
+        </Button>
+        <Button variant="ghost" onClick={onDone}>
+          إلغاء
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ===== تبويب الروابط المهمّة (CPW-R1B2) =====
+function LinksTab({ clientId, canWrite }: { clientId: string; canWrite: boolean }) {
+  const [includeInactive, setIncludeInactive] = useState(false);
+  const links = useClientExternalLinks(clientId, includeInactive);
+  const [creating, setCreating] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const setActive = useSetClientExternalLinkActive(clientId);
+  const [err, setErr] = useState<string | null>(null);
+
+  const rows = links.data ?? [];
+
+  return (
+    <Card className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-lg font-bold text-navy">الروابط المهمّة</h2>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-1.5 text-xs text-ink-2">
+            <input
+              type="checkbox"
+              checked={includeInactive}
+              onChange={(e) => setIncludeInactive(e.target.checked)}
+            />
+            إظهار المعطَّلة
+          </label>
+          {canWrite && (
+            <Button variant={creating ? 'ghost' : 'primary'} onClick={() => { setCreating((v) => !v); setEditId(null); }}>
+              {creating ? 'إغلاق' : '+ رابط'}
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <Alert tone="navy">
+        الرابط مرجع عنوان فقط — لا تُدرِج داخله أيّ كلمة مرور أو رمز وصول أو مفتاح واجهة برمجيّة.
+      </Alert>
+
+      {err && <Alert tone="alert">{err}</Alert>}
+
+      {canWrite && creating && <ExternalLinkForm clientId={clientId} onDone={() => setCreating(false)} />}
+
+      {links.isLoading ? (
+        <LoadingState label="يتم تحميل الروابط…" />
+      ) : rows.length === 0 ? (
+        <EmptyState title="لا توجد روابط" description="لم تُضَف روابط مهمّة لهذا العميل بعد." />
+      ) : (
+        <div className="space-y-3">
+          {rows.map((l) =>
+            canWrite && editId === l.id ? (
+              <ExternalLinkForm key={l.id} clientId={clientId} link={l} onDone={() => setEditId(null)} />
+            ) : (
+              <div
+                key={l.id}
+                className={`rounded-lg border p-3 text-sm ${l.isActive ? 'border-line' : 'border-line bg-offwhite opacity-70'}`}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold text-navy">{l.title}</span>
+                    <Badge tone="navy">{codeLabel(linkCategoryLabel, l.categoryCode)}</Badge>
+                    {!l.isActive && <Badge tone="muted">معطَّل</Badge>}
+                  </div>
+                  {canWrite && (
+                    <div className="flex gap-2">
+                      <Button variant="ghost" onClick={() => { setEditId(l.id); setCreating(false); }}>
+                        تعديل
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        disabled={setActive.isPending}
+                        onClick={async () => {
+                          setErr(null);
+                          try {
+                            await setActive.mutateAsync({ id: l.id, active: !l.isActive });
+                          } catch (e) {
+                            setErr(apiErrorMessage(e, 'تعذّر تغيير حالة الرابط.'));
+                          }
+                        }}
+                      >
+                        {l.isActive ? 'تعطيل' : 'تفعيل'}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                <a
+                  href={l.url}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="mt-1 block break-all text-xs text-orange-600 hover:underline"
+                >
+                  {l.url}
+                </a>
+                {l.description && <p className="mt-2 text-xs text-ink-2">{l.description}</p>}
+                <div className="mt-2 text-xs text-ink-2">
+                  أضافه {l.createdByName ?? '—'} — {formatDate(l.createdAtUtc)}
+                </div>
+              </div>
+            ),
+          )}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function ExternalLinkForm({
+  clientId,
+  link,
+  onDone,
+}: {
+  clientId: string;
+  link?: ClientExternalLinkDto;
+  onDone: () => void;
+}) {
+  const create = useCreateClientExternalLink(clientId);
+  const update = useUpdateClientExternalLink(clientId);
+  const [title, setTitle] = useState(link?.title ?? '');
+  const [url, setUrl] = useState(link?.url ?? '');
+  const [categoryCode, setCategoryCode] = useState(link?.categoryCode ?? LINK_CATEGORY_CODES[0] ?? '');
+  const [description, setDescription] = useState(link?.description ?? '');
+  const [sortOrder, setSortOrder] = useState(String(link?.sortOrder ?? 0));
+  const [err, setErr] = useState<string | null>(null);
+  const pending = create.isPending || update.isPending;
+
+  async function submit() {
+    setErr(null);
+    if (!title.trim()) {
+      setErr('عنوان الرابط مطلوب.');
+      return;
+    }
+    if (!url.trim()) {
+      setErr('العنوان الإلكتروني مطلوب.');
+      return;
+    }
+    const req: CreateClientExternalLinkRequest = {
+      title: title.trim(),
+      url: url.trim(),
+      categoryCode,
+      description: description.trim() || null,
+      sortOrder: Number(sortOrder) || 0,
+    };
+    try {
+      if (link) await update.mutateAsync({ id: link.id, req });
+      else await create.mutateAsync(req);
+      onDone();
+    } catch (e) {
+      setErr(apiErrorMessage(e, 'تعذّر حفظ الرابط.'));
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-orange-200 bg-orange-50/40 p-3">
+      <h3 className="font-semibold text-navy">{link ? 'تعديل الرابط' : 'إضافة رابط'}</h3>
+      {err && (
+        <div className="mt-2">
+          <Alert tone="alert">{err}</Alert>
+        </div>
+      )}
+      <div className="mt-3 grid gap-4 md:grid-cols-2">
+        <Field label="العنوان">
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+        </Field>
+        <Field label="الرابط">
+          <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…" />
+        </Field>
+        <Field label="التصنيف">
+          <Select value={categoryCode} onChange={(e) => setCategoryCode(e.target.value)}>
+            {LINK_CATEGORY_CODES.map((code) => (
+              <option key={code} value={code}>
+                {linkCategoryLabel[code]}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="ترتيب العرض">
+          <Input type="number" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} />
+        </Field>
+        <div className="md:col-span-2">
+          <Field label="الوصف">
+            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
+          </Field>
+        </div>
+      </div>
+      <div className="mt-3 flex gap-2">
+        <Button variant="primary" onClick={submit} disabled={pending}>
+          {pending ? 'جارٍ الحفظ…' : 'حفظ'}
         </Button>
         <Button variant="ghost" onClick={onDone}>
           إلغاء

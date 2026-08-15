@@ -54,6 +54,15 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
     public DbSet<ProjectStrategy> ProjectStrategies => Set<ProjectStrategy>();
     public DbSet<ProjectStrategyAttribute> ProjectStrategyAttributes => Set<ProjectStrategyAttribute>();
 
+    // خدمة المستندات — أوّل ارتباط مورد: العميل (CPW-R1B2)
+    public DbSet<ClientDocument> ClientDocuments => Set<ClientDocument>();
+    public DbSet<ClientDocumentVersion> ClientDocumentVersions => Set<ClientDocumentVersion>();
+    public DbSet<ClientExternalLink> ClientExternalLinks => Set<ClientExternalLink>();
+
+    // صلاحيات المستندات (CPW-R2)
+    public DbSet<ClientDocumentAllowedRole> ClientDocumentAllowedRoles => Set<ClientDocumentAllowedRole>();
+    public DbSet<ClientDocumentAllowedUser> ClientDocumentAllowedUsers => Set<ClientDocumentAllowedUser>();
+
     // كتالوج الدورات (مصدر أسماء دورات مبيعات B2C)
     public DbSet<Course> Courses => Set<Course>();
 

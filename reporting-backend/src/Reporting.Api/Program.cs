@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
@@ -131,6 +132,9 @@ builder.Services.AddAuthorization(options =>
 // ===== Rate limiting لمنع التخمين على المصادقة =====
 var authLimit = builder.Configuration.GetValue<int?>("RateLimiting:AuthPermitLimit") ?? 30;
 var authWindow = builder.Configuration.GetValue<int?>("RateLimiting:WindowSeconds") ?? 60;
+// CPW-R1B2 (C-04): حدّ معدّل الرفع لكلّ مستخدم مصادَق (لا لكلّ IP) كي لا يشترك موظّفو مكتب واحد في حصّة واحدة.
+var uploadLimit = builder.Configuration.GetValue<int?>("FileStorage:UploadRateLimitPermitLimit") ?? 20;
+var uploadWindow = builder.Configuration.GetValue<int?>("FileStorage:UploadRateLimitWindowSeconds") ?? 60;
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -141,6 +145,16 @@ builder.Services.AddRateLimiter(options =>
             {
                 PermitLimit = authLimit,
                 Window = TimeSpan.FromSeconds(authWindow)
+            }));
+    options.AddPolicy("document-upload", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? httpContext.Connection.RemoteIpAddress?.ToString()
+                ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = uploadLimit,
+                Window = TimeSpan.FromSeconds(uploadWindow)
             }));
 });
 

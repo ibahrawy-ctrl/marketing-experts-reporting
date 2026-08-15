@@ -21,7 +21,16 @@ export default function AccountPortfolioClientPage() {
         <Link to="/app/account-portfolio" className="text-sm text-ink-3 hover:text-orange-600">
           ← العودة للمحفظة
         </Link>
-        <h1 className="mt-2 text-2xl font-bold text-navy">{client.name}</h1>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-2xl font-bold text-navy">{client.name}</h1>
+          {/* جسر المحفظة ← ملفّ العميل الشامل (CPW-R2). Client 360 يبقى مصدر الحقيقة؛ لا تُكرَّر بياناته هنا. */}
+          <Link
+            to={`/app/clients/${client.id}`}
+            className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-600"
+          >
+            فتح ملف العميل
+          </Link>
+        </div>
         <div className="mt-2">
           <Badge tone={client.status === 'Active' ? 'success' : 'muted'}>{clientStatusLabel[client.status]}</Badge>
         </div>

@@ -120,7 +120,7 @@ export default function ClientsPage() {
               <tr>
                 <th className="px-3 py-2.5 font-semibold">العميل</th>
                 <th className="px-3 py-2.5 font-semibold">الحالة</th>
-                <th className="px-3 py-2.5 font-semibold">مدير الحساب</th>
+                <th className="px-3 py-2.5 font-semibold">مدير العميل</th>
                 <th className="px-3 py-2.5 font-semibold">المشاريع</th>
                 <th className="px-3 py-2.5 font-semibold">نشِطة</th>
                 <th className="px-3 py-2.5 font-semibold">في خطر</th>
@@ -290,7 +290,7 @@ function ClientHealthPanel({
               <tr>
                 <th className="px-3 py-2.5 font-semibold">العميل</th>
                 <th className="px-3 py-2.5 font-semibold">الحالة</th>
-                <th className="px-3 py-2.5 font-semibold">مدير الحساب</th>
+                <th className="px-3 py-2.5 font-semibold">مدير العميل</th>
                 <th className="px-3 py-2.5 font-semibold">مشاريع</th>
                 <th className="px-3 py-2.5 font-semibold">في خطر</th>
                 <th className="px-3 py-2.5 font-semibold">مخاطر مفتوحة</th>
@@ -383,7 +383,7 @@ function CreateClientForm({ onDone }: { onDone: () => void }) {
         <Field label="اسم العميل">
           <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="مثال: شركة النخبة" />
         </Field>
-        <Field label="مدير الحساب">
+        <Field label="مدير العميل">
           <Select value={accountManagerId} onChange={(e) => setAccountManagerId(e.target.value)}>
             <option value="">— بدون —</option>
             {(users.data ?? []).map((u) => (

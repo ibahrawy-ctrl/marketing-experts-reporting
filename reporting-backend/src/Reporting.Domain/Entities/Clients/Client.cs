@@ -59,4 +59,12 @@ public class Client : BaseEntity
 
     /// <summary>ملفّ البراند (1:0..1).</summary>
     public ClientBrandProfile? BrandProfile { get; set; }
+
+    // === CPW-R1B2 — خدمة المستندات (أوّل ارتباط مورد) ===
+
+    /// <summary>مستندات العميل (1:N).</summary>
+    public ICollection<ClientDocument> Documents { get; set; } = new List<ClientDocument>();
+
+    /// <summary>الروابط الخارجيّة المهمّة للعميل (1:N).</summary>
+    public ICollection<ClientExternalLink> ExternalLinks { get; set; } = new List<ClientExternalLink>();
 }

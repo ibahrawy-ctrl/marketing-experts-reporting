@@ -375,7 +375,7 @@ public static class Roles
     public const string DisplayAr_Hr = "الموارد البشرية";
     public const string DisplayAr_FinanceManager = "المدير المالي";
     public const string DisplayAr_Accountant = "الحسابات";
-    public const string DisplayAr_AccountPortfolioReader = "محفظة مدير الحساب";
+    public const string DisplayAr_AccountPortfolioReader = "محفظة عملائي";
 
     public static string DisplayAr(string role) => role switch
     {

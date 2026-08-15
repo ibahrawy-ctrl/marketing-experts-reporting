@@ -1,0 +1,71 @@
+namespace Reporting.Domain.Enums;
+
+/// <summary>
+/// دورة حياة المستند (CPW-R1B2 — خدمة المستندات). عامّة بالكامل ولا ترتبط بالعميل،
+/// كي تُعاد الاستفادة منها لاحقًا مع ارتباطات موارد أخرى (مشروع/مهمّة/تقرير/عقد).
+/// Draft: مرفوع ولم يُعتمد بعد. Current: النسخة السارية. Superseded: استُبدل بنسخة أحدث.
+/// Archived: مؤرشف (يبقى قابلًا للقراءة/التنزيل حسب الصلاحية، ولا يظهر افتراضيًّا).
+/// </summary>
+public enum DocumentLifecycleStatus
+{
+    Draft = 0,
+    Current = 1,
+    Superseded = 2,
+    Archived = 3
+}
+
+/// <summary>
+/// سياسة رؤية المستند (CPW-R2 — صلاحيات المستندات).
+/// تُخزَّن نصًّا (<c>HasConversion&lt;string&gt;</c>) كي لا تحتاج القيم المستقبليّة إلى هجرة.
+/// السياسة تُطبَّق <b>بعد</b> صلاحية العميل لا بدلًا منها: من لا يرى العميل لا يرى أيّ مستند فيه.
+/// </summary>
+public enum DocumentVisibilityType
+{
+    /// <summary>كلّ من لديه صلاحية على العميل (السلوك السابق — الافتراضيّ للمستندات القائمة).</summary>
+    ClientScoped = 0,
+
+    /// <summary>الإدارة فقط (Admin/CEO/GM/Manager).</summary>
+    ManagementOnly = 1,
+
+    /// <summary>الإدارة والمالية معًا.</summary>
+    ManagementAndFinance = 2,
+
+    /// <summary>المالية فقط (بالإضافة إلى Admin).</summary>
+    FinanceOnly = 3,
+
+    /// <summary>الموارد البشريّة والإدارة العليا.</summary>
+    HRManagementOnly = 4,
+
+    /// <summary>فريق المشروع (مدير العميل + مدير مشروع العميل + فريق المشروع المالك) مع الإدارة.</summary>
+    ProjectTeam = 5,
+
+    /// <summary>أدوار مخصّصة (تُحدَّد في <c>client_document_allowed_roles</c>).</summary>
+    CustomRoles = 6,
+
+    /// <summary>أشخاص محدّدون (يُحدَّدون في <c>client_document_allowed_users</c>).</summary>
+    CustomUsers = 7
+}
+
+/// <summary>
+/// حالة فحص البرمجيّات الخبيثة لنسخة الملفّ (CPW-R1B2 — قرار المالك C-01).
+/// لا يوجد محرّك فحص فعليّ في هذه النسخة ⇒ يُمنع منعًا باتًّا استخدام <c>Clean</c>
+/// ما لم يكن هناك محرّك حقيقيّ نفّذ الفحص وأعاد النتيجة. الحالة الافتراضيّة للملفّات
+/// المرفوعة بلا محرّك هي <c>NotScanned</c> (إفصاح صادق) وليست <c>Clean</c>.
+/// </summary>
+public enum DocumentScanStatus
+{
+    /// <summary>بانتظار الفحص — محرّك موجود ولم تصل النتيجة بعد.</summary>
+    Pending = 0,
+
+    /// <summary>لم يُفحَص — لا يوجد محرّك فحص مُهيّأ. الحالة الافتراضيّة في هذه النسخة.</summary>
+    NotScanned = 1,
+
+    /// <summary>نظيف — لا تُستخدَم إلّا بنتيجة محرّك فحص فعليّ.</summary>
+    Clean = 2,
+
+    /// <summary>مرفوض — المحرّك اكتشف تهديدًا.</summary>
+    Rejected = 3,
+
+    /// <summary>فشل الفحص — المحرّك موجود لكنّه أخفق (خطأ/انقطاع)، ولا يعني النظافة.</summary>
+    Failed = 4
+}

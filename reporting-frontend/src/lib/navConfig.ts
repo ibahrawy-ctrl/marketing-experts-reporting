@@ -112,7 +112,7 @@ export const MODULES: NavModule[] = [
     label: 'المشاريع والعملاء',
     icon: 'projects',
     tabs: [
-      { to: '/app/account-portfolio', label: 'مشاريع عملائي', accountManagerOnly: true, keywords: 'محفظة مدير الحساب عملاء مشاريع' },
+      { to: '/app/account-portfolio', label: 'مشاريع عملائي', accountManagerOnly: true, keywords: 'محفظة عملائي مدير العميل عملاء مشاريع' },
     ],
   },
   {

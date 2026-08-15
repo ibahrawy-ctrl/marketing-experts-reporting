@@ -1895,6 +1895,145 @@ export interface UpsertClientBrandProfileRequest {
   notes?: string | null;
 }
 
+// ===== Client Documents & External Links (CPW-R1B2) =====
+// ملاحظة أمنيّة: لا يصل مسار التخزين (StorageKey) إلى الواجهة إطلاقًا — التنزيل عبر نقطة نهاية محكومة فقط.
+export type DocumentLifecycleStatus = 'Draft' | 'Current' | 'Superseded' | 'Archived';
+export type DocumentScanStatus = 'Pending' | 'NotScanned' | 'Clean' | 'Rejected' | 'Failed';
+
+// سياسة رؤية المستند (CPW-R2). الخادم هو الفاصل؛ هذه القيم للعرض واختيار السياسة فقط.
+export type DocumentVisibilityType =
+  | 'ClientScoped'
+  | 'ManagementOnly'
+  | 'ManagementAndFinance'
+  | 'FinanceOnly'
+  | 'HRManagementOnly'
+  | 'ProjectTeam'
+  | 'CustomRoles'
+  | 'CustomUsers';
+
+export interface ClientDocumentDto {
+  id: string;
+  clientId: string;
+  title: string;
+  description: string | null;
+  categoryCode: string;
+  tags: string | null;
+  confidentialityCode: string | null;
+  lifecycleStatus: DocumentLifecycleStatus;
+  approvalStatusCode: string;
+  versionCount: number;
+  uploadedByUserId: string;
+  uploadedByName: string | null;
+  isArchived: boolean;
+  archivedAtUtc: string | null;
+  archiveReason: string | null;
+  visibilityType: DocumentVisibilityType;
+  // القائمتان تصلان null لمن لا يملك صلاحيّة إدارة مستندات العميل (لا تُعرَض للجميع).
+  allowedRoles: string[] | null;
+  allowedUserIds: string[] | null;
+  canManageVisibility: boolean;
+  currentVersionId: string | null;
+  currentVersionNo: number | null;
+  currentFileName: string | null;
+  currentContentType: string | null;
+  currentSizeBytes: number | null;
+  currentScanStatus: DocumentScanStatus | null;
+  currentForceAttachment: boolean;
+  createdAtUtc: string;
+  updatedAtUtc: string | null;
+}
+
+export interface ClientDocumentVersionDto {
+  id: string;
+  clientDocumentId: string;
+  versionNo: number;
+  originalFileName: string;
+  contentType: string;
+  sizeBytes: number;
+  sha256: string;
+  scanStatus: DocumentScanStatus;
+  scanEngine: string;
+  scannedAtUtc: string | null;
+  scanDetail: string | null;
+  uploadedByUserId: string;
+  uploadedByName: string | null;
+  changeNote: string | null;
+  isCurrent: boolean;
+  createdAtUtc: string;
+}
+
+export interface ClientDocumentDetailDto {
+  document: ClientDocumentDto;
+  versions: ClientDocumentVersionDto[];
+}
+
+export interface ClientStorageUsageDto {
+  clientId: string;
+  usedBytes: number;
+  quotaBytes: number;
+  remainingBytes: number;
+  documentCount: number;
+  versionCount: number;
+  maxUploadSizeBytes: number;
+  allowedExtensions: string[];
+  scanEngine: string;
+  scannerConfigured: boolean;
+}
+
+export interface ClientDocumentsFilter {
+  categoryCode?: string;
+  confidentialityCode?: string;
+  lifecycleStatus?: DocumentLifecycleStatus;
+  search?: string;
+  includeArchived?: boolean;
+}
+
+export interface UpdateClientDocumentRequest {
+  title: string;
+  categoryCode: string;
+  description?: string | null;
+  tags?: string | null;
+  confidentialityCode?: string | null;
+  lifecycleStatus?: DocumentLifecycleStatus | null;
+  approvalStatusCode?: string | null;
+  // سياسة الرؤية (CPW-R2). عند الإغفال تبقى السياسة الحاليّة كما هي (لا يُطبَّق افتراضيّ التصنيف في التعديل).
+  visibilityType?: DocumentVisibilityType | null;
+  allowedRoles?: string[] | null;
+  allowedUserIds?: string[] | null;
+}
+
+export interface ArchiveClientDocumentRequest {
+  reason?: string | null;
+}
+
+export interface DeleteClientDocumentRequest {
+  reason: string;
+}
+
+export interface ClientExternalLinkDto {
+  id: string;
+  clientId: string;
+  title: string;
+  url: string;
+  categoryCode: string;
+  description: string | null;
+  isActive: boolean;
+  sortOrder: number;
+  createdByUserId: string;
+  createdByName: string | null;
+  createdAtUtc: string;
+  updatedAtUtc: string | null;
+}
+
+export interface CreateClientExternalLinkRequest {
+  title: string;
+  url: string;
+  categoryCode: string;
+  description?: string | null;
+  sortOrder?: number;
+}
+export type UpdateClientExternalLinkRequest = CreateClientExternalLinkRequest;
+
 export interface ProjectDto {
   id: string;
   clientId: string;

@@ -602,7 +602,7 @@ export function AccountPortfolioHomeDashboard() {
   const activeProjects = projectList.filter((p) => p.status === 'Active').length;
 
   const quick = [
-    { to: '/app/account-portfolio', label: 'محفظة الحسابات', hint: 'مشاريعي وعملائي' },
+    { to: '/app/account-portfolio', label: 'محفظة عملائي', hint: 'مشاريعي وعملائي' },
   ];
 
   return (

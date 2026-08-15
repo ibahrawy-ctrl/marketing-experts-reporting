@@ -21,6 +21,10 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         builder.UseSetting("Seed:AdminPassword", "Admin#12345");
         // رفع حدّ المعدّل حتى لا تُخنق مجموعة الاختبارات.
         builder.UseSetting("RateLimiting:AuthPermitLimit", "100000");
+        // CPW-R1B2 — تخزين المستندات في مجلّد مؤقّت خارج شجرة المشروع، وحدّ رفع مرتفع للاختبارات.
+        builder.UseSetting("FileStorage:DocumentsRootPath",
+            Path.Combine(Path.GetTempPath(), "reporting-test-documents"));
+        builder.UseSetting("FileStorage:UploadRateLimitPermitLimit", "100000");
     }
 }
 

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Reporting.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using Reporting.Infrastructure.Persistence;
 namespace Reporting.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260807033602_ClientDocumentsAndExternalLinks")]
+    partial class ClientDocumentsAndExternalLinks
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -495,19 +498,6 @@ namespace Reporting.Infrastructure.Persistence.Migrations
                     b.Property<int>("VersionCount")
                         .HasColumnType("integer");
 
-                    b.Property<string>("VisibilityType")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasDefaultValue("ClientScoped");
-
-                    b.Property<DateTime?>("VisibilityUpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("VisibilityUpdatedByUserId")
-                        .HasColumnType("uuid");
-
                     b.HasKey("Id");
 
                     b.HasIndex("ClientId");
@@ -516,75 +506,10 @@ namespace Reporting.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ClientId", "CategoryCode");
 
-                    b.HasIndex("ClientId", "VisibilityType")
-                        .HasDatabaseName("IX_client_documents_ClientId_VisibilityType");
-
                     b.HasIndex("ClientId", "IsArchived", "IsDeleted")
                         .HasDatabaseName("IX_client_documents_ClientId_Visibility");
 
                     b.ToTable("client_documents", (string)null);
-                });
-
-            modelBuilder.Entity("Reporting.Domain.Entities.Clients.ClientDocumentAllowedRole", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ClientDocumentId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("RoleName")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<DateTime?>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ClientDocumentId");
-
-                    b.HasIndex("ClientDocumentId", "RoleName")
-                        .IsUnique()
-                        .HasDatabaseName("IX_client_document_allowed_roles_DocumentId_RoleName");
-
-                    b.ToTable("client_document_allowed_roles", (string)null);
-                });
-
-            modelBuilder.Entity("Reporting.Domain.Entities.Clients.ClientDocumentAllowedUser", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ClientDocumentId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ClientDocumentId");
-
-                    b.HasIndex("UserId");
-
-                    b.HasIndex("ClientDocumentId", "UserId")
-                        .IsUnique()
-                        .HasDatabaseName("IX_client_document_allowed_users_DocumentId_UserId");
-
-                    b.ToTable("client_document_allowed_users", (string)null);
                 });
 
             modelBuilder.Entity("Reporting.Domain.Entities.Clients.ClientDocumentVersion", b =>
@@ -735,14 +660,6 @@ namespace Reporting.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("AccountManagerId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Background")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)");
-
-                    b.Property<string>("BusinessContext")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)");
-
                     b.Property<Guid>("ClientId")
                         .HasColumnType("uuid");
 
@@ -751,18 +668,6 @@ namespace Reporting.Infrastructure.Persistence.Migrations
 
                     b.Property<DateOnly?>("EndDate")
                         .HasColumnType("date");
-
-                    b.Property<DateTime?>("HealthComputedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<decimal>("HealthPercent")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(9,2)");
-
-                    b.Property<string>("HealthStatus")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -773,23 +678,8 @@ namespace Reporting.Infrastructure.Persistence.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
 
-                    b.Property<string>("OutOfScope")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)");
-
                     b.Property<Guid?>("OwnerTeamId")
                         .HasColumnType("uuid");
-
-                    b.Property<decimal>("ProgressPercent")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(9,2)");
-
-                    b.Property<Guid?>("ProjectOwnerId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ScopeText")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)");
 
                     b.Property<string>("ServiceType")
                         .IsRequired()
@@ -804,17 +694,6 @@ namespace Reporting.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
-                    b.Property<string>("SuccessDefinition")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)");
-
-                    b.Property<string>("Summary")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<Guid?>("TeamLeaderId")
-                        .HasColumnType("uuid");
-
                     b.Property<DateTime?>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -824,15 +703,9 @@ namespace Reporting.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ClientId");
 
-                    b.HasIndex("HealthStatus");
-
                     b.HasIndex("OwnerTeamId");
 
-                    b.HasIndex("ProjectOwnerId");
-
                     b.HasIndex("Status");
-
-                    b.HasIndex("TeamLeaderId");
 
                     b.ToTable("projects", (string)null);
                 });
@@ -1390,9 +1263,6 @@ namespace Reporting.Infrastructure.Persistence.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
-                    b.Property<Guid?>("ProjectId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid?>("RelatedEscalationId")
                         .HasColumnType("uuid");
 
@@ -1421,8 +1291,6 @@ namespace Reporting.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("MadeById");
-
-                    b.HasIndex("ProjectId");
 
                     b.HasIndex("RelatedEscalationId");
 
@@ -2903,442 +2771,6 @@ namespace Reporting.Infrastructure.Persistence.Migrations
                     b.ToTable("user_positions", (string)null);
                 });
 
-            modelBuilder.Entity("Reporting.Domain.Entities.Projects360.ProjectDeliverable", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("CompletedQuantity")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("DeliverableTypeCode")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<DateTime?>("DeliveredAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<DateOnly?>("DueDate")
-                        .HasColumnType("date");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<Guid?>("ObjectiveId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("OwnerUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("PlannedQuantity")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Priority")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<decimal>("ProgressPercent")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(9,2)");
-
-                    b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("integer");
-
-                    b.Property<DateOnly?>("StartDate")
-                        .HasColumnType("date");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<DateTime?>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("WorkstreamId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("DeliverableTypeCode");
-
-                    b.HasIndex("ObjectiveId");
-
-                    b.HasIndex("OwnerUserId");
-
-                    b.HasIndex("ProjectId");
-
-                    b.HasIndex("Status");
-
-                    b.HasIndex("WorkstreamId");
-
-                    b.ToTable("project_deliverables", (string)null);
-                });
-
-            modelBuilder.Entity("Reporting.Domain.Entities.Projects360.ProjectKpi", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal?>("BaselineValue")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<string>("Category")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<decimal?>("CurrentValue")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<string>("CustomUnitLabel")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<string>("Direction")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<string>("ExternalMetricCode")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("ExternalSourceKey")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("Frequency")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateOnly?>("LastReadingDate")
-                        .HasColumnType("date");
-
-                    b.Property<DateTime?>("LastSyncedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<Guid>("ObjectiveId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("SourceType")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<decimal>("TargetValue")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<string>("Unit")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<DateTime?>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<decimal>("Weight")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(9,2)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ObjectiveId");
-
-                    b.HasIndex("ProjectId");
-
-                    b.HasIndex("SourceType");
-
-                    b.ToTable("project_kpis", (string)null);
-                });
-
-            modelBuilder.Entity("Reporting.Domain.Entities.Projects360.ProjectKpiReading", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal?>("AchievementSnapshot")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(9,2)");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<Guid>("ProjectKpiId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateOnly>("ReadingDate")
-                        .HasColumnType("date");
-
-                    b.Property<Guid>("RecordedByUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal?>("TargetSnapshot")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<DateTime?>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<decimal>("Value")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ReadingDate");
-
-                    b.HasIndex("ProjectKpiId", "ReadingDate")
-                        .IsUnique()
-                        .HasDatabaseName("IX_project_kpi_readings_ProjectKpiId_ReadingDate");
-
-                    b.ToTable("project_kpi_readings", (string)null);
-                });
-
-            modelBuilder.Entity("Reporting.Domain.Entities.Projects360.ProjectObjective", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<DateOnly?>("DueDate")
-                        .HasColumnType("date");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<Guid?>("OwnerUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Priority")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("integer");
-
-                    b.Property<DateOnly?>("StartDate")
-                        .HasColumnType("date");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<DateTime?>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<decimal>("Weight")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(9,2)");
-
-                    b.Property<Guid?>("WorkstreamId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("OwnerUserId");
-
-                    b.HasIndex("ProjectId");
-
-                    b.HasIndex("Status");
-
-                    b.HasIndex("WorkstreamId");
-
-                    b.ToTable("project_objectives", (string)null);
-                });
-
-            modelBuilder.Entity("Reporting.Domain.Entities.Projects360.ProjectStrategy", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Competitors")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CustomerPersona")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("MarketingApproach")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)");
-
-                    b.Property<string>("Messaging")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)");
-
-                    b.Property<string>("Positioning")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)");
-
-                    b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("StrategySummary")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)");
-
-                    b.Property<string>("SuccessFactors")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)");
-
-                    b.Property<string>("TargetAudience")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)");
-
-                    b.Property<string>("ToneOfVoice")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)");
-
-                    b.Property<DateTime?>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ValueProposition")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)");
-
-                    b.Property<string>("Vision")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProjectId")
-                        .IsUnique()
-                        .HasDatabaseName("IX_project_strategies_ProjectId_Active")
-                        .HasFilter("\"IsActive\" = true");
-
-                    b.ToTable("project_strategies", (string)null);
-                });
-
-            modelBuilder.Entity("Reporting.Domain.Entities.Projects360.ProjectStrategyAttribute", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("FieldCode")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<Guid>("ProjectStrategyId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("SectionCode")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ValueText")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SectionCode");
-
-                    b.HasIndex("ProjectStrategyId", "FieldCode")
-                        .IsUnique()
-                        .HasDatabaseName("IX_project_strategy_attributes_StrategyId_FieldCode");
-
-                    b.ToTable("project_strategy_attributes", (string)null);
-                });
-
             modelBuilder.Entity("Reporting.Domain.Entities.Services.Service", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4417,28 +3849,6 @@ namespace Reporting.Infrastructure.Persistence.Migrations
                     b.Navigation("CurrentVersion");
                 });
 
-            modelBuilder.Entity("Reporting.Domain.Entities.Clients.ClientDocumentAllowedRole", b =>
-                {
-                    b.HasOne("Reporting.Domain.Entities.Clients.ClientDocument", "Document")
-                        .WithMany("AllowedRoles")
-                        .HasForeignKey("ClientDocumentId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Document");
-                });
-
-            modelBuilder.Entity("Reporting.Domain.Entities.Clients.ClientDocumentAllowedUser", b =>
-                {
-                    b.HasOne("Reporting.Domain.Entities.Clients.ClientDocument", "Document")
-                        .WithMany("AllowedUsers")
-                        .HasForeignKey("ClientDocumentId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Document");
-                });
-
             modelBuilder.Entity("Reporting.Domain.Entities.Clients.ClientDocumentVersion", b =>
                 {
                     b.HasOne("Reporting.Domain.Entities.Clients.ClientDocument", "Document")
@@ -4652,79 +4062,6 @@ namespace Reporting.Infrastructure.Persistence.Migrations
                     b.Navigation("Position");
                 });
 
-            modelBuilder.Entity("Reporting.Domain.Entities.Projects360.ProjectDeliverable", b =>
-                {
-                    b.HasOne("Reporting.Domain.Entities.Projects360.ProjectObjective", "Objective")
-                        .WithMany()
-                        .HasForeignKey("ObjectiveId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("Reporting.Domain.Entities.Clients.Project", null)
-                        .WithMany()
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Objective");
-                });
-
-            modelBuilder.Entity("Reporting.Domain.Entities.Projects360.ProjectKpi", b =>
-                {
-                    b.HasOne("Reporting.Domain.Entities.Projects360.ProjectObjective", "Objective")
-                        .WithMany("Kpis")
-                        .HasForeignKey("ObjectiveId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Reporting.Domain.Entities.Clients.Project", null)
-                        .WithMany()
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Objective");
-                });
-
-            modelBuilder.Entity("Reporting.Domain.Entities.Projects360.ProjectKpiReading", b =>
-                {
-                    b.HasOne("Reporting.Domain.Entities.Projects360.ProjectKpi", "ProjectKpi")
-                        .WithMany("Readings")
-                        .HasForeignKey("ProjectKpiId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("ProjectKpi");
-                });
-
-            modelBuilder.Entity("Reporting.Domain.Entities.Projects360.ProjectObjective", b =>
-                {
-                    b.HasOne("Reporting.Domain.Entities.Clients.Project", null)
-                        .WithMany()
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("Reporting.Domain.Entities.Projects360.ProjectStrategy", b =>
-                {
-                    b.HasOne("Reporting.Domain.Entities.Clients.Project", null)
-                        .WithMany()
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("Reporting.Domain.Entities.Projects360.ProjectStrategyAttribute", b =>
-                {
-                    b.HasOne("Reporting.Domain.Entities.Projects360.ProjectStrategy", "ProjectStrategy")
-                        .WithMany("Attributes")
-                        .HasForeignKey("ProjectStrategyId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("ProjectStrategy");
-                });
-
             modelBuilder.Entity("Reporting.Domain.Entities.Submissions.ApprovalStep", b =>
                 {
                     b.HasOne("Reporting.Domain.Entities.Submissions.ReportSubmission", "ReportSubmission")
@@ -4797,10 +4134,6 @@ namespace Reporting.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Reporting.Domain.Entities.Clients.ClientDocument", b =>
                 {
-                    b.Navigation("AllowedRoles");
-
-                    b.Navigation("AllowedUsers");
-
                     b.Navigation("Versions");
                 });
 
@@ -4848,21 +4181,6 @@ namespace Reporting.Infrastructure.Persistence.Migrations
                     b.Navigation("Permissions");
 
                     b.Navigation("Scopes");
-                });
-
-            modelBuilder.Entity("Reporting.Domain.Entities.Projects360.ProjectKpi", b =>
-                {
-                    b.Navigation("Readings");
-                });
-
-            modelBuilder.Entity("Reporting.Domain.Entities.Projects360.ProjectObjective", b =>
-                {
-                    b.Navigation("Kpis");
-                });
-
-            modelBuilder.Entity("Reporting.Domain.Entities.Projects360.ProjectStrategy", b =>
-                {
-                    b.Navigation("Attributes");
                 });
 
             modelBuilder.Entity("Reporting.Domain.Entities.Submissions.ReportSubmission", b =>
