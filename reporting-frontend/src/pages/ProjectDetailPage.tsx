@@ -103,6 +103,14 @@ export default function ProjectDetailPage() {
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold text-navy">{p.name}</h1>
             <Badge tone={projectStatusTone(p.status)}>{projectStatusLabel[p.status]}</Badge>
+            {/* مدخل مساحة عمل Project 360 (CPW-R3 · R2-W12) — صفحة مستقلّة لا تبويب هنا،
+                كي تبقى هذه الصفحة وسجلّاتها القائمة كما هي بلا مساس. */}
+            <Link
+              to={`/app/projects/${p.id}/360`}
+              className="text-sm font-medium text-orange-600 hover:underline"
+            >
+              مساحة عمل المشروع (360)
+            </Link>
           </div>
         </div>
         {canManageClients && !editing && (

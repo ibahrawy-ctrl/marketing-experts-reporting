@@ -48,6 +48,7 @@ import ClientsPage from './pages/ClientsPage';
 import ClientDetailPage from './pages/ClientDetailPage';
 import ProjectsPage from './pages/ProjectsPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
+import Project360Page from './pages/Project360Page';
 import AccountPortfolioPage from './pages/AccountPortfolioPage';
 import AccountPortfolioProjectPage from './pages/AccountPortfolioProjectPage';
 import AccountPortfolioClientPage from './pages/AccountPortfolioClientPage';
@@ -87,6 +88,9 @@ const PAYROLL_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'HR', 'CeoSuppo
 const KPI_FINANCE_EXPORT_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'HR', 'CeoSupport', 'FinanceManager', 'Accountant'];
 // محفظة مدير الحساب (ACCOUNT-MANAGER-PORTFOLIO) — عرض فقط، تطابق سياسة AccountPortfolioRead بالخادم.
 const ACCOUNT_PORTFOLIO_ROLES: Role[] = ['AccountPortfolioReader', 'Admin'];
+// مساحة عمل Project 360 (CPW-R3 · R2-W12) — الخادم يكتفي بـ[Authorize] ويحسم الرؤية بالنطاق،
+// فتُبقى بوّابة الواجهة واسعة بقدر من يملك مشاريع مرئيّة فعلًا بدل تضييق يُخفي مساحة مسموحة.
+const PROJECT_360_ROLES: Role[] = [...EXEC_ROLES, 'AccountPortfolioReader'];
 // ورشة الحوكمة العامة (GOV-GOVERNANCE-UX1) — تطابق سياسة GovernanceWorkspaceAccess بالخادم؛ الرؤية مقيّدة داخليًّا حسب الدور.
 const GOVERNANCE_WORKSPACE_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'CeoSupport', 'Manager', 'TeamLeader', 'HR'];
 // التصعيد الفردي (GOV-INDIVIDUAL-ESCALATION1) — تطابق سياسة GovernanceEscalationAccess بالخادم؛ الفرز (واسع/نطاق/HR/موظف) مفروض داخليًّا.
@@ -151,6 +155,9 @@ const APP_ROUTES: { path: string; element: ReactNode; roles?: Role[] }[] = [
   { path: '/app/clients/:clientId', element: <ClientDetailPage />, roles: EXEC_ROLES },
   { path: '/app/projects', element: <ProjectsPage />, roles: EXEC_ROLES },
   { path: '/app/projects/:projectId', element: <ProjectDetailPage />, roles: EXEC_ROLES },
+  // مساحة عمل Project 360 (CPW-R3 · R2-W12): بوّابة الواجهة أوسع من EXEC_ROLES عمدًا لأنّ
+  // مدير الحساب المسؤول من مستخدميها؛ ومع ذلك الرؤية الفعليّة تُحسَم خادمًا لكلّ مشروع على حدة.
+  { path: '/app/projects/:projectId/360', element: <Project360Page />, roles: PROJECT_360_ROLES },
   // محفظة مدير الحساب (مشاريعي) — عرض فقط، النطاق مفروض خادمًا (Project.AccountManagerId == المستخدم).
   { path: '/app/account-portfolio', element: <AccountPortfolioPage />, roles: ACCOUNT_PORTFOLIO_ROLES },
   { path: '/app/account-portfolio/projects/:id', element: <AccountPortfolioProjectPage />, roles: ACCOUNT_PORTFOLIO_ROLES },
