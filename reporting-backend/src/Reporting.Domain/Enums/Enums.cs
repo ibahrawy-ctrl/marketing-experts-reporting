@@ -683,3 +683,105 @@ public enum DelayType
     /// <summary>المراجعة التنفيذية (GM/CEO) قيد الانتظار (موعدها الاثنين).</summary>
     ExecutiveReviewPending = 4
 }
+
+// ===== CPW-R3 — Project 360 Foundation (الأهداف · المؤشّرات · المخرَجات التعاقديّة · الاستراتيجيّة · الصحّة) =====
+// هذه التعدادات تخصّ **مؤشّرات المشروع** حصرًا، وهي منفصلة تمامًا عن منظومة مؤشّرات الموظّفين
+// (KpiTemplate / KpiEvaluation / KpiMetric) التي لم تُمَسّ. البادئة Project* مقصودة لمنع أيّ التباس.
+
+/// <summary>حالة هدف المشروع (CPW-R3). حالة يدويّة بالكامل — لا تُشتقّ من أيّ محرّك مهامّ.</summary>
+public enum ProjectObjectiveStatus
+{
+    NotStarted = 0,
+    InProgress = 1,
+    AtRisk = 2,
+    Completed = 3,
+    Cancelled = 4
+}
+
+/// <summary>فئة مؤشّر المشروع (CPW-R3) — للتصنيف والعرض فقط، بلا أثر على الاحتساب.</summary>
+public enum ProjectKpiCategory
+{
+    Marketing = 0,
+    Seo = 1,
+    PaidAds = 2,
+    SocialMedia = 3,
+    Sales = 4,
+    Brand = 5,
+    Content = 6,
+    CustomerService = 7,
+    Operations = 8,
+    Custom = 9
+}
+
+/// <summary>وحدة قياس مؤشّر المشروع (CPW-R3). عند <see cref="Custom"/> يُعرَض CustomUnitLabel.</summary>
+public enum ProjectKpiUnit
+{
+    Percentage = 0,
+    Number = 1,
+    Currency = 2,
+    Duration = 3,
+    Score = 4,
+    Custom = 5
+}
+
+/// <summary>تواتر قياس مؤشّر المشروع (CPW-R3) — إيقاع القراءات المتوقَّع.</summary>
+public enum ProjectKpiFrequency
+{
+    Weekly = 0,
+    Monthly = 1,
+    Quarterly = 2
+}
+
+/// <summary>اتّجاه التحسّن لمؤشّر المشروع (CPW-R3) — يحدّد معادلة نسبة الإنجاز.</summary>
+public enum ProjectKpiDirection
+{
+    /// <summary>الأعلى أفضل: الإنجاز = (الحالي ÷ الهدف) × 100.</summary>
+    HigherIsBetter = 0,
+    /// <summary>الأقلّ أفضل: الإنجاز = (الهدف ÷ الحالي) × 100.</summary>
+    LowerIsBetter = 1
+}
+
+/// <summary>
+/// اتّجاه حركة مؤشّر المشروع (CPW-R3) — **مُشتقّ وقت القراءة ولا يُخزَّن في أيّ عمود**.
+/// يُحتسَب من فارق نسبة الإنجاز بين آخر قراءتين.
+/// </summary>
+public enum ProjectKpiTrend
+{
+    /// <summary>أقلّ من قراءتين ⇒ لا يمكن استنتاج اتّجاه.</summary>
+    Unknown = 0,
+    Up = 1,
+    Flat = 2,
+    Down = 3
+}
+
+/// <summary>
+/// مصدر بيانات مؤشّر المشروع (CPW-R3 · D-06). المؤشّر لا يتغيّر — مصدر بياناته فقط.
+/// الانتقال بين المراحل = تحديث هذا العمود لصفّ قائم: لا صفّ جديد، لا هجرة، لا فقد تاريخ.
+/// </summary>
+public enum ProjectKpiSourceType
+{
+    /// <summary>المرحلة 1 (المُنفَّذة): القيمة من قراءات يدويّة في project_kpi_readings.</summary>
+    Manual = 0,
+    /// <summary>المرحلة 2 (مُهيّأة فقط): القيمة مُجمَّعة من طبقة المهامّ المستقبليّة.</summary>
+    TaskDerived = 1,
+    /// <summary>المرحلة 3 (مُهيّأة فقط): القيمة من مزامنة خارجيّة (CRM · GA4 · Meta · Ads · Search Console).</summary>
+    Integration = 2
+}
+
+/// <summary>حالة المخرَج التعاقديّ للمشروع (CPW-R3 · D-03). حالة يدويّة — <see cref="Delayed"/> لا تُشتقّ من التاريخ.</summary>
+public enum ProjectDeliverableStatus
+{
+    NotStarted = 0,
+    InProgress = 1,
+    Delivered = 2,
+    Delayed = 3,
+    Cancelled = 4
+}
+
+/// <summary>تصنيف صحّة المشروع (CPW-R3) — يُشتقّ حتميًّا من نسبة الصحّة المحتسَبة.</summary>
+public enum ProjectHealthStatus
+{
+    Green = 0,
+    Yellow = 1,
+    Red = 2
+}
