@@ -1,0 +1,66 @@
+# DNS BACKUP SNAPSHOT — marketingexperts.com.sa
+# Ticket   : EMAIL-DOMAIN-AUTHENTICATION-R1
+# Captured : 2026-07-31T00:41:16Z (read-only, authoritative source)
+# Source   : dig @ns1.marketingexperts.com.sa (authoritative)
+# Method   : per-type enumeration (AXFR refused by the authoritative server — expected/correct)
+# Purpose  : rollback reference BEFORE adding DKIM + DMARC TXT records.
+# NOTE     : This snapshot contains ONLY public DNS data. No secrets.
+
+## ---------------------------------------------------------------- SOA
+marketingexperts.com.sa. 3600 IN SOA ns1.marketingexperts.com.sa. ahmed\.neasser.gmail.com. 2026050600 3600 3600 1209600 86400
+# serial=2026050600 refresh=3600 retry=3600 expire=1209600 negative-cache-TTL=86400 (24h)
+
+## ---------------------------------------------------------------- NS
+marketingexperts.com.sa. 3600 IN NS ns1.marketingexperts.com.sa.
+marketingexperts.com.sa. 3600 IN NS ns2.marketingexperts.com.sa.
+marketingexperts.com.sa. 3600 IN NS ns3.marketingexperts.com.sa.
+# ns1 -> 104.152.171.111 (PTR ns111d.hostwhitelabel.com)
+# ns2 -> 192.206.54.211  (PTR ns211d.hostwhitelabel.com)
+# ns3 -> 148.113.134.134 (PTR ns311d.hostwhitelabel.com)
+
+## ---------------------------------------------------------------- A
+marketingexperts.com.sa. 3600 IN A 104.152.168.202
+# PTR drh1.hostwhitelabel.com
+
+## ---------------------------------------------------------------- AAAA
+# (none)
+
+## ---------------------------------------------------------------- MX
+marketingexperts.com.sa. 3600 IN MX 1  ASPMX.L.GOOGLE.COM.
+marketingexperts.com.sa. 3600 IN MX 5  ALT1.ASPMX.L.GOOGLE.COM.
+marketingexperts.com.sa. 3600 IN MX 5  ALT2.ASPMX.L.GOOGLE.COM.
+marketingexperts.com.sa. 3600 IN MX 10 ALT3.ASPMX.L.GOOGLE.COM.
+marketingexperts.com.sa. 3600 IN MX 10 ALT4.ASPMX.L.GOOGLE.COM.
+
+## ---------------------------------------------------------------- TXT (root)
+marketingexperts.com.sa. 3600 IN TXT "v=spf1 a mx ip4:104.152.168.202 include:spf.hostwhitelabel.com include:_spf.google.com -all"
+marketingexperts.com.sa. 3600 IN TXT "google-site-verification=QsYKF5gTwtYr8KHN2Q03ztHf5YzFVvV3ngLZF3cy8UA"
+marketingexperts.com.sa. 3600 IN TXT "google-site-verification=nMG5VjuywFyi6eNNQ22ic0rSXPVc6CYHH6YFe3i8Cxo"
+
+## ---------------------------------------------------------------- CAA
+# (none)
+
+## ---------------------------------------------------------------- MAIL-RELATED SUBRECORDS
+mail.marketingexperts.com.sa.    -> CNAME/alias to marketingexperts.com.sa. -> 104.152.168.202
+webmail.marketingexperts.com.sa. -> 104.152.168.202
+smtp.marketingexperts.com.sa.    -> 104.152.168.202
+autodiscover                     -> NXDOMAIN
+autoconfig                       -> NXDOMAIN
+
+## ---------------------------------------------------------------- AUTHENTICATION RECORDS (BASELINE)
+_dmarc.marketingexperts.com.sa.              -> NXDOMAIN  (DMARC NOT FOUND)
+google._domainkey.marketingexperts.com.sa.   -> NXDOMAIN  (DKIM  NOT FOUND)
+_domainkey.marketingexperts.com.sa.          -> NXDOMAIN
+# 24 common selectors scanned against authoritative NS: ALL NXDOMAIN
+# google, default, selector1, selector2, s1, s2, k1, k2, dkim, mail, smtp, email,
+# mandrill, zoho, everlytickey1, sendgrid, pm, mailjet1, mailjet2, hs1, hs2, cm,
+# 20230601, 20240101
+
+## ---------------------------------------------------------------- ROLLBACK INSTRUCTIONS
+# The planned change is ADD-ONLY (two new TXT records at two new hostnames).
+# Rollback = DELETE the two newly added records:
+#   1) TXT  google._domainkey.marketingexperts.com.sa
+#   2) TXT  _dmarc.marketingexperts.com.sa
+# NO existing record above is modified or deleted. If any record above differs
+# from this snapshot after the change, that is an incident — restore it verbatim
+# from this file.
