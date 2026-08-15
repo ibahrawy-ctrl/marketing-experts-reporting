@@ -108,7 +108,8 @@ public record CreateDecisionRequest(
     Guid? RelatedSubmissionId,
     Guid? RelatedRiskId,
     Guid? RelatedEscalationId,
-    Guid? RelatedKpiEvaluationId = null);
+    Guid? RelatedKpiEvaluationId = null,
+    Guid? ProjectId = null);
 
 public record UpdateDecisionRequest(
     string Title,

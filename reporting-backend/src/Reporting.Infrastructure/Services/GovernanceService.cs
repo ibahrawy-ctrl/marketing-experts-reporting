@@ -202,6 +202,8 @@ public class GovernanceService : IGovernanceService
     {
         if (_currentUser.UserId is not Guid uid) return Result<DecisionDto>.Failure("غير مصرّح.", "auth.unauthenticated");
         if (string.IsNullOrWhiteSpace(request.Title)) return Result<DecisionDto>.Failure("عنوان القرار مطلوب.", "decision.title_required");
+        if (request.ProjectId is Guid pid && !await _db.Projects.AnyAsync(p => p.Id == pid, ct))
+            return Result<DecisionDto>.Failure("المشروع المرتبط غير موجود.", "decision.project.not_found");
 
         var decision = new Decision
         {
@@ -212,7 +214,8 @@ public class GovernanceService : IGovernanceService
             RelatedSubmissionId = request.RelatedSubmissionId,
             RelatedRiskId = request.RelatedRiskId,
             RelatedEscalationId = request.RelatedEscalationId,
-            RelatedKpiEvaluationId = request.RelatedKpiEvaluationId
+            RelatedKpiEvaluationId = request.RelatedKpiEvaluationId,
+            ProjectId = request.ProjectId
         };
         _db.Decisions.Add(decision);
         await _db.SaveChangesAsync(ct);

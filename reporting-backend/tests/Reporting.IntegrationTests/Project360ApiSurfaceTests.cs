@@ -519,6 +519,124 @@ public class Project360ApiSurfaceTests
         }
     }
 
+    /// <summary>
+    /// UAT-DEF-02 — مسار الكتابة الأصليّ للقرار يقبل <c>ProjectId</c>، فيمتلئ سطح
+    /// <c>/api/projects/{id}/decisions</c> بدل أن يبقى فارغًا أبدًا. والترشيح يبقى بالمشروع.
+    /// </summary>
+    [Fact]
+    public async Task Decision_CreatedWithProjectId_AppearsOnThatProjectOnly()
+    {
+        var fx = await NewFixtureAsync();
+        var other = await NewProjectAsync(fx, ServiceType.Other);
+        var title = $"قرار {Guid.NewGuid().ToString("N")[..8]}";
+
+        var created = await fx.Admin.PostAsJsonAsync("/api/decisions", new
+        {
+            title,
+            description = "قرار مرتبط بمشروع",
+            projectId = fx.ProjectId,
+        });
+        Assert.Equal(HttpStatusCode.OK, created.StatusCode);
+
+        var mine = await GetAsync<List<ProjectDecisionListItemDto>>(
+            fx.Admin, $"/api/projects/{fx.ProjectId}/decisions");
+        Assert.Contains(mine, d => d.Title == title);
+
+        var theirs = await GetAsync<List<ProjectDecisionListItemDto>>(
+            fx.Admin, $"/api/projects/{other}/decisions");
+        Assert.DoesNotContain(theirs, d => d.Title == title);
+    }
+
+    /// <summary>UAT-DEF-02 — مشروع غير موجود يُرفض بدل أن يُخزَّن ارتباط معلَّق.</summary>
+    [Fact]
+    public async Task Decision_WithUnknownProjectId_IsRejected()
+    {
+        var fx = await NewFixtureAsync();
+        var res = await fx.Admin.PostAsJsonAsync("/api/decisions", new
+        {
+            title = $"قرار {Guid.NewGuid().ToString("N")[..8]}",
+            projectId = Guid.NewGuid(),
+        });
+        await AssertErrorAsync(res, HttpStatusCode.NotFound, "decision.project.not_found");
+    }
+
+    /// <summary>
+    /// UAT-DEF-01 — الملاحظة الإداريّة تقبل نوعَي <c>Project</c> و<c>Client</c>، فيمتلئ سطح
+    /// <c>/api/projects/{id}/notes</c> بدل أن يُرفض الإنشاء بـ<c>note.entity.not_found</c>.
+    /// </summary>
+    [Fact]
+    public async Task ManagementNote_OnProject_IsAccepted_AndAppearsOnThatProjectOnly()
+    {
+        var fx = await NewFixtureAsync();
+        var other = await NewProjectAsync(fx, ServiceType.Other);
+        var body = $"ملاحظة {Guid.NewGuid().ToString("N")[..8]}";
+
+        var created = await fx.Admin.PostAsJsonAsync("/api/management-notes", new
+        {
+            entityType = nameof(ManagementNoteEntityType.Project),
+            entityId = fx.ProjectId,
+            noteType = nameof(ManagementNoteType.FollowUp),
+            body,
+            requiresAction = true,
+        });
+        Assert.Equal(HttpStatusCode.OK, created.StatusCode);
+
+        var mine = await GetAsync<List<ProjectNoteListItemDto>>(
+            fx.Admin, $"/api/projects/{fx.ProjectId}/notes");
+        Assert.Contains(mine, n => n.Body == body);
+
+        var theirs = await GetAsync<List<ProjectNoteListItemDto>>(
+            fx.Admin, $"/api/projects/{other}/notes");
+        Assert.DoesNotContain(theirs, n => n.Body == body);
+    }
+
+    /// <summary>UAT-DEF-01 — العميل مقبول أيضًا، والكيان المجهول يبقى مرفوضًا كما كان.</summary>
+    [Fact]
+    public async Task ManagementNote_OnClient_IsAccepted_ButUnknownEntityStaysRejected()
+    {
+        var fx = await NewFixtureAsync();
+
+        var onClient = await fx.Admin.PostAsJsonAsync("/api/management-notes", new
+        {
+            entityType = nameof(ManagementNoteEntityType.Client),
+            entityId = fx.ClientId,
+            noteType = nameof(ManagementNoteType.FollowUp),
+            body = $"ملاحظة عميل {Guid.NewGuid().ToString("N")[..8]}",
+        });
+        Assert.Equal(HttpStatusCode.OK, onClient.StatusCode);
+
+        var ghost = await fx.Admin.PostAsJsonAsync("/api/management-notes", new
+        {
+            entityType = nameof(ManagementNoteEntityType.Project),
+            entityId = Guid.NewGuid(),
+            noteType = nameof(ManagementNoteType.FollowUp),
+            body = "ملاحظة على مشروع غير موجود",
+        });
+        await AssertErrorAsync(ghost, HttpStatusCode.NotFound, "note.entity.not_found");
+    }
+
+    /// <summary>
+    /// UAT-DEF-01 — الكتابة على ملاحظات المشروع تبقى مقصورة على أصحاب صلاحيّة الحوكمة:
+    /// من يرى المشروع لا يكتسب بذلك حقّ الكتابة عليه.
+    /// </summary>
+    [Fact]
+    public async Task ManagementNote_OnProject_IsRejectedForNonGovernanceRoles()
+    {
+        var fx = await NewFixtureAsync();
+
+        foreach (var client in new[] { fx.OwnerTeamLeader, fx.AccountManager, fx.TeamEmployee, fx.Viewer })
+        {
+            var res = await client.PostAsJsonAsync("/api/management-notes", new
+            {
+                entityType = nameof(ManagementNoteEntityType.Project),
+                entityId = fx.ProjectId,
+                noteType = nameof(ManagementNoteType.FollowUp),
+                body = "محاولة كتابة",
+            });
+            Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
+        }
+    }
+
     // ==================================================================
     // تجهيزات
     // ==================================================================

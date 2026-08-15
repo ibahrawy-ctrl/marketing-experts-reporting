@@ -102,6 +102,8 @@ public class ManagementNoteService : IManagementNoteService
         ManagementNoteEntityType.Escalation => await _db.Escalations.AnyAsync(x => x.Id == id, ct),
         ManagementNoteEntityType.Decision => await _db.Decisions.AnyAsync(x => x.Id == id, ct),
         ManagementNoteEntityType.Risk => await _db.Risks.AnyAsync(x => x.Id == id, ct),
+        ManagementNoteEntityType.Client => await _db.Clients.AnyAsync(x => x.Id == id, ct),
+        ManagementNoteEntityType.Project => await _db.Projects.AnyAsync(x => x.Id == id, ct),
         _ => false
     };
 
@@ -146,9 +148,13 @@ public class ManagementNoteService : IManagementNoteService
                     .Select(x => new { x.RaisedById, x.TargetUserId }).FirstOrDefaultAsync(ct);
                 return e is not null && (e.RaisedById == uid || e.TargetUserId == uid);
             }
-            // المخاطر والقرارات بيانات حوكمة مؤسسية — مقصورة على أصحاب صلاحية الحوكمة (فُحصت أعلاه).
+            // المخاطر والقرارات والعملاء والمشاريع بيانات حوكمة مؤسسية — الكتابة عليها مقصورة
+            // على أصحاب صلاحية الحوكمة (فُحصت أعلاه). القراءة تبقى عبر بوّابة رؤية المشروع/العميل
+            // في طبقتها الخاصّة، فلا تُفتح هنا نافذة رؤية جانبيّة.
             case ManagementNoteEntityType.Decision:
             case ManagementNoteEntityType.Risk:
+            case ManagementNoteEntityType.Client:
+            case ManagementNoteEntityType.Project:
             default:
                 return false;
         }
