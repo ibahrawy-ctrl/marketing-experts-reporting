@@ -14,12 +14,28 @@
 #     مع استثناء واحد مقصود ومعلَن: عدد الهجرات 35 → 38.
 set -uo pipefail
 
-API="http://127.0.0.1:5091"
-ENVF="/etc/khubara-reporting-test.env"
-BASELINE="/root/backups/20260816-recon-l/baseline-counts.env"
+# البيئة قابلة للتوجيه بمتغيّرات، والافتراضيّ TEST كما كان. لا ثابت بيئيّ مدفون:
+# RC يمرَّر لها API/ENVF/BASELINE/DOCROOT/STORAGE_MD5_BEFORE/MIGRATION_DELTA الخاصّة بها.
+API="${SMOKE_API:-http://127.0.0.1:5091}"
+ENVF="${SMOKE_ENVF:-/etc/khubara-reporting-test.env}"
+BASELINE="${SMOKE_BASELINE:-/root/backups/20260816-recon-l/baseline-counts.env}"
+DOCROOT="${SMOKE_DOCROOT:-/var/lib/reporting-test/documents}"
+STORAGE_MD5_BEFORE="${SMOKE_STORAGE_MD5_BEFORE:-/root/backups/20260816-recon-l/storage-md5-before.txt}"
+MIGRATION_DELTA="${SMOKE_MIGRATION_DELTA:-3}"
+# هويّات UAT مؤقّتة موجودة عمدًا أثناء التشغيل (RC لا يحمل مدير بذرة في خطّ أساسه،
+# فالمصادقة تستلزم واحدًا مؤقّتًا). فرق مُعلَن كفرق الهجرات، لا ثابت مجمَّد.
+USERS_DELTA="${SMOKE_USERS_DELTA:-0}"
+EXPECTED_HEAD="${SMOKE_EXPECTED_HEAD:-20260811142239_AddProject360Foundation}"
 
+ADMIN_STORE="${SMOKE_ADMIN_STORE:-}"
 ADMIN_EMAIL=$(grep -E '^Seed__AdminEmail=' "$ENVF" | cut -d= -f2- | tr -d '"')
 ADMIN_PASS=$(grep -E '^Seed__AdminPassword=' "$ENVF" | cut -d= -f2- | tr -d '"')
+# بيئة بلا بذور مدير صريحة (RC/الإنتاج لا يُبذَر فيهما مدير افتراضيّ): تُقرأ اعتمادات
+# المدير من المخزن الآمن، لا من الصدفة ولا من argv — كما في uni-lineage-uat.py.
+if [ -z "$ADMIN_EMAIL" ] && [ -n "$ADMIN_STORE" ] && [ -f "$ADMIN_STORE" ]; then
+  ADMIN_EMAIL=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["admin"]["email"])' "$ADMIN_STORE")
+  ADMIN_PASS=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["admin"]["password"])' "$ADMIN_STORE")
+fi
 
 CONN=$(grep -E '^ConnectionStrings__Default' "$ENVF" | cut -d= -f2- | tr -d '"')
 export PGHOST=$(echo "$CONN" | tr ';' '\n' | grep -i '^Host=' | cut -d= -f2)
@@ -28,10 +44,18 @@ export PGDATABASE=$(echo "$CONN" | tr ';' '\n' | grep -i '^Database=' | cut -d= 
 export PGUSER=$(echo "$CONN" | tr ';' '\n' | grep -i '^Username=' | cut -d= -f2)
 export PGPASSWORD=$(echo "$CONN" | tr ';' '\n' | grep -i '^Password=' | cut -d= -f2)
 
-PASS=0; FAIL=0
+PASS=0; FAIL=0; NA=0
+# جداول أنشأها هذا النشر نفسه ⟹ فحص «حفظ البيانات» عليها غير منطبق لا ناجح.
+NEW_TABLES="${SMOKE_NEW_TABLES:-}"
 chk() { # chk <label> <actual> <expected>
   if [ "$2" = "$3" ]; then echo "  PASS  $1 -> $2"; PASS=$((PASS+1));
   else echo "  FAIL  $1 -> got=$2 expected=$3"; FAIL=$((FAIL+1)); fi
+}
+chk_preserve() { # chk_preserve <table> <actual> <expected>
+  case " $NEW_TABLES " in
+    *" $1 "*) echo "  N/A   $1 -> $2 (الجدول أنشأه هذا النشر؛ لا خطّ أساس للحفظ)"; NA=$((NA+1)) ;;
+    *) chk "$1" "$2" "$3" ;;
+  esac
 }
 code() { curl -s -o /dev/null -w '%{http_code}' "$@"; }
 
@@ -43,7 +67,13 @@ echo "===== 0) BASELINE ====="
 echo "  health=$(code $API/health)"
 # الصفّ نفسه: العميل والمستند مترابطان بحُكم مصدرهما الواحد، والمستند حيّ.
 read -r DOC_ID CLIENT_ID < <(psql -At -F' ' -c 'select "Id","ClientId" from client_documents where not "IsDeleted" and not "IsArchived" order by "Id" limit 1;')
-DELETED_DOC_ID=$(psql -Atc "select \"Id\" from client_documents where \"IsDeleted\" and \"ClientId\"='$CLIENT_ID' order by \"Id\" limit 1;")
+DOC_ID="${DOC_ID:-}"; CLIENT_ID="${CLIENT_ID:-}"
+# قاعدة بلا مستندات حيّة (حالة مشروعة: بعد حذف بيانات UAT الموسومة) لا تعني فشلًا.
+# يُنتقى العميل مباشرةً، وتصير فحوص المستند الواحد غير منطبقة — بدل بناء استعلام
+# بمعرّف فارغ يُسقِط psql بخطأ صياغة uuid ويُفسد بقيّة القياس.
+[ -z "$CLIENT_ID" ] && CLIENT_ID=$(psql -Atc 'select "Id" from clients order by "Id" limit 1;')
+DELETED_DOC_ID=""
+[ -n "$DOC_ID" ] && DELETED_DOC_ID=$(psql -Atc "select \"Id\" from client_documents where \"IsDeleted\" and \"ClientId\"='$CLIENT_ID' order by \"Id\" limit 1;")
 PROJECT_ID=$(psql -Atc 'select "Id" from projects order by "Id" limit 1;')
 DOCS_EXPECTED=$(psql -Atc "select count(*) from client_documents where \"ClientId\"='$CLIENT_ID' and not \"IsDeleted\" and not \"IsArchived\";")
 echo "  client_id=$CLIENT_ID"
@@ -64,9 +94,13 @@ AUTH="Authorization: Bearer $TOKEN"
 echo "===== 2) CPW-R2 · CLIENT DOCUMENTS ====="
 chk "GET /api/clients/{id}/documents"        "$(code -H "$AUTH" "$API/api/clients/$CLIENT_ID/documents")" "200"
 chk "GET /api/clients/{id}/links"            "$(code -H "$AUTH" "$API/api/clients/$CLIENT_ID/links")" "200"
-chk "GET /api/clients/{id}/documents/{docId}" "$(code -H "$AUTH" "$API/api/clients/$CLIENT_ID/documents/$DOC_ID")" "200"
 chk "GET .../documents/storage-usage"        "$(code -H "$AUTH" "$API/api/clients/$CLIENT_ID/documents/storage-usage")" "200"
-chk "GET .../documents/{docId}/download"     "$(code -H "$AUTH" "$API/api/clients/$CLIENT_ID/documents/$DOC_ID/download")" "200"
+if [ -n "$DOC_ID" ]; then
+  chk "GET /api/clients/{id}/documents/{docId}" "$(code -H "$AUTH" "$API/api/clients/$CLIENT_ID/documents/$DOC_ID")" "200"
+  chk "GET .../documents/{docId}/download"     "$(code -H "$AUTH" "$API/api/clients/$CLIENT_ID/documents/$DOC_ID/download")" "200"
+else
+  echo "  N/A   فحوص المستند الواحد (لا مستند حيّ في القاعدة)"; NA=$((NA+1))
+fi
 DOCS_JSON=$(curl -s -H "$AUTH" "$API/api/clients/$CLIENT_ID/documents")
 DOC_COUNT=$(echo "$DOCS_JSON" | grep -o '"id"' | wc -l | tr -d ' ')
 chk "document list matches live rows in db"  "$DOC_COUNT" "$DOCS_EXPECTED"
@@ -112,20 +146,20 @@ chk "no messages sent in last hour"          "$SENT" "0"
 chk "reminder scheduler flag absent/false"   "$(grep -cE '^ReportReminderScheduler__Enabled=true' "$ENVF")" "0"
 
 echo "===== 7) DATA PRESERVATION vs PRE-DEPLOY DUMP ====="
-chk "client_documents"                       "$(psql -Atc 'select count(*) from client_documents;')" "${BL_client_documents:?}"
-chk "client_document_versions"               "$(psql -Atc 'select count(*) from client_document_versions;')" "${BL_client_document_versions:?}"
+chk_preserve "client_documents"              "$(psql -Atc 'select count(*) from client_documents;')" "${BL_client_documents:?}"
+chk_preserve "client_document_versions"      "$(psql -Atc 'select count(*) from client_document_versions;')" "${BL_client_document_versions:?}"
 chk "clients"                                "$(psql -Atc 'select count(*) from clients;')" "${BL_clients:?}"
 chk "projects"                               "$(psql -Atc 'select count(*) from projects;')" "${BL_projects:?}"
 chk "report_templates"                       "$(psql -Atc 'select count(*) from report_templates;')" "${BL_report_templates:?}"
-chk "users"                                  "$(psql -Atc 'select count(*) from "AspNetUsers";')" "${BL_AspNetUsers:?}"
+chk "users (baseline + $USERS_DELTA temporary UAT identity)" "$(psql -Atc 'select count(*) from "AspNetUsers";')" "$(( ${BL_AspNetUsers:?} + USERS_DELTA ))"
 chk "submissions"                            "$(psql -Atc 'select count(*) from report_submissions;')" "${BL_report_submissions:?}"
-chk "execution_taxonomy_values"              "$(psql -Atc 'select count(*) from execution_taxonomy_values;')" "${BL_execution_taxonomy_values:?}"
-# الاستثناء المقصود الوحيد: ثلاث هجرات إضافيّة بحتة من نَسَب الإنتاج.
-chk "migrations (baseline + 3 by design)"    "$(psql -Atc 'select count(*) from "__EFMigrationsHistory";')" "$(( ${BL___EFMigrationsHistory:?} + 3 ))"
-chk "migrations head"                        "$(psql -Atc 'select max("MigrationId") from "__EFMigrationsHistory";')" "20260811142239_AddProject360Foundation"
-chk "document storage fingerprint"           "$(find /var/lib/reporting-test/documents -type f | sort | xargs -r md5sum | md5sum | cut -d' ' -f1)" "$(cut -d' ' -f1 /root/backups/20260816-recon-l/storage-md5-before.txt)"
+chk_preserve "execution_taxonomy_values"     "$(psql -Atc 'select count(*) from execution_taxonomy_values;')" "${BL_execution_taxonomy_values:?}"
+# الاستثناء المقصود الوحيد: هجرات إضافيّة بحتة (TEST: +3 · RC: +10 = 8 هجرات + صفّا الجسر).
+chk "migrations (baseline + $MIGRATION_DELTA by design)" "$(psql -Atc 'select count(*) from "__EFMigrationsHistory";')" "$(( ${BL___EFMigrationsHistory:?} + MIGRATION_DELTA ))"
+chk "migrations head"                        "$(psql -Atc 'select max("MigrationId") from "__EFMigrationsHistory";')" "$EXPECTED_HEAD"
+chk_preserve "document_storage"              "$(find "$DOCROOT" -type f | sort | xargs -r md5sum | md5sum | cut -d' ' -f1)" "$(cut -d' ' -f1 "$STORAGE_MD5_BEFORE")"
 
 echo
 echo "===== SMOKE SUMMARY ====="
-echo "PASS=$PASS FAIL=$FAIL"
+echo "PASS=$PASS FAIL=$FAIL NA=$NA"
 [ "$FAIL" -eq 0 ] && echo "SMOKE_GATE=PASS" || echo "SMOKE_GATE=FAIL"

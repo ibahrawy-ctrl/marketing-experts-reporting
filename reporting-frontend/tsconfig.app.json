@@ -4,7 +4,10 @@
     "target": "es2023",
     "lib": ["ES2023", "DOM"],
     "module": "esnext",
-    "types": ["vite/client"],
+    /* حرّاس الانحدار داخل `src` (مثل routeRegistry.test.ts) تقرأ ملفّات المشروع نصّيًّا
+       عبر node:fs/node:path و`__dirname`، فتحتاج تعريفات node ليمرّ `tsc -b`.
+       لا أثر لذلك على الحزمة المشحونة: ملفّات الاختبار لا تدخل حزمة vite. */
+    "types": ["vite/client", "node"],
     "skipLibCheck": true,
 
     /* Bundler mode */

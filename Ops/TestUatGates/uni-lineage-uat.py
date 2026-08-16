@@ -10,10 +10,13 @@ RECONCILE-PROD-DEVELOP-LINEAGE — UAT الوظيفيّة لميزات نَسَ�
 لا يكتب أيّ بيانات على القاعدة عبر الواجهة إلّا في المسارات المعلَّمة WRITE،
 وكلّها على TEST وقابلة للعكس بحذف ما أنشأته في نفس التشغيل.
 """
-import json, sys, time, urllib.error, urllib.request
+import json, os, sys, time, urllib.error, urllib.request
 
-API = "http://127.0.0.1:5091"
-STORE = "/root/uat-secrets/uat-accounts.json"
+# القِيَم البيئيّة تُمرَّر لا تُثبَّت، لتعمل الأداة نفسها على TEST وRC (الافتراضات TEST):
+#   UAT_API · UAT_STORE · UAT_ENVF
+API = os.environ.get("UAT_API", "http://127.0.0.1:5091")
+STORE = os.environ.get("UAT_STORE", "/root/uat-secrets/uat-accounts.json")
+ENVF = os.environ.get("UAT_ENVF", "/etc/khubara-reporting-test.env")
 
 PASS = 0
 FAIL = 0
@@ -52,10 +55,15 @@ def chk(label, actual, expected):
 
 
 def main():
-    accounts = json.load(open(STORE, encoding="utf-8"))["accounts"]
-    envf = open("/etc/khubara-reporting-test.env", encoding="utf-8").read().splitlines()
-    admin_email = next(l.split("=", 1)[1].strip('"') for l in envf if l.startswith("Seed__AdminEmail="))
-    admin_pass = next(l.split("=", 1)[1].strip('"') for l in envf if l.startswith("Seed__AdminPassword="))
+    store = json.load(open(STORE, encoding="utf-8"))
+    accounts = store["accounts"]
+    # اعتمادات المدير: من ملفّ البيئة إن وُجدت فيه، وإلّا من المخزن الآمن نفسه
+    # (بيئة RC لا تحمل بذورًا افتراضيّة، فمديرها الموسوم مسجَّل في المخزن).
+    envf = open(ENVF, encoding="utf-8").read().splitlines()
+    admin_email = next((l.split("=", 1)[1].strip('"') for l in envf if l.startswith("Seed__AdminEmail=")),
+                       store.get("admin", {}).get("email"))
+    admin_pass = next((l.split("=", 1)[1].strip('"') for l in envf if l.startswith("Seed__AdminPassword=")),
+                      store.get("admin", {}).get("password"))
 
     print("===== 1) AUTH =====")
     admin = login(admin_email, admin_pass)

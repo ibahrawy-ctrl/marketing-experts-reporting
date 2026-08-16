@@ -7,10 +7,13 @@ RECONCILE-PROD-DEVELOP-LINEAGE — استقصاء تفاصيل المستند ل
 المستند (التصنيف/الرؤية) لا بتشغيل واحد.
 يقرأ الأسرار من المخزن الآمن مباشرةً: لا source ولا eval ولا argv.
 """
-import json, sys, time, urllib.error, urllib.request
+import json, os, sys, time, urllib.error, urllib.request
 
-API = "http://127.0.0.1:5091"
-STORE = "/root/uat-secrets/uat-accounts.json"
+# القِيَم البيئيّة تُمرَّر لا تُثبَّت، لتعمل الأداة نفسها على TEST وRC (الافتراضات TEST):
+#   PROBE_API · PROBE_STORE · PROBE_DOCMETA
+API = os.environ.get("PROBE_API", "http://127.0.0.1:5091")
+STORE = os.environ.get("PROBE_STORE", "/root/uat-secrets/uat-accounts.json")
+DOCMETA = os.environ.get("PROBE_DOCMETA", "/tmp/docmeta.json")
 
 
 def call(path, token=None, method="GET", payload=None):
@@ -36,7 +39,7 @@ def login(email, pw):
 
 def main():
     client_id = sys.argv[1]
-    docs = json.load(open("/tmp/docmeta.json", encoding="utf-8"))
+    docs = json.load(open(DOCMETA, encoding="utf-8"))
     accounts = json.load(open(STORE, encoding="utf-8"))["accounts"]
     print("%-40s %-18s %-16s %s" % ("document", "confidentiality", "visibility", "  ".join("%-8s" % r for r in ("OPS_MGR", "AM", "HR", "FIN_MGR", "CEO"))))
     tokens = {}

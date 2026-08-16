@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 """
-بوّابة الأدوار والنطاق ومكافحة التعداد — CPW-R2 + CPW-R3 — TEST فقط.
+بوّابة الأدوار والنطاق ومكافحة التعداد — CPW-R2 + CPW-R3.
 يقرأ الأسرار من المخزن الآمن (JSON) مباشرةً: لا source، لا eval، لا صدفة، لا argv.
 يحترم حدّ المعدّل 30/60ث بمباعدة نداءات المصادقة.
-"""
-import json, sys, time, urllib.error, urllib.request
 
-API = "http://127.0.0.1:5091"
-STORE = "/root/uat-secrets/uat-accounts.json"
+القِيَم البيئيّة تُمرَّر عبر متغيّرات البيئة لا تُثبَّت في الشيفرة، حتّى تعمل البوّابة
+نفسها — بلا نسخ متفرّعة — على TEST وRC معًا (الافتراضات تبقى TEST):
+  ROLE_GATE_API · ROLE_GATE_STORE · ROLE_GATE_MATRIX
+"""
+import json, os, sys, time, urllib.error, urllib.request
+
+API = os.environ.get("ROLE_GATE_API", "http://127.0.0.1:5091")
+STORE = os.environ.get("ROLE_GATE_STORE", "/root/uat-secrets/uat-accounts.json")
+MATRIX_OUT = os.environ.get("ROLE_GATE_MATRIX", "/root/uat-role-matrix.json")
 GHOST = "00000000-0000-0000-0000-000000000001"
 
 
@@ -90,9 +95,9 @@ def main():
     print("\n===== SUMMARY =====")
     print("PASS=%d FAIL=%d" % (PASS, FAIL))
     print("ROLE_GATE=%s" % ("PASS" if FAIL == 0 and PASS > 0 else "FAIL"))
-    with open("/root/uat-role-matrix.json", "w", encoding="utf-8") as fh:
+    with open(MATRIX_OUT, "w", encoding="utf-8") as fh:
         json.dump(matrix, fh, ensure_ascii=False, indent=2)
-    print("matrix -> /root/uat-role-matrix.json")
+    print("matrix -> %s" % MATRIX_OUT)
     return 0 if FAIL == 0 else 1
 
 
