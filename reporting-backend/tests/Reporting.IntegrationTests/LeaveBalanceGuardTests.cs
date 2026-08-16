@@ -163,30 +163,42 @@ public class LeaveBalanceGuardTests
         Assert.Equal(LeaveRequestStatus.Submitted, created.Status);
 
         var ledger = await LedgerAsync(org.Admin, org.Emp.Id);
-        // لا توجد أي حركة خصم إجازة معتمَدة لهذا الطلب — الخصم يبقى عند الاعتماد النهائي فقط.
+        // لا توجد أيّ حركة خصم إجازة معتمَدة لهذا الطلب — الخصم لا يقع قبل اعتماد قائد الفريق
+        // (LEAVE-DEDUCTION-ON-TL-APPROVAL-R1: أوّل نقطة خصم صارت اعتماد قائد الفريق لا الاعتماد النهائي).
         Assert.DoesNotContain(ledger.Entries, e =>
             e.Source == BalanceSource.ApprovedLeave && e.RelatedRequestId == created.Id);
         Assert.Equal(1, ledger.AnnualLeave.Remaining); // لم يتغيّر عن الافتتاحي
     }
 
-    // ===== 6أ) Regression — الاعتماد النهائي للطلب المُقَرّ به يخصم عدد الأيام كاملًا (السلوك القائم) =====
+    // ===== 6أ) Regression — الطلب المُقَرّ به يُخصَم عدد أيامه كاملًا مرّة واحدة عبر الدورة =====
+    // LEAVE-DEDUCTION-ON-TL-APPROVAL-R1: موضع الخصم انتقل إلى اعتماد قائد الفريق، والمقدار والوحدانيّة
+    // لم يتغيّرا. اعتمادا المدير والموارد البشرية لاحقًا لا يضيفان خصمًا ولا يغيّران مقداره.
     [Fact]
-    public async Task Regression_Deduction_Still_Happens_Only_At_Final_Approval()
+    public async Task Regression_Deduction_Happens_Once_At_TeamLeader_Approval_And_Not_Repeated()
     {
         var org = await BuildOrgAsync();
         await OpeningAsync(org.Admin, org.Emp.Id, 1);
 
         var created = (await (await CreateLeaveAsync(org.Emp.C, S, E, ack: true)).ReadAsync<LeaveRequestDto>())!;
         await org.Tl.C.PostAsJsonAsync($"/api/leave-requests/{created.Id}/team-leader/approve", new LeaveApproveRequest(null), TestJson.Options);
+
+        // الخصم وقع فورًا عند اعتماد قائد الفريق.
+        var afterTl = await LedgerAsync(org.Admin, org.Emp.Id);
+        Assert.Single(afterTl.Entries.Where(e =>
+            e.Source == BalanceSource.ApprovedLeave && e.Direction == BalanceDirection.Debit
+            && e.Amount == 3 && e.RelatedRequestId == created.Id));
+        Assert.Equal(-2, afterTl.AnnualLeave.Remaining); // 1 - 3 (سالب مسموح)
+
         await org.Manager.C.PostAsJsonAsync($"/api/leave-requests/{created.Id}/manager/approve", new LeaveApproveRequest(null), TestJson.Options);
         var final = await org.Gm.C.PostAsJsonAsync($"/api/leave-requests/{created.Id}/hr/approve", new LeaveApproveRequest("موافق"), TestJson.Options);
         Assert.Equal(HttpStatusCode.OK, final.StatusCode);
 
+        // ولا خصم إضافيّ من اعتماد المدير أو الاعتماد النهائي.
         var ledger = await LedgerAsync(org.Admin, org.Emp.Id);
-        Assert.Contains(ledger.Entries, e =>
+        Assert.Single(ledger.Entries.Where(e =>
             e.Source == BalanceSource.ApprovedLeave && e.Direction == BalanceDirection.Debit
-            && e.Amount == 3 && e.RelatedRequestId == created.Id);
-        Assert.Equal(-2, ledger.AnnualLeave.Remaining); // 1 - 3 (سالب مسموح)
+            && e.Amount == 3 && e.RelatedRequestId == created.Id));
+        Assert.Equal(-2, ledger.AnnualLeave.Remaining);
         Assert.True(ledger.AnnualLeave.IsNegative);
     }
 

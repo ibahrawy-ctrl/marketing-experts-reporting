@@ -132,13 +132,15 @@ it('الموظف العادي (غير مندوب) لا يرى أيًّا من ت
   expect(screen.queryByText(MINE)).toBeNull();
 });
 
-it('وحدات الشريط الجانبي الرئيسية تبقى ظاهرة (لا كسر للهيكل)', () => {
+it('وحدات الشريط الجانبي وتبويبات وحدة التقارير تبقى ظاهرة (لا كسر للتنقّل المدمج)', () => {
   authState.roles = ['Admin'];
   renderShell();
-  // عناوين الوحدات في الشريط الجانبي.
+  // وحدات رئيسية في الشريط الجانبي.
   expect(screen.getByText('الرئيسية')).toBeInTheDocument();
-  expect(screen.getByText('التقارير')).toBeInTheDocument();
-  // تبويبات وحدة «التقارير» النشطة.
-  expect(screen.getByText('التقارير المقدَّمة')).toBeInTheDocument();
+  // تبويبات وحدة التقارير النشطة (اللصيقة بالمسمّى الحرفي في navConfig).
+  // ROLE-AWARE-PERSONAL-REPORT-SUBMISSION-ACCESS-R1: مساران متوازيان — «تقاريري» الشخصيّ (لكل مصادَق
+  // عليه) و«تقارير الفريق» الإداريّ (EXEC_VIEW). الأدمن يرى كليهما دون أن يستبدل أحدهما الآخر.
+  expect(screen.getByText('تقاريري')).toBeInTheDocument();
+  expect(screen.getByText('تقارير الفريق')).toBeInTheDocument();
   expect(screen.getByText('تقويم التقارير')).toBeInTheDocument();
 });

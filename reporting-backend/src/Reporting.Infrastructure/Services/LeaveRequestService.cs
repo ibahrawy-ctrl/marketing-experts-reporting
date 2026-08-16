@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Reporting.Application.Audit;
 using Reporting.Application.Common;
 using Reporting.Application.Leave;
@@ -24,9 +25,11 @@ public class LeaveRequestService : ILeaveRequestService
     private readonly IAuditService _audit;
     private readonly INotificationService _notifications;
     private readonly IEmailNotificationService _emailNotifications;
+    private readonly ILeaveBalanceLifecycleService _balanceLifecycle;
 
     public LeaveRequestService(AppDbContext db, ICurrentUser currentUser, IScopeResolver scope,
-        IAuditService audit, INotificationService notifications, IEmailNotificationService emailNotifications)
+        IAuditService audit, INotificationService notifications, IEmailNotificationService emailNotifications,
+        ILeaveBalanceLifecycleService balanceLifecycle)
     {
         _db = db;
         _currentUser = currentUser;
@@ -34,6 +37,7 @@ public class LeaveRequestService : ILeaveRequestService
         _audit = audit;
         _notifications = notifications;
         _emailNotifications = emailNotifications;
+        _balanceLifecycle = balanceLifecycle;
     }
 
     /// <summary>مُعرّفات مستخدمي الموارد البشرية النشطين (Role="HR") — لإشعارات وصول الطلب لمرحلة HR.</summary>
@@ -125,6 +129,212 @@ public class LeaveRequestService : ILeaveRequestService
         var names = await UserNamesAsync(rows.Select(r => r.RequesterUserId), ct);
         return Result<IReadOnlyList<LeaveRequestListItemDto>>.Success(
             rows.Select(r => MapList(r, names)).ToList());
+    }
+
+    // ===== LEAVE-TL-PENDING-GOVERNANCE-R1 — طابور الحوكمة «معلّقة عند قادة الفرق» (قراءة-فقط) =====
+    // عتبة تحوّل الطلب من «معلّق» إلى «يحتاج متابعة» قبل تاريخ البداية (ساعات، بتوقيت الرياض المشتقّ من CreatedAtUtc).
+    // ثابت مُوثَّق قابل للضبط — بلا هجرة ولا مجدول ولا حالة مخزَّنة.
+    private const int AttentionAfterHours = 24;
+
+    public async Task<Result<TeamLeaderPendingGovernanceResultDto>> GetTeamLeaderPendingGovernanceAsync(
+        TeamLeaderPendingGovernanceQuery query, CancellationToken ct = default)
+    {
+        if (_currentUser.UserId is not Guid)
+            return Result<TeamLeaderPendingGovernanceResultDto>.Failure("غير مصرّح.", "auth.unauthenticated");
+        if (!_currentUser.IsInAnyRole(Roles.LeaveGovernanceReaders))
+            return Result<TeamLeaderPendingGovernanceResultDto>.Failure(
+                "لا صلاحية لعرض طابور الحوكمة.", "auth.forbidden");
+
+        // (أ) الأساس: كل طلب معلّق عند خطوة قائد الفريق على مستوى الشركة — بلا نطاق شخصيّ وبلا استثناء المُقدِّم،
+        // ومستقلّ تمامًا عن GetPendingAsync. (الملغى/المحذوف ناعمًا يخرج تلقائيًّا لأن حالته لن تكون Submitted.)
+        var rows = await _db.LeaveRequests.AsNoTracking()
+            .Where(r => r.Status == LeaveRequestStatus.Submitted && r.CurrentStep == LeaveRequestStep.TeamLeader)
+            .ToListAsync(ct);
+
+        if (rows.Count == 0)
+            return Result<TeamLeaderPendingGovernanceResultDto>.Success(
+                new TeamLeaderPendingGovernanceResultDto(
+                    new List<TeamLeaderPendingGovernanceItemDto>(), 0, query.Page, query.PageSize,
+                    new TeamLeaderPendingGovernanceCountersDto(0, 0, 0, 0, 0, 0)));
+
+        var requestIds = rows.Select(r => r.Id).ToList();
+        var employeeIds = rows.Select(r => r.RequesterUserId).Distinct().ToList();
+
+        // (ب) بيانات الموظفين (اسم/نشاط/فريق/إدارة).
+        var employees = await _db.Users.AsNoTracking()
+            .Where(u => employeeIds.Contains(u.Id))
+            .Select(u => new { u.Id, u.FullName, u.IsActive, u.TeamId, u.DepartmentId })
+            .ToListAsync(ct);
+        var empById = employees.ToDictionary(e => e.Id);
+
+        // (ج) الفِرق (اسم/إدارة/قائد الفريق) لفرق الموظفين المعلَّقة طلباتهم.
+        var teamIds = employees.Where(e => e.TeamId is Guid).Select(e => e.TeamId!.Value).Distinct().ToList();
+        var teams = await _db.Teams.AsNoTracking()
+            .Where(t => teamIds.Contains(t.Id))
+            .Select(t => new { t.Id, t.NameAr, t.DepartmentId, t.TeamLeaderId })
+            .ToListAsync(ct);
+        var teamById = teams.ToDictionary(t => t.Id);
+
+        // (د) الإدارات (اسم) — من إدارات الموظفين وإدارات الفِرق.
+        var deptIds = employees.Where(e => e.DepartmentId is Guid).Select(e => e.DepartmentId!.Value)
+            .Concat(teams.Select(t => t.DepartmentId)).Distinct().ToList();
+        var depts = await _db.Departments.AsNoTracking()
+            .Where(d => deptIds.Contains(d.Id))
+            .Select(d => new { d.Id, d.NameAr })
+            .ToListAsync(ct);
+        var deptNameById = depts.ToDictionary(d => d.Id, d => d.NameAr);
+
+        // (هـ) قادة الفِرق (اسم/نشاط).
+        var tlIds = teams.Where(t => t.TeamLeaderId is Guid).Select(t => t.TeamLeaderId!.Value).Distinct().ToList();
+        var tlUsers = await _db.Users.AsNoTracking()
+            .Where(u => tlIds.Contains(u.Id))
+            .Select(u => new { u.Id, u.FullName, u.IsActive })
+            .ToListAsync(ct);
+        var tlById = tlUsers.ToDictionary(u => u.Id);
+
+        // (و) عدّاد حركات الرصيد المرتبطة بكل طلب — إثبات صفريّة الخصم (لا يُفترَض وجودها لطلب معلّق).
+        var ledgerRows = await _db.EmployeeBalanceLedger.AsNoTracking()
+            .Where(l => l.RelatedRequestId != null && requestIds.Contains(l.RelatedRequestId!.Value))
+            .Select(l => l.RelatedRequestId!.Value)
+            .ToListAsync(ct);
+        var ledgerCountById = ledgerRows.GroupBy(id => id).ToDictionary(g => g.Key, g => g.Count());
+
+        // (ز) آخر حدث لكل طلب (نوع/وقت) — تجميع في الذاكرة (المجموعة صغيرة بطبيعتها).
+        var eventRows = await _db.LeaveRequestEvents.AsNoTracking()
+            .Where(e => requestIds.Contains(e.LeaveRequestId))
+            .Select(e => new { e.LeaveRequestId, e.Action, e.CreatedAtUtc })
+            .ToListAsync(ct);
+        var lastEventById = eventRows
+            .GroupBy(e => e.LeaveRequestId)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(e => e.CreatedAtUtc).First());
+
+        var today = ReportCalendarPolicy.RiyadhToday();
+
+        // (ح) بناء الصفوف المشتقّة + التصنيف.
+        var items = new List<TeamLeaderPendingGovernanceItemDto>(rows.Count);
+        foreach (var r in rows)
+        {
+            empById.TryGetValue(r.RequesterUserId, out var emp);
+            var teamId = emp?.TeamId;
+            teamById.TryGetValue(teamId ?? Guid.Empty, out var team);
+
+            Guid? tlUserId = team?.TeamLeaderId;
+            var missingTl = tlUserId is null;
+            tlById.TryGetValue(tlUserId ?? Guid.Empty, out var tl);
+
+            Guid? deptId = team?.DepartmentId ?? emp?.DepartmentId;
+            string? deptName = deptId is Guid dId && deptNameById.TryGetValue(dId, out var dn) ? dn : null;
+
+            var requestedUnits = r.Type == LeaveRequestType.Permission
+                ? 1
+                : (r.EndDate.DayNumber - r.StartDate.DayNumber) + 1;
+
+            var createdRiyadh = ReportCalendarPolicy.RiyadhDate(r.CreatedAtUtc);
+            var daysPending = today.DayNumber - createdRiyadh.DayNumber;
+            var daysUntilStart = r.StartDate.DayNumber - today.DayNumber;
+            var startedAlready = r.StartDate <= today;
+            var endedAlready = r.EndDate < today;
+            var hoursPending = (DateTime.UtcNow - r.CreatedAtUtc).TotalHours;
+
+            LeaveGovernanceDelayStatus delay;
+            string delayReason;
+            if (endedAlready)
+            {
+                delay = LeaveGovernanceDelayStatus.ExpiredUnresolved;
+                delayReason = "انتهت مدة الطلب ولم يُبتّ عند قائد الفريق.";
+            }
+            else if (startedAlready)
+            {
+                delay = LeaveGovernanceDelayStatus.Critical;
+                delayReason = "بدأ موعد الطلب والطلب ما زال معلّقًا عند قائد الفريق.";
+            }
+            else if (hoursPending > AttentionAfterHours)
+            {
+                delay = LeaveGovernanceDelayStatus.Attention;
+                delayReason = $"مضى أكثر من {AttentionAfterHours} ساعة على التقديم دون بتّ قائد الفريق.";
+            }
+            else
+            {
+                delay = LeaveGovernanceDelayStatus.Pending;
+                delayReason = "بانتظار بتّ قائد الفريق ضمن عتبة المتابعة.";
+            }
+
+            var ledgerCount = ledgerCountById.GetValueOrDefault(r.Id, 0);
+            lastEventById.TryGetValue(r.Id, out var lastEvt);
+
+            items.Add(new TeamLeaderPendingGovernanceItemDto(
+                r.Id, r.Type, r.RequesterUserId, emp?.FullName ?? string.Empty,
+                deptId, deptName, teamId, team?.NameAr,
+                tlUserId, tl?.FullName,
+                r.CreatedAtUtc, r.StartDate, r.EndDate, requestedUnits,
+                r.Status, r.CurrentStep,
+                lastEvt?.Action, lastEvt?.CreatedAtUtc,
+                daysPending, daysUntilStart, startedAlready, endedAlready,
+                delay, delayReason,
+                ledgerCount > 0, ledgerCount,
+                emp?.IsActive ?? false, tl?.IsActive ?? false, missingTl));
+        }
+
+        // (ط) الفلاتر (كلها في الذاكرة على المجموعة الصغيرة المشتقّة).
+        IEnumerable<TeamLeaderPendingGovernanceItemDto> filtered = items;
+        if (!query.IncludeInactive)
+            filtered = filtered.Where(i => i.IsEmployeeActive);
+        if (query.TeamLeaderId is Guid qtl)
+            filtered = filtered.Where(i => i.TeamLeaderUserId == qtl);
+        if (query.DepartmentId is Guid qd)
+            filtered = filtered.Where(i => i.DepartmentId == qd);
+        if (query.TeamId is Guid qt)
+            filtered = filtered.Where(i => i.TeamId == qt);
+        if (query.RequestType is LeaveRequestType qrt)
+            filtered = filtered.Where(i => i.RequestType == qrt);
+        if (query.DelayStatus is LeaveGovernanceDelayStatus qds)
+            filtered = filtered.Where(i => i.DelayStatus == qds);
+        if (query.StartDateFrom is DateOnly sdf)
+            filtered = filtered.Where(i => i.StartDate >= sdf);
+        if (query.StartDateTo is DateOnly sdt)
+            filtered = filtered.Where(i => i.StartDate <= sdt);
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            var term = query.Search.Trim();
+            filtered = filtered.Where(i =>
+                i.EmployeeName.Contains(term, StringComparison.OrdinalIgnoreCase)
+                || (i.TeamName != null && i.TeamName.Contains(term, StringComparison.OrdinalIgnoreCase))
+                || (i.TeamLeaderName != null && i.TeamLeaderName.Contains(term, StringComparison.OrdinalIgnoreCase))
+                || (i.DepartmentName != null && i.DepartmentName.Contains(term, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        var matched = filtered.ToList();
+
+        // (ي) العدّادات على كامل المطابقة (قبل الترقيم).
+        var counters = new TeamLeaderPendingGovernanceCountersDto(
+            matched.Count,
+            matched.Count(i => i.DelayStatus == LeaveGovernanceDelayStatus.Attention),
+            matched.Count(i => i.DelayStatus == LeaveGovernanceDelayStatus.Critical),
+            matched.Count(i => i.DelayStatus == LeaveGovernanceDelayStatus.ExpiredUnresolved),
+            matched.Count(i => i.MissingTeamLeaderAssignment),
+            matched.Count == 0 ? 0 : matched.Max(i => i.DaysPending));
+
+        // (ك) الترتيب: ExpiredUnresolved ← Critical ← Attention ← Pending، ثمّ الأقدم فالأحدث ضمن كل تصنيف.
+        static int SortRank(LeaveGovernanceDelayStatus s) => s switch
+        {
+            LeaveGovernanceDelayStatus.ExpiredUnresolved => 0,
+            LeaveGovernanceDelayStatus.Critical => 1,
+            LeaveGovernanceDelayStatus.Attention => 2,
+            _ => 3
+        };
+        var ordered = matched
+            .OrderBy(i => SortRank(i.DelayStatus))
+            .ThenBy(i => i.CreatedAtUtc)
+            .ToList();
+
+        // (ل) الترقيم.
+        var page = query.Page < 1 ? 1 : query.Page;
+        var pageSize = query.PageSize < 1 ? 25 : query.PageSize;
+        var paged = ordered.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+
+        // قراءة-فقط بحتة: لا SaveChanges ولا تدقيق ولا إشعار ولا أثر جانبيّ.
+        return Result<TeamLeaderPendingGovernanceResultDto>.Success(
+            new TeamLeaderPendingGovernanceResultDto(paged, matched.Count, page, pageSize, counters));
     }
 
     public async Task<Result<LeaveRequestDto>> GetByIdAsync(Guid id, CancellationToken ct = default)
@@ -257,11 +467,17 @@ public class LeaveRequestService : ILeaveRequestService
         // يعتمد طلبه الشخصي؛ يبدأ مباشرةً عند المدير. لا ينطبق على طلب الموارد البشرية (له مساره).
         var isTeamLeaderRequest = !isHrRequest && _currentUser.IsInRole(Roles.TeamLeader);
 
+        // تجاوز خطوة قائد الفريق (Direct Reporting Override): قاعدة عامة — إن كان الموظّف مضبوطًا على
+        // BypassTeamLeaderApproval=true فلا قائد فعلي له في مسار الاعتماد رغم بقائه ضمن فريق له قائد،
+        // فيُوجَّه الطلب مباشرةً إلى مديره المباشر (ثم fallback المعتمد). لا يمسّ TeamId ولا قائد الفريق.
+        var requesterBypassesTeamLeader = await _db.Users.Where(u => u.Id == uid)
+            .Select(u => u.BypassTeamLeaderApproval).FirstOrDefaultAsync(ct);
+
         // قائد الفريق الفعلي للموظّف (T-WF2): خطوة قائد الفريق يعتمدها قائد فريق الموظّف الفعلي حصرًا.
-        // إن لم يكن للموظّف فريق، أو لا قائد محدّد للفريق، أو القائد هو الموظّف نفسه ⇒ لا قائد فعلي
-        // ⇒ يُتخطّى قائد الفريق عند الإنشاء ويُوجَّه الطلب مباشرةً إلى المدير (fallback آمن بلا توقّف).
+        // إن لم يكن للموظّف فريق، أو لا قائد محدّد للفريق، أو القائد هو الموظّف نفسه، أو الموظّف Direct
+        // Reporting ⇒ لا قائد فعلي ⇒ يُتخطّى قائد الفريق عند الإنشاء ويُوجَّه الطلب مباشرةً إلى المدير.
         Guid? effectiveTeamLeaderId = null;
-        if (!isHrRequest && !isTeamLeaderRequest)
+        if (!isHrRequest && !isTeamLeaderRequest && !requesterBypassesTeamLeader)
         {
             var teamId = await _db.Users.Where(u => u.Id == uid).Select(u => u.TeamId).FirstOrDefaultAsync(ct);
             if (teamId is Guid tid)
@@ -305,6 +521,10 @@ public class LeaveRequestService : ILeaveRequestService
             AddEvent(entity.Id, uid, "team_leader_step_skipped", LeaveRequestStep.Employee,
                 LeaveRequestStatus.Submitted, LeaveRequestStatus.TeamLeaderApproved,
                 "تم تخطي مراجعة قائد الفريق لأن مقدم الطلب هو قائد الفريق.");
+        else if (requesterBypassesTeamLeader)
+            AddEvent(entity.Id, uid, "team_leader_step_skipped", LeaveRequestStep.Employee,
+                LeaveRequestStatus.Submitted, LeaveRequestStatus.TeamLeaderApproved,
+                "تم تخطي مراجعة قائد الفريق (تبعية مباشرة للمدير)، وتم توجيه الطلب إلى المدير المباشر.");
         else if (noEffectiveTeamLeader)
             AddEvent(entity.Id, uid, "team_leader_step_skipped", LeaveRequestStep.Employee,
                 LeaveRequestStatus.Submitted, LeaveRequestStatus.TeamLeaderApproved,
@@ -350,7 +570,13 @@ public class LeaveRequestService : ILeaveRequestService
         entity.CancelledAtUtc = DateTime.UtcNow;
         entity.UpdatedAtUtc = DateTime.UtcNow;
         AddEvent(entity.Id, uid, "cancelled", LeaveRequestStep.Employee, from, LeaveRequestStatus.Cancelled, null);
-        await _db.SaveChangesAsync(ct);
+
+        // LEAVE-DEDUCTION-ON-TL-APPROVAL-R1 — الإلغاء بعد وقوع الخصم يستوجب عكسًا واحدًا في المعاملة ذاتها.
+        // إن أُلغي قبل أيّ اعتماد فلا خصم ⇒ NoDebitToReverse ⇒ صفر حركة. وإن سبق عكسٌ (إلغاء بعد إعادة
+        // للتعديل مثلًا) فالنتيجة AlreadyApplied ⇒ لا عكس ثانٍ.
+        await _balanceLifecycle.ReverseDebitAsync(entity, uid, "عكس خصم الرصيد لإلغاء الطلب من مقدّمه.", ct);
+
+        if (await SaveWithLedgerConcurrencyGuardAsync(ct) is { } conflict) return conflict;
         await _audit.LogAsync(uid, "leave_request.cancelled", nameof(LeaveRequest), entity.Id, ct: ct);
 
         return Result<LeaveRequestDto>.Success(await BuildAsync(entity, uid, ct));
@@ -415,7 +641,14 @@ public class LeaveRequestService : ILeaveRequestService
         entity.ReturnReason = request.Reason.Trim();
         entity.UpdatedAtUtc = DateTime.UtcNow;
         AddEvent(entity.Id, uid, "returned", step, from, LeaveRequestStatus.ReturnedForEdit, request.Reason.Trim());
-        await _db.SaveChangesAsync(ct);
+
+        // LEAVE-DEDUCTION-ON-TL-APPROVAL-R1 (القاعدة 8) — الإعادة للتعديل تُبطِل دورة الاعتماد: الطلب يخرج
+        // من مسار المراجعة إلى الموظّف ولا يملك النظام مسار إعادة تقديم لنفس السجلّ (مخرجه الوحيد الإلغاء)
+        // ⇒ ترك الخصم قائمًا يعني حجز رصيد لطلب لا يمكن أن يُعتمَد أبدًا. لذلك يُعكَس الخصم مرّة واحدة.
+        await _balanceLifecycle.ReverseDebitAsync(entity, uid,
+            "عكس خصم الرصيد لإعادة الطلب للتعديل (إبطال دورة الاعتماد).", ct);
+
+        if (await SaveWithLedgerConcurrencyGuardAsync(ct) is { } conflict) return conflict;
         await _audit.LogAsync(uid, "leave_request.returned", nameof(LeaveRequest), entity.Id, ct: ct);
         await _notifications.NotifyAsync(entity.RequesterUserId, "leave_request.returned",
             "أُعيد طلب الإجازة/الاستئذان للتعديل", request.Reason.Trim(), "/app/leave-requests", ct);
@@ -450,9 +683,9 @@ public class LeaveRequestService : ILeaveRequestService
         AddEvent(entity.Id, uid, "revoked", LeaveRequestStep.Completed, from, LeaveRequestStatus.Cancelled, request.Reason.Trim());
 
         // عكس الخصم الآلي بإضافة حركة Credit معاكسة (لا حذف للحركة الأصلية) — في نفس المعاملة، idempotent.
-        await ApplyRevocationReversalAsync(entity, uid, request.Reason.Trim(), ct);
+        await _balanceLifecycle.ReverseDebitAsync(entity, uid, request.Reason.Trim(), ct);
 
-        await _db.SaveChangesAsync(ct);
+        if (await SaveWithLedgerConcurrencyGuardAsync(ct) is { } conflict) return conflict;
         await _audit.LogAsync(uid, "leave_request.revoked", nameof(LeaveRequest), entity.Id,
             JsonSerializer.Serialize(new { leaveRequestId = entity.Id, entity.Type }), ct: ct);
         await _notifications.NotifyAsync(entity.RequesterUserId, "leave_request.revoked",
@@ -589,15 +822,60 @@ public class LeaveRequestService : ILeaveRequestService
 
         AddEvent(entity.Id, uid, action, step, from, toStatus, comment);
 
-        // الخصم التلقائي من الرصيد عند الاعتماد النهائي — في نفس المعاملة، idempotent عبر (RelatedRequestId, Source).
-        if (toStatus == LeaveRequestStatus.HrApproved)
-            await ApplyApprovalDeductionAsync(entity, uid, ct);
+        // طيّ خطوة المدير تشغيليًّا عند غياب مدير تشغيليّ بديل (P2 — LEAVE-WORKFLOW-DEADLOCK-HOTFIX):
+        // إن اعتُمدت خطوة قائد الفريق بنجاح وكان المُعتمِد نفسه هو المدير المباشر لمقدّم الطلب، فسيمنعه
+        // حارس «عدم تصرّف الشخص نفسه في خطوتين» (أعلاه) من اعتماد خطوة المدير لاحقًا. لكنّ هذا التطابق
+        // الاسميّ وحده لا يعني جمودًا: خطوة المدير scope-based، وقد يوجد مديرٌ تشغيليّ أعلى داخل الشجرة
+        // الإدارية للموظّف يمكنه اعتمادها طبيعيًّا. لذلك نطوي الخطوة *فقط* حين لا يوجد أيّ مدير تشغيليّ بديل
+        // داخل الشجرة (جمود بنيويّ حقيقي). عندئذٍ ننقل الطلب إلى ManagerApproved/Hr في المعاملة ذاتها دون
+        // تلفيق قرار يدويّ منفصل، ونسجّل المدير كمُعتمِد لهذه الخطوة (فهو مديره المباشر فعلًا)، ونضيف حدث
+        // تدقيق مميّزًا يوثّق أنّ الطيّ آليّ لغياب مدير تشغيليّ بديل — وأنّ أدوار الشركة/الحوكمة العامة
+        // (Admin/CEO/GM/CeoSupport) لا تُعتبر بديلًا تشغيليًّا حسب P2. إن وُجد مدير تشغيليّ بديل ⇒ لا طيّ،
+        // يبقى المسار الطبيعي TeamLeaderApproved/Manager (يحفظ ضمانة T-WF2). الطلبات القديمة لا تتغيّر.
+        if (step == LeaveRequestStep.TeamLeader && toStatus == LeaveRequestStatus.TeamLeaderApproved)
+        {
+            var requesterManagerId = await _db.Users.Where(u => u.Id == entity.RequesterUserId)
+                .Select(u => u.ManagerId).FirstOrDefaultAsync(ct);
+            if (requesterManagerId == uid
+                && !await HasOperationalManagerAlternativeAsync(entity.RequesterUserId, uid, ct))
+            {
+                entity.Status = LeaveRequestStatus.ManagerApproved;
+                entity.CurrentStep = LeaveRequestStep.Hr;
+                entity.ManagerReviewerId = uid;
+                entity.ManagerDecisionAtUtc = now;
+                AddEvent(entity.Id, uid, "manager_step_auto_folded_no_operational_manager", LeaveRequestStep.Manager,
+                    LeaveRequestStatus.TeamLeaderApproved, LeaveRequestStatus.ManagerApproved,
+                    "طيّ خطوة المدير تلقائيًّا: المُعتمِد هو المدير المباشر لمقدّم الطلب ولا يوجد مدير تشغيليّ بديل داخل شجرته الإدارية يمكنه اعتماد الخطوة (أدوار الشركة/الحوكمة العامة لا تُعدّ بديلًا تشغيليًّا). انتقل الطلب مباشرةً إلى الاعتماد النهائي (HR) دون قرار مدير يدويّ ثانٍ.");
+            }
+        }
 
-        await _db.SaveChangesAsync(ct);
+        // LEAVE-DEDUCTION-ON-TL-APPROVAL-R1 — الخصم يقع عند اعتماد قائد الفريق، والعكس عند رفض لاحق.
+        // يُستدعى الخصم عند **كلّ** انتقال اعتماد لا عند TeamLeaderApproved وحده: فالطلب قد يبدأ عند خطوة
+        // المدير أصلًا (تخطّي خطوة قائد الفريق في CreateAsync لغياب قائد فعليّ أو لكون المُنشئ هو القائد/HR)
+        // فيقع الخصم عندئذٍ عند أوّل اعتماد حقيقيّ. والاستدعاء idempotent عبر (RelatedRequestId, Source)
+        // فيصير بلا أثر عند اعتماد المدير أو الموارد البشرية لاحقًا ⇒ خصم واحد لكلّ طلب مهما تعدّدت الخطوات.
+        if (toStatus is LeaveRequestStatus.TeamLeaderApproved
+            or LeaveRequestStatus.ManagerApproved
+            or LeaveRequestStatus.HrApproved)
+        {
+            await _balanceLifecycle.ApplyDebitOnTeamLeaderApprovalAsync(entity, uid, ct);
+        }
+        // رفض لاحق بعد وقوع الخصم ⇒ عكس واحد يُعيد الرصيد مرّة واحدة. وإن لم يقع خصم (رفض قائد الفريق
+        // قبل أيّ اعتماد) فالنتيجة NoDebitToReverse ولا تُكتب أيّ حركة.
+        else if (toStatus is LeaveRequestStatus.TeamLeaderRejected
+            or LeaveRequestStatus.ManagerRejected
+            or LeaveRequestStatus.HrRejected)
+        {
+            await _balanceLifecycle.ReverseDebitAsync(entity, uid,
+                rejectionReason ?? "عكس خصم الرصيد لرفض الطلب بعد اعتماد سابق.", ct);
+        }
+
+        if (await SaveWithLedgerConcurrencyGuardAsync(ct) is { } conflict) return conflict;
         await _audit.LogAsync(uid, auditAction, nameof(LeaveRequest), entity.Id, ct: ct);
 
-        // إشعار صاحب الطلب بكل قرار.
-        var title = toStatus switch
+        // إشعار صاحب الطلب بكل قرار. نعتمد الحالة الفعليّة للطلب (entity.Status) لا toStatus كي
+        // يعكس العنوانُ الطيَّ الآليّ لخطوة المدير (ManagerApproved). للمسارات غير المطويّة entity.Status == toStatus.
+        var title = entity.Status switch
         {
             LeaveRequestStatus.HrApproved => "اعتُمد طلبك نهائيًّا",
             LeaveRequestStatus.TeamLeaderRejected or LeaveRequestStatus.ManagerRejected
@@ -610,7 +888,9 @@ public class LeaveRequestService : ILeaveRequestService
         // إشعارات بريد (EMAIL-OPERATIONAL-NOTIFICATIONS-R1، DryRun) — بعد نجاح القرار، محميّة داخليًّا.
         try
         {
-            switch (toStatus)
+            // نعتمد الحالة الفعليّة (entity.Status) لا toStatus: عند طيّ خطوة المدير آليًّا تصبح الحالة
+            // ManagerApproved ⇒ يجب إشعار HR. للمسارات غير المطويّة entity.Status == toStatus (بلا تغيير سلوك).
+            switch (entity.Status)
             {
                 // الوصول لمرحلة الموارد البشرية (اعتماد المدير ⇒ الخطوة التالية Hr): إشعار مستخدمي HR.
                 case LeaveRequestStatus.ManagerApproved:
@@ -673,9 +953,14 @@ public class LeaveRequestService : ILeaveRequestService
         // لمجرد أنّ نطاقهم يشمل الموظّف. إن وُجد قائد فريق محدّد ⇒ هو وحده يُسمح له (وإلا 403).
         if (step == LeaveRequestStep.TeamLeader)
         {
+            // تجاوز خطوة قائد الفريق (Direct Reporting Override): طلب الموظّف Direct Reporting
+            // لا يمرّ بخطوة قائد الفريق أصلًا (يُوجَّه للمدير عند الإنشاء)، لكن كحارس دفاعي
+            // للطلبات القديمة نُعامِله كأنّه بلا قائد فريق فعلي فيؤول للمراجعة ضمن النطاق الإداري.
+            var requesterBypassesTeamLeader = await _db.Users.Where(u => u.Id == entity.RequesterUserId)
+                .Select(u => u.BypassTeamLeaderApproval).FirstOrDefaultAsync(ct);
             var teamId = await _db.Users.Where(u => u.Id == entity.RequesterUserId)
                 .Select(u => u.TeamId).FirstOrDefaultAsync(ct);
-            Guid? teamLeaderId = teamId is Guid tid
+            Guid? teamLeaderId = (!requesterBypassesTeamLeader && teamId is Guid tid)
                 ? await _db.Teams.Where(t => t.Id == tid).Select(t => t.TeamLeaderId).FirstOrDefaultAsync(ct)
                 : null;
             if (teamLeaderId is Guid tl)
@@ -695,6 +980,47 @@ public class LeaveRequestService : ILeaveRequestService
         return null;
     }
 
+    /// <summary>
+    /// يحدّد هل يوجد «مدير تشغيليّ بديل» يمكنه اعتماد خطوة المدير للطلب (P2 — قرار طيّ خطوة المدير).
+    /// يصعد سلسلة ManagerId التصاعدية من مقدّم الطلب باحثًا عن أوّل مستخدم:
+    ///  (1) نشط IsActive، و(2) مختلف عن مُعتمِد خطوة قائد الفريق (<paramref name="excludeUserId"/>)،
+    ///  و(3) يحمل دور Manager فعليًّا. أيّ مدير على السلسلة التصاعدية يشمل نطاقه (department = شجرة
+    /// المرؤوسين) الموظّفَ بنيويًّا، فوجوده = بديل تشغيليّ حقيقيّ لخطوة المدير (scope-based).
+    /// أدوار الشركة/الحوكمة العامة (Admin/CEO/GeneralManager/CeoSupport) لا تُعدّ بديلًا تشغيليًّا حسب P2
+    /// (لأنها ليست دور Manager، فلا يلتقطها هذا البحث حتى لو ظهرت على السلسلة). يمنع الحلقات في ManagerId،
+    /// ويتعامل بأمان مع ManagerId المفقود أو المستخدم غير النشط. يعيد true إن وُجد بديل (⇒ لا طيّ)، وإلا false.
+    /// </summary>
+    private async Task<bool> HasOperationalManagerAlternativeAsync(Guid requesterUserId, Guid excludeUserId, CancellationToken ct)
+    {
+        var managerRoleId = await _db.Roles.Where(r => r.Name == Roles.Manager)
+            .Select(r => r.Id).FirstOrDefaultAsync(ct);
+        if (managerRoleId == Guid.Empty) return false; // لا دور Manager معرّف ⇒ لا بديل تشغيليّ
+
+        var visited = new HashSet<Guid> { requesterUserId };
+        var currentId = requesterUserId;
+        while (true)
+        {
+            var managerId = await _db.Users.Where(u => u.Id == currentId)
+                .Select(u => u.ManagerId).FirstOrDefaultAsync(ct);
+            if (managerId is not Guid mid) return false; // نهاية السلسلة الإدارية
+            if (!visited.Add(mid)) return false;         // حلقة في ManagerId ⇒ توقّف آمن
+
+            if (mid != excludeUserId) // لا يُعدّ مُعتمِد خطوة قائد الفريق بديلًا لنفسه
+            {
+                var isActive = await _db.Users.Where(u => u.Id == mid)
+                    .Select(u => u.IsActive).FirstOrDefaultAsync(ct);
+                if (isActive)
+                {
+                    var isManager = await _db.UserRoles
+                        .AnyAsync(ur => ur.UserId == mid && ur.RoleId == managerRoleId, ct);
+                    if (isManager) return true; // مدير تشغيليّ بديل داخل الشجرة
+                }
+            }
+
+            currentId = mid; // اصعد خطوةً في السلسلة
+        }
+    }
+
     private void AddEvent(Guid leaveRequestId, Guid actorId, string action, LeaveRequestStep step,
         LeaveRequestStatus from, LeaveRequestStatus to, string? comment)
     {
@@ -710,80 +1036,36 @@ public class LeaveRequestService : ILeaveRequestService
         });
     }
 
-    // ===== الخصم/العكس الآلي للرصيد (V1.1) =====
+    // ===== الخصم/العكس الآلي للرصيد =====
+    // نُقل المنطق كاملًا إلى ILeaveBalanceLifecycleService (LEAVE-DEDUCTION-ON-TL-APPROVAL-R1):
+    // مسؤوليّة واحدة، والخصم صار عند اعتماد قائد الفريق لا عند الاعتماد النهائي.
 
     /// <summary>
-    /// يسجّل حركة خصم (Debit) عند الاعتماد النهائي: الإجازة = عدد الأيام على رصيد الإجازات؛
-    /// الاستئذان = وحدة السياسة (افتراضيًّا Count=1) على رصيد الأذونات. idempotent عبر (RelatedRequestId, Source).
-    /// السنة من تاريخ بداية الطلب. لا يرمي عند الرصيد السالب (مسموح بتحذير).
+    /// يحفظ المعاملة ويترجم انتهاك الفهرس الفريد الجزئيّ (RelatedRequestId, Source) في دفتر الأرصدة
+    /// — الناتج عن سباق تزامنيّ بين معاملتين تحاولان كتابة الحركة نفسها — إلى فشل عمليّ نظيف
+    /// بدل خطأ 500. القاعدة تضمن حركةً واحدة على الأكثر لكلّ (طلب، مصدر)، والمعاملة الخاسرة تُلغى
+    /// كاملةً ⇒ لا حالة جزئيّة ولا خصم مزدوج ولا رصيد سالب من تكرار تقنيّ.
+    /// تُرجِع null عند النجاح، أو نتيجة فشل جاهزة عند السباق.
     /// </summary>
-    private async Task ApplyApprovalDeductionAsync(LeaveRequest entity, Guid actor, CancellationToken ct)
+    private async Task<Result<LeaveRequestDto>?> SaveWithLedgerConcurrencyGuardAsync(CancellationToken ct)
     {
-        var (balanceType, source) = entity.Type == LeaveRequestType.Leave
-            ? (BalanceType.AnnualLeave, BalanceSource.ApprovedLeave)
-            : (BalanceType.Permission, BalanceSource.ApprovedPermission);
-
-        var exists = await _db.EmployeeBalanceLedger
-            .AnyAsync(e => e.RelatedRequestId == entity.Id && e.Source == source, ct);
-        if (exists) return; // idempotent — لا تكرار للخصم لنفس الطلب
-
-        decimal amount;
-        if (entity.Type == LeaveRequestType.Leave)
+        try
         {
-            amount = (entity.EndDate.DayNumber - entity.StartDate.DayNumber) + 1; // أيام شاملة
+            await _db.SaveChangesAsync(ct);
+            return null;
         }
-        else
+        catch (DbUpdateException ex) when (IsLedgerDuplicateViolation(ex))
         {
-            var jobRoleId = await _db.Users.Where(u => u.Id == entity.RequesterUserId)
-                .Select(u => u.JobRoleId).FirstOrDefaultAsync(ct);
-            var policy = await ResolvePolicyAsync(entity.StartDate.Year, jobRoleId, ct);
-            // الوحدة الافتراضية Count = إذن واحد. (الساعات مدعومة في السياسة لكنها ليست وحدة V1.1 الافتراضية.)
-            amount = 1;
-            _ = policy; // السياسة تُحلّ للحدود/الوحدة مستقبلًا؛ V1.1 تعتمد Count=1.
+            return Result<LeaveRequestDto>.Failure(
+                "تعذّر إتمام العملية لتزامن قرار آخر على الطلب نفسه. أعد المحاولة.",
+                "leave_request.concurrent_decision.conflict");
         }
-
-        _db.EmployeeBalanceLedger.Add(new EmployeeBalanceLedger
-        {
-            EmployeeId = entity.RequesterUserId,
-            BalanceType = balanceType,
-            Amount = amount,
-            Direction = BalanceDirection.Debit,
-            Source = source,
-            RelatedRequestId = entity.Id,
-            Year = entity.StartDate.Year,
-            CreatedBy = actor
-        });
     }
 
-    /// <summary>
-    /// يعكس الخصم الآلي بحركة Credit معاكسة (Source=Reversal) مطابِقة في المقدار والنوع والسنة، دون حذف الأصلية.
-    /// idempotent عبر (RelatedRequestId, Reversal). إن لم يوجد خصم أصلي لا يفعل شيئًا.
-    /// </summary>
-    private async Task ApplyRevocationReversalAsync(LeaveRequest entity, Guid actor, string reason, CancellationToken ct)
-    {
-        var alreadyReversed = await _db.EmployeeBalanceLedger
-            .AnyAsync(e => e.RelatedRequestId == entity.Id && e.Source == BalanceSource.Reversal, ct);
-        if (alreadyReversed) return; // idempotent — عكس واحد لكل طلب
-
-        var original = await _db.EmployeeBalanceLedger
-            .Where(e => e.RelatedRequestId == entity.Id && e.Direction == BalanceDirection.Debit
-                && (e.Source == BalanceSource.ApprovedLeave || e.Source == BalanceSource.ApprovedPermission))
-            .FirstOrDefaultAsync(ct);
-        if (original is null) return; // لا خصم لعكسه
-
-        _db.EmployeeBalanceLedger.Add(new EmployeeBalanceLedger
-        {
-            EmployeeId = original.EmployeeId,
-            BalanceType = original.BalanceType,
-            Amount = original.Amount,
-            Direction = BalanceDirection.Credit,
-            Source = BalanceSource.Reversal,
-            RelatedRequestId = entity.Id,
-            Year = original.Year,
-            Notes = reason,
-            CreatedBy = actor
-        });
-    }
+    /// <summary>يميّز انتهاك التفرّد (SQLSTATE 23505) على فهرس دفتر الأرصدة عن أيّ فشل حفظ آخر.</summary>
+    private static bool IsLedgerDuplicateViolation(DbUpdateException ex)
+        => ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } pg
+            && (pg.TableName == "employee_balance_ledger" || pg.ConstraintName?.Contains("employee_balance_ledger") == true);
 
     private async Task<BalancePolicy?> ResolvePolicyAsync(int year, Guid? jobRoleId, CancellationToken ct)
     {

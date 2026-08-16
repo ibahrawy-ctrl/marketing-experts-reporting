@@ -103,6 +103,59 @@ public class AdminGovernanceTests
         Assert.NotNull(submitted.ReviewerId);
     }
 
+    // §Phase 6 (ROLE-AWARE-PERSONAL-REPORT-R1): مراجعة KPI تُوجَّه إلى المدير المباشر للموضوع
+    // (سلسلة اعتماد الموضوع مُوجَّهة بالبيانات) لا إلى سلسلة مدير المُدخِل. المُدخِل هنا Admin (نطاق
+    // كامل) وليس مدير الموضوع؛ ومع ذلك يُشتقّ المراجع من ManagerId للموضوع مباشرةً.
+    [Fact]
+    public async Task KpiReviewer_RoutesTo_SubjectDirectManager_NotEvaluatorChain()
+    {
+        var admin = await TestAuth.LoginAsAdminAsync(_factory);
+        var (templateId, manualId, autoId) = await PublishKpiAsync(admin);
+        var (_, designatedManagerId) = await TestAuth.CreateUserAsync(_factory, "Manager");
+        var (_, subjectId) = await TestAuth.CreateUserAsync(_factory, "Employee", designatedManagerId);
+
+        var submitted = await SubmitEvalAsync(admin, templateId, subjectId, manualId, autoId, "2026-W17");
+
+        Assert.Equal(KpiEvaluationStatus.UnderReview, submitted.Status);
+        Assert.Equal(designatedManagerId, submitted.ReviewerId);
+    }
+
+    // §Phase 6: عند وجود فريق للموضوع بقائد نشط (بلا Bypass) تُوجَّه مراجعة KPI إلى قائد فريق الموضوع.
+    [Fact]
+    public async Task KpiReviewer_RoutesTo_SubjectTeamLeader_WhenNotBypassed()
+    {
+        var admin = await TestAuth.LoginAsAdminAsync(_factory);
+        var (templateId, manualId, autoId) = await PublishKpiAsync(admin);
+        var (_, teamLeaderId) = await TestAuth.CreateUserAsync(_factory, "TeamLeader");
+        var (_, subjectId) = await TestAuth.CreateUserAsync(_factory, "Employee");
+        await TestAuth.CreateTeamWithLeaderAsync(_factory, teamLeaderId, subjectId);
+
+        var submitted = await SubmitEvalAsync(admin, templateId, subjectId, manualId, autoId, "2026-W18");
+
+        Assert.Equal(KpiEvaluationStatus.UnderReview, submitted.Status);
+        Assert.Equal(teamLeaderId, submitted.ReviewerId);
+    }
+
+    // §Phase 6: موظّف Direct Reporting (BypassTeamLeaderApproval=true) يتخطّى قائد الفريق فتُوجَّه
+    // مراجعة KPI إلى مديره المباشر مباشرةً — نفس آليّة توجيه اعتماد تقارير فاطمة إلى إبراهيم.
+    [Fact]
+    public async Task KpiReviewer_SubjectBypass_SkipsTeamLeader_UsesDirectManager()
+    {
+        var admin = await TestAuth.LoginAsAdminAsync(_factory);
+        var (templateId, manualId, autoId) = await PublishKpiAsync(admin);
+        var (_, teamLeaderId) = await TestAuth.CreateUserAsync(_factory, "TeamLeader");
+        var (_, designatedManagerId) = await TestAuth.CreateUserAsync(_factory, "Manager");
+        var (_, subjectId) = await TestAuth.CreateUserAsync(_factory, "Employee", designatedManagerId);
+        await TestAuth.CreateTeamWithLeaderAsync(_factory, teamLeaderId, subjectId);
+        await TestAuth.SetBypassTeamLeaderApprovalAsync(_factory, subjectId, true);
+
+        var submitted = await SubmitEvalAsync(admin, templateId, subjectId, manualId, autoId, "2026-W19");
+
+        Assert.Equal(KpiEvaluationStatus.UnderReview, submitted.Status);
+        Assert.Equal(designatedManagerId, submitted.ReviewerId);
+        Assert.NotEqual(teamLeaderId, submitted.ReviewerId);
+    }
+
     // §المُقيّم لا يعتمد تقييمه (استبعاد المُقيّم يطغى على الترقّي).
     [Fact]
     public async Task Evaluator_Cannot_Approve_Own_Evaluation_403()
@@ -214,10 +267,14 @@ public class AdminGovernanceTests
         var (manager, managerId) = await TestAuth.CreateUserAsync(_factory, "Manager");
         var (subject, subjectId) = await TestAuth.CreateUserAsync(_factory, "Employee", managerId);
         var (tl, _) = await TestAuth.CreateUserAsync(_factory, "TeamLeader");
+        // إغلاق فجوة التوثيق: CeoSupport (دعم الرئيس التنفيذي) ومدير الحساب (AccountPortfolioReader) ممنوعان صراحةً.
+        var (hr, _) = await TestAuth.CreateUserAsync(_factory, "HR");
+        var (ceoSupport, _) = await TestAuth.CreateUserAsync(_factory, "CeoSupport");
+        var (accountManager, _) = await TestAuth.CreateUserAsync(_factory, "AccountPortfolioReader");
 
         var submitted = await SubmitEvalAsync(manager, templateId, subjectId, manualId, autoId, "2026-W27");
 
-        foreach (var forbidden in new[] { manager, subject, tl })
+        foreach (var forbidden in new[] { manager, subject, tl, hr, ceoSupport, accountManager })
         {
             var res = await forbidden.PostAsJsonAsync($"/api/kpi-evaluations/{submitted.Id}/admin-delete",
                 new KpiReviewActionRequest("محاولة"));
@@ -346,10 +403,14 @@ public class AdminGovernanceTests
         var (manager, managerId) = await TestAuth.CreateUserAsync(_factory, "Manager");
         var (employee, _) = await TestAuth.CreateUserAsync(_factory, "Employee", managerId);
         var (tl, _) = await TestAuth.CreateUserAsync(_factory, "TeamLeader");
+        // إغلاق فجوة التوثيق: CeoSupport (دعم الرئيس التنفيذي) ومدير الحساب (AccountPortfolioReader) ممنوعان صراحةً.
+        var (hr, _) = await TestAuth.CreateUserAsync(_factory, "HR");
+        var (ceoSupport, _) = await TestAuth.CreateUserAsync(_factory, "CeoSupport");
+        var (accountManager, _) = await TestAuth.CreateUserAsync(_factory, "AccountPortfolioReader");
 
         var submitted = await SubmitReportAsync(employee, templateId, fieldId, "2026-W20");
 
-        foreach (var forbidden in new[] { employee, manager, tl })
+        foreach (var forbidden in new[] { employee, manager, tl, hr, ceoSupport, accountManager })
         {
             var res = await forbidden.PostAsJsonAsync($"/api/submissions/{submitted.Id}/admin-delete",
                 new AdminDeleteRequest("محاولة"));

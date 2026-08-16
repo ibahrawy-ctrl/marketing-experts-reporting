@@ -15,6 +15,15 @@ public interface ILeaveRequestService
     /// <summary>الطلبات التي تنتظر قرار المستخدم الحالي حسب دوره ونطاقه.</summary>
     Task<Result<IReadOnlyList<LeaveRequestListItemDto>>> GetPendingAsync(CancellationToken ct = default);
 
+    /// <summary>
+    /// طابور الحوكمة «معلّقة عند قادة الفرق» (LEAVE-TL-PENDING-GOVERNANCE-R1) — قراءة-فقط على مستوى الشركة.
+    /// مستقلّ تمامًا عن GetPendingAsync: لا يفلتر بالنطاق الشخصي ولا يستثني المستخدم الحالي، ولا يمنح أيّ
+    /// سلطة قرار. يُظهِر الطلبات (Status=Submitted، CurrentStep=TeamLeader، غير محذوفة) مع تصنيف تأخّر
+    /// وعدّادات. بلا SaveChanges ولا تدقيق ولا إشعار ولا أثر جانبيّ. التفويض عبر Policies.LeaveGovernanceRead.
+    /// </summary>
+    Task<Result<TeamLeaderPendingGovernanceResultDto>> GetTeamLeaderPendingGovernanceAsync(
+        TeamLeaderPendingGovernanceQuery query, CancellationToken ct = default);
+
     /// <summary>تفاصيل طلب — للمالك أو لمن له صلاحية مراجعته ضمن نطاقه.</summary>
     Task<Result<LeaveRequestDto>> GetByIdAsync(Guid id, CancellationToken ct = default);
 

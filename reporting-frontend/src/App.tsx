@@ -27,7 +27,6 @@ import CompliancePage from './pages/CompliancePage';
 import HrEmployeesPage from './pages/HrEmployeesPage';
 import JobRolesAssignmentPage from './pages/JobRolesAssignmentPage';
 import JobRoleManagementPage from './pages/JobRoleManagementPage';
-import PositionsPage from './pages/PositionsPage';
 import ReportViewGrantsPage from './pages/ReportViewGrantsPage';
 import EmailNotificationsPage from './pages/EmailNotificationsPage';
 import EmailControlCenterPage from './pages/EmailControlCenterPage';
@@ -52,9 +51,9 @@ import Project360Page from './pages/Project360Page';
 import AccountPortfolioPage from './pages/AccountPortfolioPage';
 import AccountPortfolioProjectPage from './pages/AccountPortfolioProjectPage';
 import AccountPortfolioClientPage from './pages/AccountPortfolioClientPage';
-import GovernanceWorkspacePage from './pages/GovernanceWorkspacePage';
 import GovernanceEscalationsPage from './pages/GovernanceEscalationsPage';
 import GovernanceActionItemsPage from './pages/GovernanceActionItemsPage';
+import AdminArchivePage from './pages/AdminArchivePage';
 import type { Role } from './types/api';
 
 const EXEC_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'Manager', 'TeamLeader', 'CeoSupport', 'Viewer'];
@@ -101,6 +100,8 @@ const GOVERNANCE_WORKSPACE_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'C
 const GOVERNANCE_ESCALATION_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'CeoSupport', 'Manager', 'TeamLeader', 'HR', 'Employee'];
 // إجراءات الحوكمة والمتابعة (GOV-ACTION-ITEMS-R1) — تطابق سياسة GovernanceActionItemAccess بالخادم؛ الفرز (واسع/نطاق/HR/موظف) مفروض داخليًّا.
 const GOVERNANCE_ACTION_ITEM_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'CeoSupport', 'Manager', 'TeamLeader', 'HR', 'Employee'];
+// الأرشيف الإداريّ (RESTORE-ARCHIVE-GOVERNANCE-R1) — قراءة/استرجاع العناصر المحذوفة إداريًّا؛ تطابق سياسة ArchiveGovernanceAccess بالخادم.
+const ARCHIVE_GOVERNANCE_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager'];
 
 function Landing() {
   return (
@@ -173,6 +174,10 @@ const APP_ROUTES: { path: string; element: ReactNode; roles?: Role[] }[] = [
   { path: '/app/my-kpi', element: <MyKpiPage /> },
   { path: '/app/employees/:userId/kpi', element: <EmployeeKpiPage /> },
   { path: '/app/submissions', element: <SubmissionsPage /> },
+  // ROLE-AWARE-PERSONAL-REPORT-SUBMISSION-ACCESS-R1: سطح «تقاريري» الشخصيّ الموازي — متاح لكل مصادَق
+  // عليه (لا بوابة أدوار)، يُثبّت العرض على تقارير المستخدم نفسه (إنشاء/مسودة/إرسال/متابعة). لا يستبدل
+  // سطح الفريق /app/submissions ولا يخفيه عن القادة/الإدارة.
+  { path: '/app/my-reports', element: <SubmissionsPage personalOnly /> },
   // الإجازات والاستئذانات (V1.0.1): متاح لكل مصادَق عليه — النطاق والدور مفروضان خادمًا.
   { path: '/app/leave-requests', element: <LeaveRequestsPage /> },
   // خدمات الموظف (V1.1): الأرصدة وطلبات الموارد البشرية — متاح لكل مصادَق عليه (النطاق مفروض خادمًا).
@@ -190,7 +195,6 @@ const APP_ROUTES: { path: string; element: ReactNode; roles?: Role[] }[] = [
   { path: '/app/kpi-templates', element: <KpiTemplatesPage />, roles: TEMPLATE_GOVERNANCE_ROLES },
   { path: '/app/workflows', element: <ApprovalWorkflowsPage />, roles: EXEC_ROLES },
   { path: '/app/governance', element: <GovernancePage />, roles: GOVERNANCE_ROLES },
-  { path: '/app/governance-workspace', element: <GovernanceWorkspacePage />, roles: GOVERNANCE_WORKSPACE_ROLES },
   // التصعيد الفردي (GOV-INDIVIDUAL-ESCALATION1) — الرؤية والإجراءات مقيّدة داخليًّا حسب الدور والنطاق.
   { path: '/app/governance/escalations', element: <GovernanceEscalationsPage />, roles: GOVERNANCE_ESCALATION_ROLES },
   { path: '/app/governance/action-items', element: <GovernanceActionItemsPage />, roles: GOVERNANCE_ACTION_ITEM_ROLES },
@@ -213,8 +217,6 @@ const APP_ROUTES: { path: string; element: ReactNode; roles?: Role[] }[] = [
   { path: '/app/users', element: <UsersPage />, roles: USERS_PAGE_ROLES },
   { path: '/app/job-roles', element: <JobRolesAssignmentPage />, roles: JOB_ROLE_MANAGEMENT_ROLES },
   { path: '/app/job-roles/manage', element: <JobRoleManagementPage />, roles: JOB_ROLE_MANAGEMENT_ROLES },
-  // المناصب المرنة (Phase 1A — رؤية فقط) — Admin فقط (تطابق سياسة PositionManagement بالخادم).
-  { path: '/app/positions', element: <PositionsPage />, roles: ADMIN },
   // منح رؤية التقارير المخفيّ (REPORT-VIEW-GRANTS-R1) — Admin فقط (تطابق سياسة AdminOnly بالخادم).
   { path: '/app/report-view-grants', element: <ReportViewGrantsPage />, roles: ADMIN },
   // سجلّ إشعارات البريد (EMAIL-NOTIFICATIONS-UI-R1) — قراءة فقط، Admin/CEO/GM/CeoSupport (تطابق سياسة EmailNotificationLog بالخادم).
@@ -230,6 +232,8 @@ const APP_ROUTES: { path: string; element: ReactNode; roles?: Role[] }[] = [
   { path: '/app/execution-taxonomy', element: <ExecutionTaxonomyManagementPage />, roles: TEMPLATE_GOVERNANCE_ROLES },
   { path: '/app/settings', element: <SettingsPage />, roles: ADMIN },
   { path: '/app/audit', element: <AuditPage />, roles: ['Admin', 'CEO', 'GeneralManager'] },
+  // الأرشيف الإداريّ (RESTORE-ARCHIVE-GOVERNANCE-R1) — قراءة/استرجاع المحذوف إداريًّا؛ تطابق سياسة ArchiveGovernanceAccess بالخادم.
+  { path: '/app/admin/archive', element: <AdminArchivePage />, roles: ARCHIVE_GOVERNANCE_ROLES },
   { path: '/app/development', element: <DevelopmentPage /> },
   { path: '/app/reports', element: <ExecutiveReportsPage />, roles: EXEC_ROLES },
 ];

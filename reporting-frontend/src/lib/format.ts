@@ -37,6 +37,7 @@ import type {
   DeliverablePriority,
   LeaveRequestType,
   LeaveRequestStatus,
+  LeaveGovernanceDelayStatus,
   PermissionShortfallResolution,
   BalanceType,
   BalanceDirection,
@@ -176,6 +177,9 @@ export const kpiEvaluationStatusLabel: Record<KpiEvaluationStatus, string> = {
   Submitted: 'مُرسَل',
   Approved: 'معتمد',
   Closed: 'مُغلق',
+  UnderReview: 'قيد المراجعة',
+  NeedsRevision: 'يحتاج تعديلًا',
+  Rejected: 'مرفوض',
 };
 
 export const approvalStatusLabel: Record<ApprovalStatus, string> = {
@@ -183,6 +187,7 @@ export const approvalStatusLabel: Record<ApprovalStatus, string> = {
   Approved: 'معتمد',
   Returned: 'مُعاد',
   Escalated: 'مُصعّد',
+  CancelledByAdministrativeDeletion: 'أُلغِيت بالحذف الإداريّ',
 };
 
 export const fieldTypeLabel: Record<FieldType, string> = {
@@ -550,6 +555,23 @@ export function leaveStatusTone(s: LeaveRequestStatus): 'navy' | 'success' | 'al
   if (s === 'TeamLeaderRejected' || s === 'ManagerRejected' || s === 'HrRejected') return 'alert';
   if (s === 'ReturnedForEdit') return 'gold';
   if (s === 'Cancelled') return 'muted';
+  return 'navy';
+}
+
+// ===== LEAVE-TL-PENDING-GOVERNANCE-R1 — تصنيف تأخّر الطلبات المعلّقة عند قادة الفرق (قراءة-فقط) =====
+export const leaveGovernanceDelayLabel: Record<LeaveGovernanceDelayStatus, string> = {
+  Pending: 'معلّق',
+  Attention: 'يحتاج متابعة',
+  Critical: 'موعد الإجازة بدأ',
+  ExpiredUnresolved: 'انتهت الإجازة دون قرار',
+};
+
+export function leaveGovernanceDelayTone(
+  s: LeaveGovernanceDelayStatus,
+): 'navy' | 'success' | 'alert' | 'gold' | 'muted' {
+  if (s === 'ExpiredUnresolved') return 'alert';
+  if (s === 'Critical') return 'gold';
+  if (s === 'Attention') return 'gold';
   return 'navy';
 }
 

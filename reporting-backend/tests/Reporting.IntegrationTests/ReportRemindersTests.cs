@@ -11,6 +11,7 @@ using Reporting.Domain.Entities.System;
 using Reporting.Domain.Entities.Templates;
 using Reporting.Domain.Enums;
 using Reporting.Infrastructure.Persistence;
+using Reporting.Infrastructure.Services;
 using Xunit;
 
 namespace Reporting.IntegrationTests;
@@ -112,18 +113,45 @@ public class ReportRemindersTests
         return (await res.ReadAsync<ReportReminderRunResult>())!;
     }
 
+    /// <summary>
+    /// EMAIL-DRYRUN-DEDUPLICATION-ISOLATION-R1 — صفوف المحاكاة (DryRun) تُخزَّن بمفتاح معزول
+    /// (بادئة <c>dryrun:</c>) كي لا تحجز مفتاح التسليم الفعليّ. هذه الاختبارات تعمل بوضع المحاكاة،
+    /// لذا يُطابَق المفتاح المنطقيّ بصيغتيه: الأصليّة (التسليم) والمعزولة (المحاكاة).
+    /// </summary>
+    private static string SimKey(string correlationKey) =>
+        EmailNotificationService.DryRunCorrelationKeyPrefix + correlationKey;
+
     private async Task<int> CountByKeyAsync(string correlationKey)
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        return await db.EmailNotifications.CountAsync(n => n.CorrelationKey == correlationKey);
+        var sim = SimKey(correlationKey);
+        return await db.EmailNotifications.CountAsync(n => n.CorrelationKey == correlationKey || n.CorrelationKey == sim);
     }
 
     private async Task<EmailNotification?> FirstByKeyAsync(string correlationKey)
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        return await db.EmailNotifications.AsNoTracking().FirstOrDefaultAsync(n => n.CorrelationKey == correlationKey);
+        var sim = SimKey(correlationKey);
+        return await db.EmailNotifications.AsNoTracking()
+            .FirstOrDefaultAsync(n => n.CorrelationKey == correlationKey || n.CorrelationKey == sim);
+    }
+
+    /// <summary>
+    /// EMAIL-NOTIFICATIONS-ROLE-AWARE-SCHEDULE-FIX-R1 — عدّ صفوف التذكير الأسبوعيّ لمستخدم داخل دورة،
+    /// بصرف النظر عن صيغة مفتاح الترابط (القديمة بلا تاريخ أو الجديدة الحاملة ليوم استحقاق الدور).
+    /// </summary>
+    private async Task<int> CountWeeklyDueAsync(string weekKey, Guid userId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var prefix = $"report-weekly-due:{weekKey}:";
+        var suffix = $":{userId}";
+        return await db.EmailNotifications.CountAsync(n =>
+            n.CorrelationKey != null &&
+            n.CorrelationKey.Contains(prefix) &&
+            n.CorrelationKey.EndsWith(suffix));
     }
 
     private static string CurrentWeekKey() => ReportCalendarPolicy.WeekKeyFor(ReportCalendarPolicy.RiyadhToday());
@@ -197,21 +225,22 @@ public class ReportRemindersTests
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
     }
 
-    // ===== 9) النوع 1: تذكير أسبوعي مستحقّ (أسبوع مستقبليّ ⇒ غير متأخّر) =====
+    // ===== 9) النوع 1: لا تذكير أسبوعي قبل يوم استحقاق الدور =====
+    // EMAIL-NOTIFICATIONS-ROLE-AWARE-SCHEDULE-FIX-R1 — كان هذا الاختبار يُثبت الإنشاء لأسبوع مستقبليّ،
+    // وهو عين الخلل المُصلَح (إصدار التذكير منذ اليوم صفر للدورة لكلّ الأدوار). صار يُثبت النقيض:
+    // دورة مستقبليّة ⇒ يوم استحقاق الدور لم يحن ⇒ صفر صفوف بأيّ صيغة مفتاح ترابط.
     [Fact]
-    public async Task Generate_WeeklyDue_FutureWeek_CreatesWeeklyDueRow()
+    public async Task Generate_WeeklyDue_FutureWeek_DoesNotCreateEarlyRow()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var (_, userId) = await TestAuth.CreateUserAsync(_factory, "Employee");
         await SetupReportingRoleAsync(userId);
         var key = FutureWeekKey();
 
-        await GenerateAsync(admin, new { weekKey = key });
+        var result = await GenerateAsync(admin, new { weekKey = key });
 
-        var row = await FirstByKeyAsync($"report-weekly-due:{key}:{userId}");
-        Assert.NotNull(row);
-        Assert.Equal("report-weekly-due", row!.EventType);
-        Assert.Equal(EmailNotificationStatus.DryRun, row.Status);
+        Assert.Equal(0, await CountWeeklyDueAsync(key, userId));
+        Assert.DoesNotContain(result.Breakdown, r => r.EventType == "report-weekly-due" && r.Created > 0);
     }
 
     // ===== 10) النوع 2: تذكير يوميّ مستحقّ اليوم (مبيعات، يوم عمل) =====
@@ -257,13 +286,18 @@ public class ReportRemindersTests
     }
 
     // ===== 12) النوع 3 (يوميّ): صفّ لكل يوم عمل متأخّر في أسبوع ماضٍ كامل (5 أيام) =====
+    // DAILY-BUSINESS-DAY-COMPLIANCE-R1: أسبوع W28 (السبت 2026-07-04 → الجمعة 2026-07-10) هو أوّل
+    // أسبوع دورة بعد أرضيّة الإطلاق المؤسّسيّة (2026-07-04) وقد انقضى بالكامل قبل «اليوم» (2026-07-24).
+    // أيّام العمل المتوقَّعة فيه = الأحد→الخميس بعد الأرضية = 05,06,07,08,09 = 5 (السبت 04 عطلة،
+    // والجمعة 10 عطلة). لا يُستعمَل PastWeekKey (today−21 = 2026-07-03) لأنه أسبوع سابق للأرضية
+    // بالكامل ⇒ 0 متوقَّع ⇒ 0 تذكيرات تأخّر (السلوك الصحيح الموحَّد: لا تأخّر قبل إطلاق النظام).
     [Fact]
     public async Task Generate_DailyOverdue_PastWeek_CreatesRowPerWorkingDay()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var (_, userId) = await TestAuth.CreateUserAsync(_factory, "Employee");
         await SetupReportingRoleAsync(userId, "SALES_B2C");
-        var key = PastWeekKey();
+        const string key = "2026-W28"; // أوّل أسبوع دورة منقضٍ بعد أرضيّة الإطلاق
 
         await GenerateAsync(admin, new { weekKey = key });
 
@@ -271,8 +305,8 @@ public class ReportRemindersTests
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var count = await db.EmailNotifications.CountAsync(n =>
-            n.CorrelationKey.StartsWith("report-overdue:") && n.CorrelationKey.EndsWith(suffix));
-        // أسبوع تشغيليّ كامل ماضٍ = 5 أيام عمل (خميس، أحد، اثنين، ثلاثاء، أربعاء).
+            n.CorrelationKey.Contains("report-overdue:") && n.CorrelationKey.EndsWith(suffix));
+        // أيّام العمل بعد الأرضية في W28 = 05,06,07,08,09 = 5 (السبت 04 والجمعة 10 مستبعدان).
         Assert.Equal(5, count);
     }
 
@@ -404,32 +438,36 @@ public class ReportRemindersTests
     }
 
     // ===== 20) تسليم موجود ⇒ يُكتَم تذكير الاستحقاق =====
+    // يُستعمَل مفتاح الدورة الجارية كي يكون الكتم مُعبِّرًا حين يصادف اليوم يوم استحقاق دور الموظّف.
     [Fact]
     public async Task Generate_SubmittedReport_SuppressesDueReminder()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var (_, userId) = await TestAuth.CreateUserAsync(_factory, "Employee");
         var versionId = await SetupReportingRoleAsync(userId);
-        var key = FutureWeekKey();
+        var key = CurrentWeekKey();
         await InsertSubmissionAsync(versionId, userId, PeriodType.Weekly, key, SubmissionStatus.Submitted);
 
         await GenerateAsync(admin, new { weekKey = key });
 
-        Assert.Equal(0, await CountByKeyAsync($"report-weekly-due:{key}:{userId}"));
+        Assert.Equal(0, await CountWeeklyDueAsync(key, userId));
     }
 
     // ===== 21) IncludeDue=false ⇒ لا تذكير استحقاق =====
+    // يُستعمَل هنا مفتاح الدورة الجارية (لا المستقبليّة) كي يكون الكتم مُعبِّرًا حين يصادف اليوم
+    // يوم استحقاق دور الموظّف (الأربعاء)؛ التغطية القاطعة لكلّ أيّام الأسبوع في
+    // RoleAwareReminderScheduleTests عبر ساعة محقونة.
     [Fact]
     public async Task Generate_IncludeDueFalse_SuppressesDueTypes()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var (_, userId) = await TestAuth.CreateUserAsync(_factory, "Employee");
         await SetupReportingRoleAsync(userId);
-        var key = FutureWeekKey();
+        var key = CurrentWeekKey();
 
         await GenerateAsync(admin, new { weekKey = key, includeDue = false });
 
-        Assert.Equal(0, await CountByKeyAsync($"report-weekly-due:{key}:{userId}"));
+        Assert.Equal(0, await CountWeeklyDueAsync(key, userId));
     }
 
     // ===== 22) IncludeOverdue=false ⇒ لا تنبيه تأخّر =====
@@ -464,20 +502,23 @@ public class ReportRemindersTests
     }
 
     // ===== 24) تقييد التاريخ: اليوميّ يقتصر على اليوم المحدّد فقط =====
+    // DAILY-BUSINESS-DAY-COMPLIANCE-R1: يُستعمَل أسبوع W28 المنقضي بعد الأرضية (لا PastWeekKey
+    // السابق للأرضية بالكامل الذي يُنتج 0 أيّام متوقَّعة). اليومان مختاران من أيّام العمل بعد
+    // الأرضية (الاثنين 07-06 والأربعاء 07-08) لضمان دخولهما التوقّع وفق العقد الموحَّد.
     [Fact]
     public async Task Generate_DateRestriction_LimitsDailyToSingleDay()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var (_, userId) = await TestAuth.CreateUserAsync(_factory, "Employee");
         await SetupReportingRoleAsync(userId, "SALES_B2C");
-        var key = PastWeekKey();
-        var (start, _) = ReportCalendarPolicy.WeekRange(key); // الخميس (يوم عمل)
-        var otherDay = start.AddDays(4); // الاثنين (يوم عمل مختلف)
+        const string key = "2026-W28";
+        var restrictedDay = new DateOnly(2026, 7, 6); // الاثنين — يوم عمل ضمن W28 بعد الأرضية
+        var otherDay = new DateOnly(2026, 7, 8);       // الأربعاء — يوم عمل مختلف بعد الأرضية
 
-        await GenerateAsync(admin, new { weekKey = key, date = DateKey(start) });
+        await GenerateAsync(admin, new { weekKey = key, date = DateKey(restrictedDay) });
 
         var suffix = $":{userId}:{DelayType.EmployeeReportNotSubmitted}";
-        Assert.Equal(1, await CountByKeyAsync($"report-overdue:{DateKey(start)}{suffix}"));
+        Assert.Equal(1, await CountByKeyAsync($"report-overdue:{DateKey(restrictedDay)}{suffix}"));
         Assert.Equal(0, await CountByKeyAsync($"report-overdue:{DateKey(otherDay)}{suffix}"));
     }
 
@@ -507,17 +548,19 @@ public class ReportRemindersTests
     }
 
     // ===== 26) الصفوف المُنشأة بوضع DryRun (Status + Mode) =====
+    // EMAIL-NOTIFICATIONS-ROLE-AWARE-SCHEDULE-FIX-R1 — كان الشاهد صفَّ تذكير أسبوعيّ لأسبوع مستقبليّ،
+    // وهو ما لم يعد يُنشَأ. استُبدل بصفّ تأخّر لدورة منقضية (شاهد قطعيّ مستقلّ عن يوم الأسبوع).
     [Fact]
     public async Task Generate_CreatedRows_AreDryRunStatusAndMode()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var (_, userId) = await TestAuth.CreateUserAsync(_factory, "Employee");
         await SetupReportingRoleAsync(userId);
-        var key = FutureWeekKey();
+        var key = PastWeekKey();
 
         await GenerateAsync(admin, new { weekKey = key });
 
-        var row = await FirstByKeyAsync($"report-weekly-due:{key}:{userId}");
+        var row = await FirstByKeyAsync($"report-overdue:{key}:{userId}:{DelayType.EmployeeReportNotSubmitted}");
         Assert.NotNull(row);
         Assert.Equal(EmailNotificationStatus.DryRun, row!.Status);
         Assert.Equal(EmailNotificationMode.DryRun, row.Mode);

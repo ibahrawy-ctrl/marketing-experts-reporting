@@ -9,14 +9,15 @@ using Reporting.Infrastructure.Persistence;
 namespace Reporting.Infrastructure.Services;
 
 /// <summary>
-/// محرّك التجميع Project-First (RC-4 Task 4، Path A) — قراءة فقط.
+/// محرّك التجميع Project-First (PROJECT-FIRST-EXECUTION-AGGREGATION-CONTRACT-R1) — قراءة فقط.
 /// يقرأ قوالب التنفيذ الأربعة (ProjectFirstExecutionSchema.ExecutionTemplateTitles) من حقول ProjectRepeatableSection،
-/// حيث كل الأرقام التشغيلية مخزَّنة داخل كل مشروع في Answers (لا top-level)، ويطابق المفاتيح على الثوابت القياسية،
-/// ثم يجمّع على معرّفات المشاريع الحقيقية حسب (المشروع/الموظّف/Pod/العميل). لا يمسّ المسار القديم (Family B المسطّح)
-/// ولا مسار المبيعات (B2C/B2B). Pod = فريق المُسلِّم (Submitter.TeamId). الرؤية = اتحاد محورين مفروضين خادميًّا:
+/// حيث كل الأرقام التشغيلية مخزَّنة داخل كل مشروع في Answers (لا top-level)، ويستخرج المقاييس <b>حسب القالب</b>
+/// عبر خريطة المفاتيح الحقيقية (v5) في ProjectFirstExecutionSchema.MapFor، ثم يجمّع على معرّفات المشاريع الحقيقية
+/// حسب (المشروع/الموظّف/Pod/العميل). لا يمسّ المسار القديم (Family B المسطّح) ولا مسار المبيعات (B2C/B2B).
+/// Pod = فريق المُسلِّم (Submitter.TeamId). الرؤية = اتحاد محورين مفروضين خادميًّا:
 /// (1) نطاق التسلسل الإداري IScopeResolver (المُسلِّم داخل النطاق ⇒ ترى كل مدخلاته)، و(2) حافظة المشاريع
-/// IClientProjectAccess (RC-4 Task 4، Phase F) — مدير الحساب يرى مدخلات مشاريع عملائه ولو سلّمها موظّف
-/// خارج نطاقه الإداري. عند SeesAll لا قيد. المدخلات بلا ProjectId صالح تُتجاهَل بلا فشل مع عدّها تشخيصيًّا.
+/// IClientProjectAccess (مدير الحساب يرى مدخلات مشاريع عملائه ولو سلّمها موظّف خارج نطاقه الإداري).
+/// عند SeesAll لا قيد. المدخلات بلا ProjectId صالح تُتجاهَل بلا فشل مع عدّها تشخيصيًّا.
 /// </summary>
 public class ProjectFirstExecutionAggregationService : IProjectFirstExecutionAggregationService
 {
@@ -54,11 +55,11 @@ public class ProjectFirstExecutionAggregationService : IProjectFirstExecutionAgg
         public Dictionary<string, JsonElement>? Answers { get; set; }
     }
 
-    // مدخل مشروع واحد من قسم PRS مع القيم الرقمية القياسية المقروءة بأمان.
+    // مدخل مشروع واحد من قسم PRS مع القيم الرقمية القياسية والحالة المطبَّعة المقروءة بأمان.
     private readonly record struct ProjEntry(
         Guid SubmitterId, Guid? TeamId, PeriodType PeriodType, string PeriodKey, Guid ProjectId,
         decimal Planned, decimal Completed, decimal Approved, decimal Revisions, decimal Published, decimal Delayed,
-        decimal MessagesIn, decimal Responses, decimal IssueComments, decimal Escalations);
+        decimal MessagesIn, decimal Responses, decimal IssueComments, decimal Escalations, string Status);
 
     // أسباب إسقاط مدخلات المشاريع (كلّها داخل النطاق — لا تكشف بيانات خارج النطاق تلبيةً لـ §9).
     private const string ReasonEmptyEntry = "empty_project_entry";
@@ -85,6 +86,7 @@ public class ProjectFirstExecutionAggregationService : IProjectFirstExecutionAgg
     {
         public decimal Planned, Completed, Approved, Revisions, Published, Delayed;
         public decimal MessagesIn, Responses, IssueComments, Escalations;
+        public int StHealthy, StStable, StNeeds, StUnspecified, StTotal;
 
         public void Add(in ProjEntry e)
         {
@@ -92,6 +94,14 @@ public class ProjectFirstExecutionAggregationService : IProjectFirstExecutionAgg
             Revisions += e.Revisions; Published += e.Published; Delayed += e.Delayed;
             MessagesIn += e.MessagesIn; Responses += e.Responses;
             IssueComments += e.IssueComments; Escalations += e.Escalations;
+            switch (e.Status)
+            {
+                case ProjectFirstExecutionSchema.StatusHealthy: StHealthy++; break;
+                case ProjectFirstExecutionSchema.StatusStable: StStable++; break;
+                case ProjectFirstExecutionSchema.StatusNeedsIntervention: StNeeds++; break;
+                default: StUnspecified++; break;
+            }
+            StTotal++;
         }
 
         // المقياس الرئيسي للمقارنة الدورية = مجموع المخرجات (المُنجَز + الردود) يغطّي الإنتاج والمديرشن معًا.
@@ -101,6 +111,8 @@ public class ProjectFirstExecutionAggregationService : IProjectFirstExecutionAgg
             Planned, Completed, Approved, Revisions, Published, Delayed,
             MessagesIn, Responses, IssueComments, Escalations,
             Pct(Completed, Planned), Pct(Approved, Completed), Pct(Published, Approved), Pct(Responses, MessagesIn));
+
+        public ProjectStatusTally BuildStatus() => new(StHealthy, StStable, StNeeds, StUnspecified, StTotal);
     }
 
     // نوع الفترة الفعّال لاشتقاق الفترة السابقة: من الفلتر إن حُدّد، وإلا يُستنتَج أسبوعيًّا من صيغة المفتاح.
@@ -138,7 +150,7 @@ public class ProjectFirstExecutionAggregationService : IProjectFirstExecutionAgg
             case JsonValueKind.Number:
                 return el.TryGetDecimal(out value);
             case JsonValueKind.String:
-                // يمرّ عبر NumericNormalizer (RC-3 Task 2B) لتطبيع الخانات العربية-الهندية/الفارسية قبل التحويل.
+                // يمرّ عبر NumericNormalizer لتطبيع الخانات العربية-الهندية/الفارسية قبل التحويل.
                 return NumericNormalizer.TryParseDecimal(el.GetString(), out value);
             default:
                 return false;
@@ -148,10 +160,26 @@ public class ProjectFirstExecutionAggregationService : IProjectFirstExecutionAgg
     private static decimal Read(Dictionary<string, JsonElement> answers, string key)
         => TryReadNumber(answers, key, out var v) ? v : 0m;
 
+    // مجموع القيم الرقمية لمجموعة مفاتيح مصدر (Strategy A داخل المدخل الواحد؛ مصفوفة فارغة ⇒ 0).
+    private static decimal Sum(Dictionary<string, JsonElement> answers, string[] keys)
+    {
+        decimal total = 0m;
+        foreach (var k in keys) total += Read(answers, k);
+        return total;
+    }
+
+    // يقرأ قيمة حقل Select (نصّيًّا) لتطبيع حالة المشروع.
+    private static string? ReadRaw(Dictionary<string, JsonElement> answers, string key)
+    {
+        if (!answers.TryGetValue(key, out var el)) return null;
+        return el.ValueKind == JsonValueKind.String ? el.GetString() : el.ToString();
+    }
+
     /// <summary>
-    /// يمسح قوالب التنفيذ الأربعة ويُنتج قائمة مدخلات مشاريع مع القيم القياسية. يطبّق فلاتر التسليم/الفترة/الموظّف/الفريق،
-    /// وفلتر ProjectId مباشرةً على مدخل المشروع، والرؤية على مستوى المدخل = (المُسلِّم داخل نطاق IScopeResolver)
-    /// أو (المشروع ضمن حافظة IClientProjectAccess — لمدير الحساب). المدخلات بلا ProjectId صالح تُعدّ EntriesIgnored وتُتجاهَل.
+    /// يمسح قوالب التنفيذ الأربعة ويُنتج قائمة مدخلات مشاريع مع القيم القياسية المستخرجة حسب القالب. يطبّق فلاتر
+    /// التسليم/الفترة/الموظّف/الفريق، وفلتر ProjectId مباشرةً على مدخل المشروع، والرؤية على مستوى المدخل =
+    /// (المُسلِّم داخل نطاق IScopeResolver) أو (المشروع ضمن حافظة IClientProjectAccess). المدخلات بلا ProjectId صالح
+    /// تُعدّ EntriesIgnored وتُتجاهَل.
     /// </summary>
     private async Task<(List<ProjEntry> Entries, Diag Diag)> ScanEntriesAsync(
         ProjectFirstExecutionFilter filter, ScopeContext scope, CancellationToken ct)
@@ -168,7 +196,12 @@ public class ProjectFirstExecutionAggregationService : IProjectFirstExecutionAgg
             .ToListAsync(ct);
         if (templates.Count == 0) return (entries, diag);
 
-        var versionIds = templates.SelectMany(t => t.Versions).Select(v => v.Id).ToList();
+        // خريطة نسخة القالب ← عنوان القالب (لاستخراج المقاييس حسب القالب لكل تسليم).
+        var versionToTitle = templates
+            .SelectMany(t => t.Versions.Select(v => new { v.Id, t.Title }))
+            .ToDictionary(x => x.Id, x => x.Title);
+
+        var versionIds = versionToTitle.Keys.ToList();
         var prsFieldIds = templates
             .SelectMany(t => t.Versions)
             .SelectMany(v => v.Fields)
@@ -187,7 +220,7 @@ public class ProjectFirstExecutionAggregationService : IProjectFirstExecutionAgg
         // (مدير الحساب) يشمل مشاريع سلّمها موظّفون خارج نطاق المستخدم الإداري.
 
         var subs = await subsQ
-            .Select(s => new { s.Id, s.SubmitterId, s.TeamId, s.PeriodType, s.PeriodKey })
+            .Select(s => new { s.Id, s.SubmitterId, s.TeamId, s.PeriodType, s.PeriodKey, s.ReportTemplateVersionId })
             .ToListAsync(ct);
 
         if (subs.Count == 0) return (entries, diag);
@@ -213,6 +246,12 @@ public class ProjectFirstExecutionAggregationService : IProjectFirstExecutionAgg
             if (prs is null) continue;
 
             var meta = subMeta[v.ReportSubmissionId];
+            // خريطة المفاتيح الحقيقية لهذا التسليم بحسب عنوان قالبه (نسخة القالب المثبَّتة على التسليم).
+            var map = versionToTitle.TryGetValue(meta.ReportTemplateVersionId, out var title)
+                ? ProjectFirstExecutionSchema.MapFor(title)
+                : null;
+            if (map is null) continue; // تسليم بنسخة قالب غير معروفة ضمن الأربعة ⇒ يُتخطّى بأمان.
+
             // المُسلِّم داخل النطاق الإداري ⇒ كل مدخلاته مرئية؛ وإلا يُقاس المشروع على الحافظة (مدير الحساب).
             var submitterInScope = vis is null || scope.UserIds.Contains(meta.SubmitterId);
             if (submitterInScope) consideredSubs.Add(v.ReportSubmissionId);
@@ -221,8 +260,7 @@ public class ProjectFirstExecutionAggregationService : IProjectFirstExecutionAgg
             {
                 if (e.ProjectId is not Guid pid || pid == Guid.Empty || e.Answers is null)
                 {
-                    // Project-First: كل الأرقام يجب أن تكون داخل مشروع محدَّد. تُعدّ تشخيصيًّا فقط لتسليم داخل النطاق
-                    // (لا معنى لعدّها لمُسلِّم خارج النطاق إذ لا مشروع يُطابَق على الحافظة).
+                    // Project-First: كل الأرقام يجب أن تكون داخل مشروع محدَّد. تُعدّ تشخيصيًّا فقط لتسليم داخل النطاق.
                     if (submitterInScope)
                     {
                         diag.RowsConsidered++;
@@ -248,16 +286,17 @@ public class ProjectFirstExecutionAggregationService : IProjectFirstExecutionAgg
                 var a = e.Answers;
                 entries.Add(new ProjEntry(
                     meta.SubmitterId, meta.TeamId, meta.PeriodType, meta.PeriodKey ?? string.Empty, pid,
-                    Read(a, ProjectFirstExecutionSchema.KeyPlanned),
-                    Read(a, ProjectFirstExecutionSchema.KeyCompleted),
-                    Read(a, ProjectFirstExecutionSchema.KeyApproved),
-                    Read(a, ProjectFirstExecutionSchema.KeyRevisions),
-                    Read(a, ProjectFirstExecutionSchema.KeyPublished),
-                    Read(a, ProjectFirstExecutionSchema.KeyDelayed),
-                    Read(a, ProjectFirstExecutionSchema.KeyMessagesIn),
-                    Read(a, ProjectFirstExecutionSchema.KeyResponses),
-                    Read(a, ProjectFirstExecutionSchema.KeyIssueComments),
-                    Read(a, ProjectFirstExecutionSchema.KeyEscalations)));
+                    Sum(a, map.Planned),
+                    Sum(a, map.Completed),
+                    Sum(a, map.Approved),
+                    Sum(a, map.Revisions),
+                    0m, // Published: لا مصدر في v5 ⇒ دائمًا صفر.
+                    Sum(a, map.Delayed),
+                    Sum(a, map.MessagesIn),
+                    Sum(a, map.Responses),
+                    Sum(a, map.IssueComments),
+                    Sum(a, map.Escalations),
+                    ProjectFirstExecutionSchema.NormalizeStatus(ReadRaw(a, ProjectFirstExecutionSchema.StatusKey))));
                 seenSubs.Add(v.ReportSubmissionId);
             }
         }
@@ -367,7 +406,7 @@ public class ProjectFirstExecutionAggregationService : IProjectFirstExecutionAgg
                 var comparison = prevHeadline is null ? null
                     : BuildComparison(kv.Value.Headline, prevHeadline.TryGetValue(kv.Key, out var pv) ? pv : null);
                 return new ProjectFirstByProjectRow(kv.Key, meta.Item1, meta.Item2, clientName,
-                    contributors.GetValueOrDefault(kv.Key)?.Count ?? 0, kv.Value.Build(), comparison);
+                    contributors.GetValueOrDefault(kv.Key)?.Count ?? 0, kv.Value.Build(), comparison, kv.Value.BuildStatus());
             })
             .OrderBy(r => r.ClientName).ThenBy(r => r.ProjectName)
             .ToList();
@@ -424,7 +463,7 @@ public class ProjectFirstExecutionAggregationService : IProjectFirstExecutionAgg
                 return new ProjectFirstByEmployeeRow(
                     emp, names.GetValueOrDefault(emp, string.Empty), teamId,
                     teamId is not null ? teams.GetValueOrDefault(teamId.Value, string.Empty) : string.Empty,
-                    project, meta.Item1, meta.Item2, clientName, m.Build(), comparison);
+                    project, meta.Item1, meta.Item2, clientName, m.Build(), comparison, m.BuildStatus());
             })
             .OrderBy(r => r.EmployeeName).ThenBy(r => r.ClientName).ThenBy(r => r.ProjectName)
             .ToList();
@@ -483,7 +522,7 @@ public class ProjectFirstExecutionAggregationService : IProjectFirstExecutionAgg
                 return new ProjectFirstByPodRow(teamId, teamName,
                     podProjects.GetValueOrDefault(kv.Key)?.Count ?? 0,
                     podEmployees.GetValueOrDefault(kv.Key)?.Count ?? 0,
-                    kv.Value.Build(), comparison);
+                    kv.Value.Build(), comparison, kv.Value.BuildStatus());
             })
             .OrderBy(r => r.TeamName)
             .ToList();
@@ -535,7 +574,8 @@ public class ProjectFirstExecutionAggregationService : IProjectFirstExecutionAgg
                 var activeCount = projectSet.Count(activeProjectIds.Contains);
                 var comparison = prevHeadline is null ? null
                     : BuildComparison(kv.Value.Headline, prevHeadline.TryGetValue(kv.Key, out var pv) ? pv : null);
-                return new ProjectFirstByClientRow(clientId, clientName, projectSet.Count, activeCount, kv.Value.Build(), comparison);
+                return new ProjectFirstByClientRow(clientId, clientName, projectSet.Count, activeCount,
+                    kv.Value.Build(), comparison, kv.Value.BuildStatus());
             })
             .OrderBy(r => r.ClientName)
             .ToList();

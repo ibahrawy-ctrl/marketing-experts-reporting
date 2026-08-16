@@ -4,165 +4,132 @@ using Reporting.Domain.Enums;
 namespace Reporting.Application.Common;
 
 /// <summary>
-/// تقويم التقارير التشغيلي (Phase 5): الأسبوع التشغيلي للشركة = «الخميس → الأربعاء».
-/// دوال خالصة (Pure) تحسب: حدود الأسبوع، مفتاح الأسبوع YYYY-Www، تواريخ التسليم بحسب الدور،
-/// وانتماء الأسبوع لشهر/ربع/سنة. لا تعتمد على اسم مستخدم بعينه — كلّها قواعد دور/تاريخ.
-/// التقويم مبنيّ على ثلوثاء/خميس ISO: الخميس الذي يبدأ به الأسبوع التشغيلي هو نفسه خميس أسبوع ISO
-/// (لأنّ خميس أي أسبوع ISO يقع داخله) ⇒ ترقيم الأسابيع يبقى متوافقًا مع 2026-W25 المستخدَم سابقًا.
+/// تقويم التقارير التشغيلي — **واجهة توافق (Compatibility Facade)** تفوّض بالكامل إلى
+/// <see cref="ReportingCalendarPolicy"/> (مصدر الحقيقة الوحيد المُدرِك للأدوار).
+///
+/// تاريخيًّا بُني هذا التقويم على أسبوع «الخميس → الأربعاء». اعتمدت الإدارة تقويمًا موحّدًا
+/// يبدأ يوم **السبت** وينتهي **الجمعة** (W27→السبت 27 يونيو 2026 …) مع الإبقاء على أرقام ISO.
+/// لتجنّب مصدرَي حقيقة متعارضين، تُعاد كتابة كل الدوال هنا كـ**تفويض رقيق** للسياسة الجديدة:
+///   WeekStart→CycleStart (السبت)، WeekEnd→CycleEnd (الجمعة)، WeekKeyFor→CycleKeyFor،
+///   WeekRange→CycleRange، DueDateForRole→RoleDueDate، Week*Label→Cycle*Label.
+///
+/// تواريخ الاستحقاق بحسب الدور **تبقى مطابقة تمامًا** (الموظّف=الأربعاء، قائد الفريق=الخميس،
+/// المدير=الأحد، المدير العام/الرئيس التنفيذي=الاثنين) — يتغيّر فقط حدّ بداية الأسبوع إلى السبت
+/// ليطابق جدول الإدارة المعتمد. لا اسم مستخدم بعينه — كلّها قواعد دور/تاريخ.
 /// </summary>
 public static class ReportCalendarPolicy
 {
     // ===== المنطقة الزمنية المرجعية (آسيا/الرياض، UTC+3 ثابت بلا توقيت صيفي) =====
-    // كلّ حسابات «اليوم الحالي» وموعد الاستحقاق والتأخّر تُبنى على توقيت الرياض لا UTC،
-    // كي يتطابق إدراك «اليوم» مع يوم العمل المحلّي للشركة (السعودية لا تطبّق DST ⇒ +3 ثابت).
 
     /// <summary>إزاحة توقيت الرياض الثابتة عن UTC (+3 ساعات، بلا توقيت صيفي).</summary>
-    public static readonly TimeSpan RiyadhOffset = TimeSpan.FromHours(3);
+    public static readonly TimeSpan RiyadhOffset = ReportingCalendarPolicy.RiyadhOffset;
 
-    /// <summary>التاريخ الحالي بتوقيت الرياض (يُحوّل لحظة UTC إلى +3 ثم يأخذ التاريخ).</summary>
-    public static DateOnly RiyadhToday() =>
-        DateOnly.FromDateTime(DateTime.UtcNow.Add(RiyadhOffset));
+    /// <summary>التاريخ الحالي بتوقيت الرياض.</summary>
+    public static DateOnly RiyadhToday() => ReportingCalendarPolicy.RiyadhToday();
 
-    /// <summary>تاريخ لحظة UTC معيّنة بتوقيت الرياض (لتقييم تأخّر التسليم بيومه المحلّي).</summary>
-    public static DateOnly RiyadhDate(DateTime utc) =>
-        DateOnly.FromDateTime((utc.Kind == DateTimeKind.Utc ? utc : DateTime.SpecifyKind(utc, DateTimeKind.Utc)).Add(RiyadhOffset));
+    /// <summary>تاريخ لحظة UTC معيّنة بتوقيت الرياض.</summary>
+    public static DateOnly RiyadhDate(DateTime utc) => ReportingCalendarPolicy.RiyadhDate(utc);
 
-    // ===== الأسبوع التشغيلي (الخميس → الأربعاء) =====
+    // ===== الأسبوع التشغيلي (السبت → الجمعة) — يفوّض للسياسة الجديدة =====
 
-    /// <summary>الخميس الذي يبدأ به الأسبوع التشغيلي المحتوي على تاريخ معيّن.</summary>
-    public static DateOnly WeekStart(DateOnly date)
-    {
-        var diff = ((int)date.DayOfWeek - (int)DayOfWeek.Thursday + 7) % 7;
-        return date.AddDays(-diff);
-    }
+    /// <summary>السبت الذي يبدأ به الأسبوع التشغيلي المحتوي على تاريخ معيّن.</summary>
+    public static DateOnly WeekStart(DateOnly date) => ReportingCalendarPolicy.CycleStart(date);
 
-    /// <summary>الأربعاء الذي ينتهي به الأسبوع التشغيلي (بداية + 6 أيام).</summary>
-    public static DateOnly WeekEnd(DateOnly weekStart) => weekStart.AddDays(6);
+    /// <summary>الجمعة الذي ينتهي به الأسبوع التشغيلي (بداية + 6 أيام).</summary>
+    public static DateOnly WeekEnd(DateOnly weekStart) => ReportingCalendarPolicy.CycleEnd(weekStart);
 
-    /// <summary>مفتاح الأسبوع التشغيلي YYYY-Www للتاريخ (مرتكزًا على خميس البداية).</summary>
-    public static string WeekKeyFor(DateOnly date)
-    {
-        var thursday = WeekStart(date);
-        var dt = thursday.ToDateTime(TimeOnly.MinValue);
-        var week = ISOWeek.GetWeekOfYear(dt);
-        var year = ISOWeek.GetYear(dt);
-        return $"{year}-W{week:00}";
-    }
+    /// <summary>مفتاح الأسبوع التشغيلي YYYY-Www للتاريخ (مرتكزًا على مرجع الثلاثاء).</summary>
+    public static string WeekKeyFor(DateOnly date) => ReportingCalendarPolicy.CycleKeyFor(date);
 
-    /// <summary>عكس العملية: (خميس البداية، أربعاء النهاية) لمفتاح أسبوع.</summary>
-    public static (DateOnly Start, DateOnly End) WeekRange(string weekKey)
-    {
-        var (year, week) = ParseWeekKey(weekKey);
-        var thursday = DateOnly.FromDateTime(ISOWeek.ToDateTime(year, week, DayOfWeek.Thursday));
-        return (thursday, thursday.AddDays(6));
-    }
+    /// <summary>عكس العملية: (سبت البداية، جمعة النهاية) لمفتاح أسبوع.</summary>
+    public static (DateOnly Start, DateOnly End) WeekRange(string weekKey) =>
+        ReportingCalendarPolicy.CycleRange(weekKey);
 
     /// <summary>تحليل مفتاح الأسبوع YYYY-Www إلى (سنة، رقم الأسبوع).</summary>
-    public static (int Year, int Week) ParseWeekKey(string weekKey)
-    {
-        var parts = weekKey.Trim().Split("-W");
-        return (int.Parse(parts[0], CultureInfo.InvariantCulture), int.Parse(parts[1], CultureInfo.InvariantCulture));
-    }
+    public static (int Year, int Week) ParseWeekKey(string weekKey) =>
+        ReportingCalendarPolicy.ParseCycleKey(weekKey);
 
-    /// <summary>هل المفتاح بصيغة الأسبوع YYYY-Www (مثل 2026-W25)؟</summary>
-    public static bool IsWeekKey(string? key) =>
-        !string.IsNullOrWhiteSpace(key) && System.Text.RegularExpressions.Regex.IsMatch(key.Trim(), @"^\d{4}-W\d{2}$");
+    /// <summary>هل المفتاح بصيغة الأسبوع YYYY-Www (مثل 2026-W27)؟</summary>
+    public static bool IsWeekKey(string? key) => ReportingCalendarPolicy.IsCycleKey(key);
 
-    // ===== تواريخ التسليم بحسب الدور (Phase 5 §2/§3) =====
-    // الموظّف: ينتهي أسبوعه الأربعاء ⇒ يُسلّم بنهاية الأربعاء.
-    // قائد الفريق: يراجع بعد إغلاق أسبوع الموظّفين ⇒ يُسلّم الخميس (نهاية الأسبوع + 1).
-    // المدير: يراجع تقارير القادة ⇒ يُسلّم الأحد (نهاية الأسبوع + 4).
-    // المدير العام/الرئيس التنفيذي: يراجع ملخّص الأسبوع السابق ⇒ الاثنين (نهاية الأسبوع + 5).
+    // ===== تواريخ التسليم بحسب الدور — يفوّض للسياسة الجديدة (نفس التواريخ) =====
 
     /// <summary>تاريخ التسليم/المراجعة المتوقَّع لدور معيّن عن أسبوع تشغيلي.</summary>
-    public static DateOnly DueDateForRole(string weekKey, string role)
-    {
-        var end = WeekRange(weekKey).End; // الأربعاء
-        return role switch
-        {
-            Roles.TeamLeader => end.AddDays(1),                       // الخميس
-            Roles.Manager => end.AddDays(4),                          // الأحد
-            Roles.GeneralManager or Roles.Ceo => end.AddDays(5),      // الاثنين (مراجعة)
-            _ => end                                                  // الموظّف وغيره ⇒ الأربعاء
-        };
-    }
+    public static DateOnly DueDateForRole(string weekKey, string role) =>
+        ReportingCalendarPolicy.RoleDueDate(weekKey, role);
 
-    // ===== انتماء الأسبوع لشهر/ربع/سنة (Phase 5 §8 — تجميع KPI) =====
-    // ينتمي الأسبوع للشهر/الربع/السنة التي يقع فيها «خميس بدايته» — فلا يُحتسب أسبوع لفترتين.
+    // ===== انتماء الأسبوع لشهر/ربع/سنة (تجميع KPI) — يفوّض للسياسة الجديدة =====
 
     /// <summary>حدود فترة شهرية «YYYY-MM».</summary>
-    public static (DateOnly Start, DateOnly End) MonthRange(int year, int month)
-    {
-        var start = new DateOnly(year, month, 1);
-        return (start, start.AddMonths(1).AddDays(-1));
-    }
+    public static (DateOnly Start, DateOnly End) MonthRange(int year, int month) =>
+        ReportingCalendarPolicy.MonthRange(year, month);
 
     /// <summary>حدود فترة ربع سنوية (الربع 1..4).</summary>
-    public static (DateOnly Start, DateOnly End) QuarterRange(int year, int quarter)
-    {
-        var firstMonth = (quarter - 1) * 3 + 1;
-        var start = new DateOnly(year, firstMonth, 1);
-        return (start, start.AddMonths(3).AddDays(-1));
-    }
+    public static (DateOnly Start, DateOnly End) QuarterRange(int year, int quarter) =>
+        ReportingCalendarPolicy.QuarterRange(year, quarter);
 
     /// <summary>حدود فترة سنوية.</summary>
     public static (DateOnly Start, DateOnly End) YearRange(int year) =>
-        (new DateOnly(year, 1, 1), new DateOnly(year, 12, 31));
+        ReportingCalendarPolicy.YearRange(year);
 
-    /// <summary>هل ينتمي الأسبوع (بحسب خميس بدايته) إلى المدى [from, to]؟</summary>
-    public static bool WeekInRange(string weekKey, DateOnly from, DateOnly to)
-    {
-        if (!IsWeekKey(weekKey)) return false;
-        var anchor = WeekRange(weekKey).Start; // خميس البداية
-        return anchor >= from && anchor <= to;
-    }
+    /// <summary>هل ينتمي الأسبوع (بحسب مرجع الثلاثاء) إلى المدى [from, to]؟</summary>
+    public static bool WeekInRange(string weekKey, DateOnly from, DateOnly to) =>
+        ReportingCalendarPolicy.CycleInRange(weekKey, from, to);
+
+    // ===== تسميات عربية مفهومة — يفوّض للسياسة الجديدة =====
+
+    /// <summary>«الأسبوع 27 — 2026 (السبت 27 يونيو — الجمعة 3 يوليو)».</summary>
+    public static string WeekLabel(string weekKey) => ReportingCalendarPolicy.CycleLabel(weekKey);
+
+    /// <summary>تسمية مختصرة للأسبوع «الأسبوع 27 — 2026».</summary>
+    public static string ShortWeekLabel(string weekKey) => ReportingCalendarPolicy.ShortCycleLabel(weekKey);
+
+    // ===== مفتاح الفترة السابقة (للمقارنة الدورية في محرّك التجميع Project-First) =====
 
     /// <summary>
-    /// مفتاح الفترة السابقة مباشرةً لمفتاحٍ معلوم (للمقارنة الدورية):
-    /// أسبوعي ⇒ مفتاح أسبوع خميسه قبل 7 أيام؛ شهري YYYY-MM ⇒ الشهر السابق؛ ربعي YYYY-Qn ⇒ الربع السابق؛
-    /// يومي YYYY-MM-DD ⇒ اليوم السابق. أيّ مفتاح غير قابل للتحليل أو خارج الحدود ⇒ null (لا مقارنة، بلا استثناء).
-    /// محروسة بـ try/catch كي لا تُسقِط مسار التجميع عند مفاتيح غير قياسية في بيانات قديمة.
+    /// يشتقّ مفتاح الفترة **السابقة** لنوع فترة ومفتاح معطى (قراءة فقط، بلا تأثير جانبي):
+    /// Weekly YYYY-Www ⇒ الأسبوع التشغيلي السابق (إزاحة −7 يومًا عبر CycleKeyFor/CycleRange)،
+    /// Monthly YYYY-MM ⇒ الشهر السابق، Quarterly YYYY-Qn ⇒ الربع السابق (Q1⇒Q4 والسنة −1)،
+    /// Daily YYYY-MM-DD ⇒ اليوم السابق. أي مفتاح غير صالح/تعذّر اشتقاقه ⇒ null (لا مقارنة).
     /// </summary>
     public static string? PreviousPeriodKey(PeriodType periodType, string? periodKey)
     {
         if (string.IsNullOrWhiteSpace(periodKey)) return null;
-        var key = periodKey.Trim();
         try
         {
             switch (periodType)
             {
                 case PeriodType.Weekly:
-                    if (!IsWeekKey(key)) return null;
-                    return WeekKeyFor(WeekRange(key).Start.AddDays(-7));
+                    if (!IsWeekKey(periodKey)) return null;
+                    var (start, _) = WeekRange(periodKey);
+                    return WeekKeyFor(start.AddDays(-7));
 
                 case PeriodType.Monthly:
                 {
-                    var parts = key.Split('-');
+                    var parts = periodKey.Split('-');
                     if (parts.Length != 2) return null;
-                    var d = new DateOnly(int.Parse(parts[0], CultureInfo.InvariantCulture),
-                        int.Parse(parts[1], CultureInfo.InvariantCulture), 1).AddMonths(-1);
-                    return $"{d.Year:0000}-{d.Month:00}";
+                    var y = int.Parse(parts[0], CultureInfo.InvariantCulture);
+                    var m = int.Parse(parts[1], CultureInfo.InvariantCulture);
+                    if (m < 1 || m > 12) return null;
+                    m--; if (m == 0) { m = 12; y--; }
+                    return $"{y:D4}-{m:D2}";
                 }
 
                 case PeriodType.Quarterly:
                 {
-                    var parts = key.Split("-Q");
-                    if (parts.Length != 2) return null;
-                    var year = int.Parse(parts[0], CultureInfo.InvariantCulture);
-                    var q = int.Parse(parts[1], CultureInfo.InvariantCulture);
+                    var parts = periodKey.Split('-');
+                    if (parts.Length != 2 || !parts[1].StartsWith("Q", StringComparison.OrdinalIgnoreCase)) return null;
+                    var y = int.Parse(parts[0], CultureInfo.InvariantCulture);
+                    var q = int.Parse(parts[1].Substring(1), CultureInfo.InvariantCulture);
                     if (q < 1 || q > 4) return null;
-                    var prevQ = q - 1;
-                    var prevYear = year;
-                    if (prevQ == 0) { prevQ = 4; prevYear--; }
-                    return $"{prevYear:0000}-Q{prevQ}";
+                    q--; if (q == 0) { q = 4; y--; }
+                    return $"{y:D4}-Q{q}";
                 }
 
                 case PeriodType.Daily:
-                {
-                    if (!DateOnly.TryParse(key, CultureInfo.InvariantCulture, out var day)) return null;
-                    var prev = day.AddDays(-1);
-                    return prev.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-                }
+                    if (!DateOnly.TryParseExact(periodKey, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d))
+                        return null;
+                    return d.AddDays(-1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
                 default:
                     return null;
@@ -170,32 +137,7 @@ public static class ReportCalendarPolicy
         }
         catch
         {
-            return null; // مفتاح غير قياسي (مثل رقم أسبوع > 53) ⇒ لا مقارنة بدل إسقاط الطلب.
+            return null;
         }
-    }
-
-    // ===== تسميات عربية مفهومة (Phase 5 §7) =====
-
-    private static readonly string[] ArMonths =
-    {
-        "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
-        "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"
-    };
-
-    /// <summary>«الأسبوع 25 — 2026 (الخميس 18 يونيو — الأربعاء 24 يونيو)».</summary>
-    public static string WeekLabel(string weekKey)
-    {
-        if (!IsWeekKey(weekKey)) return weekKey;
-        var (year, week) = ParseWeekKey(weekKey);
-        var (start, end) = WeekRange(weekKey);
-        return $"الأسبوع {week} — {year} (الخميس {start.Day} {ArMonths[start.Month - 1]} — الأربعاء {end.Day} {ArMonths[end.Month - 1]})";
-    }
-
-    /// <summary>تسمية مختصرة للأسبوع «الأسبوع 25 — 2026».</summary>
-    public static string ShortWeekLabel(string weekKey)
-    {
-        if (!IsWeekKey(weekKey)) return weekKey;
-        var (year, week) = ParseWeekKey(weekKey);
-        return $"الأسبوع {week} — {year}";
     }
 }

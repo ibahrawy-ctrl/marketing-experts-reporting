@@ -103,6 +103,22 @@ public static class Roles
     };
 
     /// <summary>
+    /// الأدوار المخوّلة برؤية طابور الحوكمة «معلّقة عند قادة الفرق» (LEAVE-TL-PENDING-GOVERNANCE-R1):
+    /// Admin / CEO / GM / HR. طابور قراءة-فقط على مستوى الشركة يُظهِر الطلبات المعلّقة عند خطوة قائد الفريق
+    /// بلا أيّ سلطة قرار — منفصل تمامًا عن LeaveReviewers (طابور «بانتظار قراري»). لا يشمل Manager أو
+    /// TeamLeader أو Employee أو Viewer.
+    /// CeoSupport مُستبعَد عمدًا: سياسة الحوكمة القائمة في وحدة الإجازات لا تسمح له برؤية تفاصيل أيّ طلب
+    /// إجازة — LeaveRequestService.CanViewAsync يقصر الرؤية على LeaveFinalApprovers (HR/Admin/CEO/GM) أو
+    /// Management ضمن النطاق، وCeoSupport ليس في أيّ منهما. إدراجه هنا كان سيمنحه رؤية بيانات إجازات على
+    /// مستوى الشركة لا يملكها اليوم في أيّ سطح ⇒ توسيع صلاحية خارج نطاق هذه التذكرة. إضافته تحتاج قرار
+    /// حوكمة مستقلًّا يشمل CanViewAsync أيضًا.
+    /// </summary>
+    public static readonly string[] LeaveGovernanceReaders =
+    {
+        Admin, Ceo, GeneralManager, Hr
+    };
+
+    /// <summary>
     /// الأدوار المخوّلة بتعديل المسمّى الوظيفي للموظف (JobRoleId) عبر السطح المخصّص فقط:
     /// Admin / CeoSupport / HR / GM / CEO. لا تشمل Manager أو TeamLeader أو Employee.
     /// مستقلة تمامًا عن صلاحية إعادة تعيين كلمة المرور (UserPasswordReset) وعن AdminOnly لبقية إدارة المستخدم.
@@ -364,6 +380,18 @@ public static class Roles
         Hr, Admin, Ceo, GeneralManager
     };
 
+    /// <summary>
+    /// الأدوار المخوّلة بالوصول إلى «الأرشيف الإداريّ» واسترجاع العناصر المحذوفة إداريًّا ناعمًا
+    /// (RESTORE-ARCHIVE-GOVERNANCE-R1 — تقارير + تقييمات KPI): Admin / CEO / GM فقط.
+    /// عمدًا لا تشمل Manager / TeamLeader / HR / CeoSupport / Employee / Viewer.
+    /// الاسترجاع يعكس الحذف الإداريّ فقط (Hybrid) بلا إعادة توجيه صامتة ولا حذف نهائيّ ولا إشعارات.
+    /// (تُطابق حاليًّا AdminReportKpiDeleters عمدًا — نفس صلاحية الحذف الإداريّ هي صلاحية الاسترجاع.)
+    /// </summary>
+    public static readonly string[] ArchiveGovernanceAccessors =
+    {
+        Admin, Ceo, GeneralManager
+    };
+
     public const string DisplayAr_Admin = "مدير النظام";
     public const string DisplayAr_Ceo = "الرئيس التنفيذي";
     public const string DisplayAr_GeneralManager = "المدير العام";
@@ -417,6 +445,11 @@ public static class Policies
     // رؤية طابور المراجعة «بانتظار قراري» للإجازات — اتحاد الإدارة + الموارد البشرية (Roles.LeaveReviewers).
     public const string LeaveReview = "LeaveReview";
 
+    // رؤية طابور الحوكمة «معلّقة عند قادة الفرق» (LEAVE-TL-PENDING-GOVERNANCE-R1) — قراءة-فقط على مستوى
+    // الشركة لأدوار الحوكمة (Roles.LeaveGovernanceReaders = Admin/CEO/GM/HR). لا يمنح أيّ سلطة قرار،
+    // ومنفصل تمامًا عن LeaveReview (الذي يقود لطابور اتخاذ القرار). Manager/TeamLeader/Employee/CeoSupport = محجوب.
+    public const string LeaveGovernanceRead = "LeaveGovernanceRead";
+
     // إعادة تعيين كلمة مرور المستخدم بواسطة جهة مخوّلة — Admin + CEO + CeoSupport (GOV-R1).
     // عمدًا لا تشمل HR/GM/Manager/TeamLeader. حساب Admin لا يُعاد ضبط كلمته إلا بفاعل Admin (حارس الخدمة لم يتغيّر).
     public const string UserPasswordReset = "UserPasswordReset";
@@ -437,6 +470,7 @@ public static class Policies
 
     // إدارة المناصب المرنة (Phase 1A — رؤية فقط) — Admin فقط (عمدًا لا CEO/GM).
     // المناصب توسّع نطاق الرؤية فقط ولا تمنح أي قدرة اعتماد؛ تُدار حصرًا من مدير النظام.
+    // (مستعادة في RECONCILE-PROD-DEVELOP-LINEAGE.)
     public const string PositionManagement = "PositionManagement";
 
     // تعديل البيانات الأساسية غير الحسّاسة للموظف (الاسم فقط) — Admin/CeoSupport/HR (Roles.UserBasicManagers).
@@ -508,4 +542,8 @@ public static class Policies
 
     // الإشارة/التعليق/طلب إعادة الفتح على تقييم KPI (بلا اعتماد/رفض/حذف) — HR + Admin/CEO/GM (Roles.KpiReviewFlaggers).
     public const string KpiReviewFlag = "KpiReviewFlag";
+
+    // الوصول إلى «الأرشيف الإداريّ» واسترجاع العناصر المحذوفة إداريًّا (RESTORE-ARCHIVE-GOVERNANCE-R1) —
+    // Admin/CEO/GM فقط (Roles.ArchiveGovernanceAccessors). قراءة الأرشيف + استرجاع Hybrid بلا حذف نهائيّ ولا إشعارات.
+    public const string ArchiveGovernanceAccess = "ArchiveGovernanceAccess";
 }

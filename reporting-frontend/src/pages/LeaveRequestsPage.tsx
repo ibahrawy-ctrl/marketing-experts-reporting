@@ -1,14 +1,17 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, apiErrorMessage } from '../lib/api';
+import { api, apiErrorMessage, approvalErrorMessage } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { useToast, POST_SUCCESS_NAV_DELAY_MS } from '../components/ActionResultToast';
 import { Alert, Badge, Button, Card, EmptyState, Field, Input, Select } from '../components/ui';
 import { LoadingState, QueryError } from '../components/states';
 import {
   leaveTypeLabel,
   leaveStatusLabelFor,
   leaveStatusTone,
+  leaveGovernanceDelayLabel,
+  leaveGovernanceDelayTone,
   permissionShortfallResolutionLabel,
   formatDate,
   formatDateTime,
@@ -20,22 +23,36 @@ import type {
   CreateLeaveRequestRequest,
   MyBalancesDto,
   PermissionShortfallResolution,
+  TeamLeaderPendingGovernanceResultDto,
+  TeamLeaderPendingGovernanceItemDto,
+  LeaveGovernanceDelayStatus,
 } from '../types/api';
 
 // أدوار المراجعة (تطابق Policies.LeaveReview بالخادم) — يظهر لها تبويب «بانتظار قراري».
 // تشمل الموارد البشرية HR لأنها المعتمِد النهائي لطلبات الموظّفين العاديّين (الفرض الدقيق في الخادم).
 const REVIEW_ROLES = ['Admin', 'CEO', 'GeneralManager', 'Manager', 'TeamLeader', 'HR'] as const;
 
-type Tab = 'mine' | 'pending';
+// أدوار طابور الحوكمة (تطابق Policies.LeaveGovernanceRead / Roles.LeaveGovernanceReaders بالخادم).
+// قراءة-فقط على مستوى الشركة — لا تمنح أيّ سلطة قرار. لا تشمل Manager/TeamLeader/Employee/Viewer.
+// CeoSupport مُستبعَد اتّساقًا مع سياسة وحدة الإجازات القائمة (لا يملك رؤية تفاصيل أيّ طلب إجازة).
+const GOVERNANCE_ROLES = ['Admin', 'CEO', 'GeneralManager', 'HR'] as const;
+
+type Tab = 'mine' | 'pending' | 'governance';
 
 export default function LeaveRequestsPage() {
   // الحالة محفوظة في الرابط (?tab=&open=) لدعم الروابط العميقة.
   const [params, setParams] = useSearchParams();
   const { hasAnyRole } = useAuth();
   const canReview = hasAnyRole(...REVIEW_ROLES);
+  const canGovern = hasAnyRole(...GOVERNANCE_ROLES);
 
   const requested = params.get('tab');
-  const tab: Tab = requested === 'pending' && canReview ? 'pending' : 'mine';
+  const tab: Tab =
+    requested === 'pending' && canReview
+      ? 'pending'
+      : requested === 'governance' && canGovern
+      ? 'governance'
+      : 'mine';
   const openId = params.get('open');
 
   const setTab = (t: Tab) =>
@@ -45,11 +62,14 @@ export default function LeaveRequestsPage() {
   const back = () =>
     setParams((p) => { const n = new URLSearchParams(p); n.delete('open'); return n; });
 
-  if (openId) return <LeaveDetail id={openId} onBack={back} />;
+  // فتح التفاصيل من تبويب الحوكمة = عرض قراءة-فقط: تُخفى كلّ أزرار القرار (اعتماد/رفض/إعادة/إلغاء)
+  // كي لا يمنح سطح الحوكمة أيّ سلطة قرار ولو للأدوار التي تملكها من طابور «بانتظار قراري».
+  if (openId) return <LeaveDetail id={openId} onBack={back} readOnly={tab === 'governance'} />;
 
   const tabs: [Tab, string][] = [
     ['mine', 'طلباتي'],
     ...(canReview ? ([['pending', 'بانتظار قراري']] as [Tab, string][]) : []),
+    ...(canGovern ? ([['governance', 'معلّقة عند قادة الفرق']] as [Tab, string][]) : []),
   ];
 
   return (
@@ -76,6 +96,7 @@ export default function LeaveRequestsPage() {
       </div>
       {tab === 'mine' && <MineTab onOpen={open} />}
       {tab === 'pending' && <PendingTab onOpen={open} />}
+      {tab === 'governance' && <GovernanceTab onOpen={open} />}
     </div>
   );
 }
@@ -129,6 +150,7 @@ function permissionMinutes(start: string, end: string): number {
 
 function CreateLeaveForm({ onCreated }: { onCreated: (id: string) => void }) {
   const qc = useQueryClient();
+  const toast = useToast();
   const [type, setType] = useState<LeaveRequestType>('Leave');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -163,16 +185,25 @@ function CreateLeaveForm({ onCreated }: { onCreated: (id: string) => void }) {
           : { type, startDate, startTime: t(startTime), endTime: t(endTime), reason, notes: notes || null, permissionShortfallResolution: vars.resolution ?? 'None' };
       return api.post<LeaveRequestDto>('/leave-requests', body);
     },
-    onSuccess: (res) => {
+    onSuccess: async (res) => {
       reset();
       setConfirmUnpaid(false);
       setConfirmPermission(false);
       setPermResolution('None');
-      void qc.invalidateQueries({ queryKey: ['leave-requests-mine'] });
-      void qc.invalidateQueries({ queryKey: ['my-balances'] });
-      onCreated(res.data.id);
+      // التسلسل: إبطال الكاش وانتظار تحديثه أولًا ⇒ Toast نجاح ⇒ بعد ~700ms انتقال لتفاصيل الطلب الجديد.
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['leave-requests-mine'] }),
+        qc.invalidateQueries({ queryKey: ['my-balances'] }),
+      ]);
+      toast.success('✅ تم تقديم الطلب');
+      setTimeout(() => onCreated(res.data.id), POST_SUCCESS_NAV_DELAY_MS);
     },
-    onError: (e) => { setErr(apiErrorMessage(e)); },
+    onError: (e) => {
+      // فشل استدعاء الـAPI ⇒ Toast (رسائل التحقّق المحلّية تبقى Alert سطريًّا).
+      setConfirmUnpaid(false);
+      setConfirmPermission(false);
+      toast.error(apiErrorMessage(e));
+    },
   });
 
   const isLeave = type === 'Leave';
@@ -277,7 +308,7 @@ function CreateLeaveForm({ onCreated }: { onCreated: (id: string) => void }) {
         </div>
       )}
       <div className="mt-4">
-        <Button disabled={!canSubmit || create.isPending} onClick={handleSubmit}>
+        <Button loading={create.isPending} disabled={create.isPending || !canSubmit} onClick={() => { if (create.isPending) return; handleSubmit(); }}>
           إرسال الطلب
         </Button>
       </div>
@@ -299,7 +330,7 @@ function CreateLeaveForm({ onCreated }: { onCreated: (id: string) => void }) {
               <Button variant="ghost" disabled={create.isPending} onClick={() => setConfirmUnpaid(false)}>
                 إلغاء
               </Button>
-              <Button variant="danger" disabled={create.isPending} onClick={() => create.mutate({ acknowledged: true })}>
+              <Button variant="danger" loading={create.isPending} disabled={create.isPending} onClick={() => { if (create.isPending) return; create.mutate({ acknowledged: true }); }}>
                 الاستمرار مع الإقرار
               </Button>
             </div>
@@ -347,9 +378,10 @@ function CreateLeaveForm({ onCreated }: { onCreated: (id: string) => void }) {
                 إلغاء
               </Button>
               <Button
+                loading={create.isPending}
                 disabled={create.isPending || permResolution === 'None'}
                 title={permResolution === 'None' ? 'اختر أحد الخيارين أولًا' : undefined}
-                onClick={() => create.mutate({ resolution: permResolution })}
+                onClick={() => { if (create.isPending) return; create.mutate({ resolution: permResolution }); }}
               >
                 {permResolution === 'AdminOrPayrollReview'
                   ? 'إرسال الطلب مع إقرار الخصم المالي'
@@ -386,6 +418,334 @@ function PendingTab({ onOpen }: { onOpen: (id: string) => void }) {
         <LeaveTable items={items ?? []} onOpen={onOpen} showRequester />
       )}
     </Card>
+  );
+}
+
+// ===== تبويب «معلّقة عند قادة الفرق» (LEAVE-TL-PENDING-GOVERNANCE-R1) — قراءة-فقط =====
+// نافذة حوكمة على مستوى الشركة تُظهِر الطلبات العالقة عند خطوة قائد الفريق (Status=Submitted, CurrentStep=TeamLeader).
+// مستقلّ تمامًا عن «بانتظار قراري». لا يمنح أيّ سلطة قرار: لا اعتماد/رفض/إعادة توجيه/تعديل. الإجراءات المتاحة
+// حصرًا: عرض التفاصيل، فتح ملف الموظّف، الانتقال للطلب، نسخ المعرّف، الفلاتر والترتيب.
+const GOVERNANCE_PAGE_SIZE = 25;
+
+function GovernanceTab({ onOpen }: { onOpen: (id: string) => void }) {
+  const [page, setPage] = useState(1);
+  const [teamLeaderId, setTeamLeaderId] = useState('');
+  const [departmentId, setDepartmentId] = useState('');
+  const [teamId, setTeamId] = useState('');
+  const [requestType, setRequestType] = useState<'' | LeaveRequestType>('');
+  const [delayStatus, setDelayStatus] = useState<'' | LeaveGovernanceDelayStatus>('');
+  const [startDateFrom, setStartDateFrom] = useState('');
+  const [startDateTo, setStartDateTo] = useState('');
+  const [search, setSearch] = useState('');
+  const [includeInactive, setIncludeInactive] = useState(false);
+
+  // أيّ تغيير في الفلاتر يُعيد الترقيم للصفحة الأولى (يمنع صفحة فارغة بعد التضييق).
+  function withReset<T>(setter: (v: T) => void) {
+    return (v: T) => {
+      setter(v);
+      setPage(1);
+    };
+  }
+
+  const qs = new URLSearchParams();
+  qs.set('page', String(page));
+  qs.set('pageSize', String(GOVERNANCE_PAGE_SIZE));
+  if (teamLeaderId) qs.set('teamLeaderId', teamLeaderId);
+  if (departmentId) qs.set('departmentId', departmentId);
+  if (teamId) qs.set('teamId', teamId);
+  if (requestType) qs.set('requestType', requestType);
+  if (delayStatus) qs.set('delayStatus', delayStatus);
+  if (startDateFrom) qs.set('startDateFrom', startDateFrom);
+  if (startDateTo) qs.set('startDateTo', startDateTo);
+  if (search.trim()) qs.set('search', search.trim());
+  if (includeInactive) qs.set('includeInactive', 'true');
+
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: [
+      'leave-governance-tl-pending',
+      page,
+      teamLeaderId,
+      departmentId,
+      teamId,
+      requestType,
+      delayStatus,
+      startDateFrom,
+      startDateTo,
+      search.trim(),
+      includeInactive,
+    ],
+    queryFn: async () =>
+      (await api.get<TeamLeaderPendingGovernanceResultDto>(
+        `/leave-requests/governance/team-leader-pending?${qs.toString()}`,
+      )).data,
+    // إبقاء النتيجة السابقة أثناء تغيير الفلاتر/الصفحة: تبقى الفلاتر ظاهرة بلا وميض شاشة تحميل.
+    placeholderData: (prev) => prev,
+  });
+
+  // مصدر خيارات الفلاتر (قائد الفريق/الإدارة/الفريق) = نفس مسار الحوكمة القرائيّ بلا فلاتر،
+  // كي لا نفتح سطح صلاحيات جديدًا على الدليل التنظيميّ.
+  const { data: optionsData } = useQuery({
+    queryKey: ['leave-governance-tl-pending-options'],
+    queryFn: async () =>
+      (await api.get<TeamLeaderPendingGovernanceResultDto>(
+        '/leave-requests/governance/team-leader-pending?page=1&pageSize=500&includeInactive=true',
+      )).data,
+  });
+
+  const options = useMemo(() => {
+    const src = optionsData?.items ?? [];
+    const leaders = new Map<string, string>();
+    const departments = new Map<string, string>();
+    const teams = new Map<string, string>();
+    for (const i of src) {
+      if (i.teamLeaderUserId) leaders.set(i.teamLeaderUserId, i.teamLeaderName ?? i.teamLeaderUserId);
+      if (i.departmentId) departments.set(i.departmentId, i.departmentName ?? i.departmentId);
+      if (i.teamId) teams.set(i.teamId, i.teamName ?? i.teamId);
+    }
+    const sort = (m: Map<string, string>) =>
+      [...m.entries()].sort((a, b) => a[1].localeCompare(b[1], 'ar'));
+    return { leaders: sort(leaders), departments: sort(departments), teams: sort(teams) };
+  }, [optionsData]);
+
+  if (isLoading) return <LoadingState label="يتم تحميل طابور الحوكمة…" />;
+  if (isError)
+    return (
+      <QueryError
+        onRetry={() => refetch()}
+        description="حدث خطأ أثناء جلب طابور الطلبات المعلّقة عند قادة الفرق. أعد المحاولة."
+      />
+    );
+
+  const c = data?.counters;
+  const items = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const pageCount = Math.max(1, Math.ceil(total / GOVERNANCE_PAGE_SIZE));
+
+  return (
+    <div className="space-y-4">
+      <Alert tone="navy">
+        عرض حوكمة قراءة-فقط على مستوى الشركة للطلبات العالقة عند خطوة قائد الفريق. لا يمنح هذا العرض أيّ سلطة
+        قرار — لا اعتماد ولا رفض ولا إعادة توجيه. للمتابعة والرصد فقط.
+      </Alert>
+
+      {c && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <CounterCard label="الإجمالي المعلّق" value={c.totalPending} tone="navy" />
+          <CounterCard label="يحتاج متابعة" value={c.attention} tone="gold" />
+          <CounterCard label="موعد الإجازة بدأ" value={c.critical} tone="gold" />
+          <CounterCard label="انتهت دون قرار" value={c.expiredUnresolved} tone="alert" />
+          <CounterCard label="بلا قائد فريق" value={c.missingTeamLeader} tone="alert" />
+          <CounterCard label="أقدم طلب (يوم)" value={c.oldestPendingDays} tone="muted" />
+        </div>
+      )}
+
+      <Card className="p-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Field label="قائد الفريق">
+            <Select value={teamLeaderId} onChange={(e) => withReset(setTeamLeaderId)(e.target.value)}>
+              <option value="">الكل</option>
+              {options.leaders.map(([id, name]) => (
+                <option key={id} value={id}>{name}</option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="الإدارة">
+            <Select value={departmentId} onChange={(e) => withReset(setDepartmentId)(e.target.value)}>
+              <option value="">الكل</option>
+              {options.departments.map(([id, name]) => (
+                <option key={id} value={id}>{name}</option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="الفريق">
+            <Select value={teamId} onChange={(e) => withReset(setTeamId)(e.target.value)}>
+              <option value="">الكل</option>
+              {options.teams.map(([id, name]) => (
+                <option key={id} value={id}>{name}</option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="النوع">
+            <Select
+              value={requestType}
+              onChange={(e) => withReset(setRequestType)(e.target.value as '' | LeaveRequestType)}
+            >
+              <option value="">الكل</option>
+              <option value="Leave">إجازة</option>
+              <option value="Permission">استئذان</option>
+            </Select>
+          </Field>
+          <Field label="تصنيف التأخّر">
+            <Select
+              value={delayStatus}
+              onChange={(e) => withReset(setDelayStatus)(e.target.value as '' | LeaveGovernanceDelayStatus)}
+            >
+              <option value="">الكل</option>
+              <option value="Pending">معلّق</option>
+              <option value="Attention">يحتاج متابعة</option>
+              <option value="Critical">موعد الإجازة بدأ</option>
+              <option value="ExpiredUnresolved">انتهت الإجازة دون قرار</option>
+            </Select>
+          </Field>
+          <Field label="بداية الإجازة من">
+            <Input type="date" value={startDateFrom} onChange={(e) => withReset(setStartDateFrom)(e.target.value)} />
+          </Field>
+          <Field label="بداية الإجازة إلى">
+            <Input type="date" value={startDateTo} onChange={(e) => withReset(setStartDateTo)(e.target.value)} />
+          </Field>
+          <Field label="بحث (اسم الموظّف / قائد الفريق)">
+            <Input value={search} onChange={(e) => withReset(setSearch)(e.target.value)} placeholder="اكتب للبحث…" />
+          </Field>
+          <Field label="خيارات">
+            <label className="flex items-center gap-2 py-2 text-sm text-ink-2">
+              <input
+                type="checkbox"
+                checked={includeInactive}
+                onChange={(e) => withReset(setIncludeInactive)(e.target.checked)}
+              />
+              تضمين غير النشطين
+            </label>
+          </Field>
+        </div>
+      </Card>
+
+      <Card className="overflow-x-auto p-0">
+        {items.length === 0 ? (
+          <div className="p-5">
+            <EmptyState
+              title="لا توجد طلبات معلّقة عند قادة الفرق"
+              description="لا توجد حاليًّا طلبات إجازة أو استئذان عالقة عند خطوة قائد الفريق مطابقة للفلاتر."
+            />
+          </div>
+        ) : (
+          <GovernanceTable items={items} onOpen={onOpen} />
+        )}
+      </Card>
+
+      {total > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="text-xs text-ink-2">
+            صفحة {page} من {pageCount} — إجمالي {total} طلبًا
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+              السابق
+            </Button>
+            <Button
+              variant="ghost"
+              disabled={page >= pageCount}
+              onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+            >
+              التالي
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CounterCard({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: 'navy' | 'gold' | 'alert' | 'muted';
+}) {
+  const toneCls: Record<typeof tone, string> = {
+    navy: 'text-navy',
+    gold: 'text-amber-600',
+    alert: 'text-red-600',
+    muted: 'text-ink-2',
+  };
+  return (
+    <Card className="p-3 text-center">
+      <div className={`text-2xl font-bold ${toneCls[tone]}`}>{value}</div>
+      <div className="mt-1 text-xs text-ink-2">{label}</div>
+    </Card>
+  );
+}
+
+function GovernanceTable({
+  items,
+  onOpen,
+}: {
+  items: TeamLeaderPendingGovernanceItemDto[];
+  onOpen: (id: string) => void;
+}) {
+  return (
+    <table className="w-full min-w-[900px] text-right text-sm">
+      <thead className="border-b border-line bg-offwhite text-xs text-ink-2">
+        <tr>
+          <th className="px-3 py-2.5 font-semibold">الموظّف</th>
+          <th className="px-3 py-2.5 font-semibold">قائد الفريق</th>
+          <th className="px-3 py-2.5 font-semibold">النوع</th>
+          <th className="px-3 py-2.5 font-semibold">المدّة</th>
+          <th className="px-3 py-2.5 font-semibold">التصنيف</th>
+          <th className="px-3 py-2.5 font-semibold">أيام الانتظار</th>
+          <th className="px-3 py-2.5 font-semibold">تاريخ التقديم</th>
+          <th className="px-3 py-2.5 font-semibold"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {items.map((i) => (
+          <tr key={i.requestId} className="border-b border-line last:border-0 hover:bg-offwhite">
+            <td className="px-3 py-2.5">
+              <Link
+                to={`/app/employee/${i.employeeUserId}`}
+                className="font-medium text-navy hover:text-orange-600 hover:underline"
+              >
+                {i.employeeName}
+              </Link>
+              {!i.isEmployeeActive && <span className="mr-2 text-xs text-red-600">(غير نشط)</span>}
+              {i.departmentName && <div className="text-xs text-ink-3">{i.departmentName}</div>}
+            </td>
+            <td className="px-3 py-2.5 text-ink-2">
+              {i.missingTeamLeaderAssignment ? (
+                <Badge tone="alert">لا يوجد قائد فريق محدّد</Badge>
+              ) : (
+                <>
+                  {i.teamLeaderUserId ? (
+                    <Link
+                      to={`/app/employee/${i.teamLeaderUserId}`}
+                      className="text-navy hover:text-orange-600 hover:underline"
+                    >
+                      {i.teamLeaderName ?? '—'}
+                    </Link>
+                  ) : (
+                    (i.teamLeaderName ?? '—')
+                  )}
+                  {!i.isTeamLeaderActive && <span className="mr-2 text-xs text-red-600">(غير نشط)</span>}
+                </>
+              )}
+            </td>
+            <td className="px-3 py-2.5 text-ink-2">{leaveTypeLabel[i.requestType]}</td>
+            <td className="px-3 py-2.5 text-ink-2">
+              {i.startDate === i.endDate ? formatDate(i.startDate) : `${formatDate(i.startDate)} — ${formatDate(i.endDate)}`}
+            </td>
+            <td className="px-3 py-2.5">
+              <Badge tone={leaveGovernanceDelayTone(i.delayStatus)}>{leaveGovernanceDelayLabel[i.delayStatus]}</Badge>
+            </td>
+            <td className="px-3 py-2.5 text-ink-2">{i.daysPending}</td>
+            <td className="px-3 py-2.5 text-ink-2">{formatDate(i.createdAtUtc)}</td>
+            <td className="px-3 py-2.5">
+              <div className="flex items-center justify-end gap-1">
+                <Button variant="ghost" onClick={() => onOpen(i.requestId)}>عرض</Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => { void navigator.clipboard?.writeText(i.requestId); }}
+                  title="نسخ معرّف الطلب"
+                >
+                  نسخ المعرّف
+                </Button>
+              </div>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 
@@ -450,36 +810,59 @@ function formatTime(t: string | null): string {
 }
 
 // ===== تفاصيل الطلب + الإجراءات حسب الخطوة الحالية =====
-function LeaveDetail({ id, onBack }: { id: string; onBack: () => void }) {
+function LeaveDetail({
+  id,
+  onBack,
+  readOnly = false,
+}: {
+  id: string;
+  onBack: () => void;
+  readOnly?: boolean;
+}) {
   const qc = useQueryClient();
+  const toast = useToast();
   const { user, hasAnyRole } = useAuth();
-  const canReview = hasAnyRole(...REVIEW_ROLES);
+  // في سياق الحوكمة (readOnly) لا سلطة مراجعة إطلاقًا مهما كان دور المستخدم.
+  const canReview = !readOnly && hasAnyRole(...REVIEW_ROLES);
   const [comment, setComment] = useState('');
-  const [err, setErr] = useState<string | null>(null);
 
   const { data: r, isLoading, isError, refetch } = useQuery({
     queryKey: ['leave-request', id],
     queryFn: async () => (await api.get<LeaveRequestDto>(`/leave-requests/${id}`)).data,
   });
 
-  const invalidate = () => {
-    void qc.invalidateQueries({ queryKey: ['leave-request', id] });
-    void qc.invalidateQueries({ queryKey: ['leave-requests-mine'] });
-    void qc.invalidateQueries({ queryKey: ['leave-requests-pending'] });
-  };
+  // يُعيد Promise حتى ننتظر اكتمال تحديث الكاش قبل الرجوع للقائمة (لا رجوع قبل تحديث البيانات).
+  const invalidate = () =>
+    Promise.all([
+      qc.invalidateQueries({ queryKey: ['leave-request', id] }),
+      qc.invalidateQueries({ queryKey: ['leave-requests-mine'] }),
+      qc.invalidateQueries({ queryKey: ['leave-requests-pending'] }),
+    ]);
 
   const cancel = useMutation({
     mutationFn: () => api.post(`/leave-requests/${id}/cancel`),
-    onSuccess: () => invalidate(),
-    onError: (e) => setErr(apiErrorMessage(e)),
+    // قرار نهائيّ: إبطال الكاش وانتظاره ⇒ Toast ⇒ بعد ~700ms رجوع تلقائيّ للقائمة.
+    onSuccess: async () => { await invalidate(); toast.success('✅ تم إلغاء الطلب'); setTimeout(onBack, POST_SUCCESS_NAV_DELAY_MS); },
+    onError: (e) => toast.error(approvalErrorMessage(e)),
   });
 
   // الإجراءات: path نسبي تحت /leave-requests/{id}/… ؛ الرفض/الإعادة يتطلّبان سببًا.
   const decide = useMutation({
     mutationFn: (vars: { path: string; needsReason: boolean }) =>
       api.post(`/leave-requests/${id}/${vars.path}`, vars.needsReason ? { reason: comment } : { comment: comment || null }),
-    onSuccess: () => { setComment(''); invalidate(); },
-    onError: (e) => setErr(apiErrorMessage(e)),
+    onSuccess: async (_data, vars) => {
+      const msg = vars.path === 'return'
+        ? '✅ تم إرجاع الطلب للتعديل'
+        : vars.path.endsWith('reject')
+          ? '✅ تم رفض الطلب'
+          : '✅ تم اعتماد الطلب';
+      setComment('');
+      // قرار نهائيّ: تحديث الكاش أولًا ⇒ Toast ⇒ رجوع تلقائيّ بعد ~700ms.
+      await invalidate();
+      toast.success(msg);
+      setTimeout(onBack, POST_SUCCESS_NAV_DELAY_MS);
+    },
+    onError: (e) => toast.error(approvalErrorMessage(e)),
   });
 
   if (isLoading) return <LoadingState label="يتم تحميل الطلب…" />;
@@ -520,8 +903,6 @@ function LeaveDetail({ id, onBack }: { id: string; onBack: () => void }) {
         {' · '}
         قُدّم {formatDate(r.createdAtUtc)}
       </p>
-
-      {err && <Alert tone="alert">{err}</Alert>}
 
       <Card>
         <h2 className="mb-3 font-semibold text-navy">تفاصيل الطلب</h2>
@@ -616,12 +997,12 @@ function LeaveDetail({ id, onBack }: { id: string; onBack: () => void }) {
         <Alert tone="gold">لا يمكنك اعتماد طلبك الشخصي. سيتولّى المراجعة المعتمِدون وفق المسار أعلاه.</Alert>
       )}
 
-      {/* إلغاء الطلب — للمالك قبل الاعتماد النهائي. */}
-      {isOwner && r.canCancel && (
+      {/* إلغاء الطلب — للمالك قبل الاعتماد النهائي. مُستبعَد كليًّا في سياق الحوكمة (قراءة-فقط). */}
+      {!readOnly && isOwner && r.canCancel && (
         <Card>
           <h2 className="mb-2 font-semibold text-navy">إلغاء الطلب</h2>
           <p className="mb-3 text-sm text-ink-2">يمكنك إلغاء طلبك ما دام لم يُعتمَد نهائيًّا.</p>
-          <Button variant="danger" disabled={cancel.isPending} onClick={() => { setErr(null); cancel.mutate(); }}>
+          <Button variant="danger" loading={cancel.isPending} disabled={cancel.isPending} onClick={() => { if (cancel.isPending) return; cancel.mutate(); }}>
             إلغاء الطلب
           </Button>
         </Card>
@@ -640,16 +1021,18 @@ function LeaveDetail({ id, onBack }: { id: string; onBack: () => void }) {
             {showReview && reviewStep && (
               <>
                 <Button
+                  loading={decide.isPending}
                   disabled={decide.isPending}
-                  onClick={() => { setErr(null); decide.mutate({ path: reviewStep.approve, needsReason: false }); }}
+                  onClick={() => { if (decide.isPending) return; decide.mutate({ path: reviewStep.approve, needsReason: false }); }}
                 >
                   اعتماد
                 </Button>
                 <Button
                   variant="danger"
+                  loading={decide.isPending}
                   disabled={decide.isPending || !comment.trim()}
                   title={!comment.trim() ? 'اكتب سبب الرفض أولًا' : undefined}
-                  onClick={() => { setErr(null); decide.mutate({ path: reviewStep.reject, needsReason: true }); }}
+                  onClick={() => { if (decide.isPending) return; decide.mutate({ path: reviewStep.reject, needsReason: true }); }}
                 >
                   رفض
                 </Button>
@@ -658,9 +1041,10 @@ function LeaveDetail({ id, onBack }: { id: string; onBack: () => void }) {
             {canReturn && (
               <Button
                 variant="ghost"
+                loading={decide.isPending}
                 disabled={decide.isPending || !comment.trim()}
                 title={!comment.trim() ? 'اكتب سبب الإعادة أولًا' : undefined}
-                onClick={() => { setErr(null); decide.mutate({ path: 'return', needsReason: true }); }}
+                onClick={() => { if (decide.isPending) return; decide.mutate({ path: 'return', needsReason: true }); }}
               >
                 إعادة للتعديل
               </Button>

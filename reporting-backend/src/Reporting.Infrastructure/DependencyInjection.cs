@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Reporting.Application.AccountPortfolio;
+using Reporting.Application.Archive;
 using Reporting.Application.Auth;
 using Reporting.Application.Audit;
 using Reporting.Application.Calendar;
@@ -18,8 +19,8 @@ using Reporting.Application.Governance;
 using Reporting.Application.Kpi;
 using Reporting.Application.Leave;
 using Reporting.Application.Notifications;
-using Reporting.Application.Payroll;
 using Reporting.Application.Positions;
+using Reporting.Application.Payroll;
 using Reporting.Application.Reports;
 using Reporting.Application.Submissions;
 using Reporting.Application.Templates;
@@ -57,8 +58,10 @@ public static class DependencyInjection
         services.Configure<FileStorageOptions>(configuration.GetSection(FileStorageOptions.SectionName));
         services.Configure<EmailNotificationOptions>(configuration.GetSection(EmailNotificationOptions.SectionName));
         services.Configure<AppOptions>(configuration.GetSection(AppOptions.SectionName));
+        services.Configure<ReportReminderSchedulerOptions>(configuration.GetSection(ReportReminderSchedulerOptions.SectionName));
 
         services.AddHttpContextAccessor();
+        services.AddSingleton<ISystemClock, SystemClock>();
         services.AddScoped<ICurrentUser, CurrentUser>();
         services.AddScoped<IScopeResolver, ScopeResolver>();
         services.AddScoped<ITokenService, TokenService>();
@@ -72,8 +75,10 @@ public static class DependencyInjection
         services.AddScoped<IEmailSender, MailKitEmailSender>();
         services.AddScoped<IEmailNotificationService, EmailNotificationService>();
         services.AddScoped<IEmailControlService, EmailControlService>();
+        services.AddScoped<IEmailControlStatusService, EmailControlStatusService>();
         services.AddHostedService<EmailOutboxDispatcher>();
         services.AddHostedService<SubmissionReminderService>();
+        services.AddHostedService<ReportReminderSchedulerService>();
         services.AddScoped<IAuditService, AuditService>();
         services.AddScoped<IReportingService, ReportingService>();
         services.AddScoped<IReportingAggregationService, ReportingAggregationService>();
@@ -88,6 +93,7 @@ public static class DependencyInjection
         services.AddScoped<IGovernanceActionItemService, GovernanceActionItemService>();
         services.AddScoped<IManagementNoteService, ManagementNoteService>();
         services.AddScoped<ILeaveRequestService, LeaveRequestService>();
+        services.AddScoped<ILeaveBalanceLifecycleService, LeaveBalanceLifecycleService>();
         services.AddScoped<IBalanceService, BalanceService>();
         services.AddScoped<IEmployeeServiceRequestService, EmployeeServiceRequestService>();
         services.AddScoped<IDevelopmentService, DevelopmentService>();
@@ -95,6 +101,9 @@ public static class DependencyInjection
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<IExecutiveDashboardService, ExecutiveDashboardService>();
         services.AddScoped<IReportCalendarService, ReportCalendarService>();
+        services.AddScoped<IReportingCalendarCycleService, ReportingCalendarCycleService>();
+        services.AddScoped<IUnifiedReportStatusService, UnifiedReportStatusService>();
+        services.AddScoped<IExpectedSubmissionStatusResolver, ExpectedSubmissionStatusResolver>();
         services.AddScoped<IClientProjectAccess, ClientProjectAccess>();
         services.AddScoped<IClientService, ClientService>();
         services.AddScoped<IClientContactService, ClientContactService>();
@@ -112,6 +121,7 @@ public static class DependencyInjection
         services.AddScoped<IWorkstreamDeliverableService, WorkstreamDeliverableService>();
         services.AddScoped<IPositionService, PositionService>();
         services.AddScoped<IPayrollImpactService, PayrollImpactService>();
+        services.AddScoped<IArchiveService, ArchiveService>();
         services.AddScoped<IAccountPortfolioService, AccountPortfolioService>();
         services.AddScoped<ICourseService, CourseService>();
         services.AddScoped<Application.Services.IServiceCatalogService, ServiceCatalogService>();

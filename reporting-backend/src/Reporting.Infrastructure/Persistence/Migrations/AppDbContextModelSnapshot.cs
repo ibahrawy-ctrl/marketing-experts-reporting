@@ -2123,7 +2123,8 @@ namespace Reporting.Infrastructure.Persistence.Migrations
                     b.HasIndex("SubjectUserId");
 
                     b.HasIndex("KpiTemplateVersionId", "SubjectUserId", "PeriodKey")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"IsDeleted\" = false");
 
                     b.ToTable("kpi_evaluations", (string)null);
                 });
@@ -4204,6 +4205,9 @@ namespace Reporting.Infrastructure.Persistence.Migrations
                     b.Property<int>("AccessFailedCount")
                         .HasColumnType("integer");
 
+                    b.Property<bool>("BypassTeamLeaderApproval")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .HasColumnType("text");
@@ -4229,6 +4233,9 @@ namespace Reporting.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<Guid?>("JobRoleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("KpiReviewerOverrideUserId")
                         .HasColumnType("uuid");
 
                     b.Property<bool>("LockoutEnabled")
@@ -4257,6 +4264,9 @@ namespace Reporting.Infrastructure.Persistence.Migrations
                     b.Property<bool>("PhoneNumberConfirmed")
                         .HasColumnType("boolean");
 
+                    b.Property<Guid?>("ReportApproverOverrideUserId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("text");
 
@@ -4272,12 +4282,16 @@ namespace Reporting.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("KpiReviewerOverrideUserId");
+
                     b.HasIndex("NormalizedEmail")
                         .HasDatabaseName("EmailIndex");
 
                     b.HasIndex("NormalizedUserName")
                         .IsUnique()
                         .HasDatabaseName("UserNameIndex");
+
+                    b.HasIndex("ReportApproverOverrideUserId");
 
                     b.ToTable("AspNetUsers", (string)null);
                 });
@@ -4778,6 +4792,19 @@ namespace Reporting.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("ReportTemplateVersion");
+                });
+
+            modelBuilder.Entity("Reporting.Infrastructure.Identity.ApplicationUser", b =>
+                {
+                    b.HasOne("Reporting.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("KpiReviewerOverrideUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Reporting.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("ReportApproverOverrideUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Reporting.Domain.Entities.Clients.Client", b =>

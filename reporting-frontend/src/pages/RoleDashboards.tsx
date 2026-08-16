@@ -27,6 +27,8 @@ import {
   improvementPlanStatusLabel,
   trainingNeedStatusLabel,
 } from '../lib/format';
+import { useReportingCalendar } from '../lib/useReportingCalendar';
+import { selectBannerCycleUnified, unifiedEmployeeBanner, unifiedUrgency } from '../lib/unifiedBanner';
 import type {
   DashboardDto,
   SummaryCardDto,
@@ -255,7 +257,16 @@ function PendingApprovalsCard({ items }: { items?: SubmissionListItem[] }) {
   );
 }
 
-// تقارير تحتاج إجراء (مسودة/معادة/مصعّدة) ضمن النطاق.
+// خريطة شدّة الحالة (من مصدر الحقيقة) إلى نغمة الشارة — لا حساب محليّ للحالة.
+const severityTone: Record<string, 'navy' | 'gold' | 'alert' | 'success' | 'muted'> = {
+  info: 'navy',
+  warn: 'gold',
+  alert: 'alert',
+  success: 'success',
+  none: 'muted',
+};
+
+// تقارير تحتاج إجراء (غير مُبتدأة/مسودة/معادة/مصعّدة) ضمن النطاق — Users-first.
 function PendingReportsCard({ items, title = 'تقارير متأخرة / تحتاج إجراء' }: { items?: PendingReportDto[]; title?: string }) {
   return (
     <Card>
@@ -266,10 +277,10 @@ function PendingReportsCard({ items, title = 'تقارير متأخرة / تحت
         <ul>
           {items.slice(0, 8).map((p) => (
             <ActionItem
-              key={p.submissionId}
+              key={p.submissionId ?? `${p.submitterId}-${p.periodKey}`}
               title={p.templateTitle}
               context={`${p.submitterName} · ${p.periodKey}`}
-              badge={<Badge tone="gold">{submissionStatusLabel[p.status]}</Badge>}
+              badge={<Badge tone={severityTone[p.severity] ?? 'gold'}>{p.statusLabel}</Badge>}
             />
           ))}
         </ul>
@@ -1424,26 +1435,45 @@ export function EmployeeDashboard({ dash, kpiDelta }: { dash: DashboardDto; kpiD
   const { data: mine } = useMine(true);
   const { data: plans } = usePlans(true);
   const { data: training } = useTraining(true);
+  // REPORTING-CYCLE-SUBMISSION-STATUS-CONSISTENCY-R1 — مصدر الحالة الوحيد للّافتة = الحقل الموحّد الخادميّ.
+  // نقرأ دورات الموظّف (past محدود) لنلتقط دورةً ماضيةً «متأخّرة غير مُسلَّمة» قد لا يكون لها صفّ تسليم أصلًا،
+  // ثمّ نختار الدورة التي عيّنها الخادم «مطلوب إجراؤها الآن» (isCurrentPriority) بدل الاعتماد على mine[0].
+  const { data: cycles } = useReportingCalendar({ context: 'Report', past: 8, future: 1 });
   const cur = mine?.[0] ?? null;
   const status = cur?.status ?? null;
 
-  const banner = (() => {
+  const bannerUnified = selectBannerCycleUnified(cycles?.cycles);
+  // نستعمل المسار الموحّد فقط حين يكون الموظّف مُسنَدًا وحالته ليست «غير مطلوب» — وإلّا نرجع للمسار القديم
+  // (يحمي مُقدّمي التقارير اليوميّة الذين لا يستهلكون my-cycles، فلا انحدار في سلوكهم).
+  const useUnified =
+    !!bannerUnified &&
+    bannerUnified.unifiedStatus !== 'NotAssigned' &&
+    bannerUnified.unifiedStatus !== 'NotRequired';
+
+  const legacyBanner = (() => {
     if (!cur || status === 'Draft')
-      return { title: 'تقريرك مطلوب الآن', desc: cur ? 'لديك مسودة غير مكتملة — أكملها وأرسلها للاعتماد.' : `تقرير ${dash.period.label} بانتظار البدء.`, cta: 'ابدأ / أكمل التقرير', t: 'orange' as const };
+      return { title: 'تقريرك مطلوب الآن', desc: cur ? 'لديك مسودة غير مكتملة — أكملها وأرسلها للاعتماد.' : `تقرير ${dash.period.label} بانتظار البدء.`, cta: 'ابدأ / أكمل التقرير', t: 'orange' as const, to: '/app/submissions' };
     if (status === 'Returned')
-      return { title: 'تقريرك أُعيد للتعديل', desc: 'راجع ملاحظات مديرك وعدّل التقرير ثم أعد إرساله.', cta: 'عدّل الآن', t: 'orange' as const };
+      return { title: 'تقريرك أُعيد للتعديل', desc: 'راجع ملاحظات مديرك وعدّل التقرير ثم أعد إرساله.', cta: 'عدّل الآن', t: 'orange' as const, to: '/app/submissions' };
     if (status === 'Closed' || status === 'Visible')
-      return { title: 'تم اعتماد تقريرك بالكامل', desc: 'اكتملت سلسلة الاعتماد حتى الإدارة العليا.', cta: 'عرض التقرير', t: 'success' as const };
-    return { title: 'تم إرسال تقريرك', desc: 'تقريرك قيد المراجعة في سلسلة الاعتماد.', cta: 'متابعة الحالة', t: 'navy' as const };
+      return { title: 'تم اعتماد تقريرك بالكامل', desc: 'اكتملت سلسلة الاعتماد حتى الإدارة العليا.', cta: 'عرض التقرير', t: 'success' as const, to: '/app/submissions' };
+    return { title: 'تم إرسال تقريرك', desc: 'تقريرك قيد المراجعة في سلسلة الاعتماد.', cta: 'متابعة الحالة', t: 'navy' as const, to: '/app/submissions' };
   })();
 
+  const banner = useUnified
+    ? (() => { const b = unifiedEmployeeBanner(bannerUnified!); return { title: b.title, desc: b.description, cta: b.cta, t: b.tone, to: b.to }; })()
+    : legacyBanner;
+
   const actions: NeedsActionEntry[] = [];
-  if (!cur)
+  if (useUnified && bannerUnified!.isCurrentPriority) {
+    const b = unifiedEmployeeBanner(bannerUnified!);
+    actions.push({ id: `cycle-${bannerUnified!.periodKey}`, title: b.title, context: bannerUnified!.statusDescription || bannerUnified!.cycleLabel, urgency: unifiedUrgency(bannerUnified!.severity), to: b.to, cta: b.cta });
+  } else if (!useUnified && !cur)
     actions.push({ id: 'start', title: `ابدأ تقرير ${dash.period.label}`, context: 'لم تبدأ تقرير هذه الفترة بعد', urgency: 'high', to: '/app/submissions', cta: 'ابدأ' });
-  else if (status === 'Draft')
-    actions.push({ id: 'draft', title: 'أكمل مسودة تقريرك وأرسلها', context: 'لديك مسودة غير مكتملة', urgency: 'high', to: `/app/submissions?open=${cur.id}`, cta: 'أكمل' });
-  else if (status === 'Returned')
-    actions.push({ id: 'returned', title: 'تقريرك أُعيد للتعديل', context: 'راجع ملاحظة المعتمِد وعدّل ثم أعد الإرسال', urgency: 'high', to: `/app/submissions?open=${cur.id}`, cta: 'عدّل' });
+  else if (!useUnified && status === 'Draft')
+    actions.push({ id: 'draft', title: 'أكمل مسودة تقريرك وأرسلها', context: 'لديك مسودة غير مكتملة', urgency: 'high', to: `/app/submissions?open=${cur!.id}`, cta: 'أكمل' });
+  else if (!useUnified && status === 'Returned')
+    actions.push({ id: 'returned', title: 'تقريرك أُعيد للتعديل', context: 'راجع ملاحظة المعتمِد وعدّل ثم أعد الإرسال', urgency: 'high', to: `/app/submissions?open=${cur!.id}`, cta: 'عدّل' });
   (plans ?? [])
     .filter((p) => p.status === 'Open' || p.status === 'InProgress')
     .slice(0, 3)
@@ -1456,7 +1486,7 @@ export function EmployeeDashboard({ dash, kpiDelta }: { dash: DashboardDto; kpiD
   return (
     <div className="space-y-6">
       <ActionBanner title={banner.title} description={banner.desc} tone={banner.t}
-        cta={<Link to="/app/submissions"><Button variant="inverted">{banner.cta}</Button></Link>} />
+        cta={<Link to={banner.to}><Button variant="inverted">{banner.cta}</Button></Link>} />
 
       <NeedsActionPanel
         items={actions}
@@ -1521,7 +1551,7 @@ export function TeamLeaderDashboard({ dash }: { dash: DashboardDto }) {
   (escal ?? []).filter((e) => e.status === 'Open').slice(0, 3).forEach((e) =>
     actions.push({ id: `esc-${e.id}`, title: `تصعيد مفتوح: ${e.reason}`, context: e.targetName ?? '—', urgency: 'high', to: '/app/governance', cta: 'معالجة' }));
   (pending ?? []).slice(0, 4).forEach((p) =>
-    actions.push({ id: `late-${p.submissionId}`, title: `تقرير متأخر/مُعاد: ${p.templateTitle}`, context: `${p.submitterName} · ${submissionStatusLabel[p.status]}`, urgency: 'medium', to: '/app/submissions?tab=all', cta: 'متابعة' }));
+    actions.push({ id: `late-${p.submissionId ?? `${p.submitterId}-${p.periodKey}`}`, title: `تقرير متأخر/مُعاد: ${p.templateTitle}`, context: `${p.submitterName} · ${p.statusLabel}`, urgency: 'medium', to: '/app/submissions?tab=all', cta: 'متابعة' }));
   (members ?? []).filter(supportNeeded).slice(0, 3).forEach((m) =>
     actions.push({ id: `sup-${m.userId}`, title: `عضو يحتاج دعمًا: ${m.name}`, context: m.kpiAverage != null ? `متوسط KPI ${m.kpiAverage}${m.kpiTrend === 'Down' ? ' · اتجاه هابط' : ''}` : 'اتجاه هابط', urgency: 'medium', to: '/app/development', cta: 'خطة' }));
 
@@ -1593,7 +1623,7 @@ export function ManagerDashboard({ dash }: { dash: DashboardDto }) {
   if ((kpi?.belowTarget ?? 0) > 0)
     actions.push({ id: 'below', title: `${kpi!.belowTarget} موظف دون المستهدف KPI`, context: 'راجع التقييمات وافتح خطط تحسين', urgency: 'medium', to: '/app/kpi', cta: 'المؤشرات' });
   (pending ?? []).slice(0, 4).forEach((p) =>
-    actions.push({ id: `late-${p.submissionId}`, title: `تقرير متأخر/مُعاد: ${p.templateTitle}`, context: `${p.submitterName} · ${submissionStatusLabel[p.status]}`, urgency: 'medium', to: '/app/submissions?tab=all', cta: 'متابعة' }));
+    actions.push({ id: `late-${p.submissionId ?? `${p.submitterId}-${p.periodKey}`}`, title: `تقرير متأخر/مُعاد: ${p.templateTitle}`, context: `${p.submitterName} · ${p.statusLabel}`, urgency: 'medium', to: '/app/submissions?tab=all', cta: 'متابعة' }));
   (members ?? []).filter(supportNeeded).slice(0, 2).forEach((m) =>
     actions.push({ id: `sup-${m.userId}`, title: `عضو يحتاج دعمًا: ${m.name}`, context: m.kpiAverage != null ? `متوسط KPI ${m.kpiAverage}` : 'اتجاه هابط', urgency: 'low', to: '/app/development', cta: 'خطة' }));
 
@@ -1828,7 +1858,7 @@ export function CeoSupportDashboard({ dash }: { dash: DashboardDto }) {
 
   const actions: NeedsActionEntry[] = [];
   (pending ?? []).slice(0, 12).forEach((p) =>
-    actions.push({ id: `pend-${p.submissionId}`, title: `متابعة: ${p.templateTitle}`, context: `${p.submitterName} · ${p.periodKey} · ${submissionStatusLabel[p.status]}`, urgency: 'medium', to: `/app/submissions?open=${p.submissionId}`, cta: 'تابعي' }),
+    actions.push({ id: `pend-${p.submissionId ?? `${p.submitterId}-${p.periodKey}`}`, title: `متابعة: ${p.templateTitle}`, context: `${p.submitterName} · ${p.periodKey} · ${p.statusLabel}`, urgency: 'medium', to: p.submissionId ? `/app/submissions?open=${p.submissionId}` : '/app/submissions?tab=all', cta: 'تابعي' }),
   );
   if (rate < 95)
     actions.push({ id: 'week-incomplete', title: `صورة الأسبوع غير مكتملة (${rate}٪)`, context: `${comp?.pending ?? 0} تقرير قيد الانتظار من ${comp?.total ?? 0}`, urgency: 'low', to: '/app/reports', cta: 'تجهيز الملخّص' });

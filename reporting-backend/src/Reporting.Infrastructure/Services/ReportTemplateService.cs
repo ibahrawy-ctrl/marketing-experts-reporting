@@ -194,6 +194,18 @@ public class ReportTemplateService : IReportTemplateService
         var ids = metas.Select(m => m.Id).ToList();
         var assignments = await LoadActiveAssignmentsAsync(ids, ct);
 
+        return ResolveAssignedTemplateIds(scopes, metas, assignments);
+    }
+
+    /// <summary>
+    /// اللبّ الحسابيّ (في الذاكرة، بلا وصول لقاعدة البيانات) لحلّ القوالب المُسنَدة لمستخدم واحد
+    /// انطلاقًا من نطاقاته + بيانات القوالب + الإسنادات النشطة المُحمَّلة مسبقًا. مصدر واحد للحقيقة
+    /// يستخدمه المسار الفرديّ والمُجمَّع معًا، فيبقى منطق الأخصّية/الاستثناء/الاحتياط متطابقًا حرفيًّا.
+    /// </summary>
+    private static List<Guid> ResolveAssignedTemplateIds(
+        UserScopes scopes, IReadOnlyList<TemplateMeta> metas,
+        HashSet<(Guid, TemplateAssignmentScope, Guid, TemplateAssignmentKind)> assignments)
+    {
         var included = new List<(TemplateMeta Meta, MatchTier Tier)>();
         foreach (var m in metas)
         {
@@ -223,6 +235,35 @@ public class ReportTemplateService : IReportTemplateService
             allowed.AddRange(grp.Where(x => x.Tier == minTier).Select(x => x.Meta.Id));
         }
         return allowed.Distinct().ToList();
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyDictionary<Guid, IReadOnlyCollection<Guid>>> ResolveAssignedTemplatesForUsersAsync(
+        IReadOnlyCollection<Guid> userIds, CancellationToken ct = default)
+    {
+        var result = new Dictionary<Guid, IReadOnlyCollection<Guid>>();
+        var ids = userIds.Distinct().ToList();
+        if (ids.Count == 0) return result;
+
+        // عدد استعلامات ثابت (3) مهما بلغ عدد المستخدمين: النطاقات + بيانات القوالب + الإسنادات.
+        var users = await _db.Users.AsNoTracking()
+            .Where(x => ids.Contains(x.Id))
+            .Select(x => new { x.Id, x.JobRoleId, x.TeamId, x.DepartmentId })
+            .ToListAsync(ct);
+
+        var metas = await _db.ReportTemplates.AsNoTracking()
+            .Where(t => t.Status == TemplateStatus.Published && t.IsActive)
+            .Select(t => new TemplateMeta(t.Id, t.JobRoleId, t.Classification, t.DefaultPeriodType))
+            .ToListAsync(ct);
+
+        var assignments = await LoadActiveAssignmentsAsync(metas.Select(m => m.Id).ToList(), ct);
+
+        foreach (var u in users)
+        {
+            var scopes = new UserScopes(u.Id, u.JobRoleId, u.TeamId, u.DepartmentId);
+            result[u.Id] = ResolveAssignedTemplateIds(scopes, metas, assignments);
+        }
+        return result;
     }
 
     /// <summary>

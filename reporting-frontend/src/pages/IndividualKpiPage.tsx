@@ -55,14 +55,14 @@ interface AggSpec {
   to?: string;
 }
 
-// ===== أدوات التاريخ (UTC، أسبوع تشغيليّ الخميس→الأربعاء مطابق ReportCalendarPolicy) =====
+// ===== أدوات التاريخ (UTC، دورة التقارير السبت→الجمعة مطابقة ReportingCalendarPolicy) =====
 const DAY_MS = 86_400_000;
 function addDays(d: Date, n: number): Date {
   return new Date(d.getTime() + n * DAY_MS);
 }
-function operationalThursday(date: Date): Date {
+function cycleSaturday(date: Date): Date {
   const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-  const diff = (d.getUTCDay() - 4 + 7) % 7; // Thursday = 4
+  const diff = (d.getUTCDay() - 6 + 7) % 7; // Saturday = 6
   return addDays(d, -diff);
 }
 function isoDate(d: Date): string {
@@ -77,12 +77,12 @@ function parseIso(s: string): Date {
   return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
 }
 
-// مدى آخر N أسابيع تشغيلية شاملًا الأسبوع الحالي: [خميس البداية, أربعاء النهاية].
+// مدى آخر N دورات شاملًا الدورة الحالية: [سبت البداية, جمعة النهاية].
 function lastNWeeksRange(n: number, anchor: Date): { from: string; to: string } {
-  const curThu = operationalThursday(anchor);
-  const startThu = addDays(curThu, -(n - 1) * 7);
-  const endWed = addDays(curThu, 6);
-  return { from: isoDate(startThu), to: isoDate(endWed) };
+  const curSat = cycleSaturday(anchor);
+  const startSat = addDays(curSat, -(n - 1) * 7);
+  const endFri = addDays(curSat, 6);
+  return { from: isoDate(startSat), to: isoDate(endFri) };
 }
 
 // طلب الفترة الحالية حسب المرشّح.
@@ -141,13 +141,13 @@ function previousSpec(filter: PeriodFilter, from: string, to: string): AggSpec |
     }
   }
 }
-// الـ N أسابيع التي تسبق نافذة «آخر N أسابيع» الحالية مباشرة.
+// الـ N دورات التي تسبق نافذة «آخر N دورات» الحالية مباشرة.
 function shiftWeeks(n: number, anchor: Date): AggSpec {
-  const curThu = operationalThursday(anchor);
-  const curFromThu = addDays(curThu, -(n - 1) * 7);
-  const prevToWed = addDays(curFromThu, -1);
-  const prevFromThu = addDays(curFromThu, -n * 7);
-  return { granularity: 'Custom', from: isoDate(prevFromThu), to: isoDate(prevToWed) };
+  const curSat = cycleSaturday(anchor);
+  const curFromSat = addDays(curSat, -(n - 1) * 7);
+  const prevToFri = addDays(curFromSat, -1);
+  const prevFromSat = addDays(curFromSat, -n * 7);
+  return { granularity: 'Custom', from: isoDate(prevFromSat), to: isoDate(prevToFri) };
 }
 
 // معاملات الاستعلام لطلب /kpi-evaluations/aggregate.

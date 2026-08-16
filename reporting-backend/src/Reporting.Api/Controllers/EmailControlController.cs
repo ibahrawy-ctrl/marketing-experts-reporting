@@ -13,8 +13,21 @@ namespace Reporting.Api.Controllers;
 public class EmailControlController : ApiControllerBase
 {
     private readonly IEmailControlService _service;
+    private readonly IEmailControlStatusService _status;
 
-    public EmailControlController(IEmailControlService service) => _service = service;
+    public EmailControlController(IEmailControlService service, IEmailControlStatusService status)
+    {
+        _service = service;
+        _status = status;
+    }
+
+    // ===== الحالة التشغيليّة الحيّة (EMAIL-CONTROL-CENTER-LIVE-MODE-STATUS-R1) =====
+    // قراءة فقط: بلا كتابة على القاعدة، بلا اتّصال SMTP، بلا استدعاء أيّ مهمّة مجدوَلة، وبلا أيّ سرّ.
+    // الصلاحية موروثة من سياسة المتحكّم EmailControlManage (الأدمن حصرًا) — بلا توسيع أدوار.
+
+    [HttpGet("status")]
+    public async Task<IActionResult> GetStatus(CancellationToken ct = default)
+        => Ok(await _status.GetStatusAsync(ct));
 
     // ===== القوالب =====
 

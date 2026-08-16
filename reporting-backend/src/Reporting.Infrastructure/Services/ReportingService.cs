@@ -536,17 +536,14 @@ public class ReportingService : IReportingService
     /// <summary>
     /// أيام التسليم اليومي المتوقَّعة داخل الأسبوع التشغيلي (الخميس → الأربعاء): أيام العمل فقط (تُستبعَد
     /// الجمعة والسبت عطلة نهاية الأسبوع السعودية)، حتى «اليوم» بتوقيت الرياض كحدّ أقصى (لا تُحتسب أيام مستقبلية).
+    /// وتُستبعَد أيضًا أيّ أيام قبل أرضيّة الإطلاق المنظّميّة (4 يوليو 2026) — لا توقّع يوميّ قبل الأرضيّة.
     /// </summary>
-    private static List<DateOnly> DailyExpectedDates(string weekKey, DateOnly today)
-    {
-        var (start, end) = ReportCalendarPolicy.WeekRange(weekKey);
-        var cap = today < end ? today : end;
-        var dates = new List<DateOnly>();
-        for (var d = start; d <= cap; d = d.AddDays(1))
-            if (d.DayOfWeek is not (DayOfWeek.Friday or DayOfWeek.Saturday))
-                dates.Add(d);
-        return dates;
-    }
+    // DAILY-BUSINESS-DAY-COMPLIANCE-R1 §4 + SALES-DAILY-SATURDAY-APPLICABILITY-HOTFIX-R1:
+    // يُفوَّض بالكامل إلى مصدر الحقيقة المركزيّ (ReportingCalendarPolicy.DailyExpectedDates = نافذة الدورة
+    // Sat→Fri + أرضيّة الإطلاق + الأحد→الخميس). المرشّحون اليوميّون كلهم **مبيعات** (Daily ⟺ SALES_B2B/B2C)
+    // ⇒ saturdayEnabled:true فيُدرَج السبت المتوقَّع ابتداءً من الأرضية 2026-07-25 (الجمعة تبقى محجوبة).
+    private static List<DateOnly> DailyExpectedDates(string cycleKey, DateOnly today) =>
+        ReportingCalendarPolicy.DailyExpectedDates(cycleKey, today, saturdayEnabled: true);
 
     /// <summary>
     /// تقييم التزام أسبوع تشغيلي واحد لمجموعة مرشّحين. الأسبوعي = وحدة متوقَّعة واحدة لكلّ مرشّح وفق موعد دوره
@@ -558,7 +555,20 @@ public class ReportingService : IReportingService
         if (candidates.Count == 0) return new List<ComplianceEval>();
 
         var today = ReportCalendarPolicy.RiyadhToday();
-        var weeklyCandidates = candidates.Where(c => c.Cadence != PeriodType.Daily).ToList();
+
+        // أرضيّة الانطباق الأسبوعيّة المركزيّة (WEEKLY-REPORTING-APPLICABILITY-FLOOR-R1): دورة أسبوعيّة تبدأ
+        // قبل أرضيّة الإطلاق المعتمَدة على مستوى المنظّمة (4 يوليو 2026 = بداية 2026-W28) غير مطلوبة إطلاقًا،
+        // فلا تُولِّد أيّ وحدة أسبوعيّة متوقَّعة (لا Expected/Missing/MissingOverdue ولا مقام التزام ولا تخفيض نسبة).
+        // مصدر واحد مركزيّ = ApplicabilityFloorPolicy.WeeklyReportingLaunchFloor (نفس ثابت المستهلكات الأخرى).
+        // يُطبَّق على المرشّحين الأسبوعيّين هنا؛ واليوميّ (مبيعات) مبوَّب بنفس الأرضيّة المنظّميّة داخل
+        // DailyExpectedDates (DAILY-REPORTING-APPLICABILITY-R1) — لا يوم يوميّ متوقَّع قبل 4 يوليو 2026.
+        var weekStart = ReportCalendarPolicy.WeekRange(key).Start;
+        var weeklyApplicable = ApplicabilityFloorPolicy.IsCycleApplicable(
+            weekStart, ApplicabilityFloorPolicy.WeeklyReportingLaunchFloor);
+
+        var weeklyCandidates = weeklyApplicable
+            ? candidates.Where(c => c.Cadence != PeriodType.Daily).ToList()
+            : new List<ComplianceCandidate>();
         var dailyCandidates = candidates.Where(c => c.Cadence == PeriodType.Daily).ToList();
         var evals = new List<ComplianceEval>(candidates.Count);
 
@@ -601,24 +611,30 @@ public class ReportingService : IReportingService
             if (dates.Count > 0)
             {
                 var dailyIds = dailyCandidates.Select(c => c.UserId).ToList();
-                var dateKeys = dates.Select(d => d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)).ToList();
+                var (winStart, winEnd) = ReportingCalendarPolicy.CycleRange(key); // نافذة الدورة اليوميّة Sat→Fri
 
+                // DAILY-…-R1 §3: تحميل عريض بلا فلترة نصّية قياسيّة (كي لا تسقط المفاتيح القديمة مثل 6-7-2026)
+                // ثم تطبيع كلّ مفتاح إلى اليوم المنطقيّ داخل نافذة الأسبوع، والمطابقة على (المستخدم، اليوم المنطقيّ).
                 var dailyRows = await _db.ReportSubmissions.AsNoTracking()
-                    .Where(s => s.PeriodType == PeriodType.Daily && dateKeys.Contains(s.PeriodKey)
+                    .Where(s => s.PeriodType == PeriodType.Daily && s.PeriodKey != null
                                 && SubmittedStatuses.Contains(s.Status)
                                 && dailyIds.Contains(s.SubmitterId))
                     .Select(s => new { s.SubmitterId, s.PeriodKey, s.Status, s.SubmittedAtUtc })
                     .ToListAsync(ct);
 
                 var dailyByUserDay = dailyRows
-                    .GroupBy(s => (s.SubmitterId, s.PeriodKey))
+                    .Select(s => ReportingCalendarPolicy.TryCanonicalDay(s.PeriodKey, out var cd)
+                        ? new { s.SubmitterId, Day = cd, s.Status, s.SubmittedAtUtc, Ok = true }
+                        : new { s.SubmitterId, Day = default(DateOnly), s.Status, s.SubmittedAtUtc, Ok = false })
+                    .Where(x => x.Ok && x.Day >= winStart && x.Day <= winEnd)
+                    .GroupBy(s => (s.SubmitterId, DayKey: ReportingCalendarPolicy.DayKey(s.Day)))
                     .ToDictionary(g => g.Key, g => g.OrderBy(x => x.SubmittedAtUtc ?? DateTime.MaxValue).First());
 
                 foreach (var c in dailyCandidates)
                 {
                     foreach (var day in dates)
                     {
-                        var dayKey = day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+                        var dayKey = ReportingCalendarPolicy.DayKey(day);
                         // موعد التقرير اليومي = نهاية يومه؛ متأخّر إن سُلّم بعد ذلك اليوم.
                         if (dailyByUserDay.TryGetValue((c.UserId, dayKey), out var sub))
                         {

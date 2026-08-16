@@ -48,8 +48,13 @@ export function Button({
   children,
   variant = 'primary',
   className = '',
+  loading = false,
+  disabled,
   ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'ghost' | 'danger' | 'inverted' }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: 'primary' | 'ghost' | 'danger' | 'inverted';
+  loading?: boolean;
+}) {
   // ملاحظة: «inverted» = زر أبيض على خلفية ملوّنة (Hero Banner). يُعرّف هنا كـ variant نظيف
   // بدل تمرير className="bg-white text-navy" الذي كان يتعارض مع text-white الأساسي فيختفي النص.
   const styles =
@@ -60,11 +65,16 @@ export function Button({
         : variant === 'inverted'
           ? 'bg-white text-navy shadow-sm hover:bg-white/90'
           : 'bg-navy-50 text-navy hover:bg-navy-100';
+  // APPROVAL ACTION UX R1: عند loading نعطّل الزر ونُظهِر Spinner صغير مضمّن (حماية من النقر المزدوج).
   return (
     <button
-      className={`rounded-lg px-4 py-2 text-sm font-semibold transition disabled:opacity-50 ${styles} ${className}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:opacity-50 ${styles} ${className}`}
+      disabled={disabled || loading}
       {...rest}
     >
+      {loading && (
+        <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true" />
+      )}
       {children}
     </button>
   );

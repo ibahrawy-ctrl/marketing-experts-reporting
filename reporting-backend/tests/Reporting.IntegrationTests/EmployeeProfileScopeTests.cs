@@ -166,7 +166,7 @@ public class EmployeeProfileScopeTests
 
     // ===== مساعدون =====
 
-    private static async Task SubmitEvalAsync(HttpClient evaluator, Guid templateId, Guid manualId, Guid autoId,
+    private async Task SubmitEvalAsync(HttpClient evaluator, Guid templateId, Guid manualId, Guid autoId,
         Guid subjectId, string periodKey)
     {
         var ev = await (await evaluator.PostAsJsonAsync("/api/kpi-evaluations",
@@ -179,6 +179,9 @@ public class EmployeeProfileScopeTests
                 new KpiResultInput(autoId, 70m, null, null)
             }));
         await evaluator.PostAsync($"/api/kpi-evaluations/{ev.Id}/submit", null);
+        // اعتماد عبر مُصعَّد (CEO ليس المُقيّم ولا الموضوع) كي يظهر التقييم في ملخّص الملف (المعتمَد فقط).
+        var (ceo, _) = await TestAuth.CreateUserAsync(_factory, "CEO");
+        await ceo.PostAsync($"/api/kpi-evaluations/{ev.Id}/approve", null);
     }
 
     private static async Task<(Guid TemplateId, Guid ManualMetricId, Guid AutoMetricId)> PublishKpiAsync(HttpClient admin)

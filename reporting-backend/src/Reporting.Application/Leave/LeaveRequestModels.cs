@@ -119,3 +119,88 @@ public record TeamLeaderStuckRemediationResultDto(
     int MatchedCount,
     int RemediatedCount,
     IReadOnlyList<Guid> RemediatedRequestIds);
+
+// ===== LEAVE-TL-PENDING-GOVERNANCE-R1 — طابور الحوكمة «معلّقة عند قادة الفرق» (قراءة-فقط) =====
+// نموذج قراءة على مستوى الشركة يُظهِر طلبات الإجازة/الاستئذان العالقة عند خطوة قائد الفريق
+// (Status=Submitted، CurrentStep=TeamLeader). لا يمنح أيّ سلطة قرار ولا يكتب شيئًا (بلا اعتماد/رفض/
+// إعادة توجيه/تعديل/خصم/رصيد/إشعار). مستقلّ تمامًا عن GetPendingAsync (طابور اتخاذ القرار المُقيَّد بالنطاق).
+
+/// <summary>
+/// تصنيف تأخّر الطلب المعلّق عند قائد الفريق (حساب بتوقيت الرياض UTC+3 للعرض). لا يُخزَّن — مشتقّ عند القراءة:
+/// Pending = قبل تاريخ البداية وضمن عتبة المتابعة؛ Attention = قبل البداية لكن تجاوز عتبة المتابعة؛
+/// Critical = تاريخ البداية ≤ اليوم ≤ تاريخ النهاية والطلب ما زال Submitted/TeamLeader؛
+/// ExpiredUnresolved = تاريخ النهاية < اليوم والطلب ما زال Submitted/TeamLeader.
+/// </summary>
+public enum LeaveGovernanceDelayStatus
+{
+    Pending = 0,
+    Attention = 1,
+    Critical = 2,
+    ExpiredUnresolved = 3
+}
+
+/// <summary>صفّ حوكمة لطلب معلّق عند قائد الفريق — كل الحقول قراءة-فقط ومشتقّة.</summary>
+public record TeamLeaderPendingGovernanceItemDto(
+    Guid RequestId,
+    LeaveRequestType RequestType,
+    Guid EmployeeUserId,
+    string EmployeeName,
+    Guid? DepartmentId,
+    string? DepartmentName,
+    Guid? TeamId,
+    string? TeamName,
+    Guid? TeamLeaderUserId,
+    string? TeamLeaderName,
+    DateTime CreatedAtUtc,
+    DateOnly StartDate,
+    DateOnly EndDate,
+    int RequestedUnits,
+    LeaveRequestStatus CurrentStatus,
+    LeaveRequestStep CurrentStep,
+    string? LastEventType,
+    DateTime? LastEventAtUtc,
+    int DaysPending,
+    int DaysUntilStart,
+    bool StartedAlready,
+    bool EndedAlready,
+    LeaveGovernanceDelayStatus DelayStatus,
+    string DelayReason,
+    bool HasLedger,
+    int LedgerCount,
+    bool IsEmployeeActive,
+    bool IsTeamLeaderActive,
+    bool MissingTeamLeaderAssignment);
+
+/// <summary>عدّادات مُجمَّعة على مستوى المطابقة الكاملة (قبل الترقيم) لطابور الحوكمة.</summary>
+public record TeamLeaderPendingGovernanceCountersDto(
+    int TotalPending,
+    int Attention,
+    int Critical,
+    int ExpiredUnresolved,
+    int MissingTeamLeader,
+    int OldestPendingDays);
+
+/// <summary>نتيجة طابور الحوكمة: صفحة العناصر + الإجمالي + العدّادات.</summary>
+public record TeamLeaderPendingGovernanceResultDto(
+    IReadOnlyList<TeamLeaderPendingGovernanceItemDto> Items,
+    int Total,
+    int Page,
+    int PageSize,
+    TeamLeaderPendingGovernanceCountersDto Counters);
+
+/// <summary>
+/// معايير استعلام طابور الحوكمة (قراءة-فقط). كلّها اختيارية عدا الترقيم الافتراضيّ. الترتيب الافتراضيّ:
+/// ExpiredUnresolved ← Critical ← Attention ← Pending، ثمّ الأقدم فالأحدث ضمن كل تصنيف.
+/// </summary>
+public record TeamLeaderPendingGovernanceQuery(
+    int Page = 1,
+    int PageSize = 25,
+    Guid? TeamLeaderId = null,
+    Guid? DepartmentId = null,
+    Guid? TeamId = null,
+    LeaveRequestType? RequestType = null,
+    LeaveGovernanceDelayStatus? DelayStatus = null,
+    DateOnly? StartDateFrom = null,
+    DateOnly? StartDateTo = null,
+    string? Search = null,
+    bool IncludeInactive = false);

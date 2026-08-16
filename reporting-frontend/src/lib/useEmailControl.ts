@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './api';
 import type {
+  EmailControlCenterStatusDto,
   EmailTemplateDto,
   UpdateEmailTemplateRequest,
   EmailTemplatePreviewRequest,
@@ -14,7 +15,24 @@ import type {
 } from '../types/api';
 
 // مركز التحكم بالبريد (EMAIL-CONTROL-CENTER-R1) — قوالب/قواعد/معاينة مستقبِلين/تذكير يدويّ DryRun.
-// كلها للأدمن حصرًا عبر سياسة EmailControlManage خادميًّا. DryRun فقط — لا إرسال فعليّ.
+// كلها للأدمن حصرًا عبر سياسة EmailControlManage خادميًّا.
+// وضع الإرسال الفعليّ للنظام لا يُقرأ من هنا بل من useEmailControlStatus (المصدر: EmailNotifications:Mode).
+
+/**
+ * EMAIL-CONTROL-CENTER-LIVE-MODE-STATUS-R1 — الحالة التشغيليّة الحيّة لقناة البريد.
+ *
+ * قراءة فقط: لا كتابة، لا اتّصال SMTP، لا استدعاء لأيّ مهمّة مجدوَلة.
+ * بلا استقصاء دوريّ (refetchInterval غير مضبوط) — التحديث يدويّ عبر refetch أو عند العودة للنافذة.
+ * staleTime قصير (30 ثانية) كي لا تتكرّر الطلبات عند التنقّل بين التبويبات بلا داعٍ.
+ */
+export function useEmailControlStatus() {
+  return useQuery({
+    queryKey: ['email-control-status'],
+    queryFn: async () => (await api.get<EmailControlCenterStatusDto>('/email-control/status')).data,
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
+  });
+}
 
 export function useEmailTemplates() {
   return useQuery({

@@ -43,6 +43,16 @@ public class KpiEvaluationsController : ApiControllerBase
     public async Task<IActionResult> EvaluatableSubjects(CancellationToken ct)
         => FromResult(await _service.GetEvaluatableSubjectsAsync(ct));
 
+    // KPI-REVIEWER-OVERRIDE-R1 — بحث قرائيّ صرف عن تقييم قائم (بلا أيّ إنشاء أو تعديل).
+    [HttpGet("lookup")]
+    [Authorize(Policy = Policies.ManagementOnly)]
+    public async Task<IActionResult> Lookup(
+        [FromQuery] Guid subjectUserId, [FromQuery] string periodKey,
+        [FromQuery] Guid? kpiTemplateId, [FromQuery] Guid? kpiTemplateVersionId,
+        CancellationToken ct)
+        => FromResult(await _service.LookupAsync(
+            new KpiEvaluationLookupQuery(subjectUserId, periodKey, kpiTemplateId, kpiTemplateVersionId), ct));
+
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> Get(Guid id, CancellationToken ct)
         => FromResult(await _service.GetAsync(id, ct));

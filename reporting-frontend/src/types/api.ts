@@ -451,6 +451,66 @@ export interface SubmissionListItem {
   currentApproverId: string | null;
 }
 
+// ===== SUBMITTED-REPORTS-MISSING-EXPECTED-OVERDUE-R1 — العرض الموحّد لـ«كل التقارير» =====
+// نوع الصفّ: تسليم فعليّ قائم (ExistingSubmission) أو التزام متوقّع لم يُقدَّم (ExpectedMissingSubmission، بلا صفّ في القاعدة).
+export type SubmissionRowKind = 'ExistingSubmission' | 'ExpectedMissingSubmission';
+export type SubmissionQuickFilter =
+  | 'None'
+  | 'Overdue'
+  | 'NeedsAction'
+  | 'Returned'
+  | 'Closed'
+  | 'MineApproval';
+
+// صفّ موحّد. للصفّ المتوقّع غير المُقدَّم: submissionId=null، hasSubmission=false،
+// isExpectedSubmission=true، status="NotSubmitted"، currentApproverId=null، submittedAtUtc=null.
+export interface UnifiedSubmissionRow {
+  rowKind: SubmissionRowKind;
+  submissionId: string | null;
+  reportTemplateId: string | null;
+  templateTitle: string;
+  submitterId: string;
+  submitterName: string;
+  teamId: string | null;
+  teamName: string | null;
+  departmentId: string | null;
+  departmentName: string | null;
+  periodType: PeriodType;
+  periodKey: string;
+  status: SubmissionStatus | 'NotSubmitted';
+  statusLabel: string;
+  severity: string;
+  submittedAtUtc: string | null;
+  currentApproverId: string | null;
+  dueAt: string;
+  hasSubmission: boolean;
+  isExpectedSubmission: boolean;
+  isOverdue: boolean;
+  delayDays: number;
+}
+
+export interface UnifiedSubmissionSummary {
+  periodKey: string | null;
+  total: number;
+  overdueCount: number;
+  existingOverdueCount: number;
+  missingOverdueCount: number;
+  expectedMissingCount: number;
+  needsActionCount: number;
+  returnedCount: number;
+  closedCount: number;
+  waitingMyApprovalCount: number;
+  byStatus: { status: SubmissionStatus; count: number }[];
+}
+
+export interface UnifiedSubmissionOverview {
+  items: UnifiedSubmissionRow[];
+  summary: UnifiedSubmissionSummary;
+  page: number;
+  pageSize: number;
+  totalCount: number;
+}
+
 // ===== Governance =====
 export interface RiskDto {
   id: string;
@@ -847,8 +907,9 @@ export type FieldType =
   | 'ProjectRepeatableSection';
 
 export type TemplateStatus = 'Draft' | 'Published' | 'Archived';
-export type ApprovalStatus = 'Pending' | 'Approved' | 'Returned' | 'Escalated';
-export type KpiEvaluationStatus = 'Draft' | 'InProgress' | 'Submitted' | 'Approved' | 'Closed';
+export type ApprovalStatus = 'Pending' | 'Approved' | 'Returned' | 'Escalated' | 'CancelledByAdministrativeDeletion';
+// ADMIN-GOVERNANCE-R1: حالات مراجعة KPI الجديدة (UnderReview/NeedsRevision/Rejected). Submitted يبقى للتوافق مع القديم.
+export type KpiEvaluationStatus = 'Draft' | 'InProgress' | 'Submitted' | 'Approved' | 'Closed' | 'UnderReview' | 'NeedsRevision' | 'Rejected';
 export type KpiCadence = 'WeeklyPulse' | 'Quarterly';
 export type KpiCalcMethod = 'Manual' | 'Auto' | 'Hybrid';
 
@@ -1144,6 +1205,12 @@ export interface RepeatableSubField {
   // RC-4 Task 4D3: مصدر الخيارات الديناميكيّ من كتالوج تصنيفات التنفيذ (execution_taxonomy_values).
   // عند وجوده تُجلب القيم النشطة وقت التعبئة من /api/execution-taxonomy/options?domain=... بدل اللقطة.
   catalogDomain?: string;
+  // قيود رقميّة اختيارية للحقول الرقميّة (PROJECT-REPEATABLE-NUMERIC-VALIDATION-R1).
+  // كلّها اختياريّة: القوالب القديمة بلا هذه الخصائص تبقى بلا فرض رقميّ.
+  min?: number;
+  max?: number;
+  integerOnly?: boolean;
+  step?: number;
 }
 
 // إعداد قسم المشاريع المتكرر — يُخزَّن في configJson لحقل ProjectRepeatableSection.
@@ -1192,6 +1259,11 @@ export interface SubmissionDto {
   projectName: string | null;
 }
 
+// ADMIN-GOVERNANCE-R1: جسم طلب الحذف الإداريّ الناعم لتقرير مُسلَّم (السبب إلزاميّ).
+export interface AdminDeleteRequest {
+  reason?: string;
+}
+
 export interface FieldValueInput {
   templateFieldId: string;
   valueText?: string | null;
@@ -1234,6 +1306,38 @@ export interface KpiEvaluationDto {
   submittedAtUtc: string | null;
   canEdit: boolean;
   results: KpiResultDto[];
+  // ADMIN-GOVERNANCE-R1: مسار المراجعة/الاعتماد
+  reviewerId: string | null;
+  reviewerName: string | null;
+  reviewedAtUtc: string | null;
+  reviewNote: string | null;
+  canReview: boolean;
+  canFlag: boolean;
+  canAdminDelete: boolean;
+  canReopen: boolean;
+}
+
+// KPI-REVIEWER-OVERRIDE-R1: نتيجة البحث القرائيّ عن تقييم قائم (بلا إنشاء).
+export interface KpiEvaluationLookupDto {
+  found: boolean;
+  evaluation: KpiEvaluationDto | null;
+}
+
+// ADMIN-GOVERNANCE-R1: جسم إجراء المراجعة (السبب إلزاميّ في الإجراءات التي تتطلّبه).
+export interface KpiReviewActionRequest {
+  reason?: string;
+}
+
+// ADMIN-GOVERNANCE-R1: حدث في سجلّ مراجعة تقييم KPI (Timeline).
+export interface KpiEvaluationReviewEventDto {
+  id: string;
+  action: string;
+  actorId: string;
+  actorName: string | null;
+  fromStatus: string | null;
+  toStatus: string | null;
+  reason: string | null;
+  createdAtUtc: string;
 }
 
 export interface KpiTemplateDto {
@@ -1382,12 +1486,15 @@ export interface ActivityItemDto {
   submittedAtUtc: string | null;
 }
 export interface PendingReportDto {
-  submissionId: string;
+  submissionId: string | null;
   submitterId: string;
   submitterName: string;
   templateTitle: string;
-  status: SubmissionStatus;
+  status: string;
   periodKey: string;
+  statusLabel: string;
+  severity: string;
+  hasSubmission: boolean;
 }
 
 // ===== ملف أداء الموظف (Phase 3) =====
@@ -2300,6 +2407,56 @@ export interface LeaveRequestListItemDto {
   impactsReports: boolean;
   isPotentialUnpaidLeave: boolean;
   createdAtUtc: string;
+}
+// ===== LEAVE-TL-PENDING-GOVERNANCE-R1 — طابور الحوكمة «معلّقة عند قادة الفرق» (قراءة-فقط) =====
+// نموذج قراءة على مستوى الشركة يُظهِر الطلبات العالقة عند خطوة قائد الفريق (Status=Submitted, CurrentStep=TeamLeader).
+// لا يمنح أيّ سلطة قرار ولا يكتب شيئًا (بلا اعتماد/رفض/إعادة توجيه/تعديل/خصم/رصيد/إشعار).
+export type LeaveGovernanceDelayStatus = 'Pending' | 'Attention' | 'Critical' | 'ExpiredUnresolved';
+export interface TeamLeaderPendingGovernanceItemDto {
+  requestId: string;
+  requestType: LeaveRequestType;
+  employeeUserId: string;
+  employeeName: string;
+  departmentId: string | null;
+  departmentName: string | null;
+  teamId: string | null;
+  teamName: string | null;
+  teamLeaderUserId: string | null;
+  teamLeaderName: string | null;
+  createdAtUtc: string;
+  startDate: string;
+  endDate: string;
+  requestedUnits: number;
+  currentStatus: LeaveRequestStatus;
+  currentStep: LeaveRequestStep;
+  lastEventType: string | null;
+  lastEventAtUtc: string | null;
+  daysPending: number;
+  daysUntilStart: number;
+  startedAlready: boolean;
+  endedAlready: boolean;
+  delayStatus: LeaveGovernanceDelayStatus;
+  delayReason: string;
+  hasLedger: boolean;
+  ledgerCount: number;
+  isEmployeeActive: boolean;
+  isTeamLeaderActive: boolean;
+  missingTeamLeaderAssignment: boolean;
+}
+export interface TeamLeaderPendingGovernanceCountersDto {
+  totalPending: number;
+  attention: number;
+  critical: number;
+  expiredUnresolved: number;
+  missingTeamLeader: number;
+  oldestPendingDays: number;
+}
+export interface TeamLeaderPendingGovernanceResultDto {
+  items: TeamLeaderPendingGovernanceItemDto[];
+  total: number;
+  page: number;
+  pageSize: number;
+  counters: TeamLeaderPendingGovernanceCountersDto;
 }
 export interface CreateLeaveRequestRequest {
   type: LeaveRequestType;
@@ -3261,6 +3418,63 @@ export interface ManualReminderDryRunResultDto {
   recipients: RecipientPreviewRowDto[];
 }
 
+// ===== EMAIL-CONTROL-CENTER-LIVE-MODE-STATUS-R1 (الحالة التشغيليّة الحيّة — قراءة فقط، Admin فقط) =====
+// مصدر الحقيقة للوضع = EmailNotifications:Mode حصرًا. العلم القديم Email:Enabled يُعرَض للشفافيّة فقط.
+// بلا أيّ سرّ: لا كلمة مرور ولا طولها ولا بصمتها ولا سلسلة اتّصال — الاعتماد قيمة منطقيّة واحدة فقط.
+
+export type EmailControlStatusSeverity = 'Critical' | 'Warning' | 'Info';
+
+export interface EmailControlStatusWarningDto {
+  severity: EmailControlStatusSeverity;
+  code: string;
+  message: string;
+}
+
+export interface EmailControlCenterStatusDto {
+  // 1) الحالة التشغيليّة الحاليّة
+  mode: string;
+  isLiveSendingEnabled: boolean;
+  // 2) جدول التشغيل
+  schedulerEnabled: boolean;
+  pollMinutes: number;
+  dailyDueHour: number | null;
+  weeklyDueHour: number | null;
+  overdueHour: number | null;
+  summaryHour: number | null;
+  reviewHour: number | null;
+  timeZoneId: string;
+  timeZoneLabel: string;
+  environmentName: string;
+  // 3) جاهزيّة SMTP (بلا أسرار)
+  smtpConfigured: boolean;
+  smtpHost: string | null;
+  smtpPort: number | null;
+  usesTls: boolean;
+  senderAddress: string | null;
+  credentialConfigured: boolean;
+  // 4) إعدادات التوافق القديمة
+  legacyEmailEnabled: boolean;
+  legacyFlagIsAuthoritative: boolean;
+  // 5) العدّادات
+  totalNotifications: number;
+  historicalDryRunCount: number;
+  enabledCount: number;
+  sentCount: number;
+  pendingCount: number;
+  processingCount: number;
+  failedCount: number;
+  outboxCount: number;
+  // 6) آخر نشاط
+  lastNotificationCreatedAtUtc: string | null;
+  lastSentAtUtc: string | null;
+  lastFailureAtUtc: string | null;
+  /** آخر إشعار مُسجَّل من فئة مجدوَلة — ليس «آخر تشغيل للمجدول» (لا يوجد تتبّع تشغيل مُخزَّن). */
+  lastScheduledNotificationCreatedAtUtc: string | null;
+  // 7) وقت القراءة والتنبيهات
+  checkedAtUtc: string;
+  warnings: EmailControlStatusWarningDto[];
+}
+
 // ===== محرّك التجميع الرقمي للمبيعات (ERDS Phase 4) — B2C-UAT-FIXPACK الجزء 4 =====
 // عرض تجميعي قراءة فقط للمدير: النطاق مفروض خادميًّا عبر IScopeResolver (يرى فريقه فقط، لا يتعدّى صلاحيّته).
 export interface AggregationFilter {
@@ -3578,4 +3792,220 @@ export interface ProjectFirstExecutionReport<TRow> {
   ignoredReasons: Record<string, number>;
   viewLevel: string;
   rows: TRow[];
+// ===== ROLE-AWARE-REPORTING-CALENDAR — Phase 2.3/2.5 =====
+// دورة تقارير مُدرِكة للدور: النافذة السبت→الجمعة موحّدة لكل المستويات، وتاريخ الاستحقاق يختلف بحسب
+// الدور الأساسيّ الخادميّ فقط. كل الحقول محسوبة على الخادم — الواجهة لا تعيد حساب أيّ مفتاح دورة.
+export type ReportingCalendarContext = 'Report' | 'Kpi';
+
+// ===== REPORTING-CYCLE-SUBMISSION-STATUS-CONSISTENCY-R1 — الحالة الموحّدة =====
+// كلّ الحقول محسوبة خادميًّا عبر UnifiedReportStatusService. الواجهة تعرض فقط ولا تحسب أيّ حالة/تأخّر.
+export type UnifiedCycleStatus =
+  | 'NotAssigned'
+  | 'NotRequired'
+  | 'NotDue'
+  | 'DueNow'
+  | 'Draft'
+  | 'OverdueDraft'
+  | 'SubmittedOnTime'
+  | 'SubmittedLate'
+  | 'PendingApproval'
+  | 'ReturnedForChanges'
+  | 'OverdueReturned'
+  | 'Approved'
+  | 'Closed'
+  | 'OverdueNotSubmitted';
+
+// شدّة الحالة الموحّدة (سلسلة خادميّة): none | info | success | warn | alert.
+export type UnifiedCycleSeverity = 'none' | 'info' | 'success' | 'warn' | 'alert';
+
+export interface UnifiedReportCycleStatusDto {
+  templateId: string | null;
+  templateVersionId: string | null;
+  templateName: string;
+  periodType: PeriodType;
+  periodKey: string;
+  cycleLabel: string;
+  cycleStartDate: string;
+  cycleEndDate: string;
+  dueAt: string;
+  assignmentId: string | null;
+  isAssigned: boolean;
+  submissionId: string | null;
+  submissionStatus: SubmissionStatus | null;
+  submittedAt: string | null;
+  approvedAt: string | null;
+  closedAt: string | null;
+  hasSubmission: boolean;
+  isLate: boolean;
+  delayDays: number;
+  unifiedStatus: UnifiedCycleStatus;
+  statusLabel: string;
+  statusDescription: string;
+  severity: UnifiedCycleSeverity;
+  availableActions: string[];
+  actionUrl: string;
+  isCurrentPriority: boolean;
+}
+
+export interface ReportingCycleDto {
+  cycleKey: string;
+  cycleNumber: number;
+  cycleYear: number;
+  cycleStart: string; // DateOnly (السبت)
+  cycleEnd: string; // DateOnly (الجمعة)
+  tuesdayReference: string;
+  cycleLabel: string;
+  shortLabel: string;
+  dataCoverageStart: string;
+  dataCoverageEnd: string;
+  role: string;
+  roleLabel: string;
+  roleDueOffset: number;
+  roleDueDate: string; // DateOnly — تاريخ استحقاق الدور
+  roleDueDateLabel: string;
+  offset: number; // 0=الحالية، سالب=ماضية، موجب=مستقبلية
+  isCurrent: boolean;
+  isPast: boolean;
+  isFuture: boolean;
+  status: string; // current | past | locked
+  isOpen: boolean;
+  isLocked: boolean;
+  lockReason: string | null;
+  isOverdue: boolean;
+  requiresReason: boolean;
+  today: string;
+  context: ReportingCalendarContext;
+  // REPORTING-CYCLE-SUBMISSION-STATUS-CONSISTENCY-R1 — الحالة الموحّدة الخادميّة (إضافيّة، nullable).
+  // الواجهة تستهلكها بدل حساب الحالة محليًّا؛ الحقول القديمة أعلاه باقية للتوافق الخلفيّ.
+  unified: UnifiedReportCycleStatusDto | null;
+}
+
+export interface MyCyclesDto {
+  context: ReportingCalendarContext;
+  templateId: string | null;
+  role: string;
+  roleLabel: string;
+  currentCycleKey: string;
+  today: string;
+  cycles: ReportingCycleDto[];
+}
+
+// ROLE-AWARE-REPORTING-CALENDAR — الوضع اليوميّ (Daily). صفّ يوم واحد + غلاف my-days.
+// كل الحقول محسوبة خادميًّا (مفتاح اليوم YYYY-MM-DD بتوقيت الرياض، والحالة من قاعدة البيانات).
+export type ReportingDayStatus =
+  | 'Available'
+  | 'Draft'
+  | 'Submitted'
+  | 'Overdue'
+  | 'Holiday'
+  | 'FutureLocked'
+  | 'Returned'
+  | 'Reopened';
+
+export interface ReportingDayDto {
+  dayKey: string; // YYYY-MM-DD
+  date: string; // DateOnly
+  dayNameAr: string; // «الثلاثاء»
+  fullDateLabel: string; // «الثلاثاء 14 يوليو 2026»
+  isToday: boolean;
+  isPast: boolean;
+  isFuture: boolean;
+  isHoliday: boolean; // الجمعة وحدها (السبت يوم عمل)
+  isSelectable: boolean;
+  isOpenForDraft: boolean;
+  isDueToday: boolean;
+  isOverdue: boolean;
+  isSubmitted: boolean;
+  hasDraft: boolean;
+  status: ReportingDayStatus;
+  statusLabel: string;
+  lockReason: string | null;
+  previousDayKey: string;
+  nextDayKey: string;
+}
+
+export interface MyDaysDto {
+  templateId: string | null;
+  role: string;
+  roleLabel: string;
+  currentDayKey: string;
+  today: string;
+  days: ReportingDayDto[];
+}
+
+// ===== الأرشيف الإداريّ (RESTORE-ARCHIVE-GOVERNANCE-R1) =====
+// عناصر محذوفة إداريًّا ناعمًا (تقارير + تقييمات KPI) قابلة للقراءة والاسترجاع وفق دلالات Hybrid.
+export type ArchiveItemType = 'Report' | 'KpiEvaluation';
+export type ArchiveRetentionStatus = 'Fresh' | 'ReviewDue' | 'LongTerm';
+export type ArchiveRestoreStrategy = 'NotApplicable' | 'HistoricalApproverRestored' | 'NoActiveApprover';
+
+export interface ArchiveWorkflowStepDto {
+  level: number;
+  approverId: string;
+  approverName: string | null;
+  status: string;
+  comment: string | null;
+  decidedAtUtc: string | null;
+}
+
+export interface ArchiveAuditEntryDto {
+  id: string;
+  action: string;
+  actorId: string | null;
+  actorName: string | null;
+  createdAtUtc: string;
+  dataJson: string | null;
+}
+
+export interface ArchiveItemDto {
+  archiveItemId: string;
+  itemType: ArchiveItemType;
+  employeeId: string;
+  employeeName: string;
+  templateName: string;
+  periodKey: string;
+  status: string;
+  deletedAtUtc: string;
+  deletedByUserId: string | null;
+  deletedByName: string | null;
+  deletionReason: string | null;
+  canRestore: boolean;
+  restoreBlockedCode: string | null;
+  restoreBlockedReason: string | null;
+  daysSinceDeletion: number;
+  retentionStatus: ArchiveRetentionStatus;
+}
+
+export interface ArchiveDetailsDto extends ArchiveItemDto {
+  currentApproverId: string | null;
+  currentApproverName: string | null;
+  workflowSteps: ArchiveWorkflowStepDto[];
+  fieldValuesCount: number;
+  kpiResultsCount: number;
+  reviewEventsCount: number;
+  auditTrail: ArchiveAuditEntryDto[];
+  historicalApproverId: string | null;
+  historicalApproverName: string | null;
+  historicalApproverIsActive: boolean | null;
+  restoreStrategy: ArchiveRestoreStrategy;
+  restoreWarning: string | null;
+}
+
+export interface ArchivePagedResult {
+  items: ArchiveItemDto[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface ArchiveListFilter {
+  itemType?: ArchiveItemType;
+  periodKey?: string;
+  employeeId?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface RestoreRequest {
+  reason: string;
 }

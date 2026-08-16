@@ -136,6 +136,21 @@ public static class TestAuth
     }
 
     /// <summary>
+    /// يضبط علم تجاوز خطوة قائد الفريق (BypassTeamLeaderApproval) للمستخدم مباشرةً عبر AppDbContext.
+    /// لا توجد نقطة نهاية API لهذا العلم؛ يُضبط بيانيًّا (كما يُضبط لفاطمة على الإنتاج عبر SQL محكوم).
+    /// تستخدمه اختبارات FATMA-DIRECT-REPORTING-OVERRIDE-R1 لمحاكاة موظّف Direct Reporting.
+    /// </summary>
+    public static async Task SetBypassTeamLeaderApprovalAsync(
+        CustomWebApplicationFactory factory, Guid userId, bool value = true)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var u = await db.Users.FirstAsync(x => x.Id == userId);
+        u.BypassTeamLeaderApproval = value;
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>
     /// يُضيف عضوية فريق إضافية (ثانوية) للمستخدم في الجدول <c>user_team_memberships</c> دون تغيير فريقه الأساسي.
     /// تستخدمه اختبارات OFFICIAL-LAUNCH-FIX-PACK-R1A للتحقّق من رؤية مشاريع الفرق الإضافية.
     /// </summary>

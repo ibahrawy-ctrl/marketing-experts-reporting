@@ -42,6 +42,14 @@ public class LeaveRequestsController : ApiControllerBase
     public async Task<IActionResult> Pending(CancellationToken ct)
         => FromResult(await _service.GetPendingAsync(ct));
 
+    // ===== طابور الحوكمة «معلّقة عند قادة الفرق» (LEAVE-TL-PENDING-GOVERNANCE-R1) — قراءة-فقط =====
+    // منفصل تمامًا عن /pending (طابور اتخاذ القرار المُقيَّد بالنطاق). لا يمنح أيّ سلطة قرار.
+    [HttpGet("governance/team-leader-pending")]
+    [Authorize(Policy = Policies.LeaveGovernanceRead)]
+    public async Task<IActionResult> TeamLeaderPendingGovernance(
+        [FromQuery] TeamLeaderPendingGovernanceQuery query, CancellationToken ct)
+        => FromResult(await _service.GetTeamLeaderPendingGovernanceAsync(query, ct));
+
     [HttpPost("{id:guid}/team-leader/approve")]
     [Authorize(Policy = Policies.ManagementOnly)]
     public async Task<IActionResult> TeamLeaderApprove(Guid id, [FromBody] LeaveApproveRequest request, CancellationToken ct)

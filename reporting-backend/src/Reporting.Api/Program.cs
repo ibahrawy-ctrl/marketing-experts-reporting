@@ -77,6 +77,10 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy(Policies.LeaveFinalApproval, p => p.RequireRole(Roles.LeaveFinalApprovers));
     // رؤية طابور مراجعة الإجازات — الإدارة + الموارد البشرية (الفرض الدقيق للنطاق والخطوة في الخدمة).
     options.AddPolicy(Policies.LeaveReview, p => p.RequireRole(Roles.LeaveReviewers));
+    // رؤية طابور الحوكمة «معلّقة عند قادة الفرق» (LEAVE-TL-PENDING-GOVERNANCE-R1) — قراءة-فقط لأدوار الحوكمة
+    // (Admin/CEO/GM/HR). بلا سلطة قرار؛ منفصل تمامًا عن LeaveReview. CeoSupport مُستبعَد اتّساقًا مع
+    // CanViewAsync في وحدة الإجازات (لا يملك رؤية تفاصيل الطلبات اليوم).
+    options.AddPolicy(Policies.LeaveGovernanceRead, p => p.RequireRole(Roles.LeaveGovernanceReaders));
     // إعادة تعيين كلمة مرور المستخدم — Admin + CEO + CeoSupport (GOV-R1). الحماية الإضافية لحسابات Admin في الخدمة (فاعل Admin فقط).
     options.AddPolicy(Policies.UserPasswordReset, p => p.RequireRole(Roles.Admin, Roles.Ceo, Roles.CeoSupport));
     // إدارة المستخدمين الكاملة (إنشاء/تعديل/تعطيل/حذف + الأدوار) — Admin + CEO فقط (GOV-R1). منفصلة عن AdminOnly العامة.
@@ -127,6 +131,9 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy(Policies.KpiReview, p => p.RequireRole(Roles.KpiReviewers));
     // الإشارة/التعليق/طلب إعادة الفتح على تقييم KPI (بلا اعتماد/رفض/حذف) — HR + Admin/CEO/GM.
     options.AddPolicy(Policies.KpiReviewFlag, p => p.RequireRole(Roles.KpiReviewFlaggers));
+    // ===== RESTORE-ARCHIVE-GOVERNANCE-R1 — الأرشيف الإداريّ واسترجاع المحذوف =====
+    // قراءة الأرشيف الإداريّ (تقارير + KPI محذوفة ناعمًا) واسترجاعها وفق Hybrid — Admin/CEO/GM فقط.
+    options.AddPolicy(Policies.ArchiveGovernanceAccess, p => p.RequireRole(Roles.ArchiveGovernanceAccessors));
 });
 
 // ===== Rate limiting لمنع التخمين على المصادقة =====

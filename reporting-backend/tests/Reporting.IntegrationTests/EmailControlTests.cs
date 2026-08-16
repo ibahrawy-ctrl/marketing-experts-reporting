@@ -10,6 +10,7 @@ using Reporting.Application.Common;
 using Reporting.Application.Notifications;
 using Reporting.Infrastructure.Identity;
 using Reporting.Infrastructure.Persistence;
+using Reporting.Infrastructure.Services;
 using Xunit;
 
 namespace Reporting.IntegrationTests;
@@ -586,7 +587,9 @@ public class EmailControlTests
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var row = await db.EmailNotifications.AsNoTracking()
-                .FirstOrDefaultAsync(n => n.CorrelationKey == $"manual-reminder:{result.BatchId}:{id}");
+                // EMAIL-DRYRUN-DEDUPLICATION-ISOLATION-R1: صفوف المحاكاة تُخزَّن بمفتاح معزول (بادئة dryrun:)
+                .FirstOrDefaultAsync(n => n.CorrelationKey
+                    == $"{EmailNotificationService.DryRunCorrelationKeyPrefix}manual-reminder:{result.BatchId}:{id}");
             Assert.NotNull(row);
             Assert.Equal(Domain.Enums.EmailNotificationStatus.DryRun, row!.Status);
             Assert.Equal("manual.reminder", row.EventType);

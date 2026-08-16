@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>ModerationV6Publisher</RootNamespace>
+    <AssemblyName>ModerationV6Publisher</AssemblyName>
+    <!-- أداة آمنة لمرة واحدة خارج الحل (Reporting.sln) — لا تُنشر مع الـ API.
+         نواة النشر (Publisher) عامّة كي يختبرها مشروع الاختبارات؛ Program فقط يوصل الاتصال. -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Reporting.Infrastructure\Reporting.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

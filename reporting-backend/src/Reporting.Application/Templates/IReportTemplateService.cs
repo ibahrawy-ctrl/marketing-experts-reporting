@@ -21,6 +21,13 @@ public interface IReportTemplateService
     // تقرير لقالب غير مُسنَد. يقتصر على القوالب المنشورة النشطة.
     Task<bool> IsTemplateAssignedToUserAsync(Guid userId, Guid templateId, CancellationToken ct = default);
 
+    // نسخة مُجمَّعة من حارس الإسناد بعدد استعلامات ثابت (لا N+1): تُرجِع لكلّ مستخدم مجموعة القوالب
+    // المنشورة النشطة المُسنَدة له فعليًّا، بنفس منطق <see cref="IsTemplateAssignedToUserAsync"/> ذاته
+    // (Include/Exclude + مستويات Employee/JobRole/Team/Department/General والأخصّ يطغى). تُستخدَم في
+    // الإسقاطات القرائية (الحالة المتوقّعة) لفرض عقد الاستحقاق دون استدعاء لكلّ مستخدم على حدة.
+    Task<IReadOnlyDictionary<Guid, IReadOnlyCollection<Guid>>> ResolveAssignedTemplatesForUsersAsync(
+        IReadOnlyCollection<Guid> userIds, CancellationToken ct = default);
+
     // إدارة الإسناد/الاستثناء الصريح (Employee/JobRole/Team/Department) — حوكمة القوالب فقط.
     Task<Result<TemplateAssignmentRowDto>> AddAssignmentAsync(Guid templateId, CreateAssignmentRequest request, CancellationToken ct = default);
     Task<Result<TemplateAssignmentRowDto>> UpdateAssignmentAsync(Guid templateId, Guid assignmentId, UpdateAssignmentRequest request, CancellationToken ct = default);

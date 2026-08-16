@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, apiErrorMessage } from '../lib/api';
+import { api, apiErrorMessage, approvalErrorMessage } from '../lib/api';
+import { useToast, POST_SUCCESS_NAV_DELAY_MS } from '../components/ActionResultToast';
 import { useAuth } from '../lib/auth';
 import { useDirectoryUsers, useTeams, useDepartments } from '../lib/useDirectory';
 import { useProjects } from '../lib/useClients';
@@ -18,10 +19,15 @@ import {
   approvalStatusLabel,
   formatDate,
 } from '../lib/format';
-import { operationalWeekKey, riyadhToday } from '../lib/dashboardPeriod';
+import { WeeklyCycleCalendarPicker } from '../components/WeeklyCycleCalendarPicker';
+import { DailyCalendarPicker } from '../components/DailyCalendarPicker';
+import { resolvePresentationProfile } from '../lib/reportPresentationProfiles';
+import { PresentationProfileReport } from '../components/PresentationProfileReport';
 import { normalizeDigits, sanitizeNumericInput, isNumericGridColumn } from '../lib/numericNormalizer';
 import type {
   SubmissionListItem,
+  UnifiedSubmissionOverview,
+  SubmissionQuickFilter,
   SubmissionDto,
   SubmissionFieldValueDto,
   ReportTemplateListItem,
@@ -34,15 +40,11 @@ import type {
   ProjectRepeatableConfig,
   ProjectRepeatableEntry,
   RepeatableSubField,
+  ReportingDayDto,
 } from '../types/api';
 
 type Tab = 'all' | 'mine' | 'pending';
 const MANAGEMENT_ROLES = ['Admin', 'CEO', 'GeneralManager', 'Manager', 'TeamLeader', 'CeoSupport', 'Viewer'] as const;
-const LATE_STATES: SubmissionStatus[] = ['Draft', 'Returned'];
-// «تحتاج إجراء» = التقارير المتوقّفة التي تتطلّب تحرّكًا من صاحبها/الفريق.
-// تعريف موحّد مع بطاقة لوحة التحكم (DashboardService): مسودّة + معادة + مصعّدة.
-// «بانتظار اعتمادي» (currentApproverId) بُعد منفصل ولا يُدمج هنا.
-const NEEDS_ACTION_STATES: SubmissionStatus[] = ['Draft', 'Returned', 'Escalated'];
 
 const statusTone: Partial<Record<SubmissionStatus, 'navy' | 'success' | 'orange' | 'alert' | 'gold'>> = {
   Draft: 'gold',
@@ -53,16 +55,21 @@ const statusTone: Partial<Record<SubmissionStatus, 'navy' | 'success' | 'orange'
   Visible: 'success',
 };
 
-export default function SubmissionsPage() {
+// ROLE-AWARE-PERSONAL-REPORT-SUBMISSION-ACCESS-R1: personalOnly=true يعرض سطح «تقاريري» الشخصيّ فقط
+// (مسار /app/my-reports) موازيًا لسطح الفريق (/app/submissions) — لا يستبدل أحدهما الآخر ولا يخفي المسار
+// الشخصيّ عن القادة/الإدارة. مقاد بالمسار (route-aware) لا بأدوار مُصلَّبة داخل الصفحة.
+export default function SubmissionsPage({ personalOnly = false }: { personalOnly?: boolean } = {}) {
   // الحالة محفوظة في رابط الصفحة (?tab=&open=) لدعم الروابط العميقة من اللوحات.
   const [params, setParams] = useSearchParams();
   const { hasAnyRole, canApprove } = useAuth();
-  const isManagement = hasAnyRole(...MANAGEMENT_ROLES);
+  // في سطح «تقاريري» الشخصيّ لا يُفعَّل عرض الإدارة إطلاقًا (يبقى شخصيًّا محضًا).
+  const isManagement = !personalOnly && hasAnyRole(...MANAGEMENT_ROLES);
   const teamParam = params.get('team');
 
   const requested = params.get('tab');
-  const tab: Tab =
-    requested === 'pending' && canApprove
+  const tab: Tab = personalOnly
+    ? 'mine'
+    : requested === 'pending' && canApprove
       ? 'pending'
       : requested === 'mine'
         ? 'mine'
@@ -82,28 +89,33 @@ export default function SubmissionsPage() {
 
   // «بانتظار اعتمادي» يظهر فقط لمن يملك صلاحية الاعتماد (Admin/CEO/GM/Manager/TeamLeader).
   // الموظف/المُطّلع/مساند الإدارة لا يعتمدون تقارير الآخرين فلا يُعرض لهم التبويب.
-  const tabs: [Tab, string][] = [
-    ...(isManagement ? ([['all', 'كل التقارير']] as [Tab, string][]) : []),
-    ['mine', 'تقاريري'],
-    ...(canApprove ? ([['pending', 'بانتظار اعتمادي']] as [Tab, string][]) : []),
-  ];
+  // في سطح «تقاريري» الشخصيّ: لا شريط تبويبات (سطح واحد شخصيّ). في سطح الفريق: التبويبات المعتادة.
+  const tabs: [Tab, string][] = personalOnly
+    ? []
+    : [
+        ...(isManagement ? ([['all', 'كل التقارير']] as [Tab, string][]) : []),
+        ['mine', 'تقاريري'],
+        ...(canApprove ? ([['pending', 'بانتظار اعتمادي']] as [Tab, string][]) : []),
+      ];
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-navy">التقارير المقدمة</h1>
-      <div className="flex gap-2 border-b border-line">
-        {tabs.map(([k, label]) => (
-          <button
-            key={k}
-            onClick={() => setTab(k)}
-            className={`-mb-px border-b-2 px-4 py-2 text-sm font-semibold ${
-              tab === k ? 'border-orange text-navy' : 'border-transparent text-ink-2'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <h1 className="text-2xl font-bold text-navy">{personalOnly ? 'تقاريري' : 'التقارير المقدمة'}</h1>
+      {tabs.length > 0 && (
+        <div className="flex gap-2 border-b border-line">
+          {tabs.map(([k, label]) => (
+            <button
+              key={k}
+              onClick={() => setTab(k)}
+              className={`-mb-px border-b-2 px-4 py-2 text-sm font-semibold ${
+                tab === k ? 'border-orange text-navy' : 'border-transparent text-ink-2'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
       {tab === 'all' && isManagement && <AllReportsTab onOpen={open} initialTeam={teamParam} />}
       {tab === 'mine' && <MineTab onOpen={open} />}
       {tab === 'pending' && <PendingTab onOpen={open} />}
@@ -111,18 +123,26 @@ export default function SubmissionsPage() {
   );
 }
 
-// ===== تبويب «كل التقارير» — جدول متقدّم بفلاتر متعددة (للإدارة) =====
-type QuickFilter = '' | 'late' | 'mine-approval' | 'returned' | 'closed' | 'needs-action';
+// ===== تبويب «كل التقارير» — العرض الموحّد (SUBMITTED-REPORTS-MISSING-EXPECTED-OVERDUE-R1) =====
+// يستهلك GET /api/submissions/overview: التسليمات الفعليّة UNION الالتزامات المتوقّعة غير المُقدَّمة.
+// كل الفلاتر والعدّادات والترقيم تُحسَب في الخادم؛ الواجهة عرضٌ فقط بلا فلترة محليّة.
+type QuickFilter = SubmissionQuickFilter;
+const OVERVIEW_PAGE_SIZE = 200;
+
+// أطوار حالة الصفّ المتوقّع غير المُقدَّم لا وجود لها في submissionStatusLabel، فتُعامَل بلونٍ خاص.
+const rowStatusTone = (
+  status: SubmissionStatus | 'NotSubmitted',
+  overdue: boolean,
+): 'navy' | 'success' | 'orange' | 'alert' | 'gold' | 'muted' => {
+  if (status === 'NotSubmitted') return overdue ? 'alert' : 'gold';
+  return statusTone[status as SubmissionStatus] ?? 'muted';
+};
 
 function AllReportsTab({ onOpen, initialTeam }: { onOpen: (id: string) => void; initialTeam: string | null }) {
-  const { user, hasAnyRole } = useAuth();
+  const { hasAnyRole } = useAuth();
   // العرض الافتراضي حسب الدور: المعتمِدون المباشرون يبدؤون على «بانتظار اعتمادي»،
   // والإدارة العليا على «الكل».
-  const defaultQuick: QuickFilter = hasAnyRole('TeamLeader', 'Manager') ? 'mine-approval' : '';
-  const { data: items, isLoading, isError, refetch } = useQuery({
-    queryKey: ['submissions-all'],
-    queryFn: async () => (await api.get<SubmissionListItem[]>('/submissions')).data,
-  });
+  const defaultQuick: QuickFilter = hasAnyRole('TeamLeader', 'Manager') ? 'MineApproval' : 'None';
   const users = useDirectoryUsers();
   const teams = useTeams();
   const departments = useDepartments();
@@ -134,59 +154,93 @@ function AllReportsTab({ onOpen, initialTeam }: { onOpen: (id: string) => void; 
   const [period, setPeriod] = useState('');
   const [status, setStatus] = useState('');
   const [quick, setQuick] = useState<QuickFilter>(defaultQuick);
+  const [page, setPage] = useState(1);
+
+  // إعادة الترقيم للصفحة الأولى كلما تغيّر أي فلتر.
+  const resetPage = () => setPage(1);
+
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['submissions-overview', team, dept, employee, template, period, status, quick, page],
+    queryFn: async () => {
+      const params: Record<string, string | number> = { page, pageSize: OVERVIEW_PAGE_SIZE, quickFilter: quick };
+      if (team) params.teamId = team;
+      if (dept) params.departmentId = dept;
+      if (employee) params.submitterId = employee;
+      if (template) params.reportTemplateId = template;
+      if (period) params.periodKey = period;
+      if (status) params.status = status;
+      return (await api.get<UnifiedSubmissionOverview>('/submissions/overview', { params })).data;
+    },
+  });
 
   const userName = (id: string | null) => (users.data ?? []).find((u) => u.id === id)?.fullName ?? '—';
-
-  const filtered = useMemo(() => {
-    let rows = items ?? [];
-    if (team) rows = rows.filter((s) => s.teamId === team);
-    if (dept) rows = rows.filter((s) => s.departmentId === dept);
-    if (employee) rows = rows.filter((s) => s.submitterId === employee);
-    if (template) rows = rows.filter((s) => s.templateTitle === template);
-    if (period) rows = rows.filter((s) => s.periodKey === period);
-    if (status) rows = rows.filter((s) => s.status === status);
-    if (quick === 'late') rows = rows.filter((s) => LATE_STATES.includes(s.status));
-    if (quick === 'mine-approval') rows = rows.filter((s) => s.currentApproverId === user?.userId);
-    if (quick === 'returned') rows = rows.filter((s) => s.status === 'Returned');
-    if (quick === 'closed') rows = rows.filter((s) => s.status === 'Closed' || s.status === 'Visible');
-    if (quick === 'needs-action') rows = rows.filter((s) => NEEDS_ACTION_STATES.includes(s.status));
-    return rows;
-  }, [items, team, dept, employee, template, period, status, quick, user?.userId]);
 
   if (isLoading) return <LoadingState label="يتم تحميل التقارير…" />;
   if (isError) return <QueryError onRetry={() => refetch()} description="حدث خطأ أثناء جلب قائمة التقارير. أعد المحاولة." />;
 
-  const all = items ?? [];
-  const templateNames = [...new Set(all.map((s) => s.templateTitle))].sort();
-  const periods = [...new Set(all.map((s) => s.periodKey))].sort().reverse();
+  const items = data?.items ?? [];
+  const summary = data?.summary;
+  const totalCount = data?.totalCount ?? 0;
+  // خيارات القوالب مشتقّة من الصفوف الظاهرة (أفضل جهد ضمن الصفحة).
+  const templateOptions = [
+    ...new Map(items.filter((r) => r.reportTemplateId).map((r) => [r.reportTemplateId!, r.templateTitle])).entries(),
+  ].sort((a, b) => a[1].localeCompare(b[1], 'ar'));
+  const periods = [...new Set(items.map((r) => r.periodKey))].sort().reverse();
 
-  // بطاقات ملخّص قابلة للنقر — كل بطاقة تضبط الفلتر السريع المقابل.
-  const myApproval = all.filter((s) => s.currentApproverId === user?.userId).length;
-  const lateCount = all.filter((s) => LATE_STATES.includes(s.status)).length;
-  const returnedCount = all.filter((s) => s.status === 'Returned').length;
-  const closedCount = all.filter((s) => s.status === 'Closed' || s.status === 'Visible').length;
-  const needsActionCount = all.filter((s) => NEEDS_ACTION_STATES.includes(s.status)).length;
-  const SUMMARY: { key: QuickFilter; label: string; value: number; tone: 'navy' | 'orange' | 'alert' | 'gold' | 'success' }[] = [
-    { key: '', label: 'إجمالي التقارير', value: all.length, tone: 'navy' },
-    { key: 'needs-action', label: 'يحتاج إجراء الآن', value: needsActionCount, tone: needsActionCount > 0 ? 'orange' : 'success' },
-    { key: 'mine-approval', label: 'بانتظار اعتمادي', value: myApproval, tone: myApproval > 0 ? 'gold' : 'success' },
-    { key: 'late', label: 'متأخرة', value: lateCount, tone: lateCount > 0 ? 'alert' : 'success' },
-    { key: 'returned', label: 'معادة للتعديل', value: returnedCount, tone: returnedCount > 0 ? 'gold' : 'success' },
-    { key: 'closed', label: 'مغلقة', value: closedCount, tone: 'success' },
+  // بطاقات ملخّص قابلة للنقر — القيم من ملخّص الخادم على المجموعة الكاملة المفلترة (قبل الترقيم).
+  const SUMMARY: {
+    key: QuickFilter;
+    label: string;
+    value: number;
+    sub?: string;
+    tone: 'navy' | 'orange' | 'alert' | 'gold' | 'success';
+  }[] = [
+    { key: 'None', label: 'إجمالي التقارير', value: summary?.total ?? 0, tone: 'navy' },
+    {
+      key: 'NeedsAction',
+      label: 'يحتاج إجراء الآن',
+      value: summary?.needsActionCount ?? 0,
+      tone: (summary?.needsActionCount ?? 0) > 0 ? 'orange' : 'success',
+    },
+    {
+      key: 'Overdue',
+      label: 'متأخرة',
+      value: summary?.overdueCount ?? 0,
+      sub: (summary?.missingOverdueCount ?? 0) > 0 ? `منها ${summary?.missingOverdueCount} لم تُقدَّم` : undefined,
+      tone: (summary?.overdueCount ?? 0) > 0 ? 'alert' : 'success',
+    },
+    {
+      key: 'MineApproval',
+      label: 'بانتظار اعتمادي',
+      value: summary?.waitingMyApprovalCount ?? 0,
+      tone: (summary?.waitingMyApprovalCount ?? 0) > 0 ? 'orange' : 'success',
+    },
+    {
+      key: 'Returned',
+      label: 'معادة للتعديل',
+      value: summary?.returnedCount ?? 0,
+      tone: (summary?.returnedCount ?? 0) > 0 ? 'gold' : 'success',
+    },
+    { key: 'Closed', label: 'مغلقة', value: summary?.closedCount ?? 0, tone: 'success' },
   ];
 
   const QUICKS: [QuickFilter, string][] = [
-    ['', 'الكل'],
-    ['needs-action', 'يحتاج إجراء'],
-    ['late', 'المتأخرة'],
-    ['mine-approval', 'بانتظار اعتمادي'],
-    ['returned', 'المعادة'],
-    ['closed', 'المغلقة'],
+    ['None', 'الكل'],
+    ['NeedsAction', 'يحتاج إجراء'],
+    ['Overdue', 'المتأخرة'],
+    ['MineApproval', 'بانتظار اعتمادي'],
+    ['Returned', 'المعادة'],
+    ['Closed', 'المغلقة'],
   ];
 
   const toneText: Record<'navy' | 'orange' | 'alert' | 'gold' | 'success', string> = {
     navy: 'text-navy', orange: 'text-orange-600', alert: 'text-alert', gold: 'text-gold', success: 'text-success',
   };
+
+  const setFilter = (setter: (v: string) => void) => (v: string) => { setter(v); resetPage(); };
+  const setQuickFilter = (q: QuickFilter) => { setQuick(q); resetPage(); };
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / OVERVIEW_PAGE_SIZE));
 
   return (
     <div className="space-y-4">
@@ -195,50 +249,55 @@ function AllReportsTab({ onOpen, initialTeam }: { onOpen: (id: string) => void; 
         {SUMMARY.map((c) => (
           <button
             key={c.label}
-            onClick={() => setQuick(c.key)}
+            onClick={() => setQuickFilter(c.key)}
             className={`rounded-2xl border bg-white p-4 text-right transition hover:shadow-sm ${
               quick === c.key ? 'border-orange ring-1 ring-orange' : 'border-line'
             }`}
           >
             <p className={`text-2xl font-extrabold ${toneText[c.tone]}`}>{c.value}</p>
             <p className="mt-0.5 text-xs text-ink-2">{c.label}</p>
+            {c.sub && <p className="mt-0.5 text-[11px] font-semibold text-alert">{c.sub}</p>}
           </button>
         ))}
       </div>
+      {/* توضيح عقد الملخّص: الأرقام والقائمة يُشتقّان من نفس المجموعة بعد كل الفلاتر والتصفية السريعة. */}
+      <p className="px-1 text-[11px] text-ink-2">
+        الأرقام أعلاه تعكس نفس المجموعة المعروضة في القائمة بالأسفل بعد تطبيق كل الفلاتر (الفترة/الفريق/الإدارة/الموظف/نوع التقرير/البحث) والتصفية السريعة. تغيير التصفية السريعة يُحدّث هذه الأرقام والقائمة معًا.
+      </p>
 
       <Card>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-          <Select value={team} onChange={(e) => setTeam(e.target.value)}>
+          <Select value={team} onChange={(e) => setFilter(setTeam)(e.target.value)}>
             <option value="">كل الفرق</option>
             {(teams.data ?? []).map((t) => (
               <option key={t.id} value={t.id}>{t.nameAr}</option>
             ))}
           </Select>
-          <Select value={dept} onChange={(e) => setDept(e.target.value)}>
+          <Select value={dept} onChange={(e) => setFilter(setDept)(e.target.value)}>
             <option value="">كل الإدارات</option>
             {(departments.data ?? []).map((d) => (
               <option key={d.id} value={d.id}>{d.nameAr}</option>
             ))}
           </Select>
-          <Select value={employee} onChange={(e) => setEmployee(e.target.value)}>
+          <Select value={employee} onChange={(e) => setFilter(setEmployee)(e.target.value)}>
             <option value="">كل الموظفين</option>
             {(users.data ?? []).map((u) => (
               <option key={u.id} value={u.id}>{u.fullName}</option>
             ))}
           </Select>
-          <Select value={template} onChange={(e) => setTemplate(e.target.value)}>
+          <Select value={template} onChange={(e) => setFilter(setTemplate)(e.target.value)}>
             <option value="">كل أنواع التقارير</option>
-            {templateNames.map((t) => (
-              <option key={t} value={t}>{t}</option>
+            {templateOptions.map(([id, title]) => (
+              <option key={id} value={id}>{title}</option>
             ))}
           </Select>
-          <Select value={period} onChange={(e) => setPeriod(e.target.value)}>
-            <option value="">كل الفترات</option>
+          <Select value={period} onChange={(e) => setFilter(setPeriod)(e.target.value)}>
+            <option value="">آخر 12 أسبوعًا</option>
             {periods.map((p) => (
               <option key={p} value={p}>{p}</option>
             ))}
           </Select>
-          <Select value={status} onChange={(e) => setStatus(e.target.value)}>
+          <Select value={status} onChange={(e) => setFilter(setStatus)(e.target.value)}>
             <option value="">كل الحالات</option>
             {(Object.keys(submissionStatusLabel) as SubmissionStatus[]).map((s) => (
               <option key={s} value={s}>{submissionStatusLabel[s]}</option>
@@ -249,7 +308,7 @@ function AllReportsTab({ onOpen, initialTeam }: { onOpen: (id: string) => void; 
           {QUICKS.map(([k, label]) => (
             <button
               key={label}
-              onClick={() => setQuick(k)}
+              onClick={() => setQuickFilter(k)}
               className={`rounded-full border px-3 py-1 text-xs font-semibold ${
                 quick === k ? 'border-navy bg-navy text-white' : 'border-line text-ink-2 hover:bg-offwhite'
               }`}
@@ -261,14 +320,14 @@ function AllReportsTab({ onOpen, initialTeam }: { onOpen: (id: string) => void; 
       </Card>
 
       <Card className="overflow-x-auto p-0">
-        {filtered.length === 0 ? (
+        {items.length === 0 ? (
           <div className="py-12 text-center">
             <p className="text-sm font-medium text-ink-2">
-              {all.length === 0 ? 'لا توجد تقارير بعد.' : 'لا توجد تقارير مطابقة للفلاتر.'}
+              {totalCount === 0 ? 'لا توجد تقارير بعد.' : 'لا توجد تقارير مطابقة للفلاتر.'}
             </p>
             <p className="mx-auto mt-1 max-w-md text-xs text-ink-3">
-              {all.length === 0
-                ? 'تظهر التقارير هنا بمجرّد أن يبدأ الموظفون في تسليمها. تُنشأ التقارير من قوالب منشورة في تبويب «تقاريري».'
+              {totalCount === 0
+                ? 'تظهر التقارير هنا بمجرّد أن يبدأ الموظفون في تسليمها، أو كصفوف «لم تُقدَّم» للالتزامات المتوقّعة.'
                 : 'لا يوجد تقرير يطابق الفلاتر المحدّدة حاليًا. جرّب توسيع نطاق الفلاتر أو إعادة ضبطها.'}
             </p>
           </div>
@@ -282,32 +341,49 @@ function AllReportsTab({ onOpen, initialTeam }: { onOpen: (id: string) => void; 
                 <th className="px-3 py-2.5 font-semibold">الحالة</th>
                 <th className="px-3 py-2.5 font-semibold">تاريخ الإرسال</th>
                 <th className="px-3 py-2.5 font-semibold">المسؤول الحالي</th>
-                <th className="px-3 py-2.5 font-semibold">متأخر؟</th>
+                <th className="px-3 py-2.5 font-semibold">الاستحقاق / التأخّر</th>
                 <th className="px-3 py-2.5 font-semibold"></th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((s) => {
-                const late = LATE_STATES.includes(s.status);
+              {items.map((r) => {
+                // الصفّ المتوقّع غير المُقدَّم (null-safe): لا مُعرِّف تسليم، لا فتح ولا إجراءات.
+                const missing = r.isExpectedSubmission && !r.hasSubmission;
+                const key = missing
+                  ? `expected-${r.submitterId}-${r.reportTemplateId}-${r.periodKey}`
+                  : r.submissionId!;
+                const openRow = () => { if (!missing && r.submissionId) onOpen(r.submissionId); };
                 return (
                   <tr
-                    key={s.id}
-                    onClick={() => onOpen(s.id)}
-                    className="cursor-pointer border-b border-line last:border-0 hover:bg-offwhite"
+                    key={key}
+                    onClick={openRow}
+                    className={`border-b border-line last:border-0 ${
+                      missing ? 'bg-alert/5' : 'cursor-pointer hover:bg-offwhite'
+                    }`}
                   >
-                    <td className="px-3 py-2.5 font-semibold text-navy hover:text-orange hover:underline">{s.templateTitle}</td>
-                    <td className="px-3 py-2.5 text-ink-2">{s.submitterName}</td>
-                    <td className="px-3 py-2.5 text-ink-2">{periodTypeLabel[s.periodType]} {s.periodKey}</td>
-                    <td className="px-3 py-2.5">
-                      <Badge tone={statusTone[s.status] ?? 'muted'}>{submissionStatusLabel[s.status]}</Badge>
+                    <td className={`px-3 py-2.5 font-semibold ${missing ? 'text-ink' : 'text-navy hover:text-orange hover:underline'}`}>
+                      {r.templateTitle}
                     </td>
-                    <td className="px-3 py-2.5 text-ink-2">{formatDate(s.submittedAtUtc)}</td>
-                    <td className="px-3 py-2.5 text-ink-2">{s.currentApproverId ? userName(s.currentApproverId) : '—'}</td>
+                    <td className="px-3 py-2.5 text-ink-2">{r.submitterName}</td>
+                    <td className="px-3 py-2.5 text-ink-2">{periodTypeLabel[r.periodType]} {r.periodKey}</td>
                     <td className="px-3 py-2.5">
-                      {late ? <Badge tone="alert">متأخر</Badge> : <span className="text-ink-3">—</span>}
+                      <Badge tone={rowStatusTone(r.status, r.isOverdue)}>{r.statusLabel}</Badge>
+                    </td>
+                    <td className="px-3 py-2.5 text-ink-2">{missing ? '—' : formatDate(r.submittedAtUtc)}</td>
+                    <td className="px-3 py-2.5 text-ink-2">{r.currentApproverId ? userName(r.currentApproverId) : '—'}</td>
+                    <td className="px-3 py-2.5">
+                      {r.isOverdue ? (
+                        <Badge tone="alert">{missing ? `متأخر — لم يُقدَّم (${r.delayDays} يوم)` : `متأخر (${r.delayDays} يوم)`}</Badge>
+                      ) : (
+                        <span className="text-ink-3">استحقاق {formatDate(r.dueAt)}</span>
+                      )}
                     </td>
                     <td className="px-3 py-2.5">
-                      <Button variant="ghost" onClick={(e) => { e.stopPropagation(); onOpen(s.id); }}>عرض التقرير</Button>
+                      {missing ? (
+                        <span className="text-xs text-ink-3">لا يوجد تسليم بعد</span>
+                      ) : (
+                        <Button variant="ghost" onClick={(e) => { e.stopPropagation(); openRow(); }}>عرض التقرير</Button>
+                      )}
                     </td>
                   </tr>
                 );
@@ -316,7 +392,16 @@ function AllReportsTab({ onOpen, initialTeam }: { onOpen: (id: string) => void; 
           </table>
         )}
       </Card>
-      <p className="text-xs text-ink-3">إجمالي المعروض: {filtered.length} من {all.length} تقرير.</p>
+      <div className="flex items-center justify-between text-xs text-ink-3">
+        <p>إجمالي المطابق: {totalCount} تقرير (يشمل المتوقّع غير المُقدَّم).</p>
+        {totalPages > 1 && (
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>السابق</Button>
+            <span>صفحة {page} من {totalPages}</span>
+            <Button variant="ghost" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>التالي</Button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -402,16 +487,14 @@ function MineTab({ onOpen }: { onOpen: (id: string) => void }) {
   const periodType: PeriodType = user?.expectedReportCadence ?? 'Weekly';
   const isDaily = periodType === 'Daily';
 
-  // مفتاح الفترة الافتراضي = الفترة الحالية المطابقة لمنطق الخادم (يومي: تاريخ اليوم، أسبوعي: الأسبوع التشغيلي)،
-  // فلا يحتاج المستخدم لكتابة الصيغة يدويًّا. النص الإرشادي الأحمر يبقى توضيحًا للصيغة فقط عند تعديلها بقيمة خاطئة.
-  const defaultPeriodKey = () => {
-    const today = riyadhToday();
-    if (isDaily) return today.toISOString().slice(0, 10); // YYYY-MM-DD (تاريخ تقويميّ UTC)
-    return operationalWeekKey(today);
-  };
+  // مفتاح الفترة الافتراضي فارغ في الوضعين: يملؤه منتقي التقويم الخادميّ (يوميّ my-days أو أسبوعيّ my-cycles)
+  // باليوم الحاليّ/الدورة الحالية المحسوبة خادميًّا. لا حساب محليّ لأيّ مفتاح، ولا إدخال نصّيّ/تاريخ حرّ.
+  const defaultPeriodKey = () => '';
 
   const [reportTemplateId, setReportTemplateId] = useState('');
   const [periodKey, setPeriodKey] = useState(defaultPeriodKey);
+  // اليوميّ: هل اليوم المختار مفتوح للإنشاء؟ (يُقفَل للعطلة/المستقبل عبر الخادم). الأسبوعيّ يعتمد وجود المفتاح.
+  const [dayOpenForDraft, setDayOpenForDraft] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   // البند 9 — منع ازدواج التقارير الأسبوعية الإلزامية: نوضّح أيّ قالب «أساسي مطلوب» وأيّها «تكميلي اختياري».
@@ -422,6 +505,7 @@ function MineTab({ onOpen }: { onOpen: (id: string) => void }) {
     mutationFn: () => api.post<SubmissionDto>('/submissions', { reportTemplateId, periodType, periodKey }),
     onSuccess: (res) => {
       setPeriodKey(defaultPeriodKey());
+      setDayOpenForDraft(false); // يُعاد ضبطه تلقائيًّا عند إعادة اختيار اليوم الحاليّ من المنتقي
       void qc.invalidateQueries({ queryKey: ['submissions-mine'] });
       onOpen(res.data.id);
     },
@@ -468,35 +552,69 @@ function MineTab({ onOpen }: { onOpen: (id: string) => void }) {
             </Alert>
           </div>
         )}
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="w-72">
-            <Field label="القالب">
-              <Select value={reportTemplateId} onChange={(e) => setReportTemplateId(e.target.value)}>
-                <option value="">اختر قالبًا…</option>
-                {templates?.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.title}{t.classification === 'Supplementary' ? ' — اختياري (استبيان/متابعة)' : ' — مطلوب'}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <div className="mt-1 text-xs text-navy/60">تظهر هنا القوالب المناسبة لدور صاحب التقرير فقط.</div>
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="w-72">
+              <Field label="القالب">
+                <Select value={reportTemplateId} onChange={(e) => setReportTemplateId(e.target.value)}>
+                  <option value="">اختر قالبًا…</option>
+                  {templates?.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.title}{t.classification === 'Supplementary' ? ' — اختياري (استبيان/متابعة)' : ' — مطلوب'}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <div className="mt-1 text-xs text-navy/60">تظهر هنا القوالب المناسبة لدور صاحب التقرير فقط.</div>
+            </div>
+            <div className="w-40">
+              <Field label="الدورية">
+                <div className="flex h-10 items-center">
+                  <Badge tone="navy">{periodTypeLabel[periodType]}</Badge>
+                </div>
+              </Field>
+            </div>
           </div>
-          <div className="w-40">
-            <Field label="الدورية">
-              <div className="flex h-10 items-center">
-                <Badge tone="navy">{periodTypeLabel[periodType]}</Badge>
+
+          {/* يوميّ: منتقي اليوم التقريريّ المُدرِك للدور والحالة (يحسب اليوم الحاليّ ومفتاحه خادميًّا). */}
+          {isDaily && (
+            <div className="max-w-md">
+              <Field label="الفترة (يوم)">
+                <DailyCalendarPicker
+                  templateId={reportTemplateId || null}
+                  value={periodKey || null}
+                  onChange={(key: string, day: ReportingDayDto) => {
+                    setErr(null);
+                    setPeriodKey(key);
+                    setDayOpenForDraft(day.isOpenForDraft);
+                  }}
+                />
+              </Field>
+              <div className="mt-3">
+                <Button disabled={!reportTemplateId || !periodKey || !dayOpenForDraft || create.isPending} onClick={() => { setErr(null); create.mutate(); }}>
+                  إنشاء تقرير
+                </Button>
               </div>
-            </Field>
-          </div>
-          <div className="w-40">
-            <Field label={isDaily ? 'الفترة (يوم)' : 'الفترة (أسبوع)'}>
-              <Input value={periodKey} onChange={(e) => setPeriodKey(e.target.value)} placeholder={isDaily ? '2026-06-15' : '2026-W25'} />
-            </Field>
-          </div>
-          <Button disabled={!reportTemplateId || !periodKey || create.isPending} onClick={() => { setErr(null); create.mutate(); }}>
-            إنشاء تقرير
-          </Button>
+            </div>
+          )}
+
+          {/* أسبوعيّ: منتقي دورة التقارير المُدرِك للدور (يحسب الدورة الحالية وتاريخ الاستحقاق خادميًّا). */}
+          {!isDaily && (
+            <div className="max-w-md">
+              <Field label="الفترة (أسبوع)">
+                <WeeklyCycleCalendarPicker
+                  context="Report"
+                  value={periodKey || null}
+                  onChange={(key) => { setErr(null); setPeriodKey(key); }}
+                />
+              </Field>
+              <div className="mt-3">
+                <Button disabled={!reportTemplateId || !periodKey || create.isPending} onClick={() => { setErr(null); create.mutate(); }}>
+                  إنشاء تقرير
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </Card>
       <Card>
@@ -580,11 +698,22 @@ export function parseRepeatableConfig(json: string | null): ProjectRepeatableCon
       projectRequired: p.projectRequired ?? true,
       minProjects: Number.isFinite(p.minProjects) ? Number(p.minProjects) : 1,
       maxProjects: Number.isFinite(p.maxProjects) ? Number(p.maxProjects) : 10,
-      fields: Array.isArray(p.fields) ? p.fields : [],
+      fields: Array.isArray(p.fields) ? p.fields.map(normalizeSubField) : [],
     };
   } catch {
     return fallback;
   }
+}
+
+// تطبيع القيود الرقميّة الاختيارية لحقل فرعيّ (PROJECT-REPEATABLE-NUMERIC-VALIDATION-R1).
+// القوالب القديمة بلا هذه الخصائص تبقى كما هي (كل القيود undefined ⇒ بلا فرض).
+function normalizeSubField(f: RepeatableSubField): RepeatableSubField {
+  const out: RepeatableSubField = { ...f };
+  out.min = Number.isFinite(f.min) ? Number(f.min) : undefined;
+  out.max = Number.isFinite(f.max) ? Number(f.max) : undefined;
+  out.integerOnly = f.integerOnly === true;
+  out.step = Number.isFinite(f.step) && Number(f.step) > 0 ? Number(f.step) : undefined;
+  return out;
 }
 
 export function parseRepeatableEntries(json: string | null | undefined): ProjectRepeatableEntry[] {
@@ -611,9 +740,35 @@ export function subFieldInputKind(t: RepeatableSubField['type']): 'number' | 'lo
   return 'text';
 }
 
-function SubmissionDetail({ id, onBack }: { id: string; onBack: () => void }) {
+// الأنواع الرقميّة داخل القسم المتكرّر.
+const REPEATABLE_NUMERIC_TYPES: RepeatableSubField['type'][] = ['Number', 'Currency', 'Decimal', 'Percentage'];
+
+// تحقّق رقميّ فوريّ يطابق قواعد الخادم (PROJECT-REPEATABLE-NUMERIC-VALIDATION-R1).
+// يُرجِع رسالة خطأ عربيّة أو null. لا يُطبَّق إلا على الحقول الرقميّة ذات القيد؛ القيمة الفارغة تُترَك للمطلوبيّة.
+// الخادم يبقى مرجع الفرض النهائيّ؛ هذا للتغذية الراجعة الفوريّة فقط.
+export function validateRepeatableNumber(sf: RepeatableSubField, raw: string): string | null {
+  if (!REPEATABLE_NUMERIC_TYPES.includes(sf.type)) return null;
+  const hasConstraint =
+    sf.min !== undefined || sf.max !== undefined || sf.integerOnly === true || sf.step !== undefined;
+  if (!hasConstraint) return null;
+  if (raw === null || raw === undefined || raw.trim() === '') return null; // الفراغ ⇒ يخضع للمطلوبيّة لا للرقم.
+  const num = Number(raw);
+  if (!Number.isFinite(num)) return 'قيمة رقميّة غير صالحة.';
+  if (sf.integerOnly && !Number.isInteger(num)) return 'يجب إدخال عدد صحيح.';
+  if (sf.min !== undefined && num < sf.min) return `القيمة أقل من الحدّ الأدنى (${sf.min}).`;
+  if (sf.max !== undefined && num > sf.max) return `القيمة أكبر من الحدّ الأقصى (${sf.max}).`;
+  if (sf.step !== undefined && sf.step > 0) {
+    const baseline = sf.min ?? 0;
+    const q = (num - baseline) / sf.step;
+    if (Math.abs(q - Math.round(q)) > 1e-7) return `القيمة لا تطابق خطوة الإدخال (${sf.step}).`;
+  }
+  return null;
+}
+
+export function SubmissionDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const qc = useQueryClient();
-  const { user } = useAuth();
+  const { user, hasAnyRole } = useAuth();
+  const canAdminDelete = hasAnyRole('Admin', 'CEO', 'GeneralManager');
   const { data: sub, isLoading, isError, refetch } = useQuery({
     queryKey: ['submission', id],
     queryFn: async () => (await api.get<SubmissionDto>(`/submissions/${id}`)).data,
@@ -628,41 +783,65 @@ function SubmissionDetail({ id, onBack }: { id: string; onBack: () => void }) {
   // كتالوج خدمات B2B النشطة — يغذّي منتقي «الخدمة» في شبكة قالب مبيعات B2B حسب الخدمة.
   const { data: activeServices } = useActiveServices();
   const serviceNames = useMemo(() => (activeServices ?? []).map((s) => s.nameAr), [activeServices]);
+  const toast = useToast();
+  // حالة خطأ سطريّة مقصورة على «الحذف الإداريّ» (ADMIN-GOVERNANCE-R1، خارج نطاق Approval UX R1) — تطابق سلوك الأصل.
+  const [err, setErr] = useState<string | null>(null);
   const [draft, setDraft] = useState<Record<string, FieldValueInput>>({});
   const [comment, setComment] = useState('');
-  const [err, setErr] = useState<string | null>(null);
 
-  const invalidateAll = () => {
-    void qc.invalidateQueries({ queryKey: ['submission', id] });
-    void qc.invalidateQueries({ queryKey: ['submissions-mine'] });
-    void qc.invalidateQueries({ queryKey: ['submissions-pending'] });
-  };
+  // يُعيد Promise حتى ننتظر تحديث الكاش قبل Toast/الرجوع (لا رجوع قبل تحديث البيانات).
+  const invalidateAll = () =>
+    Promise.all([
+      qc.invalidateQueries({ queryKey: ['submission', id] }),
+      qc.invalidateQueries({ queryKey: ['submissions-mine'] }),
+      qc.invalidateQueries({ queryKey: ['submissions-pending'] }),
+    ]);
 
+  // APPROVAL ACTION UX R1: أخطاء الطلبات (mutations) عبر Toast فقط؛ التحقّق السطريّ يبقى Alert.
+  // الحفظ/الإرسال يبقيان في الصفحة؛ الـToast يُطلَق في مُعالِج الزر بعد اكتمال mutateAsync (أي بعد إبطال الكاش).
   const save = useMutation({
     mutationFn: (fields: SubmissionFieldValueDto[]) =>
       api.put(`/submissions/${id}/values`, {
         values: fields.map((f) => draft[f.templateFieldId] ?? toInput(f)),
       }),
     onSuccess: () => invalidateAll(),
-    onError: (e) => setErr(apiErrorMessage(e)),
+    onError: (e) => toast.error(approvalErrorMessage(e)),
   });
 
   const submit = useMutation({
     mutationFn: () => api.post(`/submissions/${id}/submit`),
     onSuccess: () => invalidateAll(),
-    onError: (e) => setErr(apiErrorMessage(e)),
+    onError: (e) => toast.error(approvalErrorMessage(e)),
   });
 
   const deleteDraft = useMutation({
     mutationFn: () => api.delete(`/submissions/${id}`),
-    onSuccess: () => { invalidateAll(); onBack(); },
-    onError: (e) => setErr(apiErrorMessage(e)),
+    // قرار نهائيّ: تحديث الكاش ⇒ Toast ⇒ رجوع تلقائيّ بعد ~700ms.
+    onSuccess: async () => { await invalidateAll(); toast.success('✅ تم حذف المسودة'); setTimeout(onBack, POST_SUCCESS_NAV_DELAY_MS); },
+    onError: (e) => toast.error(approvalErrorMessage(e)),
   });
 
+  // قرار نهائيّ (اعتماد/إعادة/تصعيد): تحديث القوائم أولًا ⟵ Toast نجاح ⟵ رجوع تلقائيّ للقائمة بعد ~700ms.
   const action = useMutation({
     mutationFn: (kind: 'approve' | 'return' | 'escalate') =>
       api.post(`/submissions/${id}/${kind}`, { comment: comment || null }),
-    onSuccess: () => { setComment(''); invalidateAll(); },
+    onSuccess: async (_data, kind) => {
+      const msg =
+        kind === 'approve' ? '✅ تم اعتماد التقرير بنجاح'
+        : kind === 'return' ? '✅ تم إرجاع التقرير للتعديل'
+        : '✅ تم تصعيد التقرير';
+      setComment('');
+      await invalidateAll();
+      toast.success(msg);
+      setTimeout(onBack, POST_SUCCESS_NAV_DELAY_MS);
+    },
+    onError: (e) => toast.error(approvalErrorMessage(e)),
+  });
+
+  // حذف إداريّ ناعم للتقرير (ADMIN-GOVERNANCE-R1): Admin/CEO/GM فقط، سبب إلزاميّ + تدقيق.
+  const adminDelete = useMutation({
+    mutationFn: (reason: string) => api.post(`/submissions/${id}/admin-delete`, { reason }),
+    onSuccess: () => { invalidateAll(); onBack(); },
     onError: (e) => setErr(apiErrorMessage(e)),
   });
 
@@ -706,6 +885,15 @@ function SubmissionDetail({ id, onBack }: { id: string; onBack: () => void }) {
       !NUMERIC_TYPES.includes(f.fieldType),
   );
 
+  // هل ينطبق Profile عرض على هذا التقرير؟ (وضع القراءة فقط — نموذج الإدخال لا يتغيّر إطلاقًا).
+  // عند الانطباق يُعاد ترتيب الصفحة إلى Client-first: تفاصيل العملاء والمشروعات أولًا،
+  // ثمّ النظرة العامة (الملخّص الأسبوعي + أبرز التحديات). القوالب بلا Profile تبقى بالترتيب القائم.
+  const hasPresentationProfile =
+    !sub.canEdit &&
+    prsFields.some(
+      (f) => resolvePresentationProfile(parseRepeatableConfig(f.configJson).fields, sub.templateTitle) != null,
+    );
+
   // عرض قسم المشاريع المتكرر (جسم التقرير) — تحرير أو قراءة.
   const renderPRS = (f: SubmissionFieldValueDto) => {
     const rcfg = parseRepeatableConfig(f.configJson);
@@ -714,7 +902,7 @@ function SubmissionDetail({ id, onBack }: { id: string; onBack: () => void }) {
     const update = (patch: Partial<FieldValueInput>) =>
       setDraft((prev) => ({ ...prev, [f.templateFieldId]: { ...cur, ...patch } }));
     if (!sub.canEdit) {
-      return <ProjectRepeatableDisplay key={f.templateFieldId} config={rcfg} entries={entries} projects={allProjects ?? []} />;
+      return <ProjectRepeatableDisplay key={f.templateFieldId} config={rcfg} entries={entries} projects={allProjects ?? []} templateTitle={sub.templateTitle} />;
     }
     return (
       <div key={f.templateFieldId}>
@@ -831,14 +1019,32 @@ function SubmissionDetail({ id, onBack }: { id: string; onBack: () => void }) {
   // شريط إجراءات الحفظ/الإرسال/الحذف — يظهر مرة واحدة أسفل الحقول.
   const actionBar = sub.canEdit ? (
     <div className="flex flex-wrap items-center gap-2">
-      <Button disabled={save.isPending} onClick={() => { setErr(null); save.mutate(sub.fieldValues); }}>
+      <Button
+        loading={save.isPending}
+        disabled={save.isPending || submit.isPending}
+        onClick={async () => {
+          if (save.isPending || submit.isPending) return;
+          try {
+            await save.mutateAsync(sub.fieldValues);
+            toast.success('✅ تم حفظ البيانات بنجاح');
+          } catch { /* الخطأ يظهر عبر Toast من onError */ }
+        }}
+      >
         حفظ
       </Button>
       <Button
         variant="ghost"
-        disabled={submit.isPending || missingCount > 0}
+        loading={submit.isPending || save.isPending}
+        disabled={save.isPending || submit.isPending || missingCount > 0}
         title={missingCount > 0 ? 'أكمل الحقول المطلوبة أولًا' : undefined}
-        onClick={() => { setErr(null); save.mutate(sub.fieldValues); submit.mutate(); }}
+        onClick={async () => {
+          if (save.isPending || submit.isPending) return;
+          try {
+            await save.mutateAsync(sub.fieldValues);
+            await submit.mutateAsync();
+            toast.success('✅ تم إرسال التقرير للاعتماد');
+          } catch { /* الخطأ يظهر عبر Toast من onError */ }
+        }}
       >
         إرسال للاعتماد
       </Button>
@@ -848,9 +1054,10 @@ function SubmissionDetail({ id, onBack }: { id: string; onBack: () => void }) {
       {sub.status === 'Draft' && (
         <Button
           variant="danger"
+          loading={deleteDraft.isPending}
           disabled={deleteDraft.isPending}
           onClick={() => {
-            setErr(null);
+            if (deleteDraft.isPending) return;
             if (window.confirm('هل تريد حذف هذه المسودة؟ لا يمكن التراجع عن هذا الإجراء.')) deleteDraft.mutate();
           }}
         >
@@ -918,40 +1125,65 @@ function SubmissionDetail({ id, onBack }: { id: string; onBack: () => void }) {
           {actionBar && <div className="mt-4">{actionBar}</div>}
         </Card>
       ) : (
-        // العرض Project-first: (1) نظرة عامة (2) Scorecard رقمي مطويّ ثانوي (3) جسم المشاريع.
+        // العرض Project-first. بلا Profile: (1) نظرة عامة (2) Scorecard (3) جسم المشاريع.
+        // مع Profile (Client-first): (1) تفاصيل العملاء والمشروعات (2) نظرة عامة (3) Scorecard.
         <>
-          {overviewFields.length > 0 && (
-            <Card>
-              <h2 className="mb-3 font-semibold text-navy">نظرة عامة</h2>
-              <div className="space-y-3">{overviewFields.map((f) => renderField(f))}</div>
-            </Card>
-          )}
+          {(() => {
+            const overviewCard = overviewFields.length > 0 && (
+              <Card key="overview">
+                <h2 className="mb-3 font-semibold text-navy">نظرة عامة</h2>
+                <div className="space-y-3">{overviewFields.map((f) => renderField(f))}</div>
+              </Card>
+            );
 
-          {scorecardFields.length > 0 && (
-            <Card>
-              <details>
-                <summary className="cursor-pointer select-none font-semibold text-navy">
-                  🔢 مؤشرات الأداء (KPI){' '}
-                  <span className="text-xs font-normal text-ink-2">— اضغط للعرض/الطي</span>
-                </summary>
-                <p className="mt-2 mb-3 text-xs text-ink-2">
-                  مؤشرات رقمية للتجميع والاحتساب — ليست جزءًا من جسم التقرير.
+            const scorecardCard = scorecardFields.length > 0 && (
+              <Card key="scorecard">
+                <details>
+                  <summary className="cursor-pointer select-none font-semibold text-navy">
+                    🔢 مؤشرات الأداء (KPI){' '}
+                    <span className="text-xs font-normal text-ink-2">— اضغط للعرض/الطي</span>
+                  </summary>
+                  <p className="mt-2 mb-3 text-xs text-ink-2">
+                    مؤشرات رقمية للتجميع والاحتساب — ليست جزءًا من جسم التقرير.
+                  </p>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {scorecardFields.map((f) => renderField(f))}
+                  </div>
+                </details>
+              </Card>
+            );
+
+            const projectsCard = (
+              <Card key="projects">
+                <h2 className="mb-1 font-semibold text-navy">
+                  {hasPresentationProfile ? 'تفاصيل العملاء والمشروعات' : '📁 تفاصيل المشاريع / العملاء'}
+                </h2>
+                <p className="mb-3 text-xs text-ink-2">
+                  جسم التقرير — كل مشروع/عميل في بطاقة مستقلّة تحوي كل التفاصيل والجداول.
                 </p>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {scorecardFields.map((f) => renderField(f))}
-                </div>
-              </details>
-            </Card>
-          )}
+                <div className="space-y-4">{prsFields.map((f) => renderPRS(f))}</div>
+                {!hasPresentationProfile && actionBar && (
+                  <div className="mt-4 border-t border-line pt-4">{actionBar}</div>
+                )}
+              </Card>
+            );
 
-          <Card>
-            <h2 className="mb-1 font-semibold text-navy">📁 تفاصيل المشاريع / العملاء</h2>
-            <p className="mb-3 text-xs text-ink-2">
-              جسم التقرير — كل مشروع/عميل في بطاقة مستقلّة تحوي كل التفاصيل والجداول.
-            </p>
-            <div className="space-y-4">{prsFields.map((f) => renderPRS(f))}</div>
-            {actionBar && <div className="mt-4 border-t border-line pt-4">{actionBar}</div>}
-          </Card>
+            // شريط الإجراءات في وضع الـProfile يُعرض بعد كل الأقسام (لا داخل بطاقة المشاريع).
+            return hasPresentationProfile ? (
+              <>
+                {projectsCard}
+                {overviewCard}
+                {scorecardCard}
+                {actionBar && <Card key="actions">{actionBar}</Card>}
+              </>
+            ) : (
+              <>
+                {overviewCard}
+                {scorecardCard}
+                {projectsCard}
+              </>
+            );
+          })()}
         </>
       )}
 
@@ -979,20 +1211,28 @@ function SubmissionDetail({ id, onBack }: { id: string; onBack: () => void }) {
             </Field>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button disabled={action.isPending} onClick={() => { setErr(null); action.mutate('approve'); }}>اعتماد</Button>
+            <Button
+              loading={action.isPending}
+              disabled={action.isPending}
+              onClick={() => { if (action.isPending) return; action.mutate('approve'); }}
+            >
+              اعتماد
+            </Button>
             <Button
               variant="ghost"
+              loading={action.isPending}
               disabled={action.isPending || !comment.trim()}
               title={!comment.trim() ? 'اكتب سبب الإعادة أولًا' : undefined}
-              onClick={() => { setErr(null); action.mutate('return'); }}
+              onClick={() => { if (action.isPending) return; action.mutate('return'); }}
             >
               إعادة للتعديل
             </Button>
             <Button
               variant="danger"
+              loading={action.isPending}
               disabled={action.isPending || !comment.trim()}
               title={!comment.trim() ? 'اكتب سبب التصعيد أولًا' : undefined}
-              onClick={() => { setErr(null); action.mutate('escalate'); }}
+              onClick={() => { if (action.isPending) return; action.mutate('escalate'); }}
             >
               تصعيد
             </Button>
@@ -1000,6 +1240,28 @@ function SubmissionDetail({ id, onBack }: { id: string; onBack: () => void }) {
           {!comment.trim() && (
             <p className="mt-2 text-xs text-ink-2">الاعتماد لا يتطلّب سببًا، لكن الإعادة والتصعيد يتطلّبان كتابة السبب.</p>
           )}
+        </Card>
+      )}
+
+      {/* الحذف الإداريّ الناعم (ADMIN-GOVERNANCE-R1): Admin/CEO/GM فقط، سبب إلزاميّ. */}
+      {canAdminDelete && (
+        <Card>
+          <h2 className="mb-2 font-semibold text-navy">حذف إداريّ</h2>
+          <p className="mb-3 text-sm text-ink-2">
+            حذف ناعم للتقرير مع حفظ السبب في سجلّ التدقيق. يُلغي خطوات الاعتماد المعلّقة ويُخفي التقرير من التجميعات.
+          </p>
+          <Button
+            variant="danger"
+            disabled={adminDelete.isPending}
+            onClick={() => {
+              setErr(null);
+              const reason = window.prompt('سبب الحذف الإداريّ (إلزاميّ):')?.trim();
+              if (!reason) return;
+              adminDelete.mutate(reason);
+            }}
+          >
+            حذف إداريّ للتقرير
+          </Button>
         </Card>
       )}
 
@@ -1286,6 +1548,20 @@ export function ProjectRepeatableEditor({
             {config.fields.map((sf) => {
               const val = entry.answers[sf.key] ?? '';
               const label = `${sf.label}${sf.required ? ' *' : ''}`;
+              // حقل الخطر التفصيلي يظهر فقط عند «نعم»؛ التبديل إلى «لا» لا يمسح القيمة (تبقى محفوظة في answers).
+              if (sf.key === 'risk_note' && (entry.answers['risk_exists'] ?? '') !== 'نعم') return null;
+              // تحليل المحتوى: بطاقات تحليل بدل جدول Grid التقليدي (تخزين مطابق: مصفوفة صفوف JSON في answers[key]).
+              if (sf.key === 'content_highlights') {
+                return (
+                  <div key={sf.key} className="md:col-span-2">
+                    <p className="mb-1 text-sm font-medium text-ink">{label}</p>
+                    <ContentAnalysisCardsEditor
+                      rows={parseGrid(val)}
+                      onChange={(rows) => setAnswer(i, sf.key, JSON.stringify(rows))}
+                    />
+                  </div>
+                );
+              }
               // جدول صفوف داخل المشروع: يمتدّ على عرض كامل، صفوفه محفوظة كنصّ JSON في answers[key].
               if (sf.type === 'Grid') {
                 return (
@@ -1300,8 +1576,9 @@ export function ProjectRepeatableEditor({
                 );
               }
               const k = subFieldInputKind(sf.type);
+              const numError = k === 'number' ? validateRepeatableNumber(sf, val) : null;
               return (
-                <Field key={sf.key} label={label}>
+                <Field key={sf.key} label={label} help={MOD_FIELD_GUIDANCE[sf.key]}>
                   {k === 'bool' ? (
                     <Select value={val} onChange={(e) => setAnswer(i, sf.key, e.target.value)}>
                       <option value="">—</option>
@@ -1318,7 +1595,17 @@ export function ProjectRepeatableEditor({
                       onChange={(e) => setAnswer(i, sf.key, e.target.value)}
                     />
                   ) : k === 'number' ? (
-                    <Input type="number" value={val} onChange={(e) => setAnswer(i, sf.key, e.target.value)} />
+                    <>
+                      <Input
+                        type="number"
+                        value={val}
+                        min={sf.min}
+                        max={sf.max}
+                        step={sf.integerOnly ? (sf.step ?? 1) : sf.step}
+                        onChange={(e) => setAnswer(i, sf.key, e.target.value)}
+                      />
+                      {numError && <p className="mt-1 text-xs text-red-600">{numError}</p>}
+                    </>
                   ) : k === 'date' ? (
                     <Input type="date" value={val ? val.slice(0, 10) : ''} onChange={(e) => setAnswer(i, sf.key, e.target.value)} />
                   ) : (
@@ -1339,14 +1626,55 @@ export function ProjectRepeatableEditor({
   );
 }
 
+// ===== تجميع حقول المديرشن (Vocabulary 1 المعتمدة للقالب الحيّ V5) =====
+// عرض مجمّع مفهوم للحقول المتاحة فقط. لا يحسب أي مؤشر جديد ولا يعرض أي مقياس غير مدعوم بالبيانات.
+// أقسام قصّة المديرشن. تجميع R1A الخمسة يبقى كما هو حرفيًّا (توافق خلفي V5 W28/W29)؛ أقسام تحليل المحتوى
+// الجديدة (V6) تُدرَج قبل السرد الختامي، وتُسقَط تلقائيًّا للقوالب الأقدم عبر مرشّح المجموعات الفارغة أدناه.
+const MOD_VOCAB1_GROUPS: { title: string; keys: string[] }[] = [
+  { title: 'نظرة عامة', keys: ['project_status', 'time_consumption'] },
+  { title: 'حجم العمل', keys: ['incoming_messages', 'answered_messages', 'avg_response_minutes'] },
+  { title: 'الجودة والتصعيد', keys: ['problematic_comments', 'escalations', 'complaints', 'converted_opportunities'] },
+  { title: 'الحالات', keys: ['cases_grid'] },
+  { title: 'تحليل المحتوى', keys: ['content_highlights'] },
+  { title: 'قراءة الجمهور والدروس والقرارات', keys: ['audience_insight', 'lessons_learned', 'decisions_required'] },
+  { title: 'المخاطر والفرص', keys: ['risk_exists', 'risk_note'] },
+  { title: 'السرد والتوصيات', keys: ['done', 'issues', 'recurring_questions', 'next_week', 'recommendations'] },
+];
+const MOD_VOCAB1_KNOWN = new Set(MOD_VOCAB1_GROUPS.flatMap((g) => g.keys));
+
+// إرشادات كتابة الحقول السردية الجديدة (تظهر تحت عنوان الحقل في المحرّر فقط، لا في العرض).
+const MOD_FIELD_GUIDANCE: Record<string, string> = {
+  audience_insight:
+    'اكتب أبرز ما لاحظته من تفاعل الجمهور هذا الأسبوع: التعليقات الإيجابية أو السلبية، الاعتراضات، الموضوعات التي جذبت الاهتمام، وأي فرص محتوى جديدة.',
+  lessons_learned: 'ماذا نكرر؟ / ماذا نوقف؟ / ماذا نحسن؟',
+  decisions_required: 'ما القرار المطلوب، ومن الجهة المطلوب منها اتخاذه؟',
+};
+
+// عقد بطاقة تحليل المحتوى: العمود الأول = التصنيف (بخيارات مثبَّتة)، والأعمدة الستة مطابقة لعقد V6.
+const CONTENT_ANALYSIS_CLASSIFICATIONS = ['أفضل محتوى', 'أضعف محتوى'];
+
+// كشف مفردات المديرشن المعتمدة عبر وجود مفاتيح دالّة؛ غير ذلك يسقط للعرض العام (توافق خلفي V1–V4/غير-المديرشن).
+export function isModerationVocab1(config: ProjectRepeatableConfig): boolean {
+  const keys = new Set(config.fields.map((f) => f.key));
+  return keys.has('project_status') && keys.has('incoming_messages') && keys.has('cases_grid');
+}
+
 // ===== قسم المشاريع المتكرر: عرض للقراءة فقط مجمّع حسب المشروع =====
 export function ProjectRepeatableDisplay({
-  config, entries, projects,
+  config, entries, projects, templateTitle = '',
 }: {
   config: ProjectRepeatableConfig;
   entries: ProjectRepeatableEntry[];
   projects: ProjectDto[];
+  templateTitle?: string;
 }) {
+  // AMR-OUTPUT-REDESIGN-R1: إن طابق القالب ميفولة عرض (Presentation Profile) نصيّره بالمصيّر
+  // المدفوع بالميتاداتا (مخرَج قراريّ). القوالب بلا Profile تبقى على المصيّر العامّ القائم (fallback).
+  const profile = resolvePresentationProfile(config.fields, templateTitle);
+  if (profile) {
+    return <PresentationProfileReport profile={profile} config={config} entries={entries} projects={projects} />;
+  }
+
   if (entries.length === 0)
     return <p className="rounded-lg border border-line bg-offwhite px-3 py-2 text-sm">—</p>;
 
@@ -1361,25 +1689,87 @@ export function ProjectRepeatableDisplay({
     return raw;
   };
 
-  return (
-    <div className="space-y-3">
-      {entries.map((entry, i) => (
-        <div key={i} className="rounded-lg border border-line bg-white p-3">
-          <p className="mb-2 font-semibold text-navy">{projectName(entry.projectId)}</p>
+  const renderFields = (fields: RepeatableSubField[], entry: ProjectRepeatableEntry) => {
+    const nonGrid = fields.filter((sf) => sf.type !== 'Grid');
+    const grids = fields.filter((sf) => sf.type === 'Grid');
+    return (
+      <>
+        {nonGrid.length > 0 && (
           <dl className="grid gap-x-6 gap-y-1.5 text-sm md:grid-cols-2">
-            {config.fields.filter((sf) => sf.type !== 'Grid').map((sf) => (
+            {nonGrid.map((sf) => (
               <div key={sf.key} className="flex justify-between gap-3 border-b border-line/60 pb-1">
                 <dt className="text-ink-2">{sf.label}</dt>
                 <dd className="font-medium text-ink whitespace-pre-wrap">{showAnswer(sf, entry.answers[sf.key])}</dd>
               </div>
             ))}
           </dl>
-          {config.fields.filter((sf) => sf.type === 'Grid').map((sf) => (
-            <div key={sf.key} className="mt-3">
-              <p className="mb-1 text-sm font-medium text-ink-2">{sf.label}</p>
+        )}
+        {grids.map((sf) => (
+          <div key={sf.key} className="mt-3">
+            <p className="mb-1 text-sm font-medium text-ink-2">{sf.label}</p>
+            {sf.key === 'content_highlights' ? (
+              <ContentAnalysisCardsDisplay rows={parseGrid(entry.answers[sf.key])} />
+            ) : (
               <GridDisplay columns={sf.columns ?? []} rows={parseGrid(entry.answers[sf.key])} />
+            )}
+          </div>
+        ))}
+      </>
+    );
+  };
+
+  // عرض المديرشن المجمّع (Vocabulary 1): أقسام مرتّبة مع ذيل «حقول إضافية» لأي مفتاح غير معروف.
+  if (isModerationVocab1(config)) {
+    const byKey = new Map(config.fields.map((f) => [f.key, f]));
+    const groups = MOD_VOCAB1_GROUPS
+      .map((g) => ({ title: g.title, fields: g.keys.map((k) => byKey.get(k)).filter((f): f is RepeatableSubField => !!f) }))
+      .filter((g) => g.fields.length > 0);
+    const extra = config.fields.filter((f) => !MOD_VOCAB1_KNOWN.has(f.key));
+    return (
+      <div className="space-y-3">
+        {entries.map((entry, i) => {
+          // رؤية قسم المخاطر مرهونة بالقيمة لكل مشروع: يظهر عند «نعم» أو عند وجود ملاحظة خطر تاريخية غير فارغة؛
+          // «لا» + ملاحظة فارغة ⇒ يُخفى القسم كليًّا (دون فقدان أي معلومة تاريخية إن وُجدت).
+          const entryGroups = groups
+            .map((g) => {
+              if (!g.fields.some((f) => f.key === 'risk_exists' || f.key === 'risk_note')) return g;
+              const riskYes = (entry.answers['risk_exists'] ?? '').trim() === 'نعم';
+              const noteFilled = (entry.answers['risk_note'] ?? '').trim() !== '';
+              if (!riskYes && !noteFilled) return { ...g, fields: [] as RepeatableSubField[] };
+              return { ...g, fields: g.fields.filter((f) => (f.key === 'risk_note' ? riskYes || noteFilled : true)) };
+            })
+            .filter((g) => g.fields.length > 0);
+          return (
+            <div key={i} className="rounded-lg border border-line bg-white p-3">
+              <p className="mb-2 font-semibold text-navy">{projectName(entry.projectId)}</p>
+              <div className="space-y-3">
+                {entryGroups.map((g) => (
+                  <section key={g.title}>
+                    <h5 className="mb-1.5 text-sm font-semibold text-navy/80">{g.title}</h5>
+                    {renderFields(g.fields, entry)}
+                  </section>
+                ))}
+                {extra.length > 0 && (
+                  <section>
+                    <h5 className="mb-1.5 text-sm font-semibold text-ink-2">حقول إضافية</h5>
+                    {renderFields(extra, entry)}
+                  </section>
+                )}
+              </div>
             </div>
-          ))}
+          );
+        })}
+      </div>
+    );
+  }
+
+  // العرض العام (توافق خلفي لكل القوالب الأخرى/غير-المديرشن).
+  return (
+    <div className="space-y-3">
+      {entries.map((entry, i) => (
+        <div key={i} className="rounded-lg border border-line bg-white p-3">
+          <p className="mb-2 font-semibold text-navy">{projectName(entry.projectId)}</p>
+          {renderFields(config.fields, entry)}
         </div>
       ))}
     </div>
@@ -1388,7 +1778,9 @@ export function ProjectRepeatableDisplay({
 
 export function GridDisplay({ columns, rows }: { columns: string[]; rows: string[][] }) {
   const cols = columns.length ? columns : ['القيمة'];
-  if (!rows.length) return <p className="rounded-lg border border-line bg-offwhite px-3 py-2 text-sm">—</p>;
+  // تصفية الصفوف الفارغة كليًّا (بيانات ناقصة أو مشوّهة) — لا نعرض صفوفًا خاوية.
+  const filled = rows.filter((row) => Array.isArray(row) && cols.some((_, c) => (row[c] ?? '').toString().trim() !== ''));
+  if (!filled.length) return <p className="rounded-lg border border-line bg-offwhite px-3 py-2 text-sm">—</p>;
   return (
     <div className="overflow-x-auto rounded-lg border border-line">
       <table className="w-full text-sm">
@@ -1400,7 +1792,7 @@ export function GridDisplay({ columns, rows }: { columns: string[]; rows: string
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, r) => (
+          {filled.map((row, r) => (
             <tr key={r} className="border-t border-line">
               {cols.map((_, c) => (
                 <td key={c} className="px-2 py-1.5">{row[c] ?? ''}</td>
@@ -1409,6 +1801,123 @@ export function GridDisplay({ columns, rows }: { columns: string[]; rows: string
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+// ===== تحليل المحتوى: محرّر بطاقات (بديل GridEditor لمفتاح content_highlights) =====
+// كل بطاقة = صفّ من ستّ خلايا [التصنيف، المنصة، نوع المحتوى، الرابط/التعريف، لماذا اختير، الدرس/الإجراء].
+// التخزين مطابق تمامًا لجدول Grid (مصفوفة صفوف نصية JSON في answers[key]) — بلا نوع حقل جديد ولا فقدان قيَم.
+export function ContentAnalysisCardsEditor({
+  rows, onChange,
+}: {
+  rows: string[][];
+  onChange: (rows: string[][]) => void;
+}) {
+  // نضمن أن لكل صفّ ستّ خلايا قبل التعديل (توافق مع صفوف قديمة ناقصة).
+  const setCell = (r: number, c: number, v: string) => {
+    const next = rows.map((row) => {
+      const copy = Array.isArray(row) ? [...row] : [];
+      while (copy.length < 6) copy.push('');
+      return copy;
+    });
+    next[r][c] = v;
+    onChange(next);
+  };
+  const addCard = () => onChange([...rows, ['', '', '', '', '', '']]);
+  const removeCard = (r: number) => onChange(rows.filter((_, i) => i !== r));
+
+  return (
+    <div className="space-y-3">
+      {rows.length === 0 && (
+        <p className="text-xs text-ink-3">لا يوجد تحليل محتوى بعد. يُفضَّل إضافة بطاقة لأفضل محتوى وأخرى لأضعف محتوى (غير إلزامي).</p>
+      )}
+      {rows.map((row, r) => (
+        <div key={r} className="space-y-2 rounded-lg border border-navy/20 bg-white p-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold text-navy">بطاقة تحليل محتوى #{r + 1}</span>
+            <button type="button" onClick={() => removeCard(r)} className="text-sm text-alert hover:underline">حذف البطاقة</button>
+          </div>
+          <div className="grid gap-2 md:grid-cols-2">
+            <Field label="التصنيف">
+              <Select value={row[0] ?? ''} onChange={(e) => setCell(r, 0, e.target.value)}>
+                <option value="">اختر…</option>
+                {CONTENT_ANALYSIS_CLASSIFICATIONS.map((o) => (
+                  <option key={o} value={o}>{o}</option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="المنصة">
+              <Input value={row[1] ?? ''} onChange={(e) => setCell(r, 1, e.target.value)} />
+            </Field>
+            <Field label="نوع المحتوى">
+              <Input value={row[2] ?? ''} onChange={(e) => setCell(r, 2, e.target.value)} />
+            </Field>
+            <Field label="رابط المحتوى أو تعريفه">
+              <Input value={row[3] ?? ''} onChange={(e) => setCell(r, 3, e.target.value)} />
+            </Field>
+          </div>
+          <Field label="لماذا تم اختياره؟">
+            <textarea
+              className="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-navy focus:outline-none"
+              rows={2}
+              value={row[4] ?? ''}
+              onChange={(e) => setCell(r, 4, e.target.value)}
+            />
+          </Field>
+          <Field label="الدرس المستفاد أو الإجراء المقترح">
+            <textarea
+              className="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-navy focus:outline-none"
+              rows={2}
+              value={row[5] ?? ''}
+              onChange={(e) => setCell(r, 5, e.target.value)}
+            />
+          </Field>
+        </div>
+      ))}
+      <Button variant="ghost" onClick={addCard}>+ إضافة تحليل محتوى</Button>
+    </div>
+  );
+}
+
+// ===== تحليل المحتوى: عرض بطاقات للقراءة فقط (Draft/Submitted/Returned/Approved/Closed) =====
+export function ContentAnalysisCardsDisplay({ rows }: { rows: string[][] }) {
+  const cell = (row: string[], c: number) => (row?.[c] ?? '').toString().trim();
+  const filled = rows.filter((row) => Array.isArray(row) && row.some((c) => (c ?? '').toString().trim() !== ''));
+  if (!filled.length) return <p className="rounded-lg border border-line bg-offwhite px-3 py-2 text-sm">—</p>;
+  const tone = (cls: string): 'success' | 'alert' | 'muted' =>
+    cls === 'أفضل محتوى' ? 'success' : cls === 'أضعف محتوى' ? 'alert' : 'muted';
+  const frame = (cls: string) =>
+    cls === 'أفضل محتوى' ? 'border-green-100 bg-green-50/40'
+      : cls === 'أضعف محتوى' ? 'border-red-100 bg-red-50/40'
+      : 'border-line bg-white';
+  return (
+    <div className="space-y-2">
+      {filled.map((row, r) => {
+        const cls = cell(row, 0);
+        return (
+          <div key={r} className={`rounded-lg border p-3 ${frame(cls)}`}>
+            <div className="mb-1.5 flex flex-wrap items-center gap-2">
+              {cls && <Badge tone={tone(cls)}>{cls}</Badge>}
+              {cell(row, 1) && <span className="text-xs text-ink-2">المنصة: <span className="text-ink">{cell(row, 1)}</span></span>}
+              {cell(row, 2) && <span className="text-xs text-ink-2">نوع المحتوى: <span className="text-ink">{cell(row, 2)}</span></span>}
+            </div>
+            {cell(row, 3) && <p className="mb-1 text-xs text-ink-2">الرابط/التعريف: <span className="text-ink break-all">{cell(row, 3)}</span></p>}
+            {cell(row, 4) && (
+              <div className="mb-1">
+                <span className="text-xs text-ink-2">لماذا تم اختياره؟ </span>
+                <span className="whitespace-pre-wrap text-sm text-ink">{cell(row, 4)}</span>
+              </div>
+            )}
+            {cell(row, 5) && (
+              <div>
+                <span className="text-xs text-ink-2">الدرس المستفاد أو الإجراء المقترح: </span>
+                <span className="whitespace-pre-wrap text-sm text-ink">{cell(row, 5)}</span>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

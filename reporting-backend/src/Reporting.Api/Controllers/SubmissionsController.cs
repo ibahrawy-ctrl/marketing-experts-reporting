@@ -38,6 +38,21 @@ public class SubmissionsController : ApiControllerBase
         => FromResult(await _service.SummaryAsync(
             new SubmissionFilter(status, periodKey, submitterId, teamId, departmentId), ct));
 
+    /// <summary>
+    /// SUBMITTED-REPORTS-MISSING-EXPECTED-OVERDUE-R1 — العرض الموحّد لـ«كل التقارير»:
+    /// التسليمات الفعليّة UNION الالتزامات المتوقّعة غير المُقدَّمة للدورة الفعّالة، مع عدّادات وترقيم.
+    /// </summary>
+    [HttpGet("overview")]
+    public async Task<IActionResult> Overview(
+        [FromQuery] string? periodKey, [FromQuery] Guid? submitterId, [FromQuery] Guid? teamId,
+        [FromQuery] Guid? departmentId, [FromQuery] Guid? reportTemplateId, [FromQuery] SubmissionStatus? status,
+        [FromQuery] string? search, [FromQuery] SubmissionQuickFilter quickFilter = SubmissionQuickFilter.None,
+        [FromQuery] SubmissionCadenceFilter cadence = SubmissionCadenceFilter.All,
+        [FromQuery] int page = 1, [FromQuery] int pageSize = 200, CancellationToken ct = default)
+        => FromResult(await _service.GetOverviewAsync(
+            new UnifiedSubmissionFilter(periodKey, submitterId, teamId, departmentId, reportTemplateId,
+                status, search, quickFilter, cadence, page, pageSize), ct));
+
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> Get(Guid id, CancellationToken ct)
         => FromResult(await _service.GetAsync(id, ct));

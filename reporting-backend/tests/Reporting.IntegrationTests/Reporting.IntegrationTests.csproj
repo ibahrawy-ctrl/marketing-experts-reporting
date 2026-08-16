@@ -22,6 +22,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- MODERATION-R1B: نُدرِج نواة الأداة (Publisher فقط، بلا Program.cs كي لا يتعارض Program مع Reporting.Api)
+         لاختبارها مباشرةً ضدّ AppDbContext الحقيقي. الأداة نفسها تبقى خارج الحل ولا تُنشر مع الـ API. -->
+    <Compile Include="..\..\tools\ModerationV6Publisher\Publisher.cs" Link="ToolSources\ModerationV6Publisher\Publisher.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Reporting.Api\Reporting.Api.csproj" />
     <ProjectReference Include="..\..\src\Reporting.Application\Reporting.Application.csproj" />
     <ProjectReference Include="..\..\src\Reporting.Infrastructure\Reporting.Infrastructure.csproj" />

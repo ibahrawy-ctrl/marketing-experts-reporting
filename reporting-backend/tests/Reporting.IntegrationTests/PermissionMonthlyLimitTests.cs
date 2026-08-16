@@ -349,9 +349,12 @@ public class PermissionMonthlyLimitTests
         Assert.True(ledger.Permission.IsNegative);
     }
 
-    // ===== 10) الرفض عند الاعتماد النهائي ⇒ 409 ولا يكتب أي حركة Ledger (أهمّ موضع) =====
+    // ===== 10) الرفض عند الاعتماد النهائي ⇒ 409 ولا يكتب أيّ حركة Ledger إضافية (أهمّ موضع) =====
+    // LEAVE-DEDUCTION-ON-TL-APPROVAL-R1: صار الخصم يقع عند اعتماد قائد الفريق، فحجز رصيد الطلب الثالث
+    // يسبق حارس الحدّ الشهريّ الواقع عند الاعتماد النهائي. المطلوب هنا إثبات أن الحارس (409) **لا يضيف**
+    // أيّ حركة جديدة ولا يضاعف الخصم القائم؛ واستعادة الرصيد تتمّ بمسار الرفض/الإلغاء (عكس واحد).
     [Fact]
-    public async Task RejectionAtFinalApproval_409_NoLedgerMovement()
+    public async Task RejectionAtFinalApproval_409_NoAdditionalLedgerMovement()
     {
         // سنة 2099 بلا سياسة عامّة إطلاقًا + مسمّى وظيفي فريد لكل تشغيل، فلا تتلوّث من تشغيل سابق
         // في قاعدة الاختبار المشتركة الدائمة. تُنشأ سياسة المسمّى (حد=2) بعد إنشاء الأذونات الثلاثة.
@@ -374,18 +377,26 @@ public class PermissionMonthlyLimitTests
         await RunApprovalsToManagerAsync(org, d2.Id);
         Assert.Equal(HttpStatusCode.OK, (await HrApproveAsync(org, d2.Id)).StatusCode);
 
-        // الثالث: يصل إلى ManagerApproved ثم يُرفض الاعتماد النهائي بـ409.
+        // الثالث: يصل إلى ManagerApproved (وقد حُجِز خصمه عند اعتماد قائد الفريق).
         await RunApprovalsToManagerAsync(org, d3.Id);
+        var before = await LedgerAsync(org.Admin, org.Emp.Id, year);
+        var debitsBefore = before.Entries.Count(e =>
+            e.Source == BalanceSource.ApprovedPermission && e.Direction == BalanceDirection.Debit);
+        Assert.Equal(3, debitsBefore); // خصم واحد لكلّ طلب، وقع عند اعتماد قائد الفريق
+
+        // ثمّ يُرفض الاعتماد النهائي بـ409 (حارس الحدّ الشهريّ).
         var hr3 = await HrApproveAsync(org, d3.Id);
         Assert.Equal(HttpStatusCode.Conflict, hr3.StatusCode);
         Assert.Equal("leave_request.permission_monthly_limit.conflict", await ErrorCodeAsync(hr3));
 
-        // لا حركة ApprovedPermission للطلب الثالث (لم يُخصَم).
         var ledger = await LedgerAsync(org.Admin, org.Emp.Id, year);
-        Assert.DoesNotContain(ledger.Entries, e =>
-            e.Source == BalanceSource.ApprovedPermission && e.RelatedRequestId == d3.Id);
-        // إجمالي الخصومات = 2 فقط (الأول والثاني).
-        Assert.Equal(2, ledger.Entries.Count(e =>
+        // الحارس لا يضيف أيّ حركة: العدد بعد الرفض = العدد قبله، وخصم الطلب الثالث واحد لا أكثر.
+        Assert.Equal(debitsBefore, ledger.Entries.Count(e =>
             e.Source == BalanceSource.ApprovedPermission && e.Direction == BalanceDirection.Debit));
+        Assert.Single(ledger.Entries.Where(e =>
+            e.Source == BalanceSource.ApprovedPermission && e.RelatedRequestId == d3.Id));
+        // ولا عكس تلقائيّ: الاستعادة تحتاج قرار رفض/إلغاء صريحًا (لا رفض آليّ).
+        Assert.DoesNotContain(ledger.Entries, e =>
+            e.Source == BalanceSource.Reversal && e.RelatedRequestId == d3.Id);
     }
 }

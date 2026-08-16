@@ -19,6 +19,8 @@ public class ReportDueService : IReportDueService
     private readonly AppDbContext _db;
     private readonly ICurrentUser _currentUser;
     private readonly IScopeResolver _scope;
+    // مصدر الحقيقة الموحّد للحالة المتوقّعة الأسبوعية (Gate C/D): تقويم واحد + حاسبة حالة واحدة + أرضيّة انطباق.
+    private readonly IExpectedSubmissionStatusResolver _expected;
 
     // حالات «أُرسِل التقرير» — تُعدّ تسليمًا قائمًا (أيّ حالة بعد المسودّة). مطابقة لـ ReportingService.
     private static readonly SubmissionStatus[] SubmittedStatuses =
@@ -35,11 +37,13 @@ public class ReportDueService : IReportDueService
         SubmissionStatus.ApprovedByNextLevel, SubmissionStatus.Escalated
     };
 
-    public ReportDueService(AppDbContext db, ICurrentUser currentUser, IScopeResolver scope)
+    public ReportDueService(AppDbContext db, ICurrentUser currentUser, IScopeResolver scope,
+        IExpectedSubmissionStatusResolver expected)
     {
         _db = db;
         _currentUser = currentUser;
         _scope = scope;
+        _expected = expected;
     }
 
     // ===== self-only: حالة تقرير الأسبوع الحالي للمستخدم نفسه (متاح للموظّف) =====
@@ -77,16 +81,24 @@ public class ReportDueService : IReportDueService
         if (cadence == PeriodType.Daily)
         {
             var dates = DailyExpectedDates(key, today);
-            var dateKeys = dates.Select(d => d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)).ToList();
-            var submittedDays = dateKeys.Count == 0
-                ? new HashSet<string>()
-                : (await _db.ReportSubmissions.AsNoTracking()
+            // DAILY-…-R1 §3: المطابقة على اليوم المنطقيّ (CanonicalDay) لا على النصّ الخام. المفاتيح
+            // القديمة (مثل 6-7-2026 أو 2026-07-9) لا تساوي القياسيّ نصّيًّا، فلا تُفلتَر عند قاعدة البيانات
+            // بقائمة قياسيّة؛ نُحمِّل تسليمات اليوم اليوميّة للمستخدم داخل نافذة الأسبوع ثم نُطبِّعها داخليًّا.
+            var (winStart, winEnd) = ReportingCalendarPolicy.CycleRange(key); // نافذة الدورة اليوميّة Sat→Fri
+            var rawKeys = dates.Count == 0
+                ? new List<string>()
+                : await _db.ReportSubmissions.AsNoTracking()
                     .Where(s => s.SubmitterId == uid && s.PeriodType == PeriodType.Daily
-                                && dateKeys.Contains(s.PeriodKey) && SubmittedStatuses.Contains(s.Status))
-                    .Select(s => s.PeriodKey).ToListAsync(ct)).ToHashSet();
+                                && s.PeriodKey != null && SubmittedStatuses.Contains(s.Status))
+                    .Select(s => s.PeriodKey!).ToListAsync(ct);
+            var submittedDays = new HashSet<string>();
+            foreach (var rk in rawKeys)
+                if (ReportingCalendarPolicy.TryCanonicalDay(rk, out var cd)
+                    && cd >= winStart && cd <= winEnd)
+                    submittedDays.Add(ReportingCalendarPolicy.DayKey(cd));
 
-            var submittedCount = dates.Count(d => submittedDays.Contains(d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)));
-            var overdue = dates.Any(d => today > d && !submittedDays.Contains(d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)));
+            var submittedCount = dates.Count(d => submittedDays.Contains(ReportingCalendarPolicy.DayKey(d)));
+            var overdue = dates.Any(d => today > d && !submittedDays.Contains(ReportingCalendarPolicy.DayKey(d)));
             var dueDay = dates.Count > 0 ? dates[^1] : end;
             var label = $"سلّمت {submittedCount} من {dates.Count} يوم عمل" + (overdue ? " (يوجد تأخّر)" : "");
 
@@ -97,31 +109,30 @@ public class ReportDueService : IReportDueService
                 label, null));
         }
 
-        // أسبوعي: وحدة واحدة، موعدها بحسب دور المستخدم.
+        // أسبوعي: يُفوَّض بالكامل لمصدر الحقيقة الموحّد (ExpectedSubmissionStatusResolver) —
+        // أرضيّة الانطباق + الحالة الموحّدة + التسمية جاهزة (لا حساب تأخّر محلّي، Gate C/D).
         var due = ReportCalendarPolicy.DueDateForRole(key, primaryRole);
-        var sub = await _db.ReportSubmissions.AsNoTracking()
-            .Where(s => s.SubmitterId == uid && s.PeriodType == PeriodType.Weekly
-                        && s.PeriodKey == key && SubmittedStatuses.Contains(s.Status))
-            .OrderBy(s => s.SubmittedAtUtc ?? DateTime.MaxValue)
-            .Select(s => new { s.Id, s.SubmittedAtUtc })
-            .FirstOrDefaultAsync(ct);
+        var r = (await _expected.ResolveAsync(
+                new ExpectedStatusQuery(new[] { uid }, new[] { key }, null), ct))
+            .FirstOrDefault();
 
-        if (sub is not null)
+        // غير مطالَب بهذا الأسبوع (الدورة قبل أرضيّة الانطباق أو الموظّف غير نشط) ⇒ لا تأخّر.
+        if (r is null || !r.IsExpected)
         {
-            var submittedDate = sub.SubmittedAtUtc is DateTime at ? ReportCalendarPolicy.RiyadhDate(at) : today;
-            var late = submittedDate > due;
             return Result<ReportDueMyStatus>.Success(new ReportDueMyStatus(
-                key, ReportCalendarPolicy.WeekLabel(key), start, end, due,
-                Expected: true, Submitted: true, IsOverdue: false, DelayType.NoDelay,
-                late ? "سُلّم متأخرًا" : "سُلّم في الموعد", sub.Id));
+                key, ReportCalendarPolicy.WeekLabel(key), start, end, r?.DueAt ?? due,
+                Expected: false, Submitted: false, IsOverdue: false, DelayType.NoDelay,
+                r?.StatusLabel ?? "لا يُتوقَّع منك تقرير أسبوعي في هذا الأسبوع.", null));
         }
 
-        var isOverdue = today > due;
+        var hasFinal = r.HasSubmission && r.SubmissionStatus != SubmissionStatus.Draft;
+        var isOverdue = r.Status is ExpectedSubmissionStatus.OverdueNotSubmitted
+            or ExpectedSubmissionStatus.OverdueDraft;
         return Result<ReportDueMyStatus>.Success(new ReportDueMyStatus(
-            key, ReportCalendarPolicy.WeekLabel(key), start, end, due,
-            Expected: true, Submitted: false, IsOverdue: isOverdue,
+            key, ReportCalendarPolicy.WeekLabel(key), start, end, r.DueAt,
+            Expected: true, Submitted: hasFinal, IsOverdue: isOverdue,
             isOverdue ? DelayType.EmployeeReportNotSubmitted : DelayType.NoDelay,
-            isOverdue ? "متأخّر — لم يُسلَّم" : "لم يُسلَّم بعد (ضمن المهلة)", null));
+            r.StatusLabel, r.SubmissionId));
     }
 
     // ===== نظرة عامة على مواعيد التقارير ضمن نطاق المستخدم =====
@@ -231,22 +242,21 @@ public class ReportDueService : IReportDueService
 
         if (weekly.Count > 0)
         {
+            // يُفوَّض التقييم الأسبوعي لمصدر الحقيقة الموحّد: أرضيّة الانطباق + الحالة الموحّدة (Gate C/D).
+            // المرشّح غير المطالَب بهذا الأسبوع (قبل الأرضيّة/غير نشط) لا يدخل العدّ إطلاقًا.
             var weeklyIds = weekly.Select(c => c.UserId).ToList();
-            var rows = await _db.ReportSubmissions.AsNoTracking()
-                .Where(s => s.PeriodKey == key && s.PeriodType == PeriodType.Weekly
-                            && SubmittedStatuses.Contains(s.Status) && weeklyIds.Contains(s.SubmitterId))
-                .Select(s => new { s.SubmitterId, s.Id, s.SubmittedAtUtc })
-                .ToListAsync(ct);
-            var byUser = rows.GroupBy(s => s.SubmitterId)
-                .ToDictionary(g => g.Key, g => g.OrderBy(x => x.SubmittedAtUtc ?? DateTime.MaxValue).First());
+            var byUser = (await _expected.ResolveAsync(
+                    new ExpectedStatusQuery(weeklyIds, new[] { key }, null), ct))
+                .Where(r => r.IsExpected)
+                .ToDictionary(r => r.UserId);
 
             foreach (var c in weekly)
             {
-                var due = ReportCalendarPolicy.DueDateForRole(key, c.PrimaryRole);
-                if (byUser.TryGetValue(c.UserId, out var s))
-                    evals.Add(new DueEval(c, true, due, false, s.Id));
-                else
-                    evals.Add(new DueEval(c, false, due, today > due, null));
+                if (!byUser.TryGetValue(c.UserId, out var r)) continue;
+                var hasFinal = r.HasSubmission && r.SubmissionStatus != SubmissionStatus.Draft;
+                var overdue = r.Status is ExpectedSubmissionStatus.OverdueNotSubmitted
+                    or ExpectedSubmissionStatus.OverdueDraft;
+                evals.Add(new DueEval(c, hasFinal, r.DueAt, overdue, r.SubmissionId));
             }
         }
 
@@ -256,18 +266,24 @@ public class ReportDueService : IReportDueService
             if (dates.Count > 0)
             {
                 var dailyIds = daily.Select(c => c.UserId).ToList();
-                var dateKeys = dates.Select(d => d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)).ToList();
+                var (winStart, winEnd) = ReportingCalendarPolicy.CycleRange(key); // نافذة الدورة اليوميّة Sat→Fri
+                // DAILY-…-R1 §3: تحميل عريض بلا فلترة نصّية قياسيّة (كي لا تسقط المفاتيح القديمة)
+                // ثم تطبيع كلّ مفتاح إلى اليوم المنطقيّ داخل نافذة الأسبوع، والمطابقة على (المستخدم، اليوم المنطقيّ).
                 var rows = await _db.ReportSubmissions.AsNoTracking()
-                    .Where(s => s.PeriodType == PeriodType.Daily && dateKeys.Contains(s.PeriodKey)
+                    .Where(s => s.PeriodType == PeriodType.Daily && s.PeriodKey != null
                                 && SubmittedStatuses.Contains(s.Status) && dailyIds.Contains(s.SubmitterId))
                     .Select(s => new { s.SubmitterId, s.PeriodKey })
                     .ToListAsync(ct);
-                var byUserDay = rows.Select(r => (r.SubmitterId, r.PeriodKey)).ToHashSet();
+                var byUserDay = new HashSet<(Guid, string)>();
+                foreach (var r in rows)
+                    if (ReportingCalendarPolicy.TryCanonicalDay(r.PeriodKey, out var cd)
+                        && cd >= winStart && cd <= winEnd)
+                        byUserDay.Add((r.SubmitterId, ReportingCalendarPolicy.DayKey(cd)));
 
                 foreach (var c in daily)
                     foreach (var day in dates)
                     {
-                        var dayKey = day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+                        var dayKey = ReportingCalendarPolicy.DayKey(day);
                         if (byUserDay.Contains((c.UserId, dayKey)))
                             evals.Add(new DueEval(c, true, day, false, null));
                         else
@@ -282,15 +298,16 @@ public class ReportDueService : IReportDueService
     // ===== المراجعات العالقة ضمن نطاق المعتمِد (لا تكشف لموظّف مراجعات غيره) =====
     private async Task<List<PendingReview>> ResolvePendingReviewsAsync(string key, ScopeContext scope, Guid? departmentId, Guid? teamId, CancellationToken ct)
     {
-        var (start, end) = ReportCalendarPolicy.WeekRange(key);
-        var dayKeys = new List<string>();
-        for (var d = start; d <= end; d = d.AddDays(1))
-            dayKeys.Add(d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+        // نافذة تصفية اليوميّة العالقة = نافذة الدورة Sat→Fri (لا WeekRange الخميس→الأربعاء).
+        var (start, end) = ReportingCalendarPolicy.CycleRange(key);
 
+        // DAILY-…-R1 §3: لا نفلتر التسليمات اليوميّة العالقة بقائمة مفاتيح قياسيّة عند قاعدة البيانات
+        // (كي لا تسقط المفاتيح القديمة مثل 6-7-2026)؛ نُحمِّل كلّ اليوميّة العالقة ثم نُطبِّق نافذة الأسبوع
+        // المنطقيّة داخليًّا على اليوم بعد التطبيع (CanonicalDay).
         var q = _db.ReportSubmissions.AsNoTracking()
             .Where(s => PendingApprovalStatuses.Contains(s.Status) && s.CurrentApproverId != null
                         && ((s.PeriodType == PeriodType.Weekly && s.PeriodKey == key)
-                            || (s.PeriodType == PeriodType.Daily && dayKeys.Contains(s.PeriodKey))));
+                            || s.PeriodType == PeriodType.Daily));
         if (departmentId is not null) q = q.Where(s => s.DepartmentId == departmentId);
         if (teamId is not null) q = q.Where(s => s.TeamId == teamId);
 
@@ -299,6 +316,12 @@ public class ReportDueService : IReportDueService
             s.Id, s.SubmitterId, s.PeriodType, s.PeriodKey, s.TeamId, s.DepartmentId,
             ApproverId = s.CurrentApproverId!.Value
         }).ToListAsync(ct);
+        if (raw.Count == 0) return new List<PendingReview>();
+
+        // استبعاد اليوميّة خارج نافذة الأسبوع المنطقيّة (بعد التطبيع)؛ غير القابلة للتفسير تُستبعَد أيضًا.
+        raw = raw.Where(s => s.PeriodType != PeriodType.Daily
+                             || (ReportingCalendarPolicy.TryCanonicalDay(s.PeriodKey, out var cd)
+                                 && cd >= start && cd <= end)).ToList();
         if (raw.Count == 0) return new List<PendingReview>();
 
         // المراجع ضمن نطاق المستخدم فقط (المعتمِد نفسه يجب أن يكون ضمن نطاق رؤية الطالب).
@@ -324,7 +347,7 @@ public class ReportDueService : IReportDueService
             // مفتاح أسبوع التقرير (اليومي يُشتقّ أسبوعه من يومه) لاحتساب موعد المراجعة بحسب دور المعتمِد.
             var weekKeyOfReport = s.PeriodType == PeriodType.Weekly
                 ? s.PeriodKey
-                : (DateOnly.TryParse(s.PeriodKey, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dd)
+                : (ReportingCalendarPolicy.TryCanonicalDay(s.PeriodKey, out var dd)
                     ? ReportCalendarPolicy.WeekKeyFor(dd) : key);
             var reviewDue = ReportCalendarPolicy.DueDateForRole(weekKeyOfReport, role);
             var delay = role switch
@@ -404,16 +427,12 @@ public class ReportDueService : IReportDueService
     private async Task<string?> JobRoleCodeAsync(Guid jobRoleId, CancellationToken ct) =>
         await _db.JobRoles.AsNoTracking().Where(j => j.Id == jobRoleId).Select(j => j.Code).FirstOrDefaultAsync(ct);
 
-    private static List<DateOnly> DailyExpectedDates(string weekKey, DateOnly today)
-    {
-        var (start, end) = ReportCalendarPolicy.WeekRange(weekKey);
-        var cap = today < end ? today : end;
-        var dates = new List<DateOnly>();
-        for (var d = start; d <= cap; d = d.AddDays(1))
-            if (d.DayOfWeek is not (DayOfWeek.Friday or DayOfWeek.Saturday))
-                dates.Add(d);
-        return dates;
-    }
+    // DAILY-BUSINESS-DAY-COMPLIANCE-R1 §4 + SALES-DAILY-SATURDAY-APPLICABILITY-HOTFIX-R1:
+    // يُفوَّض بالكامل إلى مصدر الحقيقة المركزيّ (ReportingCalendarPolicy.DailyExpectedDates = نافذة الدورة
+    // Sat→Fri + أرضيّة الإطلاق + الأحد→الخميس). كل المسارات اليومية هنا **مبيعات حصريًّا** (Daily ⟺ SALES_B2B/B2C)
+    // ⇒ saturdayEnabled:true فيُدرَج السبت المتوقَّع ابتداءً من الأرضية 2026-07-25 (الجمعة تبقى محجوبة).
+    private static List<DateOnly> DailyExpectedDates(string cycleKey, DateOnly today) =>
+        ReportingCalendarPolicy.DailyExpectedDates(cycleKey, today, saturdayEnabled: true);
 
     private static string NormalizeWeekKey(string? weekKey) =>
         ReportCalendarPolicy.IsWeekKey(weekKey) ? weekKey!.Trim() : ReportCalendarPolicy.WeekKeyFor(ReportCalendarPolicy.RiyadhToday());

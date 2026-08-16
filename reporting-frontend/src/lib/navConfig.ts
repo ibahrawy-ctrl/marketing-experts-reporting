@@ -24,6 +24,8 @@ const GOVERNANCE_WORKSPACE: Role[] = ['Admin', 'CEO', 'GeneralManager', 'CeoSupp
 const GOVERNANCE_ESCALATION: Role[] = ['Admin', 'CEO', 'GeneralManager', 'CeoSupport', 'Manager', 'TeamLeader', 'HR', 'Employee'];
 const GOVERNANCE_ACTION_ITEMS: Role[] = ['Admin', 'CEO', 'GeneralManager', 'CeoSupport', 'Manager', 'TeamLeader', 'HR', 'Employee'];
 const AUDIT: Role[] = ['Admin', 'CEO', 'GeneralManager'];
+// RESTORE-ARCHIVE-GOVERNANCE-R1 (مستعادة من نَسَب الإنتاج) — الأرشيف الإداريّ: Admin/CEO/GM فقط.
+const ARCHIVE_GOVERNANCE: Role[] = ['Admin', 'CEO', 'GeneralManager'];
 
 export type ModuleId =
   | 'dashboard'
@@ -79,7 +81,11 @@ export const MODULES: NavModule[] = [
     label: 'التقارير',
     icon: 'reports',
     tabs: [
-      { to: '/app/submissions', label: 'التقارير المقدَّمة', keywords: 'تقرير تسليم' },
+      // ROLE-AWARE-PERSONAL-REPORT-SUBMISSION-ACCESS-R1: مساران متوازيان — «تقاريري» الشخصيّ (لكل
+      // مصادَق عليه: إنشاء/مسودة/إرسال/متابعة) و«تقارير الفريق» الإداريّ (لمن له عرض الفريق). لا يخفي
+      // أحدهما الآخر ولا يستبدله. الحماية الفعلية مفروضة خادميًّا.
+      { to: '/app/my-reports', label: 'تقاريري', keywords: 'تقريري إنشاء مسودة إرسال تسليم' },
+      { to: '/app/submissions', label: 'تقارير الفريق', roles: EXEC_VIEW, keywords: 'تقرير تسليم كل التقارير الفريق' },
       { to: '/app/report-calendar', label: 'تقويم التقارير', keywords: 'مواعيد جدول' },
       { to: '/app/compliance', label: 'متابعة الالتزام بالتقارير', roles: COMPLETION },
       { to: '/app/workflows', label: 'مسارات الاعتماد', roles: EXEC_VIEW, keywords: 'اعتماد موافقة' },
@@ -138,6 +144,7 @@ export const MODULES: NavModule[] = [
       { to: '/app/governance/escalations', label: 'التصعيدات', roles: GOVERNANCE_ESCALATION },
       { to: '/app/governance/action-items', label: 'إجراءات الحوكمة', roles: GOVERNANCE_ACTION_ITEMS },
       { to: '/app/audit', label: 'سجل التدقيق', roles: AUDIT },
+      { to: '/app/admin/archive', label: 'الأرشيف الإداري', roles: ARCHIVE_GOVERNANCE, keywords: 'استرجاع محذوف أرشفة' },
       { to: '/app/email-notifications', label: 'سجل إشعارات البريد', roles: GOVERNANCE },
     ],
   },

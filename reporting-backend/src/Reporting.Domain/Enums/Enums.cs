@@ -548,9 +548,9 @@ public enum BalanceSource
 {
     /// <summary>رصيد افتتاحي يدوي لسنة محددة.</summary>
     OpeningBalance = 0,
-    /// <summary>خصم آلي عند اعتماد إجازة نهائيًّا (HrApproved).</summary>
+    /// <summary>خصم آلي عند اعتماد إجازة من قائد الفريق (LEAVE-DEDUCTION-ON-TL-APPROVAL-R1) — مرّة واحدة لكلّ طلب.</summary>
     ApprovedLeave = 1,
-    /// <summary>خصم آلي عند اعتماد إذن نهائيًّا (HrApproved).</summary>
+    /// <summary>خصم آلي عند اعتماد إذن من قائد الفريق (LEAVE-DEDUCTION-ON-TL-APPROVAL-R1) — مرّة واحدة لكلّ طلب.</summary>
     ApprovedPermission = 2,
     /// <summary>تعديل يدوي من الإدارة/HR (بسبب إلزامي + Audit).</summary>
     ManualAdjustment = 3,
@@ -622,18 +622,6 @@ public enum ReportViewGrantScopeKind
 {
     User = 0,
     Team = 1
-}
-
-/// <summary>
-/// نوع نطاق المنصب المرن (Phase 1A — رؤية فقط). يحدّد كيف يُترجَم نطاق المنصب إلى مجموعة مستخدمين:
-/// Department/Team عبر مرجع كيان، SpecificUsers عبر معرّف مستخدم واحد لكل سطر، AllCompany = كل الشركة.
-/// </summary>
-public enum PositionScopeKind
-{
-    Department = 0,
-    Team = 1,
-    SpecificUsers = 2,
-    AllCompany = 3
 }
 
 /// <summary>
@@ -784,4 +772,17 @@ public enum ProjectHealthStatus
     Green = 0,
     Yellow = 1,
     Red = 2
+}
+
+/// <summary>
+/// نوع نطاق المنصب المرن (Phase 1A — رؤية فقط). يحدّد كيف يُترجَم نطاق المنصب إلى مجموعة مستخدمين:
+/// Department/Team عبر مرجع كيان، SpecificUsers عبر معرّف مستخدم واحد لكل سطر، AllCompany = كل الشركة.
+/// (مستعادة في RECONCILE-PROD-DEVELOP-LINEAGE: حذفها جاء من إعادة بناء نَسَب الإنتاج التي لم تُبنَ بميزة المناصب.)
+/// </summary>
+public enum PositionScopeKind
+{
+    Department = 0,
+    Team = 1,
+    SpecificUsers = 2,
+    AllCompany = 3
 }

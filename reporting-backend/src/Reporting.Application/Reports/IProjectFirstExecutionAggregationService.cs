@@ -3,10 +3,11 @@ using Reporting.Application.Common;
 namespace Reporting.Application.Reports;
 
 /// <summary>
-/// محرّك التجميع Project-First (RC-4 Task 4، Path A) — قراءة فقط.
+/// محرّك التجميع Project-First (PROJECT-FIRST-EXECUTION-AGGREGATION-CONTRACT-R1) — قراءة فقط.
 /// يقرأ قوالب التنفيذ الأربعة من قسم المشاريع المتكرّر (ProjectRepeatableSection) حيث كل الأرقام داخل المشروع،
 /// ويُجمّعها حسب (المشروع/الموظّف/Pod/العميل) على المعرّفات الحقيقية. لا يغيّر أيّ تسليم/قالب/مسار اعتماد.
-/// النطاق محكوم بـ IScopeResolver. مستقلّ تمامًا عن مسار المبيعات (B2C/B2B) وعن المسار القديم (Family B المسطّح).
+/// النطاق محكوم بـ IScopeResolver ∪ IClientProjectAccess. مستقلّ تمامًا عن مسار المبيعات (B2C/B2B)
+/// وعن محرّك التجميع الموحّد للتنفيذ (Family B المسطّح على TableGrid).
 /// </summary>
 public interface IProjectFirstExecutionAggregationService
 {
