@@ -98,7 +98,8 @@
 
 | # | الملفّ | الموضوع |
 |---|---|---|
-| 01–17 | `/tmp/recon-int/Docs/Planning/` (غير ملتزَمة) | المراحل A–H: التحليل والتوحيد والقياس |
+| 00 | `RECONCILE-LINEAGE-R1-00-EVIDENCE-INDEX.md` | فهرس الأدلّة: النافذ مقابل التاريخيّ، والقياسات المُلغاة |
+| 01–17 | `Docs/Planning/RECONCILE-LINEAGE-R1-{01..17}-*.md` | المراحل A–H: التحليل والتوحيد والقياس |
 | 18 | `RECONCILE-LINEAGE-R1-18-CANDIDATE-HYGIENE-AND-OVERRIDE-REVERSAL.md` | نظافة المرشَّح وعكس التجاوزات المؤقّتة |
 | 19 | `RECONCILE-LINEAGE-R1-19-PRE-MERGE-GATE.md` | بوّابة ما قبل الدمج + عيبا الواجهة |
 | 20 | `RECONCILE-LINEAGE-R1-20-DEVELOP-MERGE-AND-TEST-DEPLOYMENT.md` | الدمج والدفع والنسخ والنشر والهجرات والجسر |
