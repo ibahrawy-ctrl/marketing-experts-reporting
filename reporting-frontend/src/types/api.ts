@@ -3792,6 +3792,8 @@ export interface ProjectFirstExecutionReport<TRow> {
   ignoredReasons: Record<string, number>;
   viewLevel: string;
   rows: TRow[];
+}
+
 // ===== ROLE-AWARE-REPORTING-CALENDAR — Phase 2.3/2.5 =====
 // دورة تقارير مُدرِكة للدور: النافذة السبت→الجمعة موحّدة لكل المستويات، وتاريخ الاستحقاق يختلف بحسب
 // الدور الأساسيّ الخادميّ فقط. كل الحقول محسوبة على الخادم — الواجهة لا تعيد حساب أيّ مفتاح دورة.
