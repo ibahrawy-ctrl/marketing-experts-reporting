@@ -134,6 +134,7 @@ public static class RoleCapabilities
             new("system", "system.settings", "إعدادات النظام", AdminOnly),
             new("system", "email.settings", "إعدادات البريد/التنبيهات", AdminOnly),
             new("system", "permissions.manage", "إدارة الصلاحيات", AdminOnly),
+            new("system", "positions.manage", "إدارة المناصب المرنة", AdminOnly),
 
             // ── HR / People Operations (مستقبلي — غير مُفعّل لأي دور حاليًّا) ──
             new("future", "kpi.followup", "متابعة تقييمات الأداء", Array.Empty<string>(), Future: true),

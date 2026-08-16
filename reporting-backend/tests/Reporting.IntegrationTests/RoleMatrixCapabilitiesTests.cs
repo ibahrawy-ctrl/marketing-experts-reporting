@@ -70,7 +70,7 @@ public class RoleMatrixCapabilitiesTests
         var admin = (await GetMatrixAsync()).Single(r => r.Role == "Admin");
         foreach (var key in new[]
         {
-            "users.reset_password", "users.manage", "users.manage_roles",
+            "users.reset_password", "users.manage", "users.manage_roles", "positions.manage",
             "kpi.evaluate", "report_templates.manage", "reports.view.all", "audit.view",
         })
             Assert.Equal("Active", StatusOf(admin, key));
@@ -155,6 +155,7 @@ public class RoleMatrixCapabilitiesTests
         Assert.True(RoleCapabilities.IsActive("HR", "jobroles.manage"));
         Assert.False(RoleCapabilities.IsActive("HR", "users.reset_password"));
         Assert.False(RoleCapabilities.IsActive("HR", "reports.approve"));
+        Assert.True(RoleCapabilities.IsActive("Admin", "positions.manage"));
         Assert.False(RoleCapabilities.IsActive("CeoSupport", "reports.approve"));
     }
 }
