@@ -12,8 +12,11 @@ public class CalendarIsolatedFactory : CustomWebApplicationFactory
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         base.ConfigureWebHost(builder);
+        // قابلة للتجاوز عبر TEST_DB_CONNECTION_CAL لتشغيل بروتوكول القياس على قاعدة معزولة
+        // جديدة بلا تعديل الشيفرة؛ الافتراضي يبقى reporting_calendar_iso بلا تغيير سلوك.
         builder.UseSetting("ConnectionStrings:Default",
-            "Host=localhost;Database=reporting_calendar_iso;Username=ibrahimelbahrawi");
+            System.Environment.GetEnvironmentVariable("TEST_DB_CONNECTION_CAL")
+                ?? "Host=localhost;Database=reporting_calendar_iso;Username=ibrahimelbahrawi");
     }
 }
 

@@ -13,8 +13,10 @@ public class ProjectFirstIsolatedFactory : CustomWebApplicationFactory
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         base.ConfigureWebHost(builder);
+        // قابلة للتجاوز عبر TEST_DB_CONNECTION_PFE؛ الافتراضي يبقى reporting_pfe_iso بلا تغيير سلوك.
         builder.UseSetting("ConnectionStrings:Default",
-            "Host=localhost;Database=reporting_pfe_iso;Username=ibrahimelbahrawi");
+            System.Environment.GetEnvironmentVariable("TEST_DB_CONNECTION_PFE")
+                ?? "Host=localhost;Database=reporting_pfe_iso;Username=ibrahimelbahrawi");
     }
 }
 

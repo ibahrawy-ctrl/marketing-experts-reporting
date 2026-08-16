@@ -27,7 +27,14 @@ namespace Reporting.IntegrationTests;
 [Collection("Integration")]
 public class Project360ApiSurfaceTests
 {
-    private const string TestConnectionString = "Host=localhost;Database=reporting_test;Username=ibrahimelbahrawi";
+    /// <summary>
+    /// نفس مصدر الحقيقة المستعمَل في <see cref="CustomWebApplicationFactory"/>: يقرأ
+    /// <c>TEST_DB_CONNECTION</c> ليعمل على قاعدة معزولة نظيفة بلا تعديل الشيفرة،
+    /// ويسقط افتراضيًّا إلى <c>reporting_test</c> المشتركة بلا تغيير سلوك.
+    /// </summary>
+    private static readonly string TestConnectionString =
+        System.Environment.GetEnvironmentVariable("TEST_DB_CONNECTION")
+            ?? "Host=localhost;Database=reporting_test;Username=ibrahimelbahrawi";
 
     /// <summary>
     /// <c>OVERVIEW_SQL_QUERY_COUNT</c> — عدد أوامر SQL لرحلة لوحة واحدة. **ثابت** لا يتناسب مع عدد
