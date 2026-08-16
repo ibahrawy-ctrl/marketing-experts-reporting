@@ -47,12 +47,35 @@
 
 | الادّعاء | الإثبات |
 |---|---|
-| صفر بقايا لأسماء القياس | `git grep -n "rr_cand"` ⟹ **لا نتائج** |
+| صفر بقايا لأسماء القياس **في الشيفرة** | `git grep -l "rr_cand" HEAD` خارج `Docs/` ⟹ **لا نتائج**. الأسماء تَرِد داخل `Docs/Planning/` بوصفها نصًّا توثيقيًّا لبروتوكول القياس، لا سلسلة اتّصال تُنفَّذ |
 | إصلاحات G لم تُزَل | `ScopeResolver.cs` ‎+60‎ و`RoleCapabilities.cs` ‎+1‎ ما زالت في الفرق |
 | اختبارات H2 الأحد عشر لم تُزَل | `RestoredProductionOverridesTests.cs` (403 سطرًا) ملتزَم في `d2cf8b3` |
-| ملفّات WIP الثلاثة لم تعُد | `ReportReminderSchedulerService` · `ReportWorkingDaysPolicy` · `ActionResultToast` غائبة عن كلّ الالتزامات |
+| صفر محتوى حصريّ لفرع WIP | تصحيح لصياغة سابقة غير دقيقة — انظر §2.1 أدناه |
 | صفر سرّ | مسح `password|secret|token|api_key|PRIVATE KEY` على `Ops/` و`Docs/Planning/` ⟹ أسماء أعمدة ومتغيّرات فقط، بلا قيمة واحدة |
 | البناء سليم | `dotnet build Reporting.sln -c Debug` ⟹ **0 Errors** · 4 تحذيرات `CS8604` سابقة للتذكرة |
+
+### 2.1 تصحيح: ملفّات «WIP الثلاثة» ليست ثلاثة ولا كلّها WIP
+
+صياغة سابقة في هذا التقرير ادّعت أنّ الأسماء الثلاثة «غائبة عن كلّ الالتزامات». **الادّعاء
+خاطئ ويُصحَّح هنا**، لأنّه خلط بين اسم ملفّ وبين مصدره:
+
+| الاسم | الحالة الحقيقيّة في المرشَّح |
+|---|---|
+| `ReportWorkingDaysPolicy.cs` | **غائب فعلًا** — حصريّ لفرع WIP |
+| `ReportReminderSchedulerService.cs` | **موجود** — دخل عبر التزام الإنتاج `df9891c`، ومحتواه **نسخة `ce166662` حرفيًّا** ويخالف نسخة WIP |
+| `ActionResultToast.tsx` | **موجود** — دخل عبر التزام الإنتاج `92b8c01`، ومحتواه **نسخة `ce166662` حرفيًّا** |
+
+أي أنّ الملفّين الأخيرين **شيفرة إنتاجيّة منشورة وحيّة** على Production و RC، وحفظُها هو
+غرض التذكرة نفسه؛ وجودُهما ليس تسرّبًا من WIP بل مطلب `Production Live Feature Regression = 0`.
+
+**الإثبات الحاسم على صفر تسرّب** (بدل الاستدلال بالأسماء):
+
+| الفحص | النتيجة |
+|---|---|
+| ملفّات حصريّة لفرع `wip/local-uncommitted-20260816` (غائبة عن كلا الأبوَين) | 5: `ReportWorkingDaysPolicy.cs` · `ReportWorkingDaysPolicyTests.cs` · `ModerationPerformanceV5Tests.cs` · `tools/LegacyExecutionFixture/{Program.cs,*.csproj}` |
+| منها موجود في `HEAD` | **0** |
+| ملفّات يطابق محتواها في `HEAD` نسخةَ WIP بينما يخالف كلا الأبوَين | **0** |
+| `wip/local-uncommitted-20260816` سلف لـ`HEAD`؟ | **لا** |
 
 ---
 
