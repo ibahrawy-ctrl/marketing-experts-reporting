@@ -273,7 +273,7 @@ public class Phase6ClientProjectTests
         var client = await CreateClientAsync(admin, "عميل ١٥", null);
         var project = await CreateProjectAsync(admin, client.Id, "مشروع ١٥", ServiceType.Social);
 
-        await SubmitAsync(admin, templateId, fieldId, "2026-W35", project.Id);
+        await SubmitAsync(admin, templateId, fieldId, TestCalendar.Cycle(1), project.Id);
 
         var summary = await (await admin.GetAsync($"/api/projects/{project.Id}/summary"))
             .ReadAsync<ProjectSummaryDto>();

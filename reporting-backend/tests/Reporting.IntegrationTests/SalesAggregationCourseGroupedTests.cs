@@ -76,7 +76,7 @@ public class SalesAggregationCourseGroupedTests
         await AssignTemplateToEmployeeAsync(admin, templateId, employeeId);
 
         const string course = "دورة سيو الجماعية أ";
-        const string date = "2028-02-05";
+        var date = TestCalendar.Day(0);
         await SubmitDailyB2cAsync(employee, ceo, templateId, gridId, date, B2cRow(course, 10, 40, 30, 18, 9, 6, 18000, 3));
 
         var report = await (await ceo.GetAsync(
@@ -109,7 +109,7 @@ public class SalesAggregationCourseGroupedTests
 
         // اسم دورة فريد لكل تشغيل — القاعدة المشتركة الدائمة تتراكم، والتصفية بالاسم فقط تحتاج عزلًا.
         var course = $"دورة جماعية {Guid.NewGuid():N}";
-        const string date = "2028-03-10";
+        var date = TestCalendar.Day(1);
         await SubmitDailyB2cAsync(emp1, ceo, templateId, gridId, date, B2cRow(course, 10, 40, 30, 18, 9, 6, 18000, 3));
         await SubmitDailyB2cAsync(emp2, ceo, templateId, gridId, date, B2cRow(course, 5, 20, 15, 9, 4, 3, 9000, 1));
 
@@ -147,7 +147,7 @@ public class SalesAggregationCourseGroupedTests
 
         // دورة نصّية حرّة غير موجودة في الكتالوج (تحاكي تقريرًا قديمًا) — يجب أن تُجمَّع كالمعتاد.
         const string legacyCourse = "دورة قديمة نصّية خارج الكتالوج";
-        const string date = "2028-04-12";
+        var date = TestCalendar.Day(2);
         await SubmitDailyB2cAsync(employee, ceo, templateId, gridId, date, B2cRow(legacyCourse, 8, 32, 24, 12, 6, 4, 12000, 2));
 
         var report = await (await ceo.GetAsync(

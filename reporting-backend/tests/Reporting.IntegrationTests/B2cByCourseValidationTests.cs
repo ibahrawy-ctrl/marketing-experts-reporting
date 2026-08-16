@@ -74,7 +74,7 @@ public class B2cByCourseValidationTests
     [Fact]
     public async Task ValidB2cData_Accepted_AndApprovesViaCurrentPath()
     {
-        var (submit, ceo, _, draft, gridId) = await SubmitB2cAsync("2026-W41",
+        var (submit, ceo, _, draft, gridId) = await SubmitB2cAsync(TestCalendar.Cycle(1),
             new[] { ValidRow, new[] { "دورة إدارة المشاريع", "8", "25", "20", "12", "5", "4", "12000", "2", "التوقيت" } });
 
         var submitted = await submit.ReadAsync<SubmissionDto>();
@@ -89,7 +89,7 @@ public class B2cByCourseValidationTests
     [Fact]
     public async Task EmptyDataRows_Rejected_400()
     {
-        var (submit, _, _, _, _) = await SubmitB2cAsync("2026-W42",
+        var (submit, _, _, _, _) = await SubmitB2cAsync(TestCalendar.Cycle(2),
             new[] { new[] { "", "", "", "", "", "", "", "", "", "" } });
         await AssertGridInvalidAsync(submit);
     }
@@ -98,7 +98,7 @@ public class B2cByCourseValidationTests
     [Fact]
     public async Task NegativeNumber_Rejected_400()
     {
-        var (submit, _, _, _, _) = await SubmitB2cAsync("2026-W43",
+        var (submit, _, _, _, _) = await SubmitB2cAsync(TestCalendar.Cycle(3),
             new[] { new[] { "دورة", "12", "-5", "3", "2", "1", "1", "100", "0", "" } });
         await AssertGridInvalidAsync(submit);
     }
@@ -107,7 +107,7 @@ public class B2cByCourseValidationTests
     [Fact]
     public async Task ContactedGreaterThanLeads_Rejected_400()
     {
-        var (submit, _, _, _, _) = await SubmitB2cAsync("2026-W44",
+        var (submit, _, _, _, _) = await SubmitB2cAsync(TestCalendar.Cycle(4),
             new[] { new[] { "دورة", "12", "10", "20", "5", "3", "2", "100", "0", "" } });
         await AssertGridInvalidAsync(submit);
     }
@@ -116,7 +116,7 @@ public class B2cByCourseValidationTests
     [Fact]
     public async Task QualifiedGreaterThanContacted_Rejected_400()
     {
-        var (submit, _, _, _, _) = await SubmitB2cAsync("2026-W45",
+        var (submit, _, _, _, _) = await SubmitB2cAsync(TestCalendar.Cycle(5),
             new[] { new[] { "دورة", "12", "10", "8", "15", "3", "2", "100", "0", "" } });
         await AssertGridInvalidAsync(submit);
     }
@@ -125,7 +125,7 @@ public class B2cByCourseValidationTests
     [Fact]
     public async Task SalesGreaterThanQualified_Rejected_400()
     {
-        var (submit, _, _, _, _) = await SubmitB2cAsync("2026-W46",
+        var (submit, _, _, _, _) = await SubmitB2cAsync(TestCalendar.Cycle(6),
             new[] { new[] { "دورة", "12", "10", "8", "5", "3", "8", "100", "0", "" } });
         await AssertGridInvalidAsync(submit);
     }
@@ -134,7 +134,7 @@ public class B2cByCourseValidationTests
     [Fact]
     public async Task WorkHoursZeroWithActivity_Rejected_400()
     {
-        var (submit, _, _, _, _) = await SubmitB2cAsync("2026-W47",
+        var (submit, _, _, _, _) = await SubmitB2cAsync(TestCalendar.Cycle(7),
             new[] { new[] { "دورة", "0", "10", "8", "5", "3", "2", "100", "0", "" } });
         await AssertGridInvalidAsync(submit);
     }
@@ -174,7 +174,7 @@ public class B2cByCourseValidationTests
 
         var (emp, _) = await TestAuth.CreateUserAsync(_factory, "Employee");
         var draft = await (await emp.PostAsJsonAsync("/api/submissions",
-            new CreateSubmissionRequest(created.Id, PeriodType.Weekly, "2026-W48"))).ReadAsync<SubmissionDto>();
+            new CreateSubmissionRequest(created.Id, PeriodType.Weekly, TestCalendar.Cycle(8)))).ReadAsync<SubmissionDto>();
 
         // قيمة «سالبة» بأعمدة غير B2C: لو طُبِّق تحقّق B2C خطأً لرُفِضت — لكنها تُقبَل لأن الأعمدة مختلفة.
         var gridJson = JsonSerializer.Serialize(new[] { new[] { "مبيعات", "-999" } });
@@ -189,7 +189,7 @@ public class B2cByCourseValidationTests
     [Fact]
     public async Task ApprovedB2cReport_GridValues_RemainReadable()
     {
-        var (submit, ceo, emp, draft, gridId) = await SubmitB2cAsync("2026-W49", new[] { ValidRow });
+        var (submit, ceo, emp, draft, gridId) = await SubmitB2cAsync(TestCalendar.Cycle(9), new[] { ValidRow });
         Assert.Equal(HttpStatusCode.OK, submit.StatusCode);
 
         var approved = await (await ceo.PostAsJsonAsync($"/api/submissions/{draft.Id}/approve",

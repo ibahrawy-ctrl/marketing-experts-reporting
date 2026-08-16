@@ -83,7 +83,7 @@ public class SalesAggregationTests
         var (employee, employeeId) = await TestAuth.CreateUserWithJobRoleCodeAsync(_factory, "Employee", "SALES_B2C", ceoId);
         await AssignTemplateToEmployeeAsync(admin, templateId, employeeId);
 
-        const string date = "2027-02-05";
+        var date = TestCalendar.Day(0);
         await SubmitDailyB2cAsync(employee, ceo, templateId, gridId, date, B2cRow(Course, 10, 40, 30, 18, 9, 6, 18000, 3));
 
         var report = await (await ceo.GetAsync(
@@ -109,12 +109,14 @@ public class SalesAggregationTests
         var (employee, employeeId) = await TestAuth.CreateUserWithJobRoleCodeAsync(_factory, "Employee", "SALES_B2C", ceoId);
         await AssignTemplateToEmployeeAsync(admin, templateId, employeeId);
 
-        // يومان داخل نفس الأسبوع التشغيلي (الخميس + الجمعة) لضمان انتمائهما لنفس مفتاح الأسبوع.
-        var weekKey = ReportCalendarPolicy.WeekKeyFor(new DateOnly(2027, 2, 5));
+        // يومان داخل نفس الأسبوع التشغيلي (الخميس + الأحد) لضمان انتمائهما لنفس مفتاح الأسبوع.
+        // الأسبوع منقضٍ لا مستقبليّ: بوّابة calendar.future_day_locked ترفض المستقبل،
+        // والجمعة مرفوضة بـcalendar.day_is_holiday ⟹ لا تصلح يومًا ثانيًا.
+        var weekKey = ReportCalendarPolicy.WeekKeyFor(TestCalendar.Today.AddDays(-14));
         var start = ReportCalendarPolicy.WeekRange(weekKey).Start; // الخميس
         // ثقافة ثابتة إلزاميًّا: ثقافة النظام قد تكون هجرية فتُنتِج مفتاحًا خاطئًا (مثل 1448-08-27).
         var d1 = start.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-        var d2 = start.AddDays(1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var d2 = start.AddDays(3).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
         await SubmitDailyB2cAsync(employee, ceo, templateId, gridId, d1, B2cRow(Course, 10, 40, 30, 18, 9, 6, 18000, 3));
         await SubmitDailyB2cAsync(employee, ceo, templateId, gridId, d2, B2cRow(Course, 5, 20, 15, 9, 4, 3, 9000, 1));
@@ -140,15 +142,18 @@ public class SalesAggregationTests
         var (employee, employeeId) = await TestAuth.CreateUserWithJobRoleCodeAsync(_factory, "Employee", "SALES_B2C", ceoId);
         await AssignTemplateToEmployeeAsync(admin, templateId, employeeId);
 
-        await SubmitDailyB2cAsync(employee, ceo, templateId, gridId, "2027-05-03", B2cRow(Course, 10, 40, 30, 18, 9, 6, 18000, 3));
-        await SubmitDailyB2cAsync(employee, ceo, templateId, gridId, "2027-05-20", B2cRow(Course, 5, 20, 15, 9, 4, 3, 9000, 1));
+        // يومان داخل الشهر المنقضي ⟹ نفس المفتاح الشهريّ، وكلاهما ماضٍ فتقبلهما بوّابة التقويم.
+        var days = TestCalendar.DaysInPreviousMonth(2);
+        var monthKey = TestCalendar.MonthKeyOf(days[0]);
+        await SubmitDailyB2cAsync(employee, ceo, templateId, gridId, days[0], B2cRow(Course, 10, 40, 30, 18, 9, 6, 18000, 3));
+        await SubmitDailyB2cAsync(employee, ceo, templateId, gridId, days[1], B2cRow(Course, 5, 20, 15, 9, 4, 3, 9000, 1));
 
         var report = await (await ceo.GetAsync(
-            $"/api/reporting/aggregation/b2c?periodType=Monthly&periodKey=2027-05&employeeId={employeeId}"))
+            $"/api/reporting/aggregation/b2c?periodType=Monthly&periodKey={monthKey}&employeeId={employeeId}"))
             .ReadAsync<B2cAggregationReport>();
 
         var row = Assert.Single(report!.Rows);
-        Assert.Equal("2027-05", row.PeriodKey);
+        Assert.Equal(monthKey, row.PeriodKey);
         Assert.Equal(15m, row.WorkHours);
         Assert.Equal(60m, row.Leads);
         Assert.Equal(9m, row.Sales);
@@ -164,16 +169,18 @@ public class SalesAggregationTests
         var (employee, employeeId) = await TestAuth.CreateUserWithJobRoleCodeAsync(_factory, "Employee", "SALES_B2C", ceoId);
         await AssignTemplateToEmployeeAsync(admin, templateId, employeeId);
 
-        // يومان داخل الربع الثالث 2027 (يوليو–سبتمبر).
-        await SubmitDailyB2cAsync(employee, ceo, templateId, gridId, "2027-07-10", B2cRow(Course, 10, 40, 30, 18, 9, 6, 18000, 3));
-        await SubmitDailyB2cAsync(employee, ceo, templateId, gridId, "2027-08-15", B2cRow(Course, 5, 20, 15, 9, 4, 3, 9000, 1));
+        // يومان داخل الشهر المنقضي ⟹ نفس الربع حتمًا، وكلاهما ماضٍ فتقبلهما بوّابة التقويم.
+        var days = TestCalendar.DaysInPreviousMonth(2);
+        var quarterKey = TestCalendar.QuarterKeyOf(days[0]);
+        await SubmitDailyB2cAsync(employee, ceo, templateId, gridId, days[0], B2cRow(Course, 10, 40, 30, 18, 9, 6, 18000, 3));
+        await SubmitDailyB2cAsync(employee, ceo, templateId, gridId, days[1], B2cRow(Course, 5, 20, 15, 9, 4, 3, 9000, 1));
 
         var report = await (await ceo.GetAsync(
-            $"/api/reporting/aggregation/b2c?periodType=Quarterly&periodKey=2027-Q3&employeeId={employeeId}"))
+            $"/api/reporting/aggregation/b2c?periodType=Quarterly&periodKey={quarterKey}&employeeId={employeeId}"))
             .ReadAsync<B2cAggregationReport>();
 
         var row = Assert.Single(report!.Rows);
-        Assert.Equal("2027-Q3", row.PeriodKey);
+        Assert.Equal(quarterKey, row.PeriodKey);
         Assert.Equal(15m, row.WorkHours);
         Assert.Equal(60m, row.Leads);
         Assert.Equal(9m, row.Sales);

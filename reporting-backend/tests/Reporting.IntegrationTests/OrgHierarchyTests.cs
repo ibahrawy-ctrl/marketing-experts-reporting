@@ -1,3 +1,7 @@
+using Reporting.Domain.Entities.Org;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Reporting.Infrastructure.Persistence;
 using System.Net;
 using System.Net.Http.Json;
 using Reporting.Application.Common;
@@ -155,7 +159,7 @@ public class OrgHierarchyTests
 
         // الموظف عمر ينشئ تقريرًا أسبوعيًا ويعبّئه ويرسله
         var draft = await (await org.Omar.C.PostAsJsonAsync("/api/submissions",
-            new CreateSubmissionRequest(templateId, PeriodType.Weekly, "2026-W50")))
+            new CreateSubmissionRequest(templateId, PeriodType.Weekly, TestCalendar.Cycle(1))))
             .ReadAsync<SubmissionDto>();
         await org.Omar.C.PutAsJsonAsync($"/api/submissions/{draft!.Id}/values",
             new SaveFieldValuesRequest(new[] { new FieldValueInput(fieldId, null, 1200m, null, null, null) }));
@@ -201,24 +205,59 @@ public class OrgHierarchyTests
         var (templateId, _) = await PublishWeeklyTemplateAsync(admin);
         var org = await BuildOrgAsync();
 
+        // REPORT-EXPECTED-SUBMISSION-STATUS-R1 / ApplicabilityFloorPolicy: «تحتاج إجراء» تُشتقّ من
+        // المطالَبة لا من وجود المسودّة، والمطالَبة تبدأ من أرضيّة الانطباق =
+        // max(إنشاء المستخدم، أوّل نشر للقالب). المستخدم والقالب يُنشآن الآن ⟹ أيّ دورة ماضية
+        // «قبل الأرضيّة» فلا تظهر أصلًا. لذلك يُرجَع تاريخا الإنشاء/النشر كما يفعل
+        // DailyApplicabilityUnifiedOverdueTests، ليصير المطلوب متأخّرًا فعلًا.
+        await MakeExpectedAsync(templateId, org.Omar.Id);
+
         // عمر ينشئ مسودة (لم تُرسل) للفترة
         var draft = await (await org.Omar.C.PostAsJsonAsync("/api/submissions",
-            new CreateSubmissionRequest(templateId, PeriodType.Weekly, "2026-W51")))
+            new CreateSubmissionRequest(templateId, PeriodType.Weekly, TestCalendar.Cycle(2))))
             .ReadAsync<SubmissionDto>();
         Assert.Equal(SubmissionStatus.Draft, draft!.Status);
 
         // مديره يراها ضمن "تحتاج إجراء"
-        var pendingMgr = await (await org.SalesMgr.C.GetAsync("/api/dashboard/pending-reports?periodKey=2026-W51"))
+        var pendingMgr = await (await org.SalesMgr.C.GetAsync($"/api/dashboard/pending-reports?periodKey={TestCalendar.Cycle(2)}"))
             .ReadAsync<List<PendingRow>>();
         Assert.Contains(pendingMgr!, p => p.SubmissionId == draft.Id);
 
         // مدير الفرع الآخر لا يراها
-        var pendingOther = await (await org.MktMgr.C.GetAsync("/api/dashboard/pending-reports?periodKey=2026-W51"))
+        var pendingOther = await (await org.MktMgr.C.GetAsync($"/api/dashboard/pending-reports?periodKey={TestCalendar.Cycle(2)}"))
             .ReadAsync<List<PendingRow>>();
         Assert.DoesNotContain(pendingOther!, p => p.SubmissionId == draft.Id);
     }
 
     private record PendingRow(Guid SubmissionId, Guid SubmitterId, string SubmitterName, string TemplateTitle, string Status, string PeriodKey);
+
+    /// <summary>
+    /// يجعل المستخدم **مطالَبًا فعلًا** بالقالب وفق عقد الاستحقاق المركزي:
+    /// مسمّى وظيفيّ مشترك بين المستخدم والقالب (<c>ExpectedSubmissionStatusResolver</c> يتخطّى أيّ
+    /// مستخدم بلا <c>JobRoleId</c> أو قالب غير مربوط بمسمّاه)، مع إرجاع الإنشاء وأوّل نشر إلى ما قبل
+    /// أرضيّة الانطباق حتّى تصير الدورة الماضية مطالَبة ومتأخّرة لا «قبل الأرضيّة».
+    /// </summary>
+    private async Task MakeExpectedAsync(Guid templateId, Guid userId)
+    {
+        var anchor = new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc);
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var jobRole = new JobRole { NameAr = $"مسمّى {Guid.NewGuid():N}", Code = null, IsActive = true };
+        db.JobRoles.Add(jobRole);
+
+        var template = await db.ReportTemplates.FirstAsync(t => t.Id == templateId);
+        template.JobRoleId = jobRole.Id;
+
+        var user = await db.Users.FirstAsync(u => u.Id == userId);
+        user.JobRoleId = jobRole.Id;
+        user.CreatedAtUtc = anchor;
+
+        foreach (var v in await db.ReportTemplateVersions.Where(v => v.ReportTemplateId == templateId).ToListAsync())
+            v.PublishedAtUtc = anchor;
+
+        await db.SaveChangesAsync();
+    }
 
     private static async Task<(Guid TemplateId, Guid FieldId)> PublishWeeklyTemplateAsync(HttpClient admin)
     {

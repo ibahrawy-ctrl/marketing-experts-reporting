@@ -133,9 +133,9 @@ public class ProjectFirstExecutionAggregationTests
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var (_, empId) = await TestAuth.CreateUserAsync(_factory, "Employee");
         var (clientId, projectId) = await SeedClientProjectAsync("عميل ألفا P1", "مشروع ألفا P1");
-        await SeedSubmissionAsync(empId, null, "2098-W11", new[] { (projectId, Sample()) });
+        await SeedSubmissionAsync(empId, null, TestCalendar.Cycle(1), new[] { (projectId, Sample()) });
 
-        var report = await ByProjectsAsync(admin, $"periodKey=2098-W11&employeeId={empId}");
+        var report = await ByProjectsAsync(admin, $"periodKey={TestCalendar.Cycle(1)}&employeeId={empId}");
         var row = Assert.Single(report.Rows);
         Assert.Equal(projectId, row.ProjectId);
         Assert.Equal("مشروع ألفا P1", row.ProjectName);
@@ -165,9 +165,9 @@ public class ProjectFirstExecutionAggregationTests
         var (_, empId) = await TestAuth.CreateUserAsync(_factory, "Employee");
         var teamId = await TestAuth.CreateTeamWithLeaderAsync(_factory, leaderId, empId);
         var (_, projectId) = await SeedClientProjectAsync("عميل بيتا P2", "مشروع بيتا P2");
-        await SeedSubmissionAsync(empId, teamId, "2098-W12", new[] { (projectId, Sample()) });
+        await SeedSubmissionAsync(empId, teamId, TestCalendar.Cycle(2), new[] { (projectId, Sample()) });
 
-        var report = await ByEmployeesAsync(admin, $"periodKey=2098-W12&employeeId={empId}");
+        var report = await ByEmployeesAsync(admin, $"periodKey={TestCalendar.Cycle(2)}&employeeId={empId}");
         var row = Assert.Single(report.Rows);
         Assert.Equal(empId, row.EmployeeId);
         Assert.Equal(projectId, row.ProjectId);
@@ -185,9 +185,9 @@ public class ProjectFirstExecutionAggregationTests
         var (_, empId) = await TestAuth.CreateUserAsync(_factory, "Employee");
         var teamId = await TestAuth.CreateTeamWithLeaderAsync(_factory, leaderId, empId);
         var (_, projectId) = await SeedClientProjectAsync("عميل جاما P3", "مشروع جاما P3");
-        await SeedSubmissionAsync(empId, teamId, "2098-W13", new[] { (projectId, Sample()) });
+        await SeedSubmissionAsync(empId, teamId, TestCalendar.Cycle(3), new[] { (projectId, Sample()) });
 
-        var report = await ByPodsAsync(admin, $"periodKey=2098-W13&teamId={teamId}");
+        var report = await ByPodsAsync(admin, $"periodKey={TestCalendar.Cycle(3)}&teamId={teamId}");
         var row = Assert.Single(report.Rows.Where(r => r.TeamId == teamId));
         Assert.Equal(1, row.EmployeeCount);
         Assert.Equal(1, row.ProjectCount);
@@ -201,9 +201,9 @@ public class ProjectFirstExecutionAggregationTests
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var (_, empId) = await TestAuth.CreateUserAsync(_factory, "Employee");
         var (clientId, projectId) = await SeedClientProjectAsync("عميل دلتا P4", "مشروع دلتا P4");
-        await SeedSubmissionAsync(empId, null, "2098-W14", new[] { (projectId, Sample()) });
+        await SeedSubmissionAsync(empId, null, TestCalendar.Cycle(4), new[] { (projectId, Sample()) });
 
-        var report = await ByClientsAsync(admin, $"periodKey=2098-W14&employeeId={empId}&clientId={clientId}");
+        var report = await ByClientsAsync(admin, $"periodKey={TestCalendar.Cycle(4)}&employeeId={empId}&clientId={clientId}");
         var row = Assert.Single(report.Rows);
         Assert.Equal(clientId, row.ClientId);
         Assert.Equal(1, row.ProjectCount);
@@ -219,7 +219,7 @@ public class ProjectFirstExecutionAggregationTests
         var (_, empId) = await TestAuth.CreateUserAsync(_factory, "Employee");
         var (_, projectId) = await SeedClientProjectAsync("عميل إبسيلون P5", "مشروع إبسيلون P5");
 
-        const string currentKey = "2098-W16";
+        var currentKey = TestCalendar.Cycle(5);
         var prevKey = ReportCalendarPolicy.PreviousPeriodKey(PeriodType.Weekly, currentKey)!;
         Assert.False(string.IsNullOrEmpty(prevKey));
 
@@ -251,17 +251,17 @@ public class ProjectFirstExecutionAggregationTests
         var (_, projectId) = await SeedClientProjectAsync("عميل زيتا P6", "مشروع زيتا P6");
 
         // نفس المشروع مرّتين في تسليم واحد (موظّف 1) + مرّة في تسليم آخر (موظّف 2) = 3 مدخلات تتراكم.
-        await SeedSubmissionAsync(emp1, null, "2098-W17", new[]
+        await SeedSubmissionAsync(emp1, null, TestCalendar.Cycle(6), new[]
         {
             (projectId, new ContentValues(10, 8, 6, 0, 0, 1, "🟢 ممتاز")),
             (projectId, new ContentValues(10, 7, 5, 1, 0, 2, "🟢 ممتاز")),
         });
-        await SeedSubmissionAsync(emp2, null, "2098-W17", new[]
+        await SeedSubmissionAsync(emp2, null, TestCalendar.Cycle(6), new[]
         {
             (projectId, new ContentValues(10, 5, 4, 0, 1, 1, "🟡 مستقر")),
         });
 
-        var report = await ByProjectsAsync(admin, $"periodKey=2098-W17");
+        var report = await ByProjectsAsync(admin, $"periodKey={TestCalendar.Cycle(6)}");
         var row = Assert.Single(report.Rows.Where(r => r.ProjectId == projectId));
         Assert.Equal(30m, row.Metrics.Planned);    // 10+10+10
         Assert.Equal(20m, row.Metrics.Completed);  // 8+7+5
@@ -279,15 +279,15 @@ public class ProjectFirstExecutionAggregationTests
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var (_, empId) = await TestAuth.CreateUserAsync(_factory, "Employee");
         var (_, projectId) = await SeedClientProjectAsync("عميل نطاق P7", "مشروع نطاق P7");
-        await SeedSubmissionAsync(empId, null, "2098-W18", new[] { (projectId, Sample()) });
+        await SeedSubmissionAsync(empId, null, TestCalendar.Cycle(7), new[] { (projectId, Sample()) });
 
         // الأدمن (governance ⇒ SeesAll) يرى الصفّ.
-        var asAdmin = await ByProjectsAsync(admin, $"periodKey=2098-W18&employeeId={empId}");
+        var asAdmin = await ByProjectsAsync(admin, $"periodKey={TestCalendar.Cycle(7)}&employeeId={empId}");
         Assert.Single(asAdmin.Rows);
 
         // موظّف غير مرتبط (نطاق own) لا يرى بيانات غيره ولا مشروعه.
         var (outsider, _) = await TestAuth.CreateUserAsync(_factory, "Employee");
-        var asOutsider = await ByProjectsAsync(outsider, $"periodKey=2098-W18&employeeId={empId}");
+        var asOutsider = await ByProjectsAsync(outsider, $"periodKey={TestCalendar.Cycle(7)}&employeeId={empId}");
         Assert.Empty(asOutsider.Rows);
         Assert.Equal("self", asOutsider.ViewLevel);
 
@@ -295,7 +295,7 @@ public class ProjectFirstExecutionAggregationTests
         var anon = _factory.CreateClient();
         foreach (var path in new[] { "projects", "employees", "pods", "clients" })
         {
-            var resp = await anon.GetAsync($"/api/reporting/project-execution/{path}?periodKey=2098-W18");
+            var resp = await anon.GetAsync($"/api/reporting/project-execution/{path}?periodKey={TestCalendar.Cycle(7)}");
             Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
         }
     }
@@ -322,7 +322,7 @@ public class ProjectFirstExecutionAggregationTests
                 ReportTemplateVersionId = version.Id,
                 SubmitterId = empId,
                 PeriodType = PeriodType.Weekly,
-                PeriodKey = "2098-W19",
+                PeriodKey = TestCalendar.Cycle(8),
                 Status = SubmissionStatus.Draft
             };
             db.ReportSubmissions.Add(draft);
@@ -338,7 +338,7 @@ public class ProjectFirstExecutionAggregationTests
             await db.SaveChangesAsync();
         }
 
-        var report = await ByProjectsAsync(admin, $"periodKey=2098-W19&employeeId={empId}");
+        var report = await ByProjectsAsync(admin, $"periodKey={TestCalendar.Cycle(8)}&employeeId={empId}");
         Assert.Empty(report.Rows);
         Assert.Equal(0, report.SubmissionsConsidered); // المسودّة لا تُحتسب
     }

@@ -120,7 +120,7 @@ public class ErdsPhase6ExecutiveDashboardTests
         var tpl = await GetTemplateByTitleAsync(admin, ContentProductionReportSchema.TemplateTitle);
         var (emp, _) = await TestAuth.CreateUserAsync(_factory, "Employee");
         var resp = await emp.PostAsJsonAsync("/api/submissions",
-            new CreateSubmissionRequest(tpl.Id, PeriodType.Weekly, "2029-W40"));
+            new CreateSubmissionRequest(tpl.Id, PeriodType.Weekly, TestCalendar.Cycle(1)));
         Assert.Equal(HttpStatusCode.Forbidden, resp.StatusCode);
         Assert.Contains("report.template_not_assigned", await resp.Content.ReadAsStringAsync());
     }
@@ -139,26 +139,26 @@ public class ErdsPhase6ExecutiveDashboardTests
 
         // التنفيذ (المحتوى) تاريخيّ مزروع؛ المبيعات (B2C/B2B) نشطة عبر الـAPI.
         await SeedLegacyAsync(ContentProductionReportSchema.TemplateTitle, ContentProductionReportSchema.MainTableLabel,
-            id1, "2029-W01", new[] { ContentRowWU("عميل نظرة", "25", "20", "0", "مشروع نظرة", "12") });
-        await SubmitGridAsync(e2, b2c.Id, GridField(b2c).Id, "2029-W01",
+            id1, TestCalendar.Cycle(2), new[] { ContentRowWU("عميل نظرة", "25", "20", "0", "مشروع نظرة", "12") });
+        await SubmitGridAsync(e2, b2c.Id, GridField(b2c).Id, TestCalendar.Cycle(2),
             new[] { B2cRow("دورة نظرة", "40", "100", "25", "8000") });
-        await SubmitGridAsync(e3, b2b.Id, GridField(b2b).Id, "2029-W01",
+        await SubmitGridAsync(e3, b2b.Id, GridField(b2b).Id, TestCalendar.Cycle(2),
             new[] { B2bRow("خدمة نظرة", "30", "50", "10", "5000") });
 
-        var ov1 = await GetDashboardAsync<DashboardOverviewDto>(admin, "overview", $"periodKey=2029-W01&employeeId={id1}");
+        var ov1 = await GetDashboardAsync<DashboardOverviewDto>(admin, "overview", $"periodKey={TestCalendar.Cycle(2)}&employeeId={id1}");
         Assert.Equal(12m, ov1.WorkHours);
         Assert.Equal(1, ov1.Clients);
         Assert.Equal(1, ov1.Projects);
         Assert.Equal(20m, ov1.Content);
         Assert.Equal("summary", ov1.ViewLevel); // الأدمن = governance ⇒ summary
 
-        var ov2 = await GetDashboardAsync<DashboardOverviewDto>(admin, "overview", $"periodKey=2029-W01&employeeId={id2}");
+        var ov2 = await GetDashboardAsync<DashboardOverviewDto>(admin, "overview", $"periodKey={TestCalendar.Cycle(2)}&employeeId={id2}");
         Assert.Equal(40m, ov2.WorkHours);   // ساعات B2C
         Assert.Equal(100m, ov2.Leads);
         Assert.Equal(25m, ov2.Sales);
         Assert.Equal(8000m, ov2.Revenue);
 
-        var ov3 = await GetDashboardAsync<DashboardOverviewDto>(admin, "overview", $"periodKey=2029-W01&employeeId={id3}");
+        var ov3 = await GetDashboardAsync<DashboardOverviewDto>(admin, "overview", $"periodKey={TestCalendar.Cycle(2)}&employeeId={id3}");
         Assert.Equal(30m, ov3.WorkHours);   // ساعات B2B
         Assert.Equal(50m, ov3.Leads);
         Assert.Equal(10m, ov3.Sales);       // Won
@@ -175,12 +175,12 @@ public class ErdsPhase6ExecutiveDashboardTests
         var (e1, id1) = await TestAuth.CreateUserAsync(_factory, "Employee");
         var (e2, id2) = await TestAuth.CreateUserAsync(_factory, "Employee");
 
-        await SubmitGridAsync(e1, b2c.Id, GridField(b2c).Id, "2029-W02",
+        await SubmitGridAsync(e1, b2c.Id, GridField(b2c).Id, TestCalendar.Cycle(3),
             new[] { B2cRow("دورة مبيعات", "40", "100", "25", "8000") });
-        await SubmitGridAsync(e2, b2b.Id, GridField(b2b).Id, "2029-W02",
+        await SubmitGridAsync(e2, b2b.Id, GridField(b2b).Id, TestCalendar.Cycle(3),
             new[] { B2bRow("خدمة مبيعات", "30", "60", "10", "5000") });
 
-        var s1 = await GetDashboardAsync<DashboardSalesDto>(admin, "sales", $"periodKey=2029-W02&employeeId={id1}");
+        var s1 = await GetDashboardAsync<DashboardSalesDto>(admin, "sales", $"periodKey={TestCalendar.Cycle(3)}&employeeId={id1}");
         var b2cRow = Assert.Single(s1.B2c);
         Assert.Equal("دورة مبيعات", b2cRow.Item);
         Assert.Equal(25m, b2cRow.Sales);
@@ -189,7 +189,7 @@ public class ErdsPhase6ExecutiveDashboardTests
         Assert.Equal(25m, s1.Kpis.B2cSales);
         Assert.Equal(8000m, s1.Kpis.B2cRevenue);
 
-        var s2 = await GetDashboardAsync<DashboardSalesDto>(admin, "sales", $"periodKey=2029-W02&employeeId={id2}");
+        var s2 = await GetDashboardAsync<DashboardSalesDto>(admin, "sales", $"periodKey={TestCalendar.Cycle(3)}&employeeId={id2}");
         var b2bRow = Assert.Single(s2.B2b);
         Assert.Equal("خدمة مبيعات", b2bRow.Item);
         Assert.Equal(10m, b2bRow.Sales);       // Won مطبّع في حقل Sales الموحّد
@@ -207,9 +207,9 @@ public class ErdsPhase6ExecutiveDashboardTests
         var (_, empId) = await TestAuth.CreateUserAsync(_factory, "Employee");
 
         await SeedLegacyAsync(ContentProductionReportSchema.TemplateTitle, ContentProductionReportSchema.MainTableLabel,
-            empId, "2029-W03", new[] { ContentRowWU("عميل بود", "25", "20", "2", "مشروع بود", "10") });
+            empId, TestCalendar.Cycle(4), new[] { ContentRowWU("عميل بود", "25", "20", "2", "مشروع بود", "10") });
 
-        var pods = await GetDashboardAsync<DashboardPodsDto>(admin, "pods", $"periodKey=2029-W03&employeeId={empId}");
+        var pods = await GetDashboardAsync<DashboardPodsDto>(admin, "pods", $"periodKey={TestCalendar.Cycle(4)}&employeeId={empId}");
         var pod = Assert.Single(pods.Pods);
         Assert.Equal(10m, pod.WorkHours);
         Assert.Equal(20m, pod.Content);
@@ -227,9 +227,9 @@ public class ErdsPhase6ExecutiveDashboardTests
         var client = $"عميل لوحة {tag}";
 
         await SeedLegacyAsync(MediaBuyerByClientReportSchema.TemplateTitle, MediaBuyerByClientReportSchema.MainTableLabel,
-            empId, "2029-W04", new[] { MediaRowWU(client, "Meta", "300", "60", "12", "3000", $"مشروع {tag}", "9") });
+            empId, TestCalendar.Cycle(5), new[] { MediaRowWU(client, "Meta", "300", "60", "12", "3000", $"مشروع {tag}", "9") });
 
-        var res = await GetDashboardAsync<DashboardClientsDto>(admin, "clients", $"periodKey=2029-W04&client={client}");
+        var res = await GetDashboardAsync<DashboardClientsDto>(admin, "clients", $"periodKey={TestCalendar.Cycle(5)}&client={client}");
         var row = Assert.Single(res.Clients);
         Assert.Equal(client, row.Client);
         Assert.Equal(9m, row.WorkHours);
@@ -250,12 +250,12 @@ public class ErdsPhase6ExecutiveDashboardTests
         var project = $"مشروع {tag}";
 
         await SeedLegacyAsync(ProjectsByClientReportSchema.TemplateTitle, ProjectsByClientReportSchema.MainTableLabel,
-            id1, "2029-W05", new[] { ProjectRowWU(client, project, "40", "10", "6", "2", "1", "50", "متوسط") });
+            id1, TestCalendar.Cycle(6), new[] { ProjectRowWU(client, project, "40", "10", "6", "2", "1", "50", "متوسط") });
         // الميديا تعطي إيرادًا على مستوى (العميل/المشروع) يُركّبه محرّك العملاء.
         await SeedLegacyAsync(MediaBuyerByClientReportSchema.TemplateTitle, MediaBuyerByClientReportSchema.MainTableLabel,
-            id2, "2029-W05", new[] { MediaRowWU(client, "Meta", "200", "40", "8", "3000", project, "9") });
+            id2, TestCalendar.Cycle(6), new[] { MediaRowWU(client, "Meta", "200", "40", "8", "3000", project, "9") });
 
-        var res = await GetDashboardAsync<DashboardProjectsDto>(admin, "projects", $"periodKey=2029-W05&client={client}");
+        var res = await GetDashboardAsync<DashboardProjectsDto>(admin, "projects", $"periodKey={TestCalendar.Cycle(6)}&client={client}");
         var row = Assert.Single(res.Projects);
         Assert.Equal(client, row.Client);
         Assert.Equal(project, row.Project);
@@ -272,9 +272,9 @@ public class ErdsPhase6ExecutiveDashboardTests
         var (_, empId) = await TestAuth.CreateUserAsync(_factory, "Employee");
 
         await SeedLegacyAsync(ContentProductionReportSchema.TemplateTitle, ContentProductionReportSchema.MainTableLabel,
-            empId, "2029-W06", new[] { ContentRowWU("عميل عبء", "25", "20", "0", "مشروع عبء", "10") });
+            empId, TestCalendar.Cycle(7), new[] { ContentRowWU("عميل عبء", "25", "20", "0", "مشروع عبء", "10") });
 
-        var res = await GetDashboardAsync<DashboardWorkloadDto>(admin, "workload", $"periodKey=2029-W06&employeeId={empId}");
+        var res = await GetDashboardAsync<DashboardWorkloadDto>(admin, "workload", $"periodKey={TestCalendar.Cycle(7)}&employeeId={empId}");
         var e = Assert.Single(res.Employees);
         Assert.Equal(empId, e.EmployeeId);
         Assert.Equal(10m, e.TotalWorkHours);
@@ -297,12 +297,12 @@ public class ErdsPhase6ExecutiveDashboardTests
 
         // محتوى: متأخرات + مطلوب ⇒ DelayRate = 4/40 = 10% (مؤشّر محرّك جاهز).
         await SeedLegacyAsync(ContentProductionReportSchema.TemplateTitle, ContentProductionReportSchema.MainTableLabel,
-            id1, "2029-W07", new[] { ContentRowWU(client, "40", "30", "4", "مشروع محتوى", "10") });
+            id1, TestCalendar.Cycle(8), new[] { ContentRowWU(client, "40", "30", "4", "مشروع محتوى", "10") });
         // مشاريع: خطر مرتفع + متأخّر + متوقّف.
         await SeedLegacyAsync(ProjectsByClientReportSchema.TemplateTitle, ProjectsByClientReportSchema.MainTableLabel,
-            id2, "2029-W07", new[] { ProjectRowWU(client, project, "40", "10", "5", "3", "2", "40", "مرتفع") });
+            id2, TestCalendar.Cycle(8), new[] { ProjectRowWU(client, project, "40", "10", "5", "3", "2", "40", "مرتفع") });
 
-        var res = await GetDashboardAsync<DashboardRisksDto>(admin, "risks", $"periodKey=2029-W07&client={client}");
+        var res = await GetDashboardAsync<DashboardRisksDto>(admin, "risks", $"periodKey={TestCalendar.Cycle(8)}&client={client}");
 
         var risky = Assert.Single(res.TopRiskyProjects.Where(p => p.Project == project));
         Assert.Equal("مرتفع", risky.RiskLevel);
@@ -331,19 +331,19 @@ public class ErdsPhase6ExecutiveDashboardTests
 
         // موظّفان لهما تسليم تاريخيّ لنفس العميل/الفترة بقيم مختلفة.
         await SeedLegacyAsync(ContentProductionReportSchema.TemplateTitle, ContentProductionReportSchema.MainTableLabel,
-            empAId, "2029-W08", new[] { ContentRowWU(client, "25", "20", "0", "مشروع أ", "10") });
+            empAId, TestCalendar.Cycle(9), new[] { ContentRowWU(client, "25", "20", "0", "مشروع أ", "10") });
         await SeedLegacyAsync(ContentProductionReportSchema.TemplateTitle, ContentProductionReportSchema.MainTableLabel,
-            empBId, "2029-W08", new[] { ContentRowWU(client, "10", "8", "0", "مشروع ب", "5") });
+            empBId, TestCalendar.Cycle(9), new[] { ContentRowWU(client, "10", "8", "0", "مشروع ب", "5") });
 
         // الأدمن (SeesAll) يرى مجموع الاثنين: 10 + 5 = 15 ساعة، 20 + 8 = 28 محتوى.
-        var adminView = await GetDashboardAsync<DashboardClientsDto>(admin, "clients", $"periodKey=2029-W08&client={client}");
+        var adminView = await GetDashboardAsync<DashboardClientsDto>(admin, "clients", $"periodKey={TestCalendar.Cycle(9)}&client={client}");
         var adminRow = Assert.Single(adminView.Clients);
         Assert.Equal(15m, adminRow.WorkHours);
         Assert.Equal(28m, adminRow.Content);
         Assert.Equal("summary", adminView.ViewLevel);
 
         // الموظّف أ (نطاق own) يرى تسليمه فقط: 10 ساعة، 20 محتوى.
-        var aView = await GetDashboardAsync<DashboardClientsDto>(empAClient, "clients", $"periodKey=2029-W08&client={client}");
+        var aView = await GetDashboardAsync<DashboardClientsDto>(empAClient, "clients", $"periodKey={TestCalendar.Cycle(9)}&client={client}");
         var aRow = Assert.Single(aView.Clients);
         Assert.Equal(10m, aRow.WorkHours);
         Assert.Equal(20m, aRow.Content);
@@ -358,21 +358,21 @@ public class ErdsPhase6ExecutiveDashboardTests
         var (_, empId) = await TestAuth.CreateUserAsync(_factory, "Employee");
 
         await SeedLegacyAsync(ContentProductionReportSchema.TemplateTitle, ContentProductionReportSchema.MainTableLabel,
-            empId, "2029-W09", new[] { ContentRowWU("عميل تطابق", "25", "18", "3", "مشروع تطابق", "9") });
+            empId, TestCalendar.Cycle(10), new[] { ContentRowWU("عميل تطابق", "25", "18", "3", "مشروع تطابق", "9") });
 
         // مصدر الحقيقة = محرّك Phase 5 مباشرة.
-        var engine = (await (await admin.GetAsync($"/api/reporting/aggregation/pods?periodKey=2029-W09&employeeId={empId}"))
+        var engine = (await (await admin.GetAsync($"/api/reporting/aggregation/pods?periodKey={TestCalendar.Cycle(10)}&employeeId={empId}"))
             .ReadAsync<PodExecutionReport>())!;
         var engineRow = Assert.Single(engine.Rows);
 
         // اللوحة تُعيد نفس المجاميع دون إعادة حساب.
-        var pods = await GetDashboardAsync<DashboardPodsDto>(admin, "pods", $"periodKey=2029-W09&employeeId={empId}");
+        var pods = await GetDashboardAsync<DashboardPodsDto>(admin, "pods", $"periodKey={TestCalendar.Cycle(10)}&employeeId={empId}");
         var pod = Assert.Single(pods.Pods);
         Assert.Equal(engineRow.WorkHours, pod.WorkHours);
         Assert.Equal(engineRow.ContentPieces, pod.Content);
         Assert.Equal(engineRow.DelayedItems, pod.Delayed);
 
-        var ov = await GetDashboardAsync<DashboardOverviewDto>(admin, "overview", $"periodKey=2029-W09&employeeId={empId}");
+        var ov = await GetDashboardAsync<DashboardOverviewDto>(admin, "overview", $"periodKey={TestCalendar.Cycle(10)}&employeeId={empId}");
         Assert.Equal(engineRow.WorkHours, ov.WorkHours);
         Assert.Equal(engineRow.ContentPieces, ov.Content);
     }
@@ -385,13 +385,13 @@ public class ErdsPhase6ExecutiveDashboardTests
         var (_, empId) = await TestAuth.CreateUserAsync(_factory, "Employee");
 
         await SeedLegacyAsync(ContentProductionReportSchema.TemplateTitle, ContentProductionReportSchema.MainTableLabel,
-            empId, "2029-W10", new[] { ContentRowWU("عميل عدم تأثير", "25", "22", "1", "مشروع", "8") });
+            empId, TestCalendar.Cycle(11), new[] { ContentRowWU("عميل عدم تأثير", "25", "22", "1", "مشروع", "8") });
 
         // استدعاء اللوحة أولًا.
-        _ = await GetDashboardAsync<DashboardPodsDto>(admin, "pods", $"periodKey=2029-W10&employeeId={empId}");
+        _ = await GetDashboardAsync<DashboardPodsDto>(admin, "pods", $"periodKey={TestCalendar.Cycle(11)}&employeeId={empId}");
 
         // ثم نقطة التجميع القائمة — يجب أن تبقى سليمة تمامًا.
-        var engineResp = await admin.GetAsync($"/api/reporting/aggregation/pods?periodKey=2029-W10&employeeId={empId}");
+        var engineResp = await admin.GetAsync($"/api/reporting/aggregation/pods?periodKey={TestCalendar.Cycle(11)}&employeeId={empId}");
         Assert.Equal(HttpStatusCode.OK, engineResp.StatusCode);
         var engine = (await engineResp.ReadAsync<PodExecutionReport>())!;
         var row = Assert.Single(engine.Rows);

@@ -57,8 +57,8 @@ public class ScopeEnforcementTests
         var (templateId, fieldId) = await PublishWeeklyTemplateAsync(admin);
         var org = await BuildOrgAsync();
 
-        await SubmitAsync(org.Omar.C, templateId, fieldId, "2026-W40");
-        await SubmitAsync(org.Yousef.C, templateId, fieldId, "2026-W40");
+        await SubmitAsync(org.Omar.C, templateId, fieldId, TestCalendar.Cycle(1));
+        await SubmitAsync(org.Yousef.C, templateId, fieldId, TestCalendar.Cycle(1));
 
         var list = await (await org.SalesTl.C.GetAsync("/api/submissions"))
             .ReadAsync<List<SubmissionListItemDto>>();
@@ -77,9 +77,9 @@ public class ScopeEnforcementTests
         var org = await BuildOrgAsync();
 
         await admin.PostAsJsonAsync("/api/kpi-evaluations",
-            new CreateKpiEvaluationRequest(templateId, org.Omar.Id, PeriodType.Weekly, "2026-W40"));
+            new CreateKpiEvaluationRequest(templateId, org.Omar.Id, PeriodType.Weekly, TestCalendar.Cycle(1)));
         await admin.PostAsJsonAsync("/api/kpi-evaluations",
-            new CreateKpiEvaluationRequest(templateId, org.Yousef.Id, PeriodType.Weekly, "2026-W40"));
+            new CreateKpiEvaluationRequest(templateId, org.Yousef.Id, PeriodType.Weekly, TestCalendar.Cycle(1)));
 
         var list = await (await org.SalesTl.C.GetAsync("/api/kpi-evaluations"))
             .ReadAsync<List<KpiEvaluationListItemDto>>();
@@ -96,7 +96,7 @@ public class ScopeEnforcementTests
         var (templateId, fieldId) = await PublishWeeklyTemplateAsync(admin);
         var org = await BuildOrgAsync();
 
-        var yousefSub = await SubmitAsync(org.Yousef.C, templateId, fieldId, "2026-W41");
+        var yousefSub = await SubmitAsync(org.Yousef.C, templateId, fieldId, TestCalendar.Cycle(2));
 
         var res = await org.SalesTl.C.GetAsync($"/api/submissions/{yousefSub.Id}");
         Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
@@ -110,7 +110,7 @@ public class ScopeEnforcementTests
         var org = await BuildOrgAsync();
 
         var ev = await (await admin.PostAsJsonAsync("/api/kpi-evaluations",
-            new CreateKpiEvaluationRequest(templateId, org.Yousef.Id, PeriodType.Weekly, "2026-W42")))
+            new CreateKpiEvaluationRequest(templateId, org.Yousef.Id, PeriodType.Weekly, TestCalendar.Cycle(3))))
             .ReadAsync<KpiEvaluationDto>();
         await admin.PutAsJsonAsync($"/api/kpi-evaluations/{ev!.Id}/results",
             new SaveKpiResultsRequest(new[]

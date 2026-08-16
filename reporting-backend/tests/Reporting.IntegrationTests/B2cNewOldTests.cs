@@ -121,12 +121,12 @@ public class B2cNewOldTests
         var newRows = new[] { NewRow(course, "40", "100", "80", "50", "10", "25", "8000", "10", "السعر") };
         var oldRows = new[] { OldRow(course, "20", "60", "50", "30", "8", "12", "4000", "6", "التوقيت") };
 
-        var emp = await SubmitNewOldAsync(ceoId, tpl, "2026-W40", newRows, oldRows);
+        var emp = await SubmitNewOldAsync(ceoId, tpl, TestCalendar.Cycle(1), newRows, oldRows);
 
         // القيم مُخزَّنة ومُعادة كما هي لكلا الجدولين.
         var newGrid = GridByLabel(tpl, B2cNewOldReportSchema.NewLeadsTableLabel);
         var oldGrid = GridByLabel(tpl, B2cNewOldReportSchema.OldCrmTableLabel);
-        var list = await (await emp.GetAsync("/api/submissions?period=2026-W40")).ReadAsync<List<SubmissionDto>>();
+        var list = await (await emp.GetAsync($"/api/submissions?period={TestCalendar.Cycle(1)}")).ReadAsync<List<SubmissionDto>>();
         var sub = Assert.Single(list!.Where(s => s.TemplateTitle == tpl.Title));
         var full = await (await emp.GetAsync($"/api/submissions/{sub.Id}")).ReadAsync<SubmissionDto>();
         var storedNew = Assert.Single(full!.FieldValues.Where(v => v.TemplateFieldId == newGrid.Id)).ValueJson;
@@ -147,7 +147,7 @@ public class B2cNewOldTests
         var course = Uniq("دورة");
 
         var draft = await (await emp.PostAsJsonAsync("/api/submissions",
-            new CreateSubmissionRequest(tpl.Id, PeriodType.Weekly, "2026-W41"))).ReadAsync<SubmissionDto>();
+            new CreateSubmissionRequest(tpl.Id, PeriodType.Weekly, TestCalendar.Cycle(2)))).ReadAsync<SubmissionDto>();
 
         // Old CRM: Requalified(40) > Contacted(30) ⇒ سلسلة مخالفة.
         var newRows = new[] { NewRow(course, "40", "100", "80", "50", "10", "25", "8000", "10") };
@@ -174,9 +174,9 @@ public class B2cNewOldTests
 
         var newRows = new[] { NewRow(course, "40", "100", "80", "50", "10", "25", "8000", "10") };
         var oldRows = new[] { OldRow(course, "20", "60", "50", "30", "8", "12", "4000", "6") };
-        await SubmitNewOldAsync(ceoId, tpl, "2026-W42", newRows, oldRows);
+        await SubmitNewOldAsync(ceoId, tpl, TestCalendar.Cycle(3), newRows, oldRows);
 
-        var report = await AggNewOldAsync(admin, $"periodKey=2026-W42&course={Uri.EscapeDataString(course)}");
+        var report = await AggNewOldAsync(admin, $"periodKey={TestCalendar.Cycle(3)}&course={Uri.EscapeDataString(course)}");
         var row = Assert.Single(report.Courses);
         Assert.Equal(course, row.Course);
 
@@ -213,7 +213,7 @@ public class B2cNewOldTests
 
         // تقرير على القالب القديم أحادي الجدول (Leads=70، Sales=14).
         var draft = await (await emp.PostAsJsonAsync("/api/submissions",
-            new CreateSubmissionRequest(legacy.Id, PeriodType.Weekly, "2026-W43"))).ReadAsync<SubmissionDto>();
+            new CreateSubmissionRequest(legacy.Id, PeriodType.Weekly, TestCalendar.Cycle(4)))).ReadAsync<SubmissionDto>();
         var legacyRows = new[] { new[] { course, "35", "70", "60", "40", "9", "14", "7000", "7", "السعر" } };
         await emp.PutAsJsonAsync($"/api/submissions/{draft!.Id}/values",
             new SaveFieldValuesRequest(new[] { new FieldValueInput(legacyGrid.Id, null, null, null, null, JsonSerializer.Serialize(legacyRows)) }));
@@ -221,7 +221,7 @@ public class B2cNewOldTests
         Assert.Equal(SubmissionStatus.Submitted, submitted!.Status);
 
         var report = await AggNewOldAsync(admin,
-            $"periodKey=2026-W43&employeeId={empId}&course={Uri.EscapeDataString(course)}");
+            $"periodKey={TestCalendar.Cycle(4)}&employeeId={empId}&course={Uri.EscapeDataString(course)}");
         var row = Assert.Single(report.Courses);
         // القالب القديم يُعامَل New مؤقّتًا (لا مصدر Old فيه).
         Assert.Equal(70m, row.New.Leads);

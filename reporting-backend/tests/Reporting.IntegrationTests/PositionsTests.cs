@@ -35,7 +35,7 @@ public class PositionsTests
         var deptX = await CreateDepartmentAsync("P1X");
 
         var submitterX = await CreateSubmitterAsync(deptX);
-        await SubmitAsync(submitterX.C, templateId, fieldId, "2080-W10");
+        await SubmitAsync(submitterX.C, templateId, fieldId, TestCalendar.Cycle(1));
 
         var viewer = await TestAuth.CreateUserAsync(_factory, Roles.Employee);
 
@@ -52,7 +52,7 @@ public class PositionsTests
         var deptX = await CreateDepartmentAsync("P2X");
 
         var submitterX = await CreateSubmitterAsync(deptX);
-        await SubmitAsync(submitterX.C, templateId, fieldId, "2080-W11");
+        await SubmitAsync(submitterX.C, templateId, fieldId, TestCalendar.Cycle(2));
 
         var viewer = await TestAuth.CreateUserAsync(_factory, Roles.Employee);
         await SetupViewerPositionAsync(admin, viewer.UserId, "P2", deptX, null, null, PositionScopeKind.Department);
@@ -72,8 +72,8 @@ public class PositionsTests
 
         var submitterX = await CreateSubmitterAsync(deptX);
         var submitterY = await CreateSubmitterAsync(deptY);
-        await SubmitAsync(submitterX.C, templateId, fieldId, "2080-W12");
-        await SubmitAsync(submitterY.C, templateId, fieldId, "2080-W12");
+        await SubmitAsync(submitterX.C, templateId, fieldId, TestCalendar.Cycle(3));
+        await SubmitAsync(submitterY.C, templateId, fieldId, TestCalendar.Cycle(3));
 
         var viewer = await TestAuth.CreateUserAsync(_factory, Roles.Employee);
         await SetupViewerPositionAsync(admin, viewer.UserId, "P3", deptX, null, null, PositionScopeKind.Department);
@@ -93,7 +93,7 @@ public class PositionsTests
         var tl = await TestAuth.CreateUserAsync(_factory, Roles.TeamLeader);
 
         var submitterX = await CreateSubmitterAsync(deptX, tl.UserId);
-        var sub = await SubmitAsync(submitterX.C, templateId, fieldId, "2080-W13");
+        var sub = await SubmitAsync(submitterX.C, templateId, fieldId, TestCalendar.Cycle(4));
 
         var viewer = await TestAuth.CreateUserAsync(_factory, Roles.Employee);
         await SetupViewerPositionAsync(admin, viewer.UserId, "P4", deptX, null, null, PositionScopeKind.Department);
@@ -116,7 +116,7 @@ public class PositionsTests
         var tl = await TestAuth.CreateUserAsync(_factory, Roles.TeamLeader);
 
         var submitterX = await CreateSubmitterAsync(deptX, tl.UserId);
-        var sub = await SubmitAsync(submitterX.C, templateId, fieldId, "2080-W14");
+        var sub = await SubmitAsync(submitterX.C, templateId, fieldId, TestCalendar.Cycle(5));
 
         var viewer = await TestAuth.CreateUserAsync(_factory, Roles.Employee);
         await SetupViewerPositionAsync(admin, viewer.UserId, "P5", deptX, null, null, PositionScopeKind.Department);
@@ -135,7 +135,7 @@ public class PositionsTests
         var tl = await TestAuth.CreateUserAsync(_factory, Roles.TeamLeader);
 
         var submitterX = await CreateSubmitterAsync(deptX, tl.UserId);
-        var sub = await SubmitAsync(submitterX.C, templateId, fieldId, "2080-W15");
+        var sub = await SubmitAsync(submitterX.C, templateId, fieldId, TestCalendar.Cycle(6));
 
         var viewer = await TestAuth.CreateUserAsync(_factory, Roles.Employee);
         await SetupViewerPositionAsync(admin, viewer.UserId, "P6", deptX, null, null, PositionScopeKind.Department);
@@ -154,7 +154,7 @@ public class PositionsTests
         var tl = await TestAuth.CreateUserAsync(_factory, Roles.TeamLeader);
 
         var submitterX = await CreateSubmitterAsync(deptX, tl.UserId);
-        var sub = await SubmitAsync(submitterX.C, templateId, fieldId, "2080-W16");
+        var sub = await SubmitAsync(submitterX.C, templateId, fieldId, TestCalendar.Cycle(7));
 
         var viewer = await TestAuth.CreateUserAsync(_factory, Roles.Employee);
         await SetupViewerPositionAsync(admin, viewer.UserId, "P7", deptX, null, null, PositionScopeKind.Department);
@@ -220,8 +220,8 @@ public class PositionsTests
 
         var submitterX = await CreateSubmitterAsync(deptX);
         var submitterY = await CreateSubmitterAsync(deptY);
-        await SubmitAsync(submitterX.C, templateId, fieldId, "2080-W17");
-        await SubmitAsync(submitterY.C, templateId, fieldId, "2080-W17");
+        await SubmitAsync(submitterX.C, templateId, fieldId, TestCalendar.Cycle(8));
+        await SubmitAsync(submitterY.C, templateId, fieldId, TestCalendar.Cycle(8));
 
         var ids = await SubmitterIdsAsync(admin);
         Assert.Contains(submitterX.Id, ids);
@@ -238,12 +238,12 @@ public class PositionsTests
         // قائد فريق له مرؤوس مباشر (نطاق الدور)
         var tl = await TestAuth.CreateUserAsync(_factory, Roles.TeamLeader);
         var teamMember = await TestAuth.CreateUserAsync(_factory, Roles.Employee, tl.UserId);
-        await SubmitAsync(teamMember.Client, templateId, fieldId, "2080-W18");
+        await SubmitAsync(teamMember.Client, templateId, fieldId, TestCalendar.Cycle(9));
 
         // إدارة منفصلة لا علاقة لها بفريق القائد (نطاق المنصب)
         var deptX = await CreateDepartmentAsync("P12X");
         var deptSubmitter = await CreateSubmitterAsync(deptX);
-        await SubmitAsync(deptSubmitter.C, templateId, fieldId, "2080-W18");
+        await SubmitAsync(deptSubmitter.C, templateId, fieldId, TestCalendar.Cycle(9));
 
         await SetupViewerPositionAsync(admin, tl.UserId, "P12", deptX, null, null, PositionScopeKind.Department);
 
@@ -261,7 +261,7 @@ public class PositionsTests
         var deptX = await CreateDepartmentAsync("P13X");
 
         var submitterX = await CreateSubmitterAsync(deptX);
-        await SubmitAsync(submitterX.C, templateId, fieldId, "2080-W19");
+        await SubmitAsync(submitterX.C, templateId, fieldId, TestCalendar.Cycle(10));
 
         var viewer = await TestAuth.CreateUserAsync(_factory, Roles.Employee);
         var pos = await SetupViewerPositionAsync(admin, viewer.UserId, "P13", deptX, null, null, PositionScopeKind.Department);
@@ -281,7 +281,7 @@ public class PositionsTests
         var deptX = await CreateDepartmentAsync("P14X");
 
         var submitterX = await CreateSubmitterAsync(deptX);
-        await SubmitAsync(submitterX.C, templateId, fieldId, "2080-W20");
+        await SubmitAsync(submitterX.C, templateId, fieldId, TestCalendar.Cycle(11));
 
         var viewer = await TestAuth.CreateUserAsync(_factory, Roles.Employee);
         var pos = await SetupViewerPositionAsync(admin, viewer.UserId, "P14", deptX, null, null, PositionScopeKind.Department);

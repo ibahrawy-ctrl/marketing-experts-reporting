@@ -45,7 +45,7 @@ public class NotificationLinkTests
         var (employee, _) = await TestAuth.CreateUserAsync(_factory, "Employee", managerId);
 
         var draft = await (await employee.PostAsJsonAsync("/api/submissions",
-            new CreateSubmissionRequest(templateId, PeriodType.Weekly, "2026-W40"))).ReadAsync<SubmissionDto>();
+            new CreateSubmissionRequest(templateId, PeriodType.Weekly, TestCalendar.Cycle(1)))).ReadAsync<SubmissionDto>();
         await employee.PutAsJsonAsync($"/api/submissions/{draft!.Id}/values",
             new SaveFieldValuesRequest(new[] { new FieldValueInput(fieldId, null, 100m, null, null, null) }));
         await employee.PostAsync($"/api/submissions/{draft.Id}/submit", null);
@@ -74,7 +74,7 @@ public class NotificationLinkTests
         var (subject, subjectId) = await TestAuth.CreateUserAsync(_factory, "Employee", managerId);
 
         var ev = await (await manager.PostAsJsonAsync("/api/kpi-evaluations",
-            new CreateKpiEvaluationRequest(created.Id, subjectId, PeriodType.Weekly, "2026-W41")))
+            new CreateKpiEvaluationRequest(created.Id, subjectId, PeriodType.Weekly, TestCalendar.Cycle(2))))
             .ReadAsync<KpiEvaluationDto>();
         await manager.PutAsJsonAsync($"/api/kpi-evaluations/{ev!.Id}/results",
             new SaveKpiResultsRequest(new[] { new KpiResultInput(manual!.Id, null, 80m, null) }));
@@ -128,7 +128,7 @@ public class NotificationLinkTests
         var (employee, _) = await TestAuth.CreateUserAsync(_factory, "Employee", managerId);
 
         var draft = await (await employee.PostAsJsonAsync("/api/submissions",
-            new CreateSubmissionRequest(templateId, PeriodType.Weekly, "2026-W42"))).ReadAsync<SubmissionDto>();
+            new CreateSubmissionRequest(templateId, PeriodType.Weekly, TestCalendar.Cycle(3)))).ReadAsync<SubmissionDto>();
         await employee.PutAsJsonAsync($"/api/submissions/{draft!.Id}/values",
             new SaveFieldValuesRequest(new[] { new FieldValueInput(fieldId, null, 100m, null, null, null) }));
         await employee.PostAsync($"/api/submissions/{draft.Id}/submit", null);

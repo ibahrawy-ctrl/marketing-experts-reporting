@@ -151,7 +151,7 @@ public class TemplateRoleGuardTests
         var (emp, _) = await TestAuth.CreateUserAsync(_factory, Roles.Employee, managerId);
 
         var draft = await (await emp.PostAsJsonAsync("/api/submissions",
-            new CreateSubmissionRequest(genTemplateId, PeriodType.Weekly, "2026-W35"))).ReadAsync<SubmissionDto>();
+            new CreateSubmissionRequest(genTemplateId, PeriodType.Weekly, TestCalendar.Cycle(1)))).ReadAsync<SubmissionDto>();
         await emp.PutAsJsonAsync($"/api/submissions/{draft!.Id}/values",
             new SaveFieldValuesRequest(new[] { new FieldValueInput(genFieldId, null, 10m, null, null, null) }));
         var submit = await emp.PostAsync($"/api/submissions/{draft.Id}/submit", null);
@@ -175,7 +175,7 @@ public class TemplateRoleGuardTests
         await SetJobRoleAsync(empId, roleId);
 
         var draft = await (await emp.PostAsJsonAsync("/api/submissions",
-            new CreateSubmissionRequest(templateId, PeriodType.Weekly, "2026-W36"))).ReadAsync<SubmissionDto>();
+            new CreateSubmissionRequest(templateId, PeriodType.Weekly, TestCalendar.Cycle(2)))).ReadAsync<SubmissionDto>();
 
         // حفظ أوّل ثم تعديل (محاكاة متابعة مسودة قائمة) ثم إرسال — كلها ناجحة.
         var save1 = await emp.PutAsJsonAsync($"/api/submissions/{draft!.Id}/values",

@@ -1,3 +1,4 @@
+using Reporting.Application.Common;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -27,9 +28,11 @@ public class SubmissionReminderTests
     private readonly CustomWebApplicationFactory _factory;
     public SubmissionReminderTests(CustomWebApplicationFactory factory) => _factory = factory;
 
-    // الأربعاء 24 يونيو 2026 = موعد تسليم الموظّف لأسبوع 2026-W25 (الخميس 18 → الأربعاء 24).
+    // الأربعاء 24 يونيو 2026 = موعد تسليم الموظّف لأسبوعه التشغيليّ.
     private static readonly DateOnly DueWednesday = new(2026, 6, 24);
-    private const string WeekKey = "2026-W25";
+    // المفتاح يُشتقّ من نفس السياسة التي يستعملها SubmissionReminderService بدل تصليبه: ترقيم
+    // الأسابيع سلوك خادميّ، وتصليبه يجعل التسليم المبذور لا يطابق المفتاح الذي يبحث عنه الخادم.
+    private static string WeekKey => ReportCalendarPolicy.WeekKeyFor(DueWednesday);
 
     private static SubmissionReminderService Service(WebApplicationFactory<Program> f)
     {

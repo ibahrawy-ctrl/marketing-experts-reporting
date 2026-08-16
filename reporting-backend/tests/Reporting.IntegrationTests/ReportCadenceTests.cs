@@ -63,11 +63,11 @@ public class ReportCadenceTests
         var (employee, _) = await TestAuth.CreateUserAsync(_factory, "Employee");
 
         var weekly = await employee.PostAsJsonAsync("/api/submissions",
-            new CreateSubmissionRequest(templateId, PeriodType.Weekly, "2026-W50"));
+            new CreateSubmissionRequest(templateId, PeriodType.Weekly, TestCalendar.Cycle(1)));
         Assert.Equal(HttpStatusCode.OK, weekly.StatusCode);
 
         var daily = await employee.PostAsJsonAsync("/api/submissions",
-            new CreateSubmissionRequest(templateId, PeriodType.Daily, "2026-12-15"));
+            new CreateSubmissionRequest(templateId, PeriodType.Daily, TestCalendar.Day(0)));
         Assert.Equal(HttpStatusCode.BadRequest, daily.StatusCode);
     }
 
@@ -85,11 +85,11 @@ public class ReportCadenceTests
             new CreateAssignmentRequest(TemplateAssignmentScope.Employee, salesId, TemplateAssignmentKind.Include, null));
 
         var daily = await sales.PostAsJsonAsync("/api/submissions",
-            new CreateSubmissionRequest(templateId, PeriodType.Daily, "2026-12-16"));
+            new CreateSubmissionRequest(templateId, PeriodType.Daily, TestCalendar.Day(1)));
         Assert.Equal(HttpStatusCode.OK, daily.StatusCode);
 
         var weekly = await sales.PostAsJsonAsync("/api/submissions",
-            new CreateSubmissionRequest(templateId, PeriodType.Weekly, "2026-W51"));
+            new CreateSubmissionRequest(templateId, PeriodType.Weekly, TestCalendar.Cycle(2)));
         Assert.Equal(HttpStatusCode.BadRequest, weekly.StatusCode);
     }
 

@@ -105,10 +105,10 @@ public class KpiOverviewScopeTests
         var (templateId, manualId, autoId) = await PublishKpiAsync(admin);
         var org = await BuildOrgAsync();
 
-        await SubmitEvalAsync(admin, templateId, manualId, autoId, org.Emp.Id, "2026-W43");
-        await SubmitEvalAsync(admin, templateId, manualId, autoId, org.FinEmp.Id, "2026-W43");
+        await SubmitEvalAsync(admin, templateId, manualId, autoId, org.Emp.Id, TestCalendar.Cycle(1));
+        await SubmitEvalAsync(admin, templateId, manualId, autoId, org.FinEmp.Id, TestCalendar.Cycle(1));
 
-        var report = await (await org.Mgr.C.GetAsync("/api/reports/kpi-summary?periodType=Weekly&periodKey=2026-W43"))
+        var report = await (await org.Mgr.C.GetAsync($"/api/reports/kpi-summary?periodType=Weekly&periodKey={TestCalendar.Cycle(1)}"))
             .ReadAsync<KpiSummaryReport>();
         var subjects = report!.Rows.Select(r => r.SubjectUserId).ToList();
 
@@ -138,11 +138,11 @@ public class KpiOverviewScopeTests
         var (templateId, manualId, autoId) = await PublishKpiAsync(admin);
         var org = await BuildOrgAsync();
 
-        await SubmitEvalAsync(admin, templateId, manualId, autoId, org.Emp.Id, "2026-W44");
-        await SubmitEvalAsync(admin, templateId, manualId, autoId, org.FinEmp.Id, "2026-W44");
+        await SubmitEvalAsync(admin, templateId, manualId, autoId, org.Emp.Id, TestCalendar.Cycle(2));
+        await SubmitEvalAsync(admin, templateId, manualId, autoId, org.FinEmp.Id, TestCalendar.Cycle(2));
 
         // ملخّص المؤشرات محصور بأدوار المراقبة — الموظف يُمنع
-        var summaryRes = await org.Emp.C.GetAsync("/api/reports/kpi-summary?periodType=Weekly&periodKey=2026-W44");
+        var summaryRes = await org.Emp.C.GetAsync($"/api/reports/kpi-summary?periodType=Weekly&periodKey={TestCalendar.Cycle(2)}");
         Assert.Equal(HttpStatusCode.Forbidden, summaryRes.StatusCode);
 
         // قائمة التقييمات للموظف = تقييماته فقط
@@ -162,8 +162,8 @@ public class KpiOverviewScopeTests
         var (templateId, manualId, autoId) = await PublishKpiAsync(admin);
         var org = await BuildOrgAsync();
 
-        await SubmitEvalAsync(admin, templateId, manualId, autoId, org.Emp.Id, "2026-W45");
-        await SubmitEvalAsync(admin, templateId, manualId, autoId, org.FinEmp.Id, "2026-W45");
+        await SubmitEvalAsync(admin, templateId, manualId, autoId, org.Emp.Id, TestCalendar.Cycle(3));
+        await SubmitEvalAsync(admin, templateId, manualId, autoId, org.FinEmp.Id, TestCalendar.Cycle(3));
 
         var depts = await (await admin.GetAsync("/api/directory/departments"))
             .ReadAsync<List<DirDepartment>>();
@@ -172,7 +172,7 @@ public class KpiOverviewScopeTests
         Assert.Contains(org.FinanceDeptId, deptIds);
         Assert.Contains(org.GeneralAdminDeptId, deptIds);
 
-        var report = await (await admin.GetAsync("/api/reports/kpi-summary?periodType=Weekly&periodKey=2026-W45"))
+        var report = await (await admin.GetAsync($"/api/reports/kpi-summary?periodType=Weekly&periodKey={TestCalendar.Cycle(3)}"))
             .ReadAsync<KpiSummaryReport>();
         var subjects = report!.Rows.Select(r => r.SubjectUserId).ToList();
         Assert.Contains(org.Emp.Id, subjects);

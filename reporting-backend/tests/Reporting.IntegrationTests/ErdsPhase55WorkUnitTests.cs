@@ -131,7 +131,7 @@ public class ErdsPhase55WorkUnitTests
         var tpl = await GetTemplateByTitleAsync(admin, ContentProductionReportSchema.TemplateTitle);
         var (emp, _) = await TestAuth.CreateUserAsync(_factory, "Employee");
         var resp = await emp.PostAsJsonAsync("/api/submissions",
-            new CreateSubmissionRequest(tpl.Id, PeriodType.Weekly, "2028-W40"));
+            new CreateSubmissionRequest(tpl.Id, PeriodType.Weekly, TestCalendar.Cycle(1)));
         Assert.Equal(HttpStatusCode.Forbidden, resp.StatusCode);
         Assert.Contains("report.template_not_assigned", await resp.Content.ReadAsStringAsync());
     }
@@ -153,10 +153,10 @@ public class ErdsPhase55WorkUnitTests
 
         await LegacyExecutionFixture.SeedLegacyHistoricalGridAsync(_factory,
             ContentProductionReportSchema.TemplateTitle, ContentProductionReportSchema.MainTableLabel,
-            empId, null, "2028-W01",
+            empId, null, TestCalendar.Cycle(2),
             new[] { ContentRowWU("عميل محتوى", "25", "20", "5", "مشروع محتوى", "12") });
 
-        var report = await AggPodsAsync(admin, $"periodKey=2028-W01&employeeId={empId}");
+        var report = await AggPodsAsync(admin, $"periodKey={TestCalendar.Cycle(2)}&employeeId={empId}");
         var row = Assert.Single(report.Rows);
         Assert.Equal("عميل محتوى", row.Client);
         Assert.Equal("مشروع محتوى", row.Project);
@@ -177,10 +177,10 @@ public class ErdsPhase55WorkUnitTests
 
         await LegacyExecutionFixture.SeedLegacyHistoricalGridAsync(_factory,
             DesignProductionReportSchema.TemplateTitle, DesignProductionReportSchema.MainTableLabel,
-            empId, null, "2028-W02",
+            empId, null, TestCalendar.Cycle(3),
             new[] { DesignRowWU("عميل تصميم", "30", "24", "6", "مشروع تصميم", "8") });
 
-        var report = await AggPodsAsync(admin, $"periodKey=2028-W02&employeeId={empId}");
+        var report = await AggPodsAsync(admin, $"periodKey={TestCalendar.Cycle(3)}&employeeId={empId}");
         var row = Assert.Single(report.Rows);
         Assert.Equal("عميل تصميم", row.Client);
         Assert.Equal("مشروع تصميم", row.Project);
@@ -201,10 +201,10 @@ public class ErdsPhase55WorkUnitTests
 
         await LegacyExecutionFixture.SeedLegacyHistoricalGridAsync(_factory,
             VideoProductionReportSchema.TemplateTitle, VideoProductionReportSchema.MainTableLabel,
-            empId, null, "2028-W03",
+            empId, null, TestCalendar.Cycle(4),
             new[] { VideoRowWU("عميل فيديو", "10", "8", "2", "مشروع فيديو", "6") });
 
-        var report = await AggPodsAsync(admin, $"periodKey=2028-W03&employeeId={empId}");
+        var report = await AggPodsAsync(admin, $"periodKey={TestCalendar.Cycle(4)}&employeeId={empId}");
         var row = Assert.Single(report.Rows);
         Assert.Equal("عميل فيديو", row.Client);
         Assert.Equal("مشروع فيديو", row.Project);
@@ -225,10 +225,10 @@ public class ErdsPhase55WorkUnitTests
 
         await LegacyExecutionFixture.SeedLegacyHistoricalGridAsync(_factory,
             SocialPublishingReportSchema.TemplateTitle, SocialPublishingReportSchema.MainTableLabel,
-            empId, null, "2028-W04",
+            empId, null, TestCalendar.Cycle(5),
             new[] { SocialRowWU("عميل نشر", "50", "40", "5", "مشروع نشر", "10") });
 
-        var report = await AggPodsAsync(admin, $"periodKey=2028-W04&employeeId={empId}");
+        var report = await AggPodsAsync(admin, $"periodKey={TestCalendar.Cycle(5)}&employeeId={empId}");
         var row = Assert.Single(report.Rows);
         Assert.Equal("عميل نشر", row.Client);
         Assert.Equal("مشروع نشر", row.Project);
@@ -249,10 +249,10 @@ public class ErdsPhase55WorkUnitTests
 
         await LegacyExecutionFixture.SeedLegacyHistoricalGridAsync(_factory,
             MediaBuyerByClientReportSchema.TemplateTitle, MediaBuyerByClientReportSchema.MainTableLabel,
-            empId, null, "2028-W05",
+            empId, null, TestCalendar.Cycle(6),
             new[] { MediaRowWU("عميل ميديا", "Meta", "300", "60", "12", "3000", "مشروع ميديا", "9") });
 
-        var report = await AggPodsAsync(admin, $"periodKey=2028-W05&employeeId={empId}");
+        var report = await AggPodsAsync(admin, $"periodKey={TestCalendar.Cycle(6)}&employeeId={empId}");
         var row = Assert.Single(report.Rows);
         Assert.Equal("عميل ميديا", row.Client);
         Assert.Equal("مشروع ميديا", row.Project);
@@ -273,10 +273,10 @@ public class ErdsPhase55WorkUnitTests
 
         await LegacyExecutionFixture.SeedLegacyHistoricalGridAsync(_factory,
             ProjectsByClientReportSchema.TemplateTitle, ProjectsByClientReportSchema.MainTableLabel,
-            empId, null, "2028-W06",
+            empId, null, TestCalendar.Cycle(7),
             new[] { ProjectRowWU("عميل مشاريع", "بوابة", "40", "10", "6", "2", "1", "50", "متوسط") });
 
-        var report = await AggProjectsAsync(admin, $"periodKey=2028-W06&employeeId={empId}");
+        var report = await AggProjectsAsync(admin, $"periodKey={TestCalendar.Cycle(7)}&employeeId={empId}");
         var row = Assert.Single(report.Rows);
         Assert.Equal("عميل مشاريع", row.Client);
         Assert.Equal("بوابة", row.Project);
@@ -301,14 +301,14 @@ public class ErdsPhase55WorkUnitTests
         // نفس العميل + نفس المشروع من قالبَين مختلفَين ⇒ يُجمَع في صفّ عميل/مشروع واحد.
         await LegacyExecutionFixture.SeedLegacyHistoricalGridAsync(_factory,
             ContentProductionReportSchema.TemplateTitle, ContentProductionReportSchema.MainTableLabel,
-            emp1Id, null, "2028-W07",
+            emp1Id, null, TestCalendar.Cycle(8),
             new[] { ContentRowWU(client, "25", "20", "0", project, "10") });
         await LegacyExecutionFixture.SeedLegacyHistoricalGridAsync(_factory,
             ProjectsByClientReportSchema.TemplateTitle, ProjectsByClientReportSchema.MainTableLabel,
-            emp2Id, null, "2028-W07",
+            emp2Id, null, TestCalendar.Cycle(8),
             new[] { ProjectRowWU(client, project, "15", "10", "5", "1", "2", "50", "متوسط") });
 
-        var report = await AggClientsAsync(admin, $"periodKey=2028-W07&client={client}&project={project}");
+        var report = await AggClientsAsync(admin, $"periodKey={TestCalendar.Cycle(8)}&client={client}&project={project}");
         var row = Assert.Single(report.Rows);
         Assert.Equal(client, row.Client);
         Assert.Equal(project, row.Project);
@@ -326,10 +326,10 @@ public class ErdsPhase55WorkUnitTests
 
         await LegacyExecutionFixture.SeedLegacyHistoricalGridAsync(_factory,
             ContentProductionReportSchema.TemplateTitle, ContentProductionReportSchema.MainTableLabel,
-            empId, null, "2028-W08",
+            empId, null, TestCalendar.Cycle(9),
             new[] { ContentRowWU("عميل ساعة محتوى", "25", "20", "0", "مشروع", "10") });
 
-        var report = await AggPodsAsync(admin, $"periodKey=2028-W08&employeeId={empId}");
+        var report = await AggPodsAsync(admin, $"periodKey={TestCalendar.Cycle(9)}&employeeId={empId}");
         var row = Assert.Single(report.Rows);
         Assert.Equal(2.00m, row.ProductivityIndicators.ContentPerHour); // 20 / 10
     }
@@ -343,10 +343,10 @@ public class ErdsPhase55WorkUnitTests
 
         await LegacyExecutionFixture.SeedLegacyHistoricalGridAsync(_factory,
             DesignProductionReportSchema.TemplateTitle, DesignProductionReportSchema.MainTableLabel,
-            empId, null, "2028-W09",
+            empId, null, TestCalendar.Cycle(10),
             new[] { DesignRowWU("عميل ساعة تصميم", "30", "15", "0", "مشروع", "10") });
 
-        var report = await AggPodsAsync(admin, $"periodKey=2028-W09&employeeId={empId}");
+        var report = await AggPodsAsync(admin, $"periodKey={TestCalendar.Cycle(10)}&employeeId={empId}");
         var row = Assert.Single(report.Rows);
         Assert.Equal(1.50m, row.ProductivityIndicators.DesignsPerHour); // 15 / 10
     }
@@ -360,10 +360,10 @@ public class ErdsPhase55WorkUnitTests
 
         await LegacyExecutionFixture.SeedLegacyHistoricalGridAsync(_factory,
             VideoProductionReportSchema.TemplateTitle, VideoProductionReportSchema.MainTableLabel,
-            empId, null, "2028-W10",
+            empId, null, TestCalendar.Cycle(11),
             new[] { VideoRowWU("عميل ساعة فيديو", "10", "8", "0", "مشروع", "4") });
 
-        var report = await AggPodsAsync(admin, $"periodKey=2028-W10&employeeId={empId}");
+        var report = await AggPodsAsync(admin, $"periodKey={TestCalendar.Cycle(11)}&employeeId={empId}");
         var row = Assert.Single(report.Rows);
         Assert.Equal(2.00m, row.ProductivityIndicators.VideosPerHour); // 8 / 4
     }
@@ -377,10 +377,10 @@ public class ErdsPhase55WorkUnitTests
 
         await LegacyExecutionFixture.SeedLegacyHistoricalGridAsync(_factory,
             SocialPublishingReportSchema.TemplateTitle, SocialPublishingReportSchema.MainTableLabel,
-            empId, null, "2028-W11",
+            empId, null, TestCalendar.Cycle(12),
             new[] { SocialRowWU("عميل ساعة نشر", "50", "20", "0", "مشروع", "5") });
 
-        var report = await AggPodsAsync(admin, $"periodKey=2028-W11&employeeId={empId}");
+        var report = await AggPodsAsync(admin, $"periodKey={TestCalendar.Cycle(12)}&employeeId={empId}");
         var row = Assert.Single(report.Rows);
         Assert.Equal(4.00m, row.ProductivityIndicators.PostsPerHour); // 20 / 5
     }
@@ -395,10 +395,10 @@ public class ErdsPhase55WorkUnitTests
         // صفّ بترتيب قديم (9 خلايا فقط) بلا أعمدة Work Unit.
         await LegacyExecutionFixture.SeedLegacyHistoricalGridAsync(_factory,
             ContentProductionReportSchema.TemplateTitle, ContentProductionReportSchema.MainTableLabel,
-            empId, null, "2028-W12",
+            empId, null, TestCalendar.Cycle(13),
             new[] { ContentRowLegacy("عميل قديم", "25", "20", "5") });
 
-        var report = await AggPodsAsync(admin, $"periodKey=2028-W12&employeeId={empId}");
+        var report = await AggPodsAsync(admin, $"periodKey={TestCalendar.Cycle(13)}&employeeId={empId}");
         var row = Assert.Single(report.Rows);
         Assert.Equal("عميل قديم", row.Client);
         Assert.Equal(string.Empty, row.Project);   // عمود المشروع خارج الحدود ⇒ فارغ
@@ -417,11 +417,11 @@ public class ErdsPhase55WorkUnitTests
         // تسليم تاريخيّ اكتمل مساره سابقًا (Closed) — يقرؤه المحرّك (المُستبعَد هو Draft فقط).
         await LegacyExecutionFixture.SeedLegacyHistoricalGridAsync(_factory,
             ContentProductionReportSchema.TemplateTitle, ContentProductionReportSchema.MainTableLabel,
-            empId, null, "2028-W14",
+            empId, null, TestCalendar.Cycle(14),
             new[] { ContentRowWU("عميل اعتماد", "10", "8", "1", "مشروع اعتماد", "5") },
             status: SubmissionStatus.Closed);
 
-        var pods = await AggPodsAsync(admin, $"periodKey=2028-W14&employeeId={empId}");
+        var pods = await AggPodsAsync(admin, $"periodKey={TestCalendar.Cycle(14)}&employeeId={empId}");
         var row = Assert.Single(pods.Rows);
         Assert.Equal(8m, row.ContentPieces);
         Assert.Equal(5m, row.WorkHours);
@@ -438,10 +438,10 @@ public class ErdsPhase55WorkUnitTests
         // صفّ بالترتيب القديم: العميل(0)/معتمد(6)/متأخر(7) — إلحاق الأعمدة الجديدة لم يُزِح هذه الفهارس.
         await LegacyExecutionFixture.SeedLegacyHistoricalGridAsync(_factory,
             ContentProductionReportSchema.TemplateTitle, ContentProductionReportSchema.MainTableLabel,
-            empId, null, "2028-W15",
+            empId, null, TestCalendar.Cycle(15),
             new[] { ContentRowLegacy("عميل استقرار", "40", "30", "4") });
 
-        var report = await AggPodsAsync(admin, $"periodKey=2028-W15&employeeId={empId}");
+        var report = await AggPodsAsync(admin, $"periodKey={TestCalendar.Cycle(15)}&employeeId={empId}");
         var row = Assert.Single(report.Rows);
         Assert.Equal("عميل استقرار", row.Client);
         Assert.Equal(30m, row.ContentPieces);                     // فهرس المعتمد (6) ثابت
@@ -463,17 +463,17 @@ public class ErdsPhase55WorkUnitTests
         var (emp, empId) = await TestAuth.CreateUserAsync(_factory, "Employee");
 
         // B2C: [الدورة، ساعات، Leads، Contacted، Qualified، Follow، Sales، Revenue، Lost، السبب]
-        await SubmitGridAsync(emp, b2c.Id, b2cGrid.Id, "2028-W13",
+        await SubmitGridAsync(emp, b2c.Id, b2cGrid.Id, TestCalendar.Cycle(16),
             new[] { new[] { "دورة وحدة العمل", "40", "100", "80", "50", "10", "25", "8000", "10", "" } });
 
-        var b2cReport = (await (await admin.GetAsync($"/api/reporting/aggregation/b2c?periodKey=2028-W13&employeeId={empId}"))
+        var b2cReport = (await (await admin.GetAsync($"/api/reporting/aggregation/b2c?periodKey={TestCalendar.Cycle(16)}&employeeId={empId}"))
             .ReadAsync<B2cAggregationReport>())!;
         Assert.Single(b2cReport.Rows);
         Assert.Equal("دورة وحدة العمل", b2cReport.Rows[0].Course);
         Assert.Equal(40m, b2cReport.Rows[0].WorkHours);
 
         // محرّك Phase 5 لا يرى قالب B2C ⇒ لا صفوف.
-        var pods = await AggPodsAsync(admin, $"periodKey=2028-W13&employeeId={empId}");
+        var pods = await AggPodsAsync(admin, $"periodKey={TestCalendar.Cycle(16)}&employeeId={empId}");
         Assert.Empty(pods.Rows);
     }
 }

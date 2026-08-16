@@ -126,7 +126,7 @@ public class ErdsPhase5PodExecutionTests
         var tpl = await GetTemplateByTitleAsync(admin, title);
         var (emp, _) = await TestAuth.CreateUserAsync(_factory, "Employee");
         var resp = await emp.PostAsJsonAsync("/api/submissions",
-            new CreateSubmissionRequest(tpl.Id, PeriodType.Weekly, "2026-W40"));
+            new CreateSubmissionRequest(tpl.Id, PeriodType.Weekly, TestCalendar.Cycle(1)));
         Assert.Equal(HttpStatusCode.Forbidden, resp.StatusCode);
         var raw = await resp.Content.ReadAsStringAsync();
         Assert.Contains("report.template_not_assigned", raw);

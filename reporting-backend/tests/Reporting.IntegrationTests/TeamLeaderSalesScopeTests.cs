@@ -95,7 +95,7 @@ public class TeamLeaderSalesScopeTests
         await AssignTemplateToEmployeeAsync(admin, templateId, outTeamId);
 
         // يوم واحد داخل أسبوع تشغيلي واحد لكلا الموظّفين (ثقافة ثابتة إلزاميًّا لتفادي التقويم الهجري).
-        var weekKey = ReportCalendarPolicy.WeekKeyFor(new DateOnly(2028, 3, 9));
+        var weekKey = ReportCalendarPolicy.WeekKeyFor(TestCalendar.Today.AddDays(-14));
         var day = ReportCalendarPolicy.WeekRange(weekKey).Start.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
         // موظّف الفريق يعتمده قائد الفريق (مديره المباشر)؛ موظّف خارج الفريق يعتمده CEO.
@@ -137,7 +137,7 @@ public class TeamLeaderSalesScopeTests
         await AssignTemplateToEmployeeAsync(admin, templateId, inTeamId);
         await AssignTemplateToEmployeeAsync(admin, templateId, outTeamId);
 
-        var weekKey = ReportCalendarPolicy.WeekKeyFor(new DateOnly(2028, 6, 8));
+        var weekKey = ReportCalendarPolicy.WeekKeyFor(TestCalendar.Today.AddDays(-14));
         var day = ReportCalendarPolicy.WeekRange(weekKey).Start.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
         await SubmitDailyB2cAsync(inTeamEmp, teamLeader, templateId, gridId, day, B2cRow(Course, 10, 40, 30, 18, 9, 6, 18000, 3));

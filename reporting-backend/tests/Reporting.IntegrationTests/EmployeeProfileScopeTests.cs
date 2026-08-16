@@ -146,11 +146,11 @@ public class EmployeeProfileScopeTests
         Assert.Null(before.Summary.LastKpiScore);
         Assert.Equal(0, before.Summary.KpiCount);
 
-        await SubmitEvalAsync(admin, templateId, manualId, autoId, org.Emp.Id, "2026-W47");
+        await SubmitEvalAsync(admin, templateId, manualId, autoId, org.Emp.Id, TestCalendar.Cycle(1));
 
         var after = await (await org.Mgr.C.GetAsync($"/api/dashboard/employee-profile/{org.Emp.Id}")).ReadAsync<Profile>();
         Assert.NotNull(after!.Summary.LastKpiScore);
-        Assert.Equal("2026-W47", after.Summary.LastKpiPeriod);
+        Assert.Equal(TestCalendar.Cycle(1), after.Summary.LastKpiPeriod);
         Assert.Equal(1, after.Summary.KpiCount);
     }
 

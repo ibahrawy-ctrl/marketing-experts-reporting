@@ -64,7 +64,7 @@ public class ReportViewGrantTests
         var (target, targetId) = await TestAuth.CreateUserAsync(_factory, "Employee", managerId);
         var (grantee, granteeId) = await TestAuth.CreateUserAsync(_factory, "Employee");
 
-        var submitted = await SubmitReportAsync(target, templateId, fieldId, "2026-W41");
+        var submitted = await SubmitReportAsync(target, templateId, fieldId, TestCalendar.Cycle(1));
         Assert.Equal(SubmissionStatus.Submitted, submitted.Status);
 
         // قبل المنح: المستفيد لا يرى تقرير الهدف (نطاق=own).
@@ -78,7 +78,7 @@ public class ReportViewGrantTests
         Assert.True(grant!.IsActive);
 
         // بعد المنح: المستفيد يرى التقرير المُرسَل عبر القائمة وعبر الجلب المباشر.
-        var list = await (await grantee.GetAsync("/api/submissions?periodKey=2026-W41"))
+        var list = await (await grantee.GetAsync($"/api/submissions?periodKey={TestCalendar.Cycle(1)}"))
             .ReadAsync<List<SubmissionDto>>();
         Assert.Contains(list!, s => s.Id == submitted.Id);
 
@@ -99,12 +99,12 @@ public class ReportViewGrantTests
         var teamId = await TestAuth.CreateTeamWithLeaderAsync(_factory, leaderId, targetId);
         var (grantee, granteeId) = await TestAuth.CreateUserAsync(_factory, "Employee");
 
-        var submitted = await SubmitReportAsync(target, templateId, fieldId, "2026-W42");
+        var submitted = await SubmitReportAsync(target, templateId, fieldId, TestCalendar.Cycle(2));
 
         await admin.PostAsJsonAsync("/api/report-view-grants",
             new CreateReportViewGrantRequest(granteeId, ReportViewGrantScopeKind.Team, TargetTeamId: teamId));
 
-        var list = await (await grantee.GetAsync("/api/submissions?periodKey=2026-W42"))
+        var list = await (await grantee.GetAsync($"/api/submissions?periodKey={TestCalendar.Cycle(2)}"))
             .ReadAsync<List<SubmissionDto>>();
         Assert.Contains(list!, s => s.Id == submitted.Id);
 
@@ -127,12 +127,12 @@ public class ReportViewGrantTests
 
         // مسودة (لم تُرسَل) — مخفيّة عن المستفيد.
         var draft = await (await target.PostAsJsonAsync("/api/submissions",
-            new CreateSubmissionRequest(templateId, PeriodType.Weekly, "2026-W43"))).ReadAsync<SubmissionDto>();
+            new CreateSubmissionRequest(templateId, PeriodType.Weekly, TestCalendar.Cycle(3)))).ReadAsync<SubmissionDto>();
         var draftGet = await grantee.GetAsync($"/api/submissions/{draft!.Id}");
         Assert.Equal(HttpStatusCode.Forbidden, draftGet.StatusCode);
 
         // مُعادة للتعديل — مخفيّة عن المستفيد.
-        var submitted = await SubmitReportAsync(target, templateId, fieldId, "2026-W44");
+        var submitted = await SubmitReportAsync(target, templateId, fieldId, TestCalendar.Cycle(4));
         await manager.PostAsJsonAsync($"/api/submissions/{submitted.Id}/return",
             new ApprovalActionRequest("يرجى التصحيح"));
         var returnedGet = await grantee.GetAsync($"/api/submissions/{submitted.Id}");
@@ -158,7 +158,7 @@ public class ReportViewGrantTests
         await admin.PostAsJsonAsync("/api/report-view-grants",
             new CreateReportViewGrantRequest(granteeId, ReportViewGrantScopeKind.User, TargetUserId: targetId));
 
-        var submitted = await SubmitReportAsync(target, templateId, fieldId, "2026-W45");
+        var submitted = await SubmitReportAsync(target, templateId, fieldId, TestCalendar.Cycle(5));
 
         var approve = await grantee.PostAsJsonAsync($"/api/submissions/{submitted.Id}/approve",
             new ApprovalActionRequest(null));
@@ -237,7 +237,7 @@ public class ReportViewGrantTests
         var (target, targetId) = await TestAuth.CreateUserAsync(_factory, "Employee", managerId);
         var (grantee, granteeId) = await TestAuth.CreateUserAsync(_factory, "Employee");
 
-        var submitted = await SubmitReportAsync(target, templateId, fieldId, "2026-W46");
+        var submitted = await SubmitReportAsync(target, templateId, fieldId, TestCalendar.Cycle(6));
         var grant = await (await admin.PostAsJsonAsync("/api/report-view-grants",
             new CreateReportViewGrantRequest(granteeId, ReportViewGrantScopeKind.User, TargetUserId: targetId)))
             .ReadAsync<ReportViewGrantDto>();
@@ -293,10 +293,10 @@ public class ReportViewGrantTests
         var (target, _) = await TestAuth.CreateUserAsync(_factory, "Employee", managerId);
         var (grantee, _) = await TestAuth.CreateUserAsync(_factory, "Employee");
 
-        var submitted = await SubmitReportAsync(target, templateId, fieldId, "2026-W47");
+        var submitted = await SubmitReportAsync(target, templateId, fieldId, TestCalendar.Cycle(7));
 
         // بلا منح: المستفيد لا يرى تقرير الهدف (المنح معزول ولا يُوسّع النطاق الأساسي).
-        var list = await (await grantee.GetAsync("/api/submissions?periodKey=2026-W47"))
+        var list = await (await grantee.GetAsync($"/api/submissions?periodKey={TestCalendar.Cycle(7)}"))
             .ReadAsync<List<SubmissionDto>>();
         Assert.DoesNotContain(list!, s => s.Id == submitted.Id);
         Assert.Equal(HttpStatusCode.Forbidden, (await grantee.GetAsync($"/api/submissions/{submitted.Id}")).StatusCode);

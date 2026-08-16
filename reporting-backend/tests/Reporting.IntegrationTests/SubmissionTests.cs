@@ -206,10 +206,10 @@ public class SubmissionTests
         var (employee, _) = await TestAuth.CreateUserAsync(_factory, "Employee");
 
         await (await employee.PostAsJsonAsync("/api/submissions",
-            new CreateSubmissionRequest(templateId, PeriodType.Weekly, "2026-W40")))
+            new CreateSubmissionRequest(templateId, PeriodType.Weekly, TestCalendar.Cycle(1))))
             .ReadAsync<SubmissionDto>();
 
-        var summary = await (await admin.GetAsync("/api/submissions/summary?periodKey=2026-W40"))
+        var summary = await (await admin.GetAsync($"/api/submissions/summary?periodKey={TestCalendar.Cycle(1)}"))
             .ReadAsync<SubmissionSummaryDto>();
         Assert.NotNull(summary);
         Assert.True(summary!.Total >= 1);
@@ -234,7 +234,7 @@ public class SubmissionTests
         var (employee, _) = await TestAuth.CreateUserAsync(_factory, "Employee");
 
         var draft = await (await employee.PostAsJsonAsync("/api/submissions",
-            new CreateSubmissionRequest(templateId, PeriodType.Weekly, "2026-W41")))
+            new CreateSubmissionRequest(templateId, PeriodType.Weekly, TestCalendar.Cycle(2))))
             .ReadAsync<SubmissionDto>();
         // تعبئة قيمة كي نتحقّق من حذف القيم المرتبطة عبر Cascade.
         await employee.PutAsJsonAsync($"/api/submissions/{draft!.Id}/values",
@@ -261,7 +261,7 @@ public class SubmissionTests
         var (attacker, _) = await TestAuth.CreateUserAsync(_factory, "Employee");
 
         var draft = await (await owner.PostAsJsonAsync("/api/submissions",
-            new CreateSubmissionRequest(templateId, PeriodType.Weekly, "2026-W42")))
+            new CreateSubmissionRequest(templateId, PeriodType.Weekly, TestCalendar.Cycle(3))))
             .ReadAsync<SubmissionDto>();
 
         var del = await attacker.DeleteAsync($"/api/submissions/{draft!.Id}");
@@ -280,7 +280,7 @@ public class SubmissionTests
         var (owner, _) = await TestAuth.CreateUserAsync(_factory, "Employee");
 
         var draft = await (await owner.PostAsJsonAsync("/api/submissions",
-            new CreateSubmissionRequest(templateId, PeriodType.Weekly, "2026-W43")))
+            new CreateSubmissionRequest(templateId, PeriodType.Weekly, TestCalendar.Cycle(4))))
             .ReadAsync<SubmissionDto>();
 
         // حتى الأدمن لا يحذف مسودة موظّف آخر (owner-only).
@@ -297,7 +297,7 @@ public class SubmissionTests
         var (employee, _) = await TestAuth.CreateUserAsync(_factory, "Employee", managerId);
 
         var draft = await (await employee.PostAsJsonAsync("/api/submissions",
-            new CreateSubmissionRequest(templateId, PeriodType.Weekly, "2026-W44")))
+            new CreateSubmissionRequest(templateId, PeriodType.Weekly, TestCalendar.Cycle(5))))
             .ReadAsync<SubmissionDto>();
         await employee.PutAsJsonAsync($"/api/submissions/{draft!.Id}/values",
             new SaveFieldValuesRequest(new[] { new FieldValueInput(fieldId, null, 7m, null, null, null) }));
@@ -318,7 +318,7 @@ public class SubmissionTests
         var (employee, _) = await TestAuth.CreateUserAsync(_factory, "Employee", ceoId);
 
         var draft = await (await employee.PostAsJsonAsync("/api/submissions",
-            new CreateSubmissionRequest(templateId, PeriodType.Weekly, "2026-W45")))
+            new CreateSubmissionRequest(templateId, PeriodType.Weekly, TestCalendar.Cycle(6))))
             .ReadAsync<SubmissionDto>();
         await employee.PutAsJsonAsync($"/api/submissions/{draft!.Id}/values",
             new SaveFieldValuesRequest(new[] { new FieldValueInput(fieldId, null, 3m, null, null, null) }));

@@ -313,15 +313,15 @@ public class ComplianceDueLateTests
             await AddDailySubmissionAsync(versionId, emp, d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), SubmissionStatus.Submitted, AtRiyadh(d));
 
         var summary = await GetSummaryAsync(admin, week, dept);
-        Assert.Equal(5, summary.Expected);        // الخميس + الأحد→الأربعاء (الجمعة/السبت مستبعدتان)
-        Assert.Equal(5, summary.Submitted);
-        Assert.Equal(5, summary.OnTime);
+        Assert.Equal(days.Count, summary.Expected);
+        Assert.Equal(days.Count, summary.Submitted);
+        Assert.Equal(days.Count, summary.OnTime);
         Assert.Equal(0, summary.Late);
 
         var row = await GetRowAsync(admin, week, emp);
         Assert.True(row.Submitted);
         Assert.False(row.Late);
-        Assert.Equal("سلّم 5 من 5 يوم", row.StatusLabel);
+        Assert.Equal($"سلّم {days.Count} من {days.Count} يوم", row.StatusLabel);
     }
 
     // (16) مندوب يومي سلّم 3 من 5 أيام في أسبوع منقضٍ ⇒ مُسلَّم 3، MissingOverdue 2، Late 2، صفّ متأخر غير مكتمل.
@@ -338,15 +338,15 @@ public class ComplianceDueLateTests
             await AddDailySubmissionAsync(versionId, emp, d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), SubmissionStatus.Submitted, AtRiyadh(d));
 
         var summary = await GetSummaryAsync(admin, week, dept);
-        Assert.Equal(5, summary.Expected);
+        Assert.Equal(days.Count, summary.Expected);
         Assert.Equal(3, summary.Submitted);
-        Assert.Equal(2, summary.MissingOverdue);
-        Assert.Equal(2, summary.Late);
+        Assert.Equal(days.Count - 3, summary.MissingOverdue);
+        Assert.Equal(days.Count - 3, summary.Late);
 
         var row = await GetRowAsync(admin, week, emp);
         Assert.False(row.Submitted);              // لم يكمل كلّ الأيام المتوقَّعة
         Assert.True(row.Late);
-        Assert.Equal("سلّم 3 من 5 يوم", row.StatusLabel);
+        Assert.Equal($"سلّم 3 من {days.Count} يوم", row.StatusLabel);
     }
 
     // (17) مندوب يومي سلّم كلّ الأيام لكنّ أحدها بعد يومه ⇒ LateSubmitted 1، Submitted 5، الصفّ مكتمل لكنّه متأخر.
@@ -368,16 +368,16 @@ public class ComplianceDueLateTests
         }
 
         var summary = await GetSummaryAsync(admin, week, dept);
-        Assert.Equal(5, summary.Submitted);
+        Assert.Equal(days.Count, summary.Submitted);
         Assert.Equal(1, summary.LateSubmitted);
-        Assert.Equal(4, summary.OnTime);
+        Assert.Equal(days.Count - 1, summary.OnTime);
         Assert.Equal(1, summary.Late);
 
         var row = await GetRowAsync(admin, week, emp);
         Assert.True(row.Submitted);
         Assert.True(row.Late);
         Assert.True(row.LateSubmitted);
-        Assert.Equal("سلّم 5 من 5 يوم (متأخر)", row.StatusLabel);
+        Assert.Equal($"سلّم {days.Count} من {days.Count} يوم (متأخر)", row.StatusLabel);
     }
 
     // (18) Draft يومي (SALES_B2B) لا يُحتسب تسليمًا: يوم مسودّة ⇒ مُسلَّم 4 من 5، MissingOverdue 1.
@@ -398,24 +398,28 @@ public class ComplianceDueLateTests
         }
 
         var summary = await GetSummaryAsync(admin, week, dept);
-        Assert.Equal(5, summary.Expected);
-        Assert.Equal(4, summary.Submitted);       // المسودّة لا تُحتسب
+        Assert.Equal(days.Count, summary.Expected);
+        Assert.Equal(days.Count - 1, summary.Submitted);       // المسودّة لا تُحتسب
         Assert.Equal(1, summary.MissingOverdue);
 
         var row = await GetRowAsync(admin, week, emp);
         Assert.False(row.Submitted);
-        Assert.Equal("سلّم 4 من 5 يوم", row.StatusLabel);
+        Assert.Equal($"سلّم {days.Count - 1} من {days.Count} يوم", row.StatusLabel);
     }
 
     // ===== أدوات مساعدة =====
 
-    // أيام العمل ضمن الأسبوع التشغيلي (الخميس→الأربعاء) باستثناء الجمعة/السبت = 5 أيام.
+    // أيام العمل المتوقَّعة ضمن الأسبوع التشغيلي لدور مبيعات يوميّ.
+    // SALES-DAILY-SATURDAY-APPLICABILITY-HOTFIX-R1: القرار في السبت **ليس** ثابتًا — السبت يوم عمل
+    // لأدوار المبيعات ابتداءً من ReportingCalendarPolicy.SalesSaturdayApplicabilityFloor. لذلك يُفوَّض
+    // القرار إلى السياسة الحيّة نفسها التي يستعملها الخادم (ReportDueService/ReportingService) بدل
+    // استبعاد الجمعة/السبت محليًّا، وإلّا صار التوقّع متقادمًا بعد تجاوز الأرضية.
     private static List<DateOnly> WorkingDays(string weekKey)
     {
         var (start, end) = ReportCalendarPolicy.WeekRange(weekKey);
         var list = new List<DateOnly>();
         for (var d = start; d <= end; d = d.AddDays(1))
-            if (d.DayOfWeek is not (DayOfWeek.Friday or DayOfWeek.Saturday))
+            if (ReportingCalendarPolicy.IsDailyExpectedBusinessDay(d, saturdayEnabled: true))
                 list.Add(d);
         return list;
     }

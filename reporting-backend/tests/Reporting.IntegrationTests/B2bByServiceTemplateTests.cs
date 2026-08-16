@@ -137,7 +137,7 @@ public class B2bByServiceTemplateTests
     [Fact]
     public async Task Submit_B2bTable_StoresTabularValues_AndApprovesViaCurrentPath()
     {
-        var (submit, ceo, emp, empId, draft, gridId) = await SubmitB2bAsync("2028-05-03",
+        var (submit, ceo, emp, empId, draft, gridId) = await SubmitB2bAsync(TestCalendar.Day(0),
             new[] { ValidRow, Row("حملات إعلانية", 8, 25, 15, 10, 5, 3, 4, 18000) });
 
         var submitted = await submit.ReadAsync<SubmissionDto>();
@@ -161,7 +161,7 @@ public class B2bByServiceTemplateTests
     [Fact]
     public async Task EmptyDataRows_Rejected_400()
     {
-        var (submit, _, _, _, _, _) = await SubmitB2bAsync("2028-05-04",
+        var (submit, _, _, _, _, _) = await SubmitB2bAsync(TestCalendar.Day(1),
             new[] { new[] { "", "", "", "", "", "", "", "", "", "" } });
         await AssertGridInvalidAsync(submit);
     }
@@ -170,7 +170,7 @@ public class B2bByServiceTemplateTests
     [Fact]
     public async Task NegativeNumber_Rejected_400()
     {
-        var (submit, _, _, _, _, _) = await SubmitB2bAsync("2028-05-05",
+        var (submit, _, _, _, _, _) = await SubmitB2bAsync(TestCalendar.Day(2),
             new[] { Row("تصميم موقع إلكتروني", 10, -5, 3, 2, 1, 1, 1, 100) });
         await AssertGridInvalidAsync(submit);
     }
@@ -179,7 +179,7 @@ public class B2bByServiceTemplateTests
     [Fact]
     public async Task MeetingsGreaterThanLeads_Rejected_400()
     {
-        var (submit, _, _, _, _, _) = await SubmitB2bAsync("2028-05-06",
+        var (submit, _, _, _, _, _) = await SubmitB2bAsync(TestCalendar.Day(3),
             new[] { Row("تصميم موقع إلكتروني", 10, 10, 20, 5, 3, 2, 2, 100) });
         await AssertGridInvalidAsync(submit);
     }
@@ -188,7 +188,7 @@ public class B2bByServiceTemplateTests
     [Fact]
     public async Task ProposalsGreaterThanMeetings_Rejected_400()
     {
-        var (submit, _, _, _, _, _) = await SubmitB2bAsync("2028-05-07",
+        var (submit, _, _, _, _, _) = await SubmitB2bAsync(TestCalendar.Day(4),
             new[] { Row("تصميم موقع إلكتروني", 10, 20, 8, 15, 3, 2, 2, 100) });
         await AssertGridInvalidAsync(submit);
     }
@@ -197,7 +197,7 @@ public class B2bByServiceTemplateTests
     [Fact]
     public async Task WonGreaterThanProposals_Rejected_400()
     {
-        var (submit, _, _, _, _, _) = await SubmitB2bAsync("2028-05-08",
+        var (submit, _, _, _, _, _) = await SubmitB2bAsync(TestCalendar.Day(5),
             new[] { Row("تصميم موقع إلكتروني", 10, 20, 10, 5, 3, 8, 2, 100) });
         await AssertGridInvalidAsync(submit);
     }
@@ -206,7 +206,7 @@ public class B2bByServiceTemplateTests
     [Fact]
     public async Task LostGreaterThanLeads_Rejected_400()
     {
-        var (submit, _, _, _, _, _) = await SubmitB2bAsync("2028-05-09",
+        var (submit, _, _, _, _, _) = await SubmitB2bAsync(TestCalendar.Day(6),
             new[] { Row("تصميم موقع إلكتروني", 10, 10, 8, 5, 3, 2, 15, 100) });
         await AssertGridInvalidAsync(submit);
     }
@@ -215,7 +215,7 @@ public class B2bByServiceTemplateTests
     [Fact]
     public async Task ValidB2bData_Accepted_AndApproves()
     {
-        var (submit, ceo, _, _, draft, _) = await SubmitB2bAsync("2028-05-10", new[] { ValidRow });
+        var (submit, ceo, _, _, draft, _) = await SubmitB2bAsync(TestCalendar.Day(7), new[] { ValidRow });
         var submitted = await submit.ReadAsync<SubmissionDto>();
         Assert.Equal(SubmissionStatus.Submitted, submitted!.Status);
 
@@ -236,7 +236,7 @@ public class B2bByServiceTemplateTests
         await AssignTemplateToEmployeeAsync(admin, detail.Id, empId);
 
         const string service = "تصميم موقع إلكتروني";
-        const string date = "2028-06-14";
+        var date = TestCalendar.Day(8);
         var draft = await (await emp.PostAsJsonAsync("/api/submissions",
             new CreateSubmissionRequest(detail.Id, PeriodType.Daily, date))).ReadAsync<SubmissionDto>();
         var gridJson = JsonSerializer.Serialize(new[] { Row(service, 12, 40, 20, 12, 6, 4, 5, 30000) });
@@ -273,7 +273,7 @@ public class B2bByServiceTemplateTests
 
         // خدمة نصّية حرّة خارج الكتالوج (تحاكي تقريرًا قديمًا) — يجب أن تُجمَّع كالمعتاد.
         const string legacyService = "خدمة قديمة نصّية خارج الكتالوج";
-        const string date = "2028-07-19";
+        var date = TestCalendar.Day(9);
         var draft = await (await emp.PostAsJsonAsync("/api/submissions",
             new CreateSubmissionRequest(detail.Id, PeriodType.Daily, date))).ReadAsync<SubmissionDto>();
         var gridJson = JsonSerializer.Serialize(new[] { Row(legacyService, 8, 32, 16, 10, 5, 3, 4, 20000) });
@@ -329,7 +329,7 @@ public class B2bByServiceTemplateTests
         var (emp, empId) = await TestAuth.CreateUserAsync(_factory, "Employee");
         await AssignTemplateToEmployeeAsync(admin, created.Id, empId);
         var draft = await (await emp.PostAsJsonAsync("/api/submissions",
-            new CreateSubmissionRequest(created.Id, PeriodType.Weekly, "2028-W40"))).ReadAsync<SubmissionDto>();
+            new CreateSubmissionRequest(created.Id, PeriodType.Weekly, TestCalendar.Cycle(1)))).ReadAsync<SubmissionDto>();
 
         var gridJson = JsonSerializer.Serialize(new[] { new[] { "مبيعات", "-999" } });
         await emp.PutAsJsonAsync($"/api/submissions/{draft!.Id}/values",

@@ -100,7 +100,7 @@ public class ProjectRepeatableGridTests
         var project = await CreateProjectAsync(admin, "مشروع 1");
 
         var grid = GridCell(new[] { "x1", "y1", "z1" }, new[] { "x2", "y2", "z2" });
-        var draftId = await CreateDraftAsync(admin, templateId, "2099-W01");
+        var draftId = await CreateDraftAsync(admin, templateId, TestCalendar.Cycle(1));
         await SaveValuesAsync(admin, draftId,
             new FieldValueInput(fieldId, null, null, null, null,
                 SectionValue((project.Id, new() { ["rows"] = grid }))));
@@ -123,7 +123,7 @@ public class ProjectRepeatableGridTests
         var project = await CreateProjectAsync(admin, "مشروع SEO");
 
         var row = new[] { "خدمات تسويق", "/services", "3", "1200", "84", "7%", "▲", "ثابت" };
-        var draftId = await CreateDraftAsync(admin, templateId, "2099-W02");
+        var draftId = await CreateDraftAsync(admin, templateId, TestCalendar.Cycle(2));
         await SaveValuesAsync(admin, draftId,
             new FieldValueInput(fieldId, null, null, null, null,
                 SectionValue((project.Id, new() { ["keywords"] = GridCell(row) }))));
@@ -151,7 +151,7 @@ public class ProjectRepeatableGridTests
         var cell = GridCell(
             new[] { "حملة رمضان", "Meta", "تحويلات", "5000", "120 عميل", "نشطة", "زيادة الميزانية" },
             new[] { "حملة بحث", "Google", "زيارات", "3000", "900 نقرة", "متوقفة", "مراجعة" });
-        var draftId = await CreateDraftAsync(admin, templateId, "2099-W03");
+        var draftId = await CreateDraftAsync(admin, templateId, TestCalendar.Cycle(3));
         await SaveValuesAsync(admin, draftId,
             new FieldValueInput(fieldId, null, null, null, null,
                 SectionValue((project.Id, new() { ["campaigns"] = cell }))));
@@ -173,8 +173,8 @@ public class ProjectRepeatableGridTests
         var (templateId, fieldId) = await PublishSectionAsync(admin, config);
         var project = await CreateProjectAsync(admin, "مشروع مقالات");
 
-        var cell = GridCell(new[] { "دليل SEO", "سيو", "منشور", "سارة", "2099-01-10", "جيد" });
-        var draftId = await CreateDraftAsync(admin, templateId, "2099-W04");
+        var cell = GridCell(new[] { "دليل SEO", "سيو", "منشور", "سارة", TestCalendar.Day(0), "جيد" });
+        var draftId = await CreateDraftAsync(admin, templateId, TestCalendar.Cycle(4));
         await SaveValuesAsync(admin, draftId,
             new FieldValueInput(fieldId, null, null, null, null,
                 SectionValue((project.Id, new() { ["articles"] = cell }))));
@@ -198,7 +198,7 @@ public class ProjectRepeatableGridTests
         var project = await CreateProjectAsync(admin, "عميل سماح");
 
         var actions = GridCell(new[] { "تجديد العقد", "سماح" }, new[] { "اجتماع مراجعة", "المدير" });
-        var draftId = await CreateDraftAsync(admin, templateId, "2099-W05");
+        var draftId = await CreateDraftAsync(admin, templateId, TestCalendar.Cycle(5));
         await SaveValuesAsync(admin, draftId,
             new FieldValueInput(fieldId, null, null, null, null,
                 SectionValue((project.Id, new() { ["account_status"] = "🟢 ممتازة", ["actions"] = actions }))));
@@ -234,7 +234,7 @@ public class ProjectRepeatableGridTests
         await admin.PostAsync($"/api/report-templates/versions/{versionId}/publish", null);
         var project = await CreateProjectAsync(admin, "مشروع هجين");
 
-        var draftId = await CreateDraftAsync(admin, created.Id, "2099-W06");
+        var draftId = await CreateDraftAsync(admin, created.Id, TestCalendar.Cycle(6));
         await SaveValuesAsync(admin, draftId,
             new FieldValueInput(academy!.Id, null, 42m, null, null, null),
             new FieldValueInput(section!.Id, null, null, null, null,
@@ -266,7 +266,7 @@ public class ProjectRepeatableGridTests
         await admin.PostAsync($"/api/report-templates/versions/{versionId}/publish", null);
         var project = await CreateProjectAsync(admin, "مشروع رقم");
 
-        var draftId = await CreateDraftAsync(admin, created.Id, "2099-W07");
+        var draftId = await CreateDraftAsync(admin, created.Id, TestCalendar.Cycle(7));
         await SaveValuesAsync(admin, draftId,
             new FieldValueInput(num!.Id, null, 999.5m, null, null, null),
             new FieldValueInput(section!.Id, null, null, null, null,
@@ -288,7 +288,7 @@ public class ProjectRepeatableGridTests
         var (templateId, fieldId) = await PublishSectionAsync(admin, config);
         var project = await CreateProjectAsync(admin, "مشروع فارغ");
 
-        var draftId = await CreateDraftAsync(admin, templateId, "2099-W08");
+        var draftId = await CreateDraftAsync(admin, templateId, TestCalendar.Cycle(8));
         await SaveValuesAsync(admin, draftId,
             new FieldValueInput(fieldId, null, null, null, null,
                 SectionValue((project.Id, new() { ["rows"] = GridCell() }))));
@@ -306,7 +306,7 @@ public class ProjectRepeatableGridTests
         var p1 = await CreateProjectAsync(admin, "أول");
         var p2 = await CreateProjectAsync(admin, "ثاني");
 
-        var draftId = await CreateDraftAsync(admin, templateId, "2099-W09");
+        var draftId = await CreateDraftAsync(admin, templateId, TestCalendar.Cycle(9));
         await SaveValuesAsync(admin, draftId,
             new FieldValueInput(fieldId, null, null, null, null,
                 SectionValue(
@@ -346,7 +346,7 @@ public class ProjectRepeatableGridTests
         var config = SectionConfig(true, 1, 5, GridField("rows", "جدول", false, "أ"));
         var (templateId, _) = await PublishSectionAsync(admin, config);
 
-        var draftId = await CreateDraftAsync(admin, templateId, "2099-W10");
+        var draftId = await CreateDraftAsync(admin, templateId, TestCalendar.Cycle(10));
         var res = await admin.PostAsync($"/api/submissions/{draftId}/submit", null);
         Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode);
     }
@@ -361,7 +361,7 @@ public class ProjectRepeatableGridTests
         var p1 = await CreateProjectAsync(admin, "أ");
         var p2 = await CreateProjectAsync(admin, "ب");
 
-        var draftId = await CreateDraftAsync(admin, templateId, "2099-W11");
+        var draftId = await CreateDraftAsync(admin, templateId, TestCalendar.Cycle(11));
         await SaveValuesAsync(admin, draftId,
             new FieldValueInput(fieldId, null, null, null, null,
                 SectionValue(
@@ -381,7 +381,7 @@ public class ProjectRepeatableGridTests
         var (employee, _) = await TestAuth.CreateUserAsync(_factory, Roles.Employee);
         var project = await CreateProjectAsync(admin, "مشروع الأدمن فقط");
 
-        var draftId = await CreateDraftAsync(employee, templateId, "2099-W12");
+        var draftId = await CreateDraftAsync(employee, templateId, TestCalendar.Cycle(12));
         await SaveValuesAsync(employee, draftId,
             new FieldValueInput(fieldId, null, null, null, null,
                 SectionValue((project.Id, new() { ["rows"] = GridCell(new[] { "x" }) }))));
@@ -404,7 +404,7 @@ public class ProjectRepeatableGridTests
         await admin.PostAsync($"/api/report-templates/versions/{v1}/publish", null);
 
         // تسليم على الإصدار الأول (بلا Grid).
-        var draftId = await CreateDraftAsync(admin, created.Id, "2099-W13");
+        var draftId = await CreateDraftAsync(admin, created.Id, TestCalendar.Cycle(13));
         await SaveValuesAsync(admin, draftId,
             new FieldValueInput(oldField!.Id, "قيمة قديمة", null, null, null, null));
         var submitted = await (await admin.PostAsync($"/api/submissions/{draftId}/submit", null)).ReadAsync<SubmissionDto>();
@@ -467,11 +467,11 @@ public class ProjectRepeatableGridTests
         values.RemoveAll(v => v.TemplateFieldId == prsId);
         values.Add(new FieldValueInput(prsId, null, null, null, null, SectionValue((seoProject.Id, new()))));
 
-        var draftId = await CreateDraftAsync(admin, seo.Id, "2099-W14");
+        var draftId = await CreateDraftAsync(admin, seo.Id, TestCalendar.Cycle(14));
         await SaveValuesAsync(admin, draftId, values.ToArray());
         await admin.PostAsync($"/api/submissions/{draftId}/submit", null);
 
-        var rollup = await (await admin.GetAsync("/api/reports/seo-rollup?periodType=Weekly&periodKey=2099-W14"))
+        var rollup = await (await admin.GetAsync($"/api/reports/seo-rollup?periodType=Weekly&periodKey={TestCalendar.Cycle(14)}"))
             .ReadAsync<SeoRollupReport>();
         Assert.Equal(10m, rollup!.TotalImprovedKeywords);
         Assert.Equal(4m, rollup.TotalDeclinedKeywords);
@@ -489,7 +489,7 @@ public class ProjectRepeatableGridTests
         var (templateId, fieldId) = await PublishSectionAsync(admin, config);
         var project = await CreateProjectAsync(admin, "مشروع ناقص");
 
-        var draftId = await CreateDraftAsync(admin, templateId, "2099-W15");
+        var draftId = await CreateDraftAsync(admin, templateId, TestCalendar.Cycle(15));
         // الحقل النصّي المطلوب "status" مفقود رغم امتلاء الجدول.
         await SaveValuesAsync(admin, draftId,
             new FieldValueInput(fieldId, null, null, null, null,

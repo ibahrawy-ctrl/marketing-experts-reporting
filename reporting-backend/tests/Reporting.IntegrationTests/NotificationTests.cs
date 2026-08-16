@@ -49,7 +49,7 @@ public class NotificationTests
         var (manager, managerId) = await TestAuth.CreateUserAsync(_factory, "Manager");
         var (employee, _) = await TestAuth.CreateUserAsync(_factory, "Employee", managerId);
 
-        await SubmitToManagerAsync(employee, templateId, fieldId, "2026-W50");
+        await SubmitToManagerAsync(employee, templateId, fieldId, TestCalendar.Cycle(1));
 
         var list = await (await manager.GetAsync("/api/notifications")).ReadAsync<List<NotificationDto>>();
         Assert.NotNull(list);
@@ -68,7 +68,7 @@ public class NotificationTests
         var (manager, managerId) = await TestAuth.CreateUserAsync(_factory, "Manager");
         var (employee, _) = await TestAuth.CreateUserAsync(_factory, "Employee", managerId);
 
-        await SubmitToManagerAsync(employee, templateId, fieldId, "2026-W51");
+        await SubmitToManagerAsync(employee, templateId, fieldId, TestCalendar.Cycle(2));
 
         var list = await (await manager.GetAsync("/api/notifications")).ReadAsync<List<NotificationDto>>();
         var target = list!.First(n => !n.IsRead);
@@ -97,8 +97,8 @@ public class NotificationTests
         var (manager, managerId) = await TestAuth.CreateUserAsync(_factory, "Manager");
         var (employee, _) = await TestAuth.CreateUserAsync(_factory, "Employee", managerId);
 
-        await SubmitToManagerAsync(employee, templateId, fieldId, "2026-W52");
-        await SubmitToManagerAsync(employee, templateId, fieldId, "2026-W53");
+        await SubmitToManagerAsync(employee, templateId, fieldId, TestCalendar.Cycle(3));
+        await SubmitToManagerAsync(employee, templateId, fieldId, TestCalendar.Cycle(4));
 
         await manager.PostAsync("/api/notifications/read-all", null);
 

@@ -68,7 +68,7 @@ public class MultiProjectSectionTests
         var (templateId, _) = await PublishSectionTemplateAsync(admin);
         var (employee, _) = await TestAuth.CreateUserAsync(_factory, Roles.Employee);
 
-        var draftId = await CreateDraftAsync(employee, templateId, "2026-W41");
+        var draftId = await CreateDraftAsync(employee, templateId, TestCalendar.Cycle(1));
         var res = await employee.PostAsync($"/api/submissions/{draftId}/submit", null);
 
         Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode);
@@ -82,7 +82,7 @@ public class MultiProjectSectionTests
         var (templateId, fieldId) = await PublishSectionTemplateAsync(admin);
         var (employee, _) = await TestAuth.CreateUserAsync(_factory, Roles.Employee);
 
-        var draftId = await CreateDraftAsync(employee, templateId, "2026-W42");
+        var draftId = await CreateDraftAsync(employee, templateId, TestCalendar.Cycle(2));
         await SaveSectionAsync(employee, draftId, fieldId,
             "[{\"projectId\":null,\"answers\":{\"spend\":\"1500\"}}]");
 
@@ -101,7 +101,7 @@ public class MultiProjectSectionTests
         // مشروع يراه المسؤول فقط — الموظف خارج نطاقه.
         var project = await CreateProjectAsync(admin, "مشروع خارج النطاق");
 
-        var draftId = await CreateDraftAsync(employee, templateId, "2026-W43");
+        var draftId = await CreateDraftAsync(employee, templateId, TestCalendar.Cycle(3));
         await SaveSectionAsync(employee, draftId, fieldId,
             $"[{{\"projectId\":\"{project.Id}\",\"answers\":{{\"spend\":\"1500\"}}}}]");
 
@@ -117,7 +117,7 @@ public class MultiProjectSectionTests
         var (templateId, fieldId) = await PublishSectionTemplateAsync(admin);
         var project = await CreateProjectAsync(admin, "مشروع بلا ميزانية");
 
-        var draftId = await CreateDraftAsync(admin, templateId, "2026-W44");
+        var draftId = await CreateDraftAsync(admin, templateId, TestCalendar.Cycle(4));
         await SaveSectionAsync(admin, draftId, fieldId,
             $"[{{\"projectId\":\"{project.Id}\",\"answers\":{{\"spend\":\"\"}}}}]");
 
@@ -134,7 +134,7 @@ public class MultiProjectSectionTests
         // المسؤول يرى كل المشاريع، فالمشروع ضمن نطاقه.
         var project = await CreateProjectAsync(admin, "مشروع صالح");
 
-        var draftId = await CreateDraftAsync(admin, templateId, "2026-W45");
+        var draftId = await CreateDraftAsync(admin, templateId, TestCalendar.Cycle(5));
         await SaveSectionAsync(admin, draftId, fieldId,
             $"[{{\"projectId\":\"{project.Id}\",\"answers\":{{\"spend\":\"1500\"}}}}]");
 

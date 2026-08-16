@@ -62,11 +62,12 @@ public class ReportsTests
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var (templateId, _) = await PublishTemplateAsync(admin);
         var (employee, _) = await TestAuth.CreateUserAsync(_factory, "Employee");
+        var period = TestCalendar.Cycle(1);
 
         await employee.PostAsJsonAsync("/api/submissions",
-            new CreateSubmissionRequest(templateId, PeriodType.Weekly, "2026-W60"));
+            new CreateSubmissionRequest(templateId, PeriodType.Weekly, period));
 
-        var report = await (await admin.GetAsync("/api/reports/submission-completeness?periodKey=2026-W60"))
+        var report = await (await admin.GetAsync($"/api/reports/submission-completeness?periodKey={period}"))
             .ReadAsync<SubmissionCompletenessReport>();
         Assert.NotNull(report);
         Assert.True(report!.Total >= 1);
@@ -157,7 +158,7 @@ public class ReportsTests
         var templateId = list!.Single(t => t.Title == B2cReportSchema.TemplateTitle).Id;
 
         var (rep, _) = await TestAuth.CreateUserAsync(_factory, "Employee");
-        const string period = "2026-W71";
+        var period = TestCalendar.Cycle(2);
 
         var draft = await (await rep.PostAsJsonAsync("/api/submissions",
             new CreateSubmissionRequest(templateId, PeriodType.Weekly, period)))
@@ -197,7 +198,7 @@ public class ReportsTests
         var (tl, tlId) = await TestAuth.CreateUserAsync(_factory, "TeamLeader");
         var (rep1, _) = await TestAuth.CreateUserAsync(_factory, "Employee", tlId);
         var (rep2, _) = await TestAuth.CreateUserAsync(_factory, "Employee", tlId);
-        const string period = "2026-W72";
+        var period = TestCalendar.Cycle(3);
 
         async Task SubmitAsync(HttpClient c, decimal leads, decimal reg)
         {
@@ -252,7 +253,7 @@ public class ReportsTests
     public async Task B2cRollup_Ceo_ReturnsExecutiveSummaryWithoutRepRows()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
-        const string period = "2026-W73";
+        var period = TestCalendar.Cycle(4);
         await SeedB2cSubmissionAsync(admin, period, 100m, 25m);
 
         var (ceo, _) = await TestAuth.CreateUserAsync(_factory, "CEO");
@@ -274,7 +275,7 @@ public class ReportsTests
     public async Task B2cRollup_GeneralManager_ReturnsSummaryWithoutRepRows()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
-        const string period = "2026-W74";
+        var period = TestCalendar.Cycle(5);
         await SeedB2cSubmissionAsync(admin, period, 80m, 16m);
 
         var (gm, _) = await TestAuth.CreateUserAsync(_factory, "GeneralManager");
@@ -397,7 +398,7 @@ public class ReportsTests
 
         var (buyer, buyerId) = await TestAuth.CreateUserAsync(_factory, "Employee");
         var buyerProject = await CreateOwnedProjectAsync(admin, buyerId);
-        const string period = "2026-W81";
+        var period = TestCalendar.Cycle(6);
         await SubmitMediaBuyerAsync(buyer, templateId, spendF, leadsF, ctrF, convF, prsF, buyerProject, period, 5000m, 200m, 2.5m, 20m);
 
         var mine = await (await buyer.GetAsync($"/api/reports/media-buyer-rollup?periodType=Weekly&periodKey={period}"))
@@ -431,7 +432,7 @@ public class ReportsTests
         var (b2, b2Id) = await TestAuth.CreateUserAsync(_factory, "Employee", mgrId);
         var p1 = await CreateOwnedProjectAsync(admin, b1Id);
         var p2 = await CreateOwnedProjectAsync(admin, b2Id);
-        const string period = "2026-W82";
+        var period = TestCalendar.Cycle(7);
 
         // b1 أكفأ (CPL=20)، b2 أضعف (CPL=50).
         await SubmitMediaBuyerAsync(b1, templateId, spendF, leadsF, ctrF, convF, prsF, p1, period, 2000m, 100m, 3m, 25m);
@@ -458,7 +459,7 @@ public class ReportsTests
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var (templateId, spendF, leadsF, ctrF, convF, prsF) = await ResolveMediaBuyerTemplateAsync(admin);
-        const string period = "2026-W83";
+        var period = TestCalendar.Cycle(8);
         var (buyer, buyerId) = await TestAuth.CreateUserAsync(_factory, "Employee");
         var buyerProject = await CreateOwnedProjectAsync(admin, buyerId);
         await SubmitMediaBuyerAsync(buyer, templateId, spendF, leadsF, ctrF, convF, prsF, buyerProject, period, 4000m, 100m, 2m, 15m);
@@ -484,7 +485,7 @@ public class ReportsTests
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var (templateId, spendF, leadsF, ctrF, convF, prsF) = await ResolveMediaBuyerTemplateAsync(admin);
-        const string period = "2026-W84";
+        var period = TestCalendar.Cycle(9);
         var (buyer, buyerId) = await TestAuth.CreateUserAsync(_factory, "Employee");
         var buyerProject = await CreateOwnedProjectAsync(admin, buyerId);
         await SubmitMediaBuyerAsync(buyer, templateId, spendF, leadsF, ctrF, convF, prsF, buyerProject, period, 3000m, 60m, 2m, 12m);
@@ -508,7 +509,7 @@ public class ReportsTests
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var (templateId, spendF, leadsF, ctrF, convF, prsF) = await ResolveMediaBuyerTemplateAsync(admin);
-        const string period = "2026-W85";
+        var period = TestCalendar.Cycle(10);
         var (buyer, buyerId) = await TestAuth.CreateUserAsync(_factory, "Employee");
         var buyerProject = await CreateOwnedProjectAsync(admin, buyerId);
         await SubmitMediaBuyerAsync(buyer, templateId, spendF, leadsF, ctrF, convF, prsF, buyerProject, period, 9000m, 300m, 2m, 18m);
@@ -612,7 +613,7 @@ public class ReportsTests
 
         var (spec, specId) = await TestAuth.CreateUserAsync(_factory, "Employee");
         var specProject = await CreateOwnedProjectAsync(admin, specId);
-        const string period = "2026-W91";
+        var period = TestCalendar.Cycle(11);
         await SubmitSeoTeamAsync(spec, teamId, improvedF, declinedF, tasksF, issuesF, teamPrsF, specProject, period, 50m, 10m, 12m, 3m);
         await SubmitSeoArticlesAsync(spec, articlesId, plannedF, publishedF, lateF, articlesPrsF, specProject, period, 8m, 6m, 1m);
 
@@ -655,7 +656,7 @@ public class ReportsTests
         var (s2, s2Id) = await TestAuth.CreateUserAsync(_factory, "Employee", tlId);
         var p1 = await CreateOwnedProjectAsync(admin, s1Id);
         var p2 = await CreateOwnedProjectAsync(admin, s2Id);
-        const string period = "2026-W92";
+        var period = TestCalendar.Cycle(12);
 
         // s1 صافي موجب (+30)؛ s2 صافي سالب (−15) → يحتاج متابعة.
         await SubmitSeoTeamAsync(s1, teamId, improvedF, declinedF, tasksF, issuesF, teamPrsF, p1, period, 40m, 10m, 15m, 2m);
@@ -683,7 +684,7 @@ public class ReportsTests
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var (teamId, improvedF, declinedF, tasksF, issuesF, teamPrsF, _, _, _, _, _)
             = await ResolveSeoTemplatesAsync(admin);
-        const string period = "2026-W93";
+        var period = TestCalendar.Cycle(13);
         var (spec, specId) = await TestAuth.CreateUserAsync(_factory, "Employee");
         var specProject = await CreateOwnedProjectAsync(admin, specId);
         await SubmitSeoTeamAsync(spec, teamId, improvedF, declinedF, tasksF, issuesF, teamPrsF, specProject, period, 30m, 5m, 10m, 2m);
@@ -709,7 +710,7 @@ public class ReportsTests
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var (teamId, improvedF, declinedF, tasksF, issuesF, teamPrsF, _, _, _, _, _)
             = await ResolveSeoTemplatesAsync(admin);
-        const string period = "2026-W94";
+        var period = TestCalendar.Cycle(14);
         var (spec, specId) = await TestAuth.CreateUserAsync(_factory, "Employee");
         var specProject = await CreateOwnedProjectAsync(admin, specId);
         await SubmitSeoTeamAsync(spec, teamId, improvedF, declinedF, tasksF, issuesF, teamPrsF, specProject, period, 20m, 4m, 9m, 1m);
@@ -733,7 +734,7 @@ public class ReportsTests
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var (teamId, improvedF, declinedF, tasksF, issuesF, teamPrsF, _, _, _, _, _)
             = await ResolveSeoTemplatesAsync(admin);
-        const string period = "2026-W95";
+        var period = TestCalendar.Cycle(15);
         var (spec, specId) = await TestAuth.CreateUserAsync(_factory, "Employee");
         var specProject = await CreateOwnedProjectAsync(admin, specId);
         await SubmitSeoTeamAsync(spec, teamId, improvedF, declinedF, tasksF, issuesF, teamPrsF, specProject, period, 60m, 5m, 14m, 2m);
@@ -759,7 +760,7 @@ public class ReportsTests
         var (templateId, spendF, leadsF, ctrF, convF, _) = await ResolveMediaBuyerTemplateAsync(admin);
 
         var (buyer, _) = await TestAuth.CreateUserAsync(_factory, "Employee");
-        const string period = "2026-W86";
+        var period = TestCalendar.Cycle(16);
 
         // مسودّة بالقيم المسطّحة فقط دون أيّ عنصر مشروع في القسم الإلزاميّ.
         var draft = await (await buyer.PostAsJsonAsync("/api/submissions",
@@ -798,7 +799,7 @@ public class ReportsTests
             = await ResolveSeoTemplatesAsync(admin);
 
         var (spec, _) = await TestAuth.CreateUserAsync(_factory, "Employee");
-        const string period = "2026-W96";
+        var period = TestCalendar.Cycle(17);
 
         // مسودّة تقرير فريق SEO بالقيم المسطّحة فقط دون أيّ عنصر مشروع في القسم الإلزاميّ.
         var draft = await (await spec.PostAsJsonAsync("/api/submissions",
