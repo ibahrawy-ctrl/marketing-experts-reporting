@@ -1,0 +1,905 @@
+C|AspNetRoleClaims|ClaimType|text||YES|
+C|AspNetRoleClaims|ClaimValue|text||YES|
+C|AspNetRoleClaims|Id|integer||NO|
+C|AspNetRoleClaims|RoleId|uuid||NO|
+C|AspNetRoles|ConcurrencyStamp|text||YES|
+C|AspNetRoles|DisplayNameAr|text||YES|
+C|AspNetRoles|Id|uuid||NO|
+C|AspNetRoles|Name|character varying|256|YES|
+C|AspNetRoles|NormalizedName|character varying|256|YES|
+C|AspNetUserClaims|ClaimType|text||YES|
+C|AspNetUserClaims|ClaimValue|text||YES|
+C|AspNetUserClaims|Id|integer||NO|
+C|AspNetUserClaims|UserId|uuid||NO|
+C|AspNetUserLogins|LoginProvider|text||NO|
+C|AspNetUserLogins|ProviderDisplayName|text||YES|
+C|AspNetUserLogins|ProviderKey|text||NO|
+C|AspNetUserLogins|UserId|uuid||NO|
+C|AspNetUserRoles|RoleId|uuid||NO|
+C|AspNetUserRoles|UserId|uuid||NO|
+C|AspNetUserTokens|LoginProvider|text||NO|
+C|AspNetUserTokens|Name|text||NO|
+C|AspNetUserTokens|UserId|uuid||NO|
+C|AspNetUserTokens|Value|text||YES|
+C|AspNetUsers|AccessFailedCount|integer||NO|
+C|AspNetUsers|BypassTeamLeaderApproval|boolean||NO|false
+C|AspNetUsers|ConcurrencyStamp|text||YES|
+C|AspNetUsers|CreatedAtUtc|timestamp with time zone||NO|
+C|AspNetUsers|DepartmentId|uuid||YES|
+C|AspNetUsers|EmailConfirmed|boolean||NO|
+C|AspNetUsers|Email|character varying|256|YES|
+C|AspNetUsers|FullName|text||NO|
+C|AspNetUsers|Id|uuid||NO|
+C|AspNetUsers|IsActive|boolean||NO|
+C|AspNetUsers|JobRoleId|uuid||YES|
+C|AspNetUsers|KpiReviewerOverrideUserId|uuid||YES|
+C|AspNetUsers|LockoutEnabled|boolean||NO|
+C|AspNetUsers|LockoutEnd|timestamp with time zone||YES|
+C|AspNetUsers|ManagerId|uuid||YES|
+C|AspNetUsers|NormalizedEmail|character varying|256|YES|
+C|AspNetUsers|NormalizedUserName|character varying|256|YES|
+C|AspNetUsers|PasswordHash|text||YES|
+C|AspNetUsers|PhoneNumberConfirmed|boolean||NO|
+C|AspNetUsers|PhoneNumber|text||YES|
+C|AspNetUsers|ReportApproverOverrideUserId|uuid||YES|
+C|AspNetUsers|SecurityStamp|text||YES|
+C|AspNetUsers|TeamId|uuid||YES|
+C|AspNetUsers|TwoFactorEnabled|boolean||NO|
+C|AspNetUsers|UserName|character varying|256|YES|
+C|approval_steps|ApproverId|uuid||NO|
+C|approval_steps|Comment|text||YES|
+C|approval_steps|CreatedAtUtc|timestamp with time zone||NO|
+C|approval_steps|DecidedAtUtc|timestamp with time zone||YES|
+C|approval_steps|Id|uuid||NO|
+C|approval_steps|Level|integer||NO|
+C|approval_steps|ReportSubmissionId|uuid||NO|
+C|approval_steps|Status|character varying|40|NO|
+C|approval_steps|UpdatedAtUtc|timestamp with time zone||YES|
+C|audit_logs|Action|character varying|100|NO|
+C|audit_logs|ActorId|uuid||YES|
+C|audit_logs|CreatedAtUtc|timestamp with time zone||NO|
+C|audit_logs|DataJson|jsonb||YES|
+C|audit_logs|EntityId|uuid||YES|
+C|audit_logs|EntityType|character varying|100|NO|
+C|audit_logs|Id|uuid||NO|
+C|audit_logs|IpAddress|character varying|64|YES|
+C|audit_logs|UpdatedAtUtc|timestamp with time zone||YES|
+C|balance_policies|AllowNegativeBalance|boolean||NO|
+C|balance_policies|AnnualLeaveDefaultDays|numeric||NO|
+C|balance_policies|CreatedAtUtc|timestamp with time zone||NO|
+C|balance_policies|Id|uuid||NO|
+C|balance_policies|JobRoleId|uuid||YES|
+C|balance_policies|PermissionAnnualLimit|numeric||YES|
+C|balance_policies|PermissionMonthlyLimit|numeric||YES|
+C|balance_policies|PermissionUnit|character varying|10|NO|
+C|balance_policies|UpdatedAtUtc|timestamp with time zone||YES|
+C|balance_policies|Year|integer||NO|
+C|clients|AccountManagerId|uuid||YES|
+C|clients|CreatedAtUtc|timestamp with time zone||NO|
+C|clients|Id|uuid||NO|
+C|clients|MainContactInfo|character varying|300|YES|
+C|clients|MainContactName|character varying|200|YES|
+C|clients|Name|character varying|200|NO|
+C|clients|Notes|character varying|2000|YES|
+C|clients|Status|character varying|20|NO|
+C|clients|UpdatedAtUtc|timestamp with time zone||YES|
+C|courses|CreatedAtUtc|timestamp with time zone||NO|
+C|courses|Id|uuid||NO|
+C|courses|IsActive|boolean||NO|
+C|courses|NameAr|character varying|200|NO|
+C|courses|NameEn|character varying|200|YES|
+C|courses|SortOrder|integer||NO|
+C|courses|UpdatedAtUtc|timestamp with time zone||YES|
+C|decisions|CreatedAtUtc|timestamp with time zone||NO|
+C|decisions|DecidedAtUtc|timestamp with time zone||YES|
+C|decisions|Description|text||YES|
+C|decisions|Id|uuid||NO|
+C|decisions|MadeById|uuid||NO|
+C|decisions|NextAction|character varying|1000|YES|
+C|decisions|RelatedEscalationId|uuid||YES|
+C|decisions|RelatedKpiEvaluationId|uuid||YES|
+C|decisions|RelatedRiskId|uuid||YES|
+C|decisions|RelatedSubmissionId|uuid||YES|
+C|decisions|Status|character varying|20|NO|
+C|decisions|Title|character varying|300|NO|
+C|decisions|UpdatedAtUtc|timestamp with time zone||YES|
+C|departments|Code|character varying|50|YES|
+C|departments|CreatedAtUtc|timestamp with time zone||NO|
+C|departments|Id|uuid||NO|
+C|departments|IsActive|boolean||NO|
+C|departments|ManagerId|uuid||YES|
+C|departments|NameAr|character varying|200|NO|
+C|departments|NameEn|character varying|200|YES|
+C|departments|UpdatedAtUtc|timestamp with time zone||YES|
+C|email_notifications|AttemptCount|integer||NO|
+C|email_notifications|BodyHtml|text||NO|
+C|email_notifications|BodyText|text||YES|
+C|email_notifications|CorrelationKey|character varying|300|NO|
+C|email_notifications|CreatedAtUtc|timestamp with time zone||NO|
+C|email_notifications|CreatedByUserId|uuid||YES|
+C|email_notifications|EntityId|uuid||NO|
+C|email_notifications|EntityType|character varying|100|NO|
+C|email_notifications|EventType|character varying|80|NO|
+C|email_notifications|FailedAt|timestamp with time zone||YES|
+C|email_notifications|FailureReason|character varying|2000|YES|
+C|email_notifications|Id|uuid||NO|
+C|email_notifications|LastAttemptAt|timestamp with time zone||YES|
+C|email_notifications|Mode|character varying|20|NO|
+C|email_notifications|RecipientEmail|character varying|320|YES|
+C|email_notifications|RecipientName|character varying|300|YES|
+C|email_notifications|RecipientUserId|uuid||YES|
+C|email_notifications|SentAt|timestamp with time zone||YES|
+C|email_notifications|Status|character varying|20|NO|
+C|email_notifications|Subject|character varying|500|NO|
+C|email_notifications|UpdatedAtUtc|timestamp with time zone||YES|
+C|email_outbox|Attempts|integer||NO|
+C|email_outbox|CreatedAtUtc|timestamp with time zone||NO|
+C|email_outbox|HtmlBody|text||NO|
+C|email_outbox|Id|uuid||NO|
+C|email_outbox|LastError|character varying|2000|YES|
+C|email_outbox|NextAttemptUtc|timestamp with time zone||NO|
+C|email_outbox|RecipientId|uuid||NO|
+C|email_outbox|SentAtUtc|timestamp with time zone||YES|
+C|email_outbox|Status|integer||NO|
+C|email_outbox|Subject|character varying|500|NO|
+C|email_outbox|ToEmail|character varying|320|NO|
+C|email_outbox|ToName|character varying|300|YES|
+C|email_outbox|Type|character varying|80|NO|
+C|email_outbox|UpdatedAtUtc|timestamp with time zone||YES|
+C|email_rules|CooldownMinutes|integer||YES|
+C|email_rules|CreatedAtUtc|timestamp with time zone||NO|
+C|email_rules|EventType|character varying|80|NO|
+C|email_rules|Id|uuid||NO|
+C|email_rules|IsEnabled|boolean||NO|
+C|email_rules|Mode|character varying|20|NO|
+C|email_rules|SendToAdmin|boolean||NO|
+C|email_rules|SendToEmployee|boolean||NO|
+C|email_rules|SendToGovernance|boolean||NO|
+C|email_rules|SendToHr|boolean||NO|
+C|email_rules|SendToManager|boolean||NO|
+C|email_rules|SendToTeamLeader|boolean||NO|
+C|email_rules|TemplateKey|character varying|80|NO|
+C|email_rules|UpdatedAtUtc|timestamp with time zone||YES|
+C|email_rules|UpdatedByUserId|uuid||YES|
+C|email_templates|AvailableVariablesJson|text||YES|
+C|email_templates|BodyTemplate|text||NO|
+C|email_templates|Category|character varying|40|NO|
+C|email_templates|CreatedAtUtc|timestamp with time zone||NO|
+C|email_templates|DefaultMode|character varying|20|NO|
+C|email_templates|Id|uuid||NO|
+C|email_templates|IsEnabled|boolean||NO|
+C|email_templates|Key|character varying|80|NO|
+C|email_templates|NameAr|character varying|200|NO|
+C|email_templates|SubjectTemplate|character varying|500|NO|
+C|email_templates|UpdatedAtUtc|timestamp with time zone||YES|
+C|email_templates|UpdatedByUserId|uuid||YES|
+C|employee_balance_ledger|Amount|numeric||NO|
+C|employee_balance_ledger|BalanceType|character varying|20|NO|
+C|employee_balance_ledger|CreatedAtUtc|timestamp with time zone||NO|
+C|employee_balance_ledger|CreatedBy|uuid||NO|
+C|employee_balance_ledger|Direction|character varying|10|NO|
+C|employee_balance_ledger|EmployeeId|uuid||NO|
+C|employee_balance_ledger|Id|uuid||NO|
+C|employee_balance_ledger|Notes|character varying|1000|YES|
+C|employee_balance_ledger|RelatedRequestId|uuid||YES|
+C|employee_balance_ledger|Source|character varying|30|NO|
+C|employee_balance_ledger|UpdatedAtUtc|timestamp with time zone||YES|
+C|employee_balance_ledger|Year|integer||NO|
+C|employee_service_request_events|Action|character varying|50|NO|
+C|employee_service_request_events|ActorUserId|uuid||NO|
+C|employee_service_request_events|Comment|character varying|2000|YES|
+C|employee_service_request_events|CreatedAtUtc|timestamp with time zone||NO|
+C|employee_service_request_events|EmployeeServiceRequestId|uuid||NO|
+C|employee_service_request_events|FromStatus|character varying|20|NO|
+C|employee_service_request_events|Id|uuid||NO|
+C|employee_service_request_events|ToStatus|character varying|20|NO|
+C|employee_service_request_events|UpdatedAtUtc|timestamp with time zone||YES|
+C|employee_service_requests|AssignedToHrUserId|uuid||YES|
+C|employee_service_requests|AttachmentPath|character varying|1000|YES|
+C|employee_service_requests|CompletedAtUtc|timestamp with time zone||YES|
+C|employee_service_requests|CreatedAtUtc|timestamp with time zone||NO|
+C|employee_service_requests|Description|character varying|2000|YES|
+C|employee_service_requests|DestinationEntity|character varying|200|YES|
+C|employee_service_requests|HrAttachmentContentType|character varying|100|YES|
+C|employee_service_requests|HrAttachmentOriginalFileName|character varying|260|YES|
+C|employee_service_requests|HrAttachmentPath|character varying|1000|YES|
+C|employee_service_requests|HrAttachmentSizeBytes|bigint||YES|
+C|employee_service_requests|HrAttachmentUploadedAtUtc|timestamp with time zone||YES|
+C|employee_service_requests|HrAttachmentUploadedByUserId|uuid||YES|
+C|employee_service_requests|HrComment|character varying|2000|YES|
+C|employee_service_requests|Id|uuid||NO|
+C|employee_service_requests|PreferredLanguage|character varying|10|NO|
+C|employee_service_requests|RejectionReason|character varying|1000|YES|
+C|employee_service_requests|RequestType|character varying|30|NO|
+C|employee_service_requests|RequesterUserId|uuid||NO|
+C|employee_service_requests|Status|character varying|20|NO|
+C|employee_service_requests|Title|character varying|200|NO|
+C|employee_service_requests|UpdatedAtUtc|timestamp with time zone||YES|
+C|escalations|CreatedAtUtc|timestamp with time zone||NO|
+C|escalations|Id|uuid||NO|
+C|escalations|KpiEvaluationId|uuid||YES|
+C|escalations|NextAction|character varying|1000|YES|
+C|escalations|RaisedById|uuid||NO|
+C|escalations|Reason|character varying|1000|NO|
+C|escalations|ReportSubmissionId|uuid||YES|
+C|escalations|Resolution|text||YES|
+C|escalations|ResolvedAtUtc|timestamp with time zone||YES|
+C|escalations|RiskId|uuid||YES|
+C|escalations|Status|character varying|20|NO|
+C|escalations|TargetUserId|uuid||NO|
+C|escalations|UpdatedAtUtc|timestamp with time zone||YES|
+C|governance_action_item_updates|ActionItemId|uuid||NO|
+C|governance_action_item_updates|AuthorId|uuid||NO|
+C|governance_action_item_updates|Body|character varying|2000|YES|
+C|governance_action_item_updates|CreatedAtUtc|timestamp with time zone||NO|
+C|governance_action_item_updates|Id|uuid||NO|
+C|governance_action_item_updates|NewStatus|character varying|20|YES|
+C|governance_action_item_updates|OldStatus|character varying|20|YES|
+C|governance_action_item_updates|UpdateType|character varying|30|NO|
+C|governance_action_item_updates|UpdatedAtUtc|timestamp with time zone||YES|
+C|governance_action_items|AssignedByUserId|uuid||YES|
+C|governance_action_items|AssignedToUserId|uuid||YES|
+C|governance_action_items|CompletedAtUtc|timestamp with time zone||YES|
+C|governance_action_items|CompletedByUserId|uuid||YES|
+C|governance_action_items|CompletionNote|character varying|2000|YES|
+C|governance_action_items|CreatedAtUtc|timestamp with time zone||NO|
+C|governance_action_items|CreatedByUserId|uuid||NO|
+C|governance_action_items|Description|character varying|4000|YES|
+C|governance_action_items|DueDate|date||YES|
+C|governance_action_items|Id|uuid||NO|
+C|governance_action_items|IsSensitive|boolean||NO|
+C|governance_action_items|Priority|character varying|20|NO|
+C|governance_action_items|SourceId|uuid||YES|
+C|governance_action_items|SourceType|character varying|30|NO|
+C|governance_action_items|Status|character varying|20|NO|
+C|governance_action_items|Title|character varying|300|NO|
+C|governance_action_items|UpdatedAtUtc|timestamp with time zone||YES|
+C|governance_escalation_updates|AuthorId|uuid||NO|
+C|governance_escalation_updates|Body|character varying|2000|YES|
+C|governance_escalation_updates|CreatedAtUtc|timestamp with time zone||NO|
+C|governance_escalation_updates|EscalationId|uuid||NO|
+C|governance_escalation_updates|Id|uuid||NO|
+C|governance_escalation_updates|NewStatus|character varying|30|YES|
+C|governance_escalation_updates|OldStatus|character varying|30|YES|
+C|governance_escalation_updates|UpdateType|character varying|20|NO|
+C|governance_escalation_updates|UpdatedAtUtc|timestamp with time zone||YES|
+C|governance_escalations|AssignedToUserId|uuid||YES|
+C|governance_escalations|ClosedAtUtc|timestamp with time zone||YES|
+C|governance_escalations|ClosedByUserId|uuid||YES|
+C|governance_escalations|CreatedAtUtc|timestamp with time zone||NO|
+C|governance_escalations|Description|character varying|4000|YES|
+C|governance_escalations|EscalationType|character varying|30|NO|
+C|governance_escalations|Id|uuid||NO|
+C|governance_escalations|RaisedByUserId|uuid||NO|
+C|governance_escalations|RelatedGovernanceItemId|uuid||YES|
+C|governance_escalations|RelatedSubmissionId|uuid||YES|
+C|governance_escalations|Resolution|character varying|2000|YES|
+C|governance_escalations|Severity|character varying|20|NO|
+C|governance_escalations|Status|character varying|30|NO|
+C|governance_escalations|TargetDepartmentId|uuid||YES|
+C|governance_escalations|TargetTeamId|uuid||YES|
+C|governance_escalations|TargetType|character varying|30|NO|
+C|governance_escalations|TargetUserId|uuid||YES|
+C|governance_escalations|Title|character varying|300|NO|
+C|governance_escalations|UpdatedAtUtc|timestamp with time zone||YES|
+C|governance_item_updates|AuthorId|uuid||NO|
+C|governance_item_updates|Body|character varying|2000|YES|
+C|governance_item_updates|CreatedAtUtc|timestamp with time zone||NO|
+C|governance_item_updates|GovernanceItemId|uuid||NO|
+C|governance_item_updates|Id|uuid||NO|
+C|governance_item_updates|NewStatus|character varying|20|YES|
+C|governance_item_updates|OldStatus|character varying|20|YES|
+C|governance_item_updates|UpdateType|character varying|20|NO|
+C|governance_item_updates|UpdatedAtUtc|timestamp with time zone||YES|
+C|governance_items|ApplicationScope|character varying|20|NO|'User'::character varying
+C|governance_items|AssignedToUserId|uuid||YES|
+C|governance_items|Category|character varying|30|NO|
+C|governance_items|ClosedAtUtc|timestamp with time zone||YES|
+C|governance_items|ClosedById|uuid||YES|
+C|governance_items|CreatedAtUtc|timestamp with time zone||NO|
+C|governance_items|CreatedById|uuid||NO|
+C|governance_items|DepartmentId|uuid||YES|
+C|governance_items|Description|character varying|4000|YES|
+C|governance_items|DueDate|date||YES|
+C|governance_items|Id|uuid||NO|
+C|governance_items|RelatedSubmissionId|uuid||YES|
+C|governance_items|RelatedUserId|uuid||YES|
+C|governance_items|ResolutionSummary|character varying|2000|YES|
+C|governance_items|Severity|character varying|20|NO|
+C|governance_items|Status|character varying|20|NO|
+C|governance_items|TeamId|uuid||YES|
+C|governance_items|Title|character varying|300|NO|
+C|governance_items|UpdatedAtUtc|timestamp with time zone||YES|
+C|improvement_plans|CreatedAtUtc|timestamp with time zone||NO|
+C|improvement_plans|Description|text||YES|
+C|improvement_plans|DueDateUtc|timestamp with time zone||YES|
+C|improvement_plans|Id|uuid||NO|
+C|improvement_plans|OwnerId|uuid||NO|
+C|improvement_plans|RelatedTrainingNeedId|uuid||YES|
+C|improvement_plans|Status|character varying|30|NO|
+C|improvement_plans|SubjectUserId|uuid||NO|
+C|improvement_plans|Title|character varying|300|NO|
+C|improvement_plans|UpdatedAtUtc|timestamp with time zone||YES|
+C|job_roles|Code|character varying|50|YES|
+C|job_roles|CreatedAtUtc|timestamp with time zone||NO|
+C|job_roles|DepartmentId|uuid||YES|
+C|job_roles|Id|uuid||NO|
+C|job_roles|IsActive|boolean||NO|
+C|job_roles|NameAr|character varying|200|NO|
+C|job_roles|NameEn|character varying|200|YES|
+C|job_roles|UpdatedAtUtc|timestamp with time zone||YES|
+C|kpi_evaluation_review_events|Action|character varying|40|NO|
+C|kpi_evaluation_review_events|ActorId|uuid||NO|
+C|kpi_evaluation_review_events|CreatedAtUtc|timestamp with time zone||NO|
+C|kpi_evaluation_review_events|FromStatus|character varying|30|YES|
+C|kpi_evaluation_review_events|Id|uuid||NO|
+C|kpi_evaluation_review_events|KpiEvaluationId|uuid||NO|
+C|kpi_evaluation_review_events|PreviousValuesJson|jsonb||YES|
+C|kpi_evaluation_review_events|Reason|character varying|2000|YES|
+C|kpi_evaluation_review_events|ToStatus|character varying|30|YES|
+C|kpi_evaluation_review_events|UpdatedAtUtc|timestamp with time zone||YES|
+C|kpi_evaluations|CreatedAtUtc|timestamp with time zone||NO|
+C|kpi_evaluations|DeletedAtUtc|timestamp with time zone||YES|
+C|kpi_evaluations|DeletedByUserId|uuid||YES|
+C|kpi_evaluations|DeletionReason|character varying|1000|YES|
+C|kpi_evaluations|DepartmentId|uuid||YES|
+C|kpi_evaluations|EvaluatorId|uuid||YES|
+C|kpi_evaluations|Id|uuid||NO|
+C|kpi_evaluations|IsDeleted|boolean||NO|false
+C|kpi_evaluations|KpiTemplateVersionId|uuid||NO|
+C|kpi_evaluations|PeriodKey|character varying|30|NO|
+C|kpi_evaluations|PeriodType|character varying|30|NO|
+C|kpi_evaluations|ReviewNote|character varying|2000|YES|
+C|kpi_evaluations|ReviewedAtUtc|timestamp with time zone||YES|
+C|kpi_evaluations|ReviewerId|uuid||YES|
+C|kpi_evaluations|Status|character varying|30|NO|
+C|kpi_evaluations|SubjectUserId|uuid||NO|
+C|kpi_evaluations|SubmittedAtUtc|timestamp with time zone||YES|
+C|kpi_evaluations|TeamId|uuid||YES|
+C|kpi_evaluations|TotalScore|numeric||YES|
+C|kpi_evaluations|Trend|character varying|20|NO|
+C|kpi_evaluations|UpdatedAtUtc|timestamp with time zone||YES|
+C|kpi_metrics|CalcConfigJson|jsonb||YES|
+C|kpi_metrics|CalcMethod|character varying|30|NO|
+C|kpi_metrics|CreatedAtUtc|timestamp with time zone||NO|
+C|kpi_metrics|Description|text||YES|
+C|kpi_metrics|Id|uuid||NO|
+C|kpi_metrics|KpiTemplateVersionId|uuid||NO|
+C|kpi_metrics|Name|character varying|300|NO|
+C|kpi_metrics|Order|integer||NO|
+C|kpi_metrics|TargetValue|numeric||YES|
+C|kpi_metrics|Unit|character varying|50|YES|
+C|kpi_metrics|UpdatedAtUtc|timestamp with time zone||YES|
+C|kpi_metrics|Weight|numeric||NO|
+C|kpi_results|CreatedAtUtc|timestamp with time zone||NO|
+C|kpi_results|Id|uuid||NO|
+C|kpi_results|KpiEvaluationId|uuid||NO|
+C|kpi_results|KpiMetricId|uuid||NO|
+C|kpi_results|Note|text||YES|
+C|kpi_results|RawValue|numeric||YES|
+C|kpi_results|Score|numeric||YES|
+C|kpi_results|UpdatedAtUtc|timestamp with time zone||YES|
+C|kpi_results|Weight|numeric||NO|
+C|kpi_template_assignments|CreatedAtUtc|timestamp with time zone||NO|
+C|kpi_template_assignments|CreatedById|uuid||YES|
+C|kpi_template_assignments|Id|uuid||NO|
+C|kpi_template_assignments|IsActive|boolean||NO|
+C|kpi_template_assignments|Kind|character varying|30|NO|
+C|kpi_template_assignments|KpiTemplateId|uuid||NO|
+C|kpi_template_assignments|Notes|character varying|1000|YES|
+C|kpi_template_assignments|ScopeId|uuid||NO|
+C|kpi_template_assignments|ScopeType|character varying|30|NO|
+C|kpi_template_assignments|UpdatedAtUtc|timestamp with time zone||YES|
+C|kpi_template_assignments|UpdatedById|uuid||YES|
+C|kpi_template_versions|CreatedAtUtc|timestamp with time zone||NO|
+C|kpi_template_versions|Id|uuid||NO|
+C|kpi_template_versions|IsPublished|boolean||NO|
+C|kpi_template_versions|KpiTemplateId|uuid||NO|
+C|kpi_template_versions|PublishedAtUtc|timestamp with time zone||YES|
+C|kpi_template_versions|PublishedById|uuid||YES|
+C|kpi_template_versions|UpdatedAtUtc|timestamp with time zone||YES|
+C|kpi_template_versions|VersionNumber|integer||NO|
+C|kpi_templates|Cadence|character varying|30|NO|
+C|kpi_templates|CreatedAtUtc|timestamp with time zone||NO|
+C|kpi_templates|Description|text||YES|
+C|kpi_templates|Id|uuid||NO|
+C|kpi_templates|IsActive|boolean||NO|
+C|kpi_templates|JobRoleId|uuid||YES|
+C|kpi_templates|OwnerId|uuid||NO|
+C|kpi_templates|Status|character varying|30|NO|
+C|kpi_templates|Title|character varying|300|NO|
+C|kpi_templates|UpdatedAtUtc|timestamp with time zone||YES|
+C|leave_request_events|Action|character varying|50|NO|
+C|leave_request_events|ActorUserId|uuid||NO|
+C|leave_request_events|Comment|character varying|1000|YES|
+C|leave_request_events|CreatedAtUtc|timestamp with time zone||NO|
+C|leave_request_events|FromStatus|character varying|30|NO|
+C|leave_request_events|Id|uuid||NO|
+C|leave_request_events|LeaveRequestId|uuid||NO|
+C|leave_request_events|Step|character varying|20|NO|
+C|leave_request_events|ToStatus|character varying|30|NO|
+C|leave_request_events|UpdatedAtUtc|timestamp with time zone||YES|
+C|leave_requests|BalanceAtRequest|numeric||YES|
+C|leave_requests|CancelledAtUtc|timestamp with time zone||YES|
+C|leave_requests|CreatedAtUtc|timestamp with time zone||NO|
+C|leave_requests|CurrentStep|character varying|20|NO|
+C|leave_requests|EmployeeAcknowledgedAtUtc|timestamp with time zone||YES|
+C|leave_requests|EmployeeAcknowledgedUnpaidDeduction|boolean||NO|false
+C|leave_requests|EndDate|date||NO|
+C|leave_requests|EndTime|time without time zone||YES|
+C|leave_requests|HrDecisionAtUtc|timestamp with time zone||YES|
+C|leave_requests|HrReviewerId|uuid||YES|
+C|leave_requests|Id|uuid||NO|
+C|leave_requests|IsHrRequest|boolean||NO|false
+C|leave_requests|IsPotentialUnpaidLeave|boolean||NO|false
+C|leave_requests|ManagerDecisionAtUtc|timestamp with time zone||YES|
+C|leave_requests|ManagerReviewerId|uuid||YES|
+C|leave_requests|Notes|character varying|2000|YES|
+C|leave_requests|PermissionShortfallResolution|integer||NO|0
+C|leave_requests|Reason|character varying|1000|NO|
+C|leave_requests|RejectionReason|character varying|1000|YES|
+C|leave_requests|RequestedLeaveDays|integer||YES|
+C|leave_requests|RequesterUserId|uuid||NO|
+C|leave_requests|ReturnReason|character varying|1000|YES|
+C|leave_requests|StartDate|date||NO|
+C|leave_requests|StartTime|time without time zone||YES|
+C|leave_requests|Status|character varying|30|NO|
+C|leave_requests|TeamLeaderDecisionAtUtc|timestamp with time zone||YES|
+C|leave_requests|TeamLeaderReviewerId|uuid||YES|
+C|leave_requests|Type|character varying|20|NO|
+C|leave_requests|UncoveredLeaveDays|numeric||YES|
+C|leave_requests|UpdatedAtUtc|timestamp with time zone||YES|
+C|management_notes|AuthorId|uuid||NO|
+C|management_notes|Body|character varying|2000|NO|
+C|management_notes|CreatedAtUtc|timestamp with time zone||NO|
+C|management_notes|EntityId|uuid||NO|
+C|management_notes|EntityType|character varying|30|NO|
+C|management_notes|Id|uuid||NO|
+C|management_notes|NoteType|character varying|30|NO|
+C|management_notes|RequiresAction|boolean||NO|
+C|management_notes|ResolvedAtUtc|timestamp with time zone||YES|
+C|management_notes|ResolvedById|uuid||YES|
+C|management_notes|Status|character varying|20|NO|
+C|management_notes|UpdatedAtUtc|timestamp with time zone||YES|
+C|notifications|Body|text||YES|
+C|notifications|CreatedAtUtc|timestamp with time zone||NO|
+C|notifications|Id|uuid||NO|
+C|notifications|IsRead|boolean||NO|
+C|notifications|Link|character varying|500|YES|
+C|notifications|RecipientId|uuid||NO|
+C|notifications|Title|character varying|300|NO|
+C|notifications|Type|character varying|80|NO|
+C|notifications|UpdatedAtUtc|timestamp with time zone||YES|
+C|payroll_impact_reviews|CreatedAtUtc|timestamp with time zone||NO|
+C|payroll_impact_reviews|FinanceNote|character varying|2000|YES|
+C|payroll_impact_reviews|Id|uuid||NO|
+C|payroll_impact_reviews|LeaveRequestId|uuid||NO|
+C|payroll_impact_reviews|ReviewedAtUtc|timestamp with time zone||YES|
+C|payroll_impact_reviews|ReviewedByUserId|uuid||YES|
+C|payroll_impact_reviews|Status|character varying|20|NO|
+C|payroll_impact_reviews|UpdatedAtUtc|timestamp with time zone||YES|
+C|projects|AccountManagerId|uuid||YES|
+C|projects|ClientId|uuid||NO|
+C|projects|CreatedAtUtc|timestamp with time zone||NO|
+C|projects|EndDate|date||YES|
+C|projects|Id|uuid||NO|
+C|projects|Name|character varying|200|NO|
+C|projects|Notes|character varying|2000|YES|
+C|projects|OwnerTeamId|uuid||YES|
+C|projects|ServiceType|character varying|20|NO|
+C|projects|StartDate|date||YES|
+C|projects|Status|character varying|20|NO|
+C|projects|UpdatedAtUtc|timestamp with time zone||YES|
+C|refresh_tokens|CreatedAtUtc|timestamp with time zone||NO|
+C|refresh_tokens|ExpiresUtc|timestamp with time zone||NO|
+C|refresh_tokens|Id|uuid||NO|
+C|refresh_tokens|RevokedAtUtc|timestamp with time zone||YES|
+C|refresh_tokens|Token|character varying|200|NO|
+C|refresh_tokens|UserId|uuid||NO|
+C|report_submissions|ClientId|uuid||YES|
+C|report_submissions|ClosedAtUtc|timestamp with time zone||YES|
+C|report_submissions|CreatedAtUtc|timestamp with time zone||NO|
+C|report_submissions|CurrentApproverId|uuid||YES|
+C|report_submissions|DeletedAtUtc|timestamp with time zone||YES|
+C|report_submissions|DeletedByUserId|uuid||YES|
+C|report_submissions|DeletionReason|character varying|1000|YES|
+C|report_submissions|DepartmentId|uuid||YES|
+C|report_submissions|Id|uuid||NO|
+C|report_submissions|IsDeleted|boolean||NO|false
+C|report_submissions|PeriodKey|character varying|30|NO|
+C|report_submissions|PeriodType|character varying|30|NO|
+C|report_submissions|ProjectId|uuid||YES|
+C|report_submissions|ReportTemplateVersionId|uuid||NO|
+C|report_submissions|Status|character varying|40|NO|
+C|report_submissions|SubmittedAtUtc|timestamp with time zone||YES|
+C|report_submissions|SubmitterId|uuid||NO|
+C|report_submissions|TeamId|uuid||YES|
+C|report_submissions|UpdatedAtUtc|timestamp with time zone||YES|
+C|report_template_assignments|CreatedAtUtc|timestamp with time zone||NO|
+C|report_template_assignments|CreatedById|uuid||YES|
+C|report_template_assignments|Id|uuid||NO|
+C|report_template_assignments|IsActive|boolean||NO|
+C|report_template_assignments|Kind|character varying|30|NO|
+C|report_template_assignments|Notes|character varying|1000|YES|
+C|report_template_assignments|ReportTemplateId|uuid||NO|
+C|report_template_assignments|ScopeId|uuid||NO|
+C|report_template_assignments|ScopeType|character varying|30|NO|
+C|report_template_assignments|UpdatedAtUtc|timestamp with time zone||YES|
+C|report_template_assignments|UpdatedById|uuid||YES|
+C|report_template_versions|CreatedAtUtc|timestamp with time zone||NO|
+C|report_template_versions|Id|uuid||NO|
+C|report_template_versions|IsPublished|boolean||NO|
+C|report_template_versions|PublishedAtUtc|timestamp with time zone||YES|
+C|report_template_versions|PublishedById|uuid||YES|
+C|report_template_versions|ReportTemplateId|uuid||NO|
+C|report_template_versions|UpdatedAtUtc|timestamp with time zone||YES|
+C|report_template_versions|VersionNumber|integer||NO|
+C|report_templates|Classification|character varying|30|NO|''::character varying
+C|report_templates|CreatedAtUtc|timestamp with time zone||NO|
+C|report_templates|DefaultPeriodType|character varying|30|NO|
+C|report_templates|Description|text||YES|
+C|report_templates|Id|uuid||NO|
+C|report_templates|IsActive|boolean||NO|
+C|report_templates|JobRoleId|uuid||YES|
+C|report_templates|OwnerId|uuid||NO|
+C|report_templates|Status|character varying|30|NO|
+C|report_templates|Title|character varying|300|NO|
+C|report_templates|UpdatedAtUtc|timestamp with time zone||YES|
+C|report_view_grants|CreatedAtUtc|timestamp with time zone||NO|
+C|report_view_grants|CreatedByUserId|uuid||YES|
+C|report_view_grants|ExpiresAtUtc|timestamp with time zone||YES|
+C|report_view_grants|GranteeUserId|uuid||NO|
+C|report_view_grants|Id|uuid||NO|
+C|report_view_grants|IsActive|boolean||NO|
+C|report_view_grants|Notes|character varying|1000|YES|
+C|report_view_grants|RevokedAtUtc|timestamp with time zone||YES|
+C|report_view_grants|RevokedByUserId|uuid||YES|
+C|report_view_grants|ScopeKind|integer||NO|
+C|report_view_grants|TargetTeamId|uuid||YES|
+C|report_view_grants|TargetUserId|uuid||YES|
+C|report_view_grants|UpdatedAtUtc|timestamp with time zone||YES|
+C|risks|ClientId|uuid||YES|
+C|risks|ClosedAtUtc|timestamp with time zone||YES|
+C|risks|CreatedAtUtc|timestamp with time zone||NO|
+C|risks|DepartmentId|uuid||YES|
+C|risks|Description|text||YES|
+C|risks|Id|uuid||NO|
+C|risks|MitigationPlan|text||YES|
+C|risks|NextAction|character varying|1000|YES|
+C|risks|OwnerId|uuid||NO|
+C|risks|ProjectId|uuid||YES|
+C|risks|RelatedKpiEvaluationId|uuid||YES|
+C|risks|RelatedSubmissionId|uuid||YES|
+C|risks|Severity|character varying|20|NO|
+C|risks|Status|character varying|20|NO|
+C|risks|SubjectUserId|uuid||YES|
+C|risks|TeamId|uuid||YES|
+C|risks|Title|character varying|300|NO|
+C|risks|UpdatedAtUtc|timestamp with time zone||YES|
+C|services|CreatedAtUtc|timestamp with time zone||NO|
+C|services|Id|uuid||NO|
+C|services|IsActive|boolean||NO|
+C|services|NameAr|character varying|200|NO|
+C|services|NameEn|character varying|200|YES|
+C|services|SortOrder|integer||NO|
+C|services|UpdatedAtUtc|timestamp with time zone||YES|
+C|submission_field_values|CreatedAtUtc|timestamp with time zone||NO|
+C|submission_field_values|Id|uuid||NO|
+C|submission_field_values|ReportSubmissionId|uuid||NO|
+C|submission_field_values|TemplateFieldId|uuid||NO|
+C|submission_field_values|UpdatedAtUtc|timestamp with time zone||YES|
+C|submission_field_values|ValueBool|boolean||YES|
+C|submission_field_values|ValueDate|timestamp with time zone||YES|
+C|submission_field_values|ValueJson|jsonb||YES|
+C|submission_field_values|ValueNumber|numeric||YES|
+C|submission_field_values|ValueText|text||YES|
+C|teams|CreatedAtUtc|timestamp with time zone||NO|
+C|teams|DepartmentId|uuid||NO|
+C|teams|Id|uuid||NO|
+C|teams|IsActive|boolean||NO|
+C|teams|NameAr|character varying|200|NO|
+C|teams|NameEn|character varying|200|YES|
+C|teams|TeamLeaderId|uuid||YES|
+C|teams|UpdatedAtUtc|timestamp with time zone||YES|
+C|template_fields|ConfigJson|jsonb||YES|
+C|template_fields|CreatedAtUtc|timestamp with time zone||NO|
+C|template_fields|FieldType|character varying|30|NO|
+C|template_fields|HelpText|text||YES|
+C|template_fields|Id|uuid||NO|
+C|template_fields|IsRequired|boolean||NO|
+C|template_fields|Key|character varying|100|YES|
+C|template_fields|Label|character varying|300|NO|
+C|template_fields|Order|integer||NO|
+C|template_fields|ReportTemplateVersionId|uuid||NO|
+C|template_fields|UpdatedAtUtc|timestamp with time zone||YES|
+C|training_needs|CreatedAtUtc|timestamp with time zone||NO|
+C|training_needs|Description|text||YES|
+C|training_needs|Id|uuid||NO|
+C|training_needs|RaisedById|uuid||NO|
+C|training_needs|RelatedKpiEvaluationId|uuid||YES|
+C|training_needs|Source|character varying|100|YES|
+C|training_needs|Status|character varying|30|NO|
+C|training_needs|SubjectUserId|uuid||NO|
+C|training_needs|Title|character varying|300|NO|
+C|training_needs|UpdatedAtUtc|timestamp with time zone||YES|
+C|user_team_memberships|CreatedAtUtc|timestamp with time zone||NO|
+C|user_team_memberships|CreatedByUserId|uuid||YES|
+C|user_team_memberships|EndDateUtc|timestamp with time zone||YES|
+C|user_team_memberships|Id|uuid||NO|
+C|user_team_memberships|IsActive|boolean||NO|
+C|user_team_memberships|MembershipType|character varying|40|NO|
+C|user_team_memberships|Notes|character varying|1000|YES|
+C|user_team_memberships|StartDateUtc|timestamp with time zone||YES|
+C|user_team_memberships|TeamId|uuid||NO|
+C|user_team_memberships|UpdatedAtUtc|timestamp with time zone||YES|
+C|user_team_memberships|UserId|uuid||NO|
+I|AspNetRoleClaims|IX_AspNetRoleClaims_RoleId|CREATE INDEX "IX_AspNetRoleClaims_RoleId" ON public."AspNetRoleClaims" USING btree ("RoleId")
+I|AspNetRoleClaims|PK_AspNetRoleClaims|CREATE UNIQUE INDEX "PK_AspNetRoleClaims" ON public."AspNetRoleClaims" USING btree ("Id")
+I|AspNetRoles|PK_AspNetRoles|CREATE UNIQUE INDEX "PK_AspNetRoles" ON public."AspNetRoles" USING btree ("Id")
+I|AspNetRoles|RoleNameIndex|CREATE UNIQUE INDEX "RoleNameIndex" ON public."AspNetRoles" USING btree ("NormalizedName")
+I|AspNetUserClaims|IX_AspNetUserClaims_UserId|CREATE INDEX "IX_AspNetUserClaims_UserId" ON public."AspNetUserClaims" USING btree ("UserId")
+I|AspNetUserClaims|PK_AspNetUserClaims|CREATE UNIQUE INDEX "PK_AspNetUserClaims" ON public."AspNetUserClaims" USING btree ("Id")
+I|AspNetUserLogins|IX_AspNetUserLogins_UserId|CREATE INDEX "IX_AspNetUserLogins_UserId" ON public."AspNetUserLogins" USING btree ("UserId")
+I|AspNetUserLogins|PK_AspNetUserLogins|CREATE UNIQUE INDEX "PK_AspNetUserLogins" ON public."AspNetUserLogins" USING btree ("LoginProvider", "ProviderKey")
+I|AspNetUserRoles|IX_AspNetUserRoles_RoleId|CREATE INDEX "IX_AspNetUserRoles_RoleId" ON public."AspNetUserRoles" USING btree ("RoleId")
+I|AspNetUserRoles|PK_AspNetUserRoles|CREATE UNIQUE INDEX "PK_AspNetUserRoles" ON public."AspNetUserRoles" USING btree ("UserId", "RoleId")
+I|AspNetUserTokens|PK_AspNetUserTokens|CREATE UNIQUE INDEX "PK_AspNetUserTokens" ON public."AspNetUserTokens" USING btree ("UserId", "LoginProvider", "Name")
+I|AspNetUsers|EmailIndex|CREATE INDEX "EmailIndex" ON public."AspNetUsers" USING btree ("NormalizedEmail")
+I|AspNetUsers|IX_AspNetUsers_KpiReviewerOverrideUserId|CREATE INDEX "IX_AspNetUsers_KpiReviewerOverrideUserId" ON public."AspNetUsers" USING btree ("KpiReviewerOverrideUserId")
+I|AspNetUsers|IX_AspNetUsers_ReportApproverOverrideUserId|CREATE INDEX "IX_AspNetUsers_ReportApproverOverrideUserId" ON public."AspNetUsers" USING btree ("ReportApproverOverrideUserId")
+I|AspNetUsers|PK_AspNetUsers|CREATE UNIQUE INDEX "PK_AspNetUsers" ON public."AspNetUsers" USING btree ("Id")
+I|AspNetUsers|UserNameIndex|CREATE UNIQUE INDEX "UserNameIndex" ON public."AspNetUsers" USING btree ("NormalizedUserName")
+I|approval_steps|IX_approval_steps_ApproverId|CREATE INDEX "IX_approval_steps_ApproverId" ON public.approval_steps USING btree ("ApproverId")
+I|approval_steps|IX_approval_steps_ReportSubmissionId|CREATE INDEX "IX_approval_steps_ReportSubmissionId" ON public.approval_steps USING btree ("ReportSubmissionId")
+I|approval_steps|PK_approval_steps|CREATE UNIQUE INDEX "PK_approval_steps" ON public.approval_steps USING btree ("Id")
+I|audit_logs|IX_audit_logs_ActorId|CREATE INDEX "IX_audit_logs_ActorId" ON public.audit_logs USING btree ("ActorId")
+I|audit_logs|IX_audit_logs_EntityType_EntityId|CREATE INDEX "IX_audit_logs_EntityType_EntityId" ON public.audit_logs USING btree ("EntityType", "EntityId")
+I|audit_logs|PK_audit_logs|CREATE UNIQUE INDEX "PK_audit_logs" ON public.audit_logs USING btree ("Id")
+I|balance_policies|IX_balance_policies_Year_JobRoleId|CREATE UNIQUE INDEX "IX_balance_policies_Year_JobRoleId" ON public.balance_policies USING btree ("Year", "JobRoleId")
+I|balance_policies|PK_balance_policies|CREATE UNIQUE INDEX "PK_balance_policies" ON public.balance_policies USING btree ("Id")
+I|clients|IX_clients_AccountManagerId|CREATE INDEX "IX_clients_AccountManagerId" ON public.clients USING btree ("AccountManagerId")
+I|clients|IX_clients_Status|CREATE INDEX "IX_clients_Status" ON public.clients USING btree ("Status")
+I|clients|PK_clients|CREATE UNIQUE INDEX "PK_clients" ON public.clients USING btree ("Id")
+I|courses|IX_courses_NameAr|CREATE UNIQUE INDEX "IX_courses_NameAr" ON public.courses USING btree ("NameAr")
+I|courses|PK_courses|CREATE UNIQUE INDEX "PK_courses" ON public.courses USING btree ("Id")
+I|decisions|IX_decisions_MadeById|CREATE INDEX "IX_decisions_MadeById" ON public.decisions USING btree ("MadeById")
+I|decisions|IX_decisions_RelatedEscalationId|CREATE INDEX "IX_decisions_RelatedEscalationId" ON public.decisions USING btree ("RelatedEscalationId")
+I|decisions|IX_decisions_RelatedRiskId|CREATE INDEX "IX_decisions_RelatedRiskId" ON public.decisions USING btree ("RelatedRiskId")
+I|decisions|IX_decisions_RelatedSubmissionId|CREATE INDEX "IX_decisions_RelatedSubmissionId" ON public.decisions USING btree ("RelatedSubmissionId")
+I|decisions|PK_decisions|CREATE UNIQUE INDEX "PK_decisions" ON public.decisions USING btree ("Id")
+I|departments|IX_departments_Code|CREATE UNIQUE INDEX "IX_departments_Code" ON public.departments USING btree ("Code") WHERE ("Code" IS NOT NULL)
+I|departments|PK_departments|CREATE UNIQUE INDEX "PK_departments" ON public.departments USING btree ("Id")
+I|email_notifications|IX_email_notifications_CorrelationKey|CREATE UNIQUE INDEX "IX_email_notifications_CorrelationKey" ON public.email_notifications USING btree ("CorrelationKey")
+I|email_notifications|IX_email_notifications_CreatedAtUtc|CREATE INDEX "IX_email_notifications_CreatedAtUtc" ON public.email_notifications USING btree ("CreatedAtUtc")
+I|email_notifications|IX_email_notifications_EntityType_EntityId|CREATE INDEX "IX_email_notifications_EntityType_EntityId" ON public.email_notifications USING btree ("EntityType", "EntityId")
+I|email_notifications|IX_email_notifications_EventType|CREATE INDEX "IX_email_notifications_EventType" ON public.email_notifications USING btree ("EventType")
+I|email_notifications|IX_email_notifications_RecipientUserId|CREATE INDEX "IX_email_notifications_RecipientUserId" ON public.email_notifications USING btree ("RecipientUserId")
+I|email_notifications|IX_email_notifications_Status|CREATE INDEX "IX_email_notifications_Status" ON public.email_notifications USING btree ("Status")
+I|email_notifications|PK_email_notifications|CREATE UNIQUE INDEX "PK_email_notifications" ON public.email_notifications USING btree ("Id")
+I|email_outbox|IX_email_outbox_RecipientId|CREATE INDEX "IX_email_outbox_RecipientId" ON public.email_outbox USING btree ("RecipientId")
+I|email_outbox|IX_email_outbox_Status_NextAttemptUtc|CREATE INDEX "IX_email_outbox_Status_NextAttemptUtc" ON public.email_outbox USING btree ("Status", "NextAttemptUtc")
+I|email_outbox|PK_email_outbox|CREATE UNIQUE INDEX "PK_email_outbox" ON public.email_outbox USING btree ("Id")
+I|email_rules|IX_email_rules_TemplateKey_EventType|CREATE UNIQUE INDEX "IX_email_rules_TemplateKey_EventType" ON public.email_rules USING btree ("TemplateKey", "EventType")
+I|email_rules|PK_email_rules|CREATE UNIQUE INDEX "PK_email_rules" ON public.email_rules USING btree ("Id")
+I|email_templates|IX_email_templates_Category|CREATE INDEX "IX_email_templates_Category" ON public.email_templates USING btree ("Category")
+I|email_templates|IX_email_templates_Key|CREATE UNIQUE INDEX "IX_email_templates_Key" ON public.email_templates USING btree ("Key")
+I|email_templates|PK_email_templates|CREATE UNIQUE INDEX "PK_email_templates" ON public.email_templates USING btree ("Id")
+I|employee_balance_ledger|IX_employee_balance_ledger_EmployeeId_BalanceType_Year|CREATE INDEX "IX_employee_balance_ledger_EmployeeId_BalanceType_Year" ON public.employee_balance_ledger USING btree ("EmployeeId", "BalanceType", "Year")
+I|employee_balance_ledger|IX_employee_balance_ledger_RelatedRequestId_Source|CREATE UNIQUE INDEX "IX_employee_balance_ledger_RelatedRequestId_Source" ON public.employee_balance_ledger USING btree ("RelatedRequestId", "Source") WHERE ("RelatedRequestId" IS NOT NULL)
+I|employee_balance_ledger|PK_employee_balance_ledger|CREATE UNIQUE INDEX "PK_employee_balance_ledger" ON public.employee_balance_ledger USING btree ("Id")
+I|employee_service_request_events|IX_employee_service_request_events_EmployeeServiceRequestId|CREATE INDEX "IX_employee_service_request_events_EmployeeServiceRequestId" ON public.employee_service_request_events USING btree ("EmployeeServiceRequestId")
+I|employee_service_request_events|PK_employee_service_request_events|CREATE UNIQUE INDEX "PK_employee_service_request_events" ON public.employee_service_request_events USING btree ("Id")
+I|employee_service_requests|IX_employee_service_requests_RequesterUserId|CREATE INDEX "IX_employee_service_requests_RequesterUserId" ON public.employee_service_requests USING btree ("RequesterUserId")
+I|employee_service_requests|IX_employee_service_requests_Status|CREATE INDEX "IX_employee_service_requests_Status" ON public.employee_service_requests USING btree ("Status")
+I|employee_service_requests|PK_employee_service_requests|CREATE UNIQUE INDEX "PK_employee_service_requests" ON public.employee_service_requests USING btree ("Id")
+I|escalations|IX_escalations_KpiEvaluationId|CREATE INDEX "IX_escalations_KpiEvaluationId" ON public.escalations USING btree ("KpiEvaluationId")
+I|escalations|IX_escalations_ReportSubmissionId|CREATE INDEX "IX_escalations_ReportSubmissionId" ON public.escalations USING btree ("ReportSubmissionId")
+I|escalations|IX_escalations_RiskId|CREATE INDEX "IX_escalations_RiskId" ON public.escalations USING btree ("RiskId")
+I|escalations|IX_escalations_TargetUserId|CREATE INDEX "IX_escalations_TargetUserId" ON public.escalations USING btree ("TargetUserId")
+I|escalations|PK_escalations|CREATE UNIQUE INDEX "PK_escalations" ON public.escalations USING btree ("Id")
+I|governance_action_item_updates|IX_governance_action_item_updates_ActionItemId|CREATE INDEX "IX_governance_action_item_updates_ActionItemId" ON public.governance_action_item_updates USING btree ("ActionItemId")
+I|governance_action_item_updates|IX_governance_action_item_updates_AuthorId|CREATE INDEX "IX_governance_action_item_updates_AuthorId" ON public.governance_action_item_updates USING btree ("AuthorId")
+I|governance_action_item_updates|PK_governance_action_item_updates|CREATE UNIQUE INDEX "PK_governance_action_item_updates" ON public.governance_action_item_updates USING btree ("Id")
+I|governance_action_items|IX_governance_action_items_AssignedToUserId|CREATE INDEX "IX_governance_action_items_AssignedToUserId" ON public.governance_action_items USING btree ("AssignedToUserId")
+I|governance_action_items|IX_governance_action_items_CreatedAtUtc|CREATE INDEX "IX_governance_action_items_CreatedAtUtc" ON public.governance_action_items USING btree ("CreatedAtUtc")
+I|governance_action_items|IX_governance_action_items_CreatedByUserId|CREATE INDEX "IX_governance_action_items_CreatedByUserId" ON public.governance_action_items USING btree ("CreatedByUserId")
+I|governance_action_items|IX_governance_action_items_DueDate|CREATE INDEX "IX_governance_action_items_DueDate" ON public.governance_action_items USING btree ("DueDate")
+I|governance_action_items|IX_governance_action_items_Priority|CREATE INDEX "IX_governance_action_items_Priority" ON public.governance_action_items USING btree ("Priority")
+I|governance_action_items|IX_governance_action_items_SourceType_SourceId|CREATE INDEX "IX_governance_action_items_SourceType_SourceId" ON public.governance_action_items USING btree ("SourceType", "SourceId")
+I|governance_action_items|IX_governance_action_items_Status|CREATE INDEX "IX_governance_action_items_Status" ON public.governance_action_items USING btree ("Status")
+I|governance_action_items|PK_governance_action_items|CREATE UNIQUE INDEX "PK_governance_action_items" ON public.governance_action_items USING btree ("Id")
+I|governance_escalation_updates|IX_governance_escalation_updates_AuthorId|CREATE INDEX "IX_governance_escalation_updates_AuthorId" ON public.governance_escalation_updates USING btree ("AuthorId")
+I|governance_escalation_updates|IX_governance_escalation_updates_EscalationId|CREATE INDEX "IX_governance_escalation_updates_EscalationId" ON public.governance_escalation_updates USING btree ("EscalationId")
+I|governance_escalation_updates|PK_governance_escalation_updates|CREATE UNIQUE INDEX "PK_governance_escalation_updates" ON public.governance_escalation_updates USING btree ("Id")
+I|governance_escalations|IX_governance_escalations_AssignedToUserId|CREATE INDEX "IX_governance_escalations_AssignedToUserId" ON public.governance_escalations USING btree ("AssignedToUserId")
+I|governance_escalations|IX_governance_escalations_CreatedAtUtc|CREATE INDEX "IX_governance_escalations_CreatedAtUtc" ON public.governance_escalations USING btree ("CreatedAtUtc")
+I|governance_escalations|IX_governance_escalations_EscalationType|CREATE INDEX "IX_governance_escalations_EscalationType" ON public.governance_escalations USING btree ("EscalationType")
+I|governance_escalations|IX_governance_escalations_RaisedByUserId|CREATE INDEX "IX_governance_escalations_RaisedByUserId" ON public.governance_escalations USING btree ("RaisedByUserId")
+I|governance_escalations|IX_governance_escalations_RelatedGovernanceItemId|CREATE INDEX "IX_governance_escalations_RelatedGovernanceItemId" ON public.governance_escalations USING btree ("RelatedGovernanceItemId")
+I|governance_escalations|IX_governance_escalations_RelatedSubmissionId|CREATE INDEX "IX_governance_escalations_RelatedSubmissionId" ON public.governance_escalations USING btree ("RelatedSubmissionId")
+I|governance_escalations|IX_governance_escalations_Severity|CREATE INDEX "IX_governance_escalations_Severity" ON public.governance_escalations USING btree ("Severity")
+I|governance_escalations|IX_governance_escalations_Status|CREATE INDEX "IX_governance_escalations_Status" ON public.governance_escalations USING btree ("Status")
+I|governance_escalations|IX_governance_escalations_TargetDepartmentId|CREATE INDEX "IX_governance_escalations_TargetDepartmentId" ON public.governance_escalations USING btree ("TargetDepartmentId")
+I|governance_escalations|IX_governance_escalations_TargetTeamId|CREATE INDEX "IX_governance_escalations_TargetTeamId" ON public.governance_escalations USING btree ("TargetTeamId")
+I|governance_escalations|IX_governance_escalations_TargetUserId|CREATE INDEX "IX_governance_escalations_TargetUserId" ON public.governance_escalations USING btree ("TargetUserId")
+I|governance_escalations|PK_governance_escalations|CREATE UNIQUE INDEX "PK_governance_escalations" ON public.governance_escalations USING btree ("Id")
+I|governance_item_updates|IX_governance_item_updates_AuthorId|CREATE INDEX "IX_governance_item_updates_AuthorId" ON public.governance_item_updates USING btree ("AuthorId")
+I|governance_item_updates|IX_governance_item_updates_GovernanceItemId|CREATE INDEX "IX_governance_item_updates_GovernanceItemId" ON public.governance_item_updates USING btree ("GovernanceItemId")
+I|governance_item_updates|PK_governance_item_updates|CREATE UNIQUE INDEX "PK_governance_item_updates" ON public.governance_item_updates USING btree ("Id")
+I|governance_items|IX_governance_items_ApplicationScope|CREATE INDEX "IX_governance_items_ApplicationScope" ON public.governance_items USING btree ("ApplicationScope")
+I|governance_items|IX_governance_items_AssignedToUserId|CREATE INDEX "IX_governance_items_AssignedToUserId" ON public.governance_items USING btree ("AssignedToUserId")
+I|governance_items|IX_governance_items_Category|CREATE INDEX "IX_governance_items_Category" ON public.governance_items USING btree ("Category")
+I|governance_items|IX_governance_items_CreatedById|CREATE INDEX "IX_governance_items_CreatedById" ON public.governance_items USING btree ("CreatedById")
+I|governance_items|IX_governance_items_DepartmentId|CREATE INDEX "IX_governance_items_DepartmentId" ON public.governance_items USING btree ("DepartmentId")
+I|governance_items|IX_governance_items_RelatedSubmissionId|CREATE INDEX "IX_governance_items_RelatedSubmissionId" ON public.governance_items USING btree ("RelatedSubmissionId")
+I|governance_items|IX_governance_items_RelatedUserId|CREATE INDEX "IX_governance_items_RelatedUserId" ON public.governance_items USING btree ("RelatedUserId")
+I|governance_items|IX_governance_items_Status|CREATE INDEX "IX_governance_items_Status" ON public.governance_items USING btree ("Status")
+I|governance_items|IX_governance_items_TeamId|CREATE INDEX "IX_governance_items_TeamId" ON public.governance_items USING btree ("TeamId")
+I|governance_items|PK_governance_items|CREATE UNIQUE INDEX "PK_governance_items" ON public.governance_items USING btree ("Id")
+I|improvement_plans|IX_improvement_plans_SubjectUserId|CREATE INDEX "IX_improvement_plans_SubjectUserId" ON public.improvement_plans USING btree ("SubjectUserId")
+I|improvement_plans|PK_improvement_plans|CREATE UNIQUE INDEX "PK_improvement_plans" ON public.improvement_plans USING btree ("Id")
+I|job_roles|IX_job_roles_Code|CREATE UNIQUE INDEX "IX_job_roles_Code" ON public.job_roles USING btree ("Code") WHERE ("Code" IS NOT NULL)
+I|job_roles|PK_job_roles|CREATE UNIQUE INDEX "PK_job_roles" ON public.job_roles USING btree ("Id")
+I|kpi_evaluation_review_events|IX_kpi_evaluation_review_events_KpiEvaluationId_CreatedAtUtc|CREATE INDEX "IX_kpi_evaluation_review_events_KpiEvaluationId_CreatedAtUtc" ON public.kpi_evaluation_review_events USING btree ("KpiEvaluationId", "CreatedAtUtc")
+I|kpi_evaluation_review_events|PK_kpi_evaluation_review_events|CREATE UNIQUE INDEX "PK_kpi_evaluation_review_events" ON public.kpi_evaluation_review_events USING btree ("Id")
+I|kpi_evaluations|IX_kpi_evaluations_KpiTemplateVersionId_SubjectUserId_PeriodKey|CREATE UNIQUE INDEX "IX_kpi_evaluations_KpiTemplateVersionId_SubjectUserId_PeriodKey" ON public.kpi_evaluations USING btree ("KpiTemplateVersionId", "SubjectUserId", "PeriodKey") WHERE ("IsDeleted" = false)
+I|kpi_evaluations|IX_kpi_evaluations_SubjectUserId|CREATE INDEX "IX_kpi_evaluations_SubjectUserId" ON public.kpi_evaluations USING btree ("SubjectUserId")
+I|kpi_evaluations|PK_kpi_evaluations|CREATE UNIQUE INDEX "PK_kpi_evaluations" ON public.kpi_evaluations USING btree ("Id")
+I|kpi_metrics|IX_kpi_metrics_KpiTemplateVersionId|CREATE INDEX "IX_kpi_metrics_KpiTemplateVersionId" ON public.kpi_metrics USING btree ("KpiTemplateVersionId")
+I|kpi_metrics|PK_kpi_metrics|CREATE UNIQUE INDEX "PK_kpi_metrics" ON public.kpi_metrics USING btree ("Id")
+I|kpi_results|IX_kpi_results_KpiEvaluationId_KpiMetricId|CREATE UNIQUE INDEX "IX_kpi_results_KpiEvaluationId_KpiMetricId" ON public.kpi_results USING btree ("KpiEvaluationId", "KpiMetricId")
+I|kpi_results|PK_kpi_results|CREATE UNIQUE INDEX "PK_kpi_results" ON public.kpi_results USING btree ("Id")
+I|kpi_template_assignments|IX_kpi_template_assignments_KpiTemplateId_ScopeType_ScopeId_Ki~|CREATE UNIQUE INDEX "IX_kpi_template_assignments_KpiTemplateId_ScopeType_ScopeId_Ki~" ON public.kpi_template_assignments USING btree ("KpiTemplateId", "ScopeType", "ScopeId", "Kind")
+I|kpi_template_assignments|IX_kpi_template_assignments_KpiTemplateId|CREATE INDEX "IX_kpi_template_assignments_KpiTemplateId" ON public.kpi_template_assignments USING btree ("KpiTemplateId")
+I|kpi_template_assignments|PK_kpi_template_assignments|CREATE UNIQUE INDEX "PK_kpi_template_assignments" ON public.kpi_template_assignments USING btree ("Id")
+I|kpi_template_versions|IX_kpi_template_versions_KpiTemplateId_VersionNumber|CREATE UNIQUE INDEX "IX_kpi_template_versions_KpiTemplateId_VersionNumber" ON public.kpi_template_versions USING btree ("KpiTemplateId", "VersionNumber")
+I|kpi_template_versions|PK_kpi_template_versions|CREATE UNIQUE INDEX "PK_kpi_template_versions" ON public.kpi_template_versions USING btree ("Id")
+I|kpi_templates|IX_kpi_templates_JobRoleId|CREATE INDEX "IX_kpi_templates_JobRoleId" ON public.kpi_templates USING btree ("JobRoleId")
+I|kpi_templates|PK_kpi_templates|CREATE UNIQUE INDEX "PK_kpi_templates" ON public.kpi_templates USING btree ("Id")
+I|leave_request_events|IX_leave_request_events_LeaveRequestId|CREATE INDEX "IX_leave_request_events_LeaveRequestId" ON public.leave_request_events USING btree ("LeaveRequestId")
+I|leave_request_events|PK_leave_request_events|CREATE UNIQUE INDEX "PK_leave_request_events" ON public.leave_request_events USING btree ("Id")
+I|leave_requests|IX_leave_requests_RequesterUserId_StartDate_EndDate|CREATE INDEX "IX_leave_requests_RequesterUserId_StartDate_EndDate" ON public.leave_requests USING btree ("RequesterUserId", "StartDate", "EndDate")
+I|leave_requests|IX_leave_requests_RequesterUserId|CREATE INDEX "IX_leave_requests_RequesterUserId" ON public.leave_requests USING btree ("RequesterUserId")
+I|leave_requests|IX_leave_requests_Status|CREATE INDEX "IX_leave_requests_Status" ON public.leave_requests USING btree ("Status")
+I|leave_requests|PK_leave_requests|CREATE UNIQUE INDEX "PK_leave_requests" ON public.leave_requests USING btree ("Id")
+I|management_notes|IX_management_notes_AuthorId|CREATE INDEX "IX_management_notes_AuthorId" ON public.management_notes USING btree ("AuthorId")
+I|management_notes|IX_management_notes_EntityType_EntityId|CREATE INDEX "IX_management_notes_EntityType_EntityId" ON public.management_notes USING btree ("EntityType", "EntityId")
+I|management_notes|PK_management_notes|CREATE UNIQUE INDEX "PK_management_notes" ON public.management_notes USING btree ("Id")
+I|notifications|IX_notifications_RecipientId_CreatedAtUtc|CREATE INDEX "IX_notifications_RecipientId_CreatedAtUtc" ON public.notifications USING btree ("RecipientId", "CreatedAtUtc")
+I|notifications|IX_notifications_RecipientId_IsRead|CREATE INDEX "IX_notifications_RecipientId_IsRead" ON public.notifications USING btree ("RecipientId", "IsRead")
+I|notifications|PK_notifications|CREATE UNIQUE INDEX "PK_notifications" ON public.notifications USING btree ("Id")
+I|payroll_impact_reviews|IX_payroll_impact_reviews_LeaveRequestId|CREATE UNIQUE INDEX "IX_payroll_impact_reviews_LeaveRequestId" ON public.payroll_impact_reviews USING btree ("LeaveRequestId")
+I|payroll_impact_reviews|PK_payroll_impact_reviews|CREATE UNIQUE INDEX "PK_payroll_impact_reviews" ON public.payroll_impact_reviews USING btree ("Id")
+I|projects|IX_projects_AccountManagerId|CREATE INDEX "IX_projects_AccountManagerId" ON public.projects USING btree ("AccountManagerId")
+I|projects|IX_projects_ClientId|CREATE INDEX "IX_projects_ClientId" ON public.projects USING btree ("ClientId")
+I|projects|IX_projects_OwnerTeamId|CREATE INDEX "IX_projects_OwnerTeamId" ON public.projects USING btree ("OwnerTeamId")
+I|projects|IX_projects_Status|CREATE INDEX "IX_projects_Status" ON public.projects USING btree ("Status")
+I|projects|PK_projects|CREATE UNIQUE INDEX "PK_projects" ON public.projects USING btree ("Id")
+I|refresh_tokens|IX_refresh_tokens_Token|CREATE UNIQUE INDEX "IX_refresh_tokens_Token" ON public.refresh_tokens USING btree ("Token")
+I|refresh_tokens|IX_refresh_tokens_UserId|CREATE INDEX "IX_refresh_tokens_UserId" ON public.refresh_tokens USING btree ("UserId")
+I|refresh_tokens|PK_refresh_tokens|CREATE UNIQUE INDEX "PK_refresh_tokens" ON public.refresh_tokens USING btree ("Id")
+I|report_submissions|IX_report_submissions_ClientId|CREATE INDEX "IX_report_submissions_ClientId" ON public.report_submissions USING btree ("ClientId")
+I|report_submissions|IX_report_submissions_CurrentApproverId|CREATE INDEX "IX_report_submissions_CurrentApproverId" ON public.report_submissions USING btree ("CurrentApproverId")
+I|report_submissions|IX_report_submissions_ProjectId|CREATE INDEX "IX_report_submissions_ProjectId" ON public.report_submissions USING btree ("ProjectId")
+I|report_submissions|IX_report_submissions_ReportTemplateVersionId_SubmitterId_Peri~|CREATE UNIQUE INDEX "IX_report_submissions_ReportTemplateVersionId_SubmitterId_Peri~" ON public.report_submissions USING btree ("ReportTemplateVersionId", "SubmitterId", "PeriodKey") WHERE ("IsDeleted" = false)
+I|report_submissions|IX_report_submissions_Status|CREATE INDEX "IX_report_submissions_Status" ON public.report_submissions USING btree ("Status")
+I|report_submissions|IX_report_submissions_SubmitterId|CREATE INDEX "IX_report_submissions_SubmitterId" ON public.report_submissions USING btree ("SubmitterId")
+I|report_submissions|PK_report_submissions|CREATE UNIQUE INDEX "PK_report_submissions" ON public.report_submissions USING btree ("Id")
+I|report_template_assignments|IX_report_template_assignments_ReportTemplateId_ScopeType_Scop~|CREATE UNIQUE INDEX "IX_report_template_assignments_ReportTemplateId_ScopeType_Scop~" ON public.report_template_assignments USING btree ("ReportTemplateId", "ScopeType", "ScopeId", "Kind")
+I|report_template_assignments|IX_report_template_assignments_ReportTemplateId|CREATE INDEX "IX_report_template_assignments_ReportTemplateId" ON public.report_template_assignments USING btree ("ReportTemplateId")
+I|report_template_assignments|PK_report_template_assignments|CREATE UNIQUE INDEX "PK_report_template_assignments" ON public.report_template_assignments USING btree ("Id")
+I|report_template_versions|IX_report_template_versions_ReportTemplateId_VersionNumber|CREATE UNIQUE INDEX "IX_report_template_versions_ReportTemplateId_VersionNumber" ON public.report_template_versions USING btree ("ReportTemplateId", "VersionNumber")
+I|report_template_versions|PK_report_template_versions|CREATE UNIQUE INDEX "PK_report_template_versions" ON public.report_template_versions USING btree ("Id")
+I|report_templates|IX_report_templates_JobRoleId|CREATE INDEX "IX_report_templates_JobRoleId" ON public.report_templates USING btree ("JobRoleId")
+I|report_templates|PK_report_templates|CREATE UNIQUE INDEX "PK_report_templates" ON public.report_templates USING btree ("Id")
+I|report_view_grants|IX_report_view_grants_GranteeUserId_TargetTeamId|CREATE UNIQUE INDEX "IX_report_view_grants_GranteeUserId_TargetTeamId" ON public.report_view_grants USING btree ("GranteeUserId", "TargetTeamId") WHERE ("IsActive" AND ("ScopeKind" = 1))
+I|report_view_grants|IX_report_view_grants_GranteeUserId_TargetUserId|CREATE UNIQUE INDEX "IX_report_view_grants_GranteeUserId_TargetUserId" ON public.report_view_grants USING btree ("GranteeUserId", "TargetUserId") WHERE ("IsActive" AND ("ScopeKind" = 0))
+I|report_view_grants|IX_report_view_grants_GranteeUserId|CREATE INDEX "IX_report_view_grants_GranteeUserId" ON public.report_view_grants USING btree ("GranteeUserId")
+I|report_view_grants|IX_report_view_grants_IsActive|CREATE INDEX "IX_report_view_grants_IsActive" ON public.report_view_grants USING btree ("IsActive")
+I|report_view_grants|IX_report_view_grants_TargetTeamId|CREATE INDEX "IX_report_view_grants_TargetTeamId" ON public.report_view_grants USING btree ("TargetTeamId")
+I|report_view_grants|IX_report_view_grants_TargetUserId|CREATE INDEX "IX_report_view_grants_TargetUserId" ON public.report_view_grants USING btree ("TargetUserId")
+I|report_view_grants|PK_report_view_grants|CREATE UNIQUE INDEX "PK_report_view_grants" ON public.report_view_grants USING btree ("Id")
+I|risks|IX_risks_ClientId|CREATE INDEX "IX_risks_ClientId" ON public.risks USING btree ("ClientId")
+I|risks|IX_risks_DepartmentId|CREATE INDEX "IX_risks_DepartmentId" ON public.risks USING btree ("DepartmentId")
+I|risks|IX_risks_ProjectId|CREATE INDEX "IX_risks_ProjectId" ON public.risks USING btree ("ProjectId")
+I|risks|IX_risks_RelatedKpiEvaluationId|CREATE INDEX "IX_risks_RelatedKpiEvaluationId" ON public.risks USING btree ("RelatedKpiEvaluationId")
+I|risks|IX_risks_RelatedSubmissionId|CREATE INDEX "IX_risks_RelatedSubmissionId" ON public.risks USING btree ("RelatedSubmissionId")
+I|risks|IX_risks_Status|CREATE INDEX "IX_risks_Status" ON public.risks USING btree ("Status")
+I|risks|IX_risks_SubjectUserId|CREATE INDEX "IX_risks_SubjectUserId" ON public.risks USING btree ("SubjectUserId")
+I|risks|PK_risks|CREATE UNIQUE INDEX "PK_risks" ON public.risks USING btree ("Id")
+I|services|IX_services_NameAr|CREATE UNIQUE INDEX "IX_services_NameAr" ON public.services USING btree ("NameAr")
+I|services|PK_services|CREATE UNIQUE INDEX "PK_services" ON public.services USING btree ("Id")
+I|submission_field_values|IX_submission_field_values_ReportSubmissionId_TemplateFieldId|CREATE UNIQUE INDEX "IX_submission_field_values_ReportSubmissionId_TemplateFieldId" ON public.submission_field_values USING btree ("ReportSubmissionId", "TemplateFieldId")
+I|submission_field_values|PK_submission_field_values|CREATE UNIQUE INDEX "PK_submission_field_values" ON public.submission_field_values USING btree ("Id")
+I|teams|IX_teams_DepartmentId|CREATE INDEX "IX_teams_DepartmentId" ON public.teams USING btree ("DepartmentId")
+I|teams|PK_teams|CREATE UNIQUE INDEX "PK_teams" ON public.teams USING btree ("Id")
+I|template_fields|IX_template_fields_ReportTemplateVersionId|CREATE INDEX "IX_template_fields_ReportTemplateVersionId" ON public.template_fields USING btree ("ReportTemplateVersionId")
+I|template_fields|PK_template_fields|CREATE UNIQUE INDEX "PK_template_fields" ON public.template_fields USING btree ("Id")
+I|training_needs|IX_training_needs_SubjectUserId|CREATE INDEX "IX_training_needs_SubjectUserId" ON public.training_needs USING btree ("SubjectUserId")
+I|training_needs|PK_training_needs|CREATE UNIQUE INDEX "PK_training_needs" ON public.training_needs USING btree ("Id")
+I|user_team_memberships|IX_user_team_memberships_TeamId|CREATE INDEX "IX_user_team_memberships_TeamId" ON public.user_team_memberships USING btree ("TeamId")
+I|user_team_memberships|IX_user_team_memberships_UserId_TeamId|CREATE UNIQUE INDEX "IX_user_team_memberships_UserId_TeamId" ON public.user_team_memberships USING btree ("UserId", "TeamId")
+I|user_team_memberships|IX_user_team_memberships_UserId|CREATE INDEX "IX_user_team_memberships_UserId" ON public.user_team_memberships USING btree ("UserId")
+I|user_team_memberships|PK_user_team_memberships|CREATE UNIQUE INDEX "PK_user_team_memberships" ON public.user_team_memberships USING btree ("Id")
+K|AspNetRoleClaims|FK_AspNetRoleClaims_AspNetRoles_RoleId|FOREIGN KEY ("RoleId") REFERENCES "AspNetRoles"("Id") ON DELETE CASCADE
+K|AspNetRoleClaims|PK_AspNetRoleClaims|PRIMARY KEY ("Id")
+K|AspNetRoles|PK_AspNetRoles|PRIMARY KEY ("Id")
+K|AspNetUserClaims|FK_AspNetUserClaims_AspNetUsers_UserId|FOREIGN KEY ("UserId") REFERENCES "AspNetUsers"("Id") ON DELETE CASCADE
+K|AspNetUserClaims|PK_AspNetUserClaims|PRIMARY KEY ("Id")
+K|AspNetUserLogins|FK_AspNetUserLogins_AspNetUsers_UserId|FOREIGN KEY ("UserId") REFERENCES "AspNetUsers"("Id") ON DELETE CASCADE
+K|AspNetUserLogins|PK_AspNetUserLogins|PRIMARY KEY ("LoginProvider", "ProviderKey")
+K|AspNetUserRoles|FK_AspNetUserRoles_AspNetRoles_RoleId|FOREIGN KEY ("RoleId") REFERENCES "AspNetRoles"("Id") ON DELETE CASCADE
+K|AspNetUserRoles|FK_AspNetUserRoles_AspNetUsers_UserId|FOREIGN KEY ("UserId") REFERENCES "AspNetUsers"("Id") ON DELETE CASCADE
+K|AspNetUserRoles|PK_AspNetUserRoles|PRIMARY KEY ("UserId", "RoleId")
+K|AspNetUserTokens|FK_AspNetUserTokens_AspNetUsers_UserId|FOREIGN KEY ("UserId") REFERENCES "AspNetUsers"("Id") ON DELETE CASCADE
+K|AspNetUserTokens|PK_AspNetUserTokens|PRIMARY KEY ("UserId", "LoginProvider", "Name")
+K|AspNetUsers|FK_AspNetUsers_AspNetUsers_KpiReviewerOverrideUserId|FOREIGN KEY ("KpiReviewerOverrideUserId") REFERENCES "AspNetUsers"("Id") ON DELETE RESTRICT
+K|AspNetUsers|FK_AspNetUsers_AspNetUsers_ReportApproverOverrideUserId|FOREIGN KEY ("ReportApproverOverrideUserId") REFERENCES "AspNetUsers"("Id") ON DELETE RESTRICT
+K|AspNetUsers|PK_AspNetUsers|PRIMARY KEY ("Id")
+K|approval_steps|FK_approval_steps_report_submissions_ReportSubmissionId|FOREIGN KEY ("ReportSubmissionId") REFERENCES report_submissions("Id") ON DELETE CASCADE
+K|approval_steps|PK_approval_steps|PRIMARY KEY ("Id")
+K|audit_logs|PK_audit_logs|PRIMARY KEY ("Id")
+K|balance_policies|PK_balance_policies|PRIMARY KEY ("Id")
+K|clients|PK_clients|PRIMARY KEY ("Id")
+K|courses|PK_courses|PRIMARY KEY ("Id")
+K|decisions|PK_decisions|PRIMARY KEY ("Id")
+K|departments|PK_departments|PRIMARY KEY ("Id")
+K|email_notifications|PK_email_notifications|PRIMARY KEY ("Id")
+K|email_outbox|PK_email_outbox|PRIMARY KEY ("Id")
+K|email_rules|PK_email_rules|PRIMARY KEY ("Id")
+K|email_templates|PK_email_templates|PRIMARY KEY ("Id")
+K|employee_balance_ledger|PK_employee_balance_ledger|PRIMARY KEY ("Id")
+K|employee_service_request_events|PK_employee_service_request_events|PRIMARY KEY ("Id")
+K|employee_service_requests|PK_employee_service_requests|PRIMARY KEY ("Id")
+K|escalations|PK_escalations|PRIMARY KEY ("Id")
+K|governance_action_item_updates|FK_governance_action_item_updates_governance_action_items_Acti~|FOREIGN KEY ("ActionItemId") REFERENCES governance_action_items("Id") ON DELETE CASCADE
+K|governance_action_item_updates|PK_governance_action_item_updates|PRIMARY KEY ("Id")
+K|governance_action_items|PK_governance_action_items|PRIMARY KEY ("Id")
+K|governance_escalation_updates|FK_governance_escalation_updates_governance_escalations_Escala~|FOREIGN KEY ("EscalationId") REFERENCES governance_escalations("Id") ON DELETE CASCADE
+K|governance_escalation_updates|PK_governance_escalation_updates|PRIMARY KEY ("Id")
+K|governance_escalations|PK_governance_escalations|PRIMARY KEY ("Id")
+K|governance_item_updates|FK_governance_item_updates_governance_items_GovernanceItemId|FOREIGN KEY ("GovernanceItemId") REFERENCES governance_items("Id") ON DELETE CASCADE
+K|governance_item_updates|PK_governance_item_updates|PRIMARY KEY ("Id")
+K|governance_items|PK_governance_items|PRIMARY KEY ("Id")
+K|improvement_plans|PK_improvement_plans|PRIMARY KEY ("Id")
+K|job_roles|PK_job_roles|PRIMARY KEY ("Id")
+K|kpi_evaluation_review_events|FK_kpi_evaluation_review_events_kpi_evaluations_KpiEvaluationId|FOREIGN KEY ("KpiEvaluationId") REFERENCES kpi_evaluations("Id") ON DELETE RESTRICT
+K|kpi_evaluation_review_events|PK_kpi_evaluation_review_events|PRIMARY KEY ("Id")
+K|kpi_evaluations|PK_kpi_evaluations|PRIMARY KEY ("Id")
+K|kpi_metrics|FK_kpi_metrics_kpi_template_versions_KpiTemplateVersionId|FOREIGN KEY ("KpiTemplateVersionId") REFERENCES kpi_template_versions("Id") ON DELETE CASCADE
+K|kpi_metrics|PK_kpi_metrics|PRIMARY KEY ("Id")
+K|kpi_results|FK_kpi_results_kpi_evaluations_KpiEvaluationId|FOREIGN KEY ("KpiEvaluationId") REFERENCES kpi_evaluations("Id") ON DELETE CASCADE
+K|kpi_results|PK_kpi_results|PRIMARY KEY ("Id")
+K|kpi_template_assignments|FK_kpi_template_assignments_kpi_templates_KpiTemplateId|FOREIGN KEY ("KpiTemplateId") REFERENCES kpi_templates("Id") ON DELETE CASCADE
+K|kpi_template_assignments|PK_kpi_template_assignments|PRIMARY KEY ("Id")
+K|kpi_template_versions|FK_kpi_template_versions_kpi_templates_KpiTemplateId|FOREIGN KEY ("KpiTemplateId") REFERENCES kpi_templates("Id") ON DELETE CASCADE
+K|kpi_template_versions|PK_kpi_template_versions|PRIMARY KEY ("Id")
+K|kpi_templates|PK_kpi_templates|PRIMARY KEY ("Id")
+K|leave_request_events|PK_leave_request_events|PRIMARY KEY ("Id")
+K|leave_requests|PK_leave_requests|PRIMARY KEY ("Id")
+K|management_notes|PK_management_notes|PRIMARY KEY ("Id")
+K|notifications|PK_notifications|PRIMARY KEY ("Id")
+K|payroll_impact_reviews|FK_payroll_impact_reviews_leave_requests_LeaveRequestId|FOREIGN KEY ("LeaveRequestId") REFERENCES leave_requests("Id") ON DELETE RESTRICT
+K|payroll_impact_reviews|PK_payroll_impact_reviews|PRIMARY KEY ("Id")
+K|projects|FK_projects_clients_ClientId|FOREIGN KEY ("ClientId") REFERENCES clients("Id") ON DELETE RESTRICT
+K|projects|PK_projects|PRIMARY KEY ("Id")
+K|refresh_tokens|PK_refresh_tokens|PRIMARY KEY ("Id")
+K|report_submissions|PK_report_submissions|PRIMARY KEY ("Id")
+K|report_template_assignments|FK_report_template_assignments_report_templates_ReportTemplate~|FOREIGN KEY ("ReportTemplateId") REFERENCES report_templates("Id") ON DELETE CASCADE
+K|report_template_assignments|PK_report_template_assignments|PRIMARY KEY ("Id")
+K|report_template_versions|FK_report_template_versions_report_templates_ReportTemplateId|FOREIGN KEY ("ReportTemplateId") REFERENCES report_templates("Id") ON DELETE CASCADE
+K|report_template_versions|PK_report_template_versions|PRIMARY KEY ("Id")
+K|report_templates|PK_report_templates|PRIMARY KEY ("Id")
+K|report_view_grants|PK_report_view_grants|PRIMARY KEY ("Id")
+K|risks|PK_risks|PRIMARY KEY ("Id")
+K|services|PK_services|PRIMARY KEY ("Id")
+K|submission_field_values|FK_submission_field_values_report_submissions_ReportSubmission~|FOREIGN KEY ("ReportSubmissionId") REFERENCES report_submissions("Id") ON DELETE CASCADE
+K|submission_field_values|PK_submission_field_values|PRIMARY KEY ("Id")
+K|teams|FK_teams_departments_DepartmentId|FOREIGN KEY ("DepartmentId") REFERENCES departments("Id") ON DELETE RESTRICT
+K|teams|PK_teams|PRIMARY KEY ("Id")
+K|template_fields|FK_template_fields_report_template_versions_ReportTemplateVers~|FOREIGN KEY ("ReportTemplateVersionId") REFERENCES report_template_versions("Id") ON DELETE CASCADE
+K|template_fields|PK_template_fields|PRIMARY KEY ("Id")
+K|training_needs|PK_training_needs|PRIMARY KEY ("Id")
+K|user_team_memberships|FK_user_team_memberships_AspNetUsers_UserId|FOREIGN KEY ("UserId") REFERENCES "AspNetUsers"("Id") ON DELETE CASCADE
+K|user_team_memberships|FK_user_team_memberships_teams_TeamId|FOREIGN KEY ("TeamId") REFERENCES teams("Id") ON DELETE RESTRICT
+K|user_team_memberships|PK_user_team_memberships|PRIMARY KEY ("Id")
