@@ -24,6 +24,29 @@ public class ProjectService : IProjectService
         _audit = audit;
     }
 
+    // ======================================================================
+    // عقد الرفض الموحّد (P360-WF-R2 · GAP-24 · مكافحة التعداد — FINDING-W6-04)
+    // ======================================================================
+
+    /// <summary>
+    /// **الرسالة العامّة الوحيدة** لحالتَي «غير موجود» و«موجود خارج النطاق». ثابت واحد كي لا
+    /// ينحرف نصّ إحداهما عن الأخرى بتعديل لاحق فيعود التمييز من حيث لا يُقصَد.
+    /// </summary>
+    internal const string ProjectNotFoundMessage = "المشروع غير موجود.";
+    internal const string ProjectNotFoundCode = "project.not_found";
+
+    /// <summary>
+    /// **الرفض المميَّز الوحيد المسموح (403)**: من يرى المشروع فعلًا ولا يملك القدرة المطلوبة عليه.
+    /// لا يكشف وجود شيء لا يعرفه المستخدم أصلًا، فلا يخدم التعداد.
+    /// </summary>
+    private const string StructuralForbiddenMessage = "لا تملك صلاحية التعديل البنيويّ على هذا المشروع.";
+
+    /// <summary>
+    /// حارس القدرة البنيويّة داخل الخدمة — **لا يُعتمد على سمة المتحكّم وحدها** (دفاع بالعمق).
+    /// قائد الفريق ومدير الحساب لا يملكانها بالدور؛ صلاحيّتهما تشغيليّة بالمورد.
+    /// </summary>
+    private bool HasStructuralCapability() => _currentUser.IsInAnyRole(Roles.ProjectStructuralManagers);
+
     public async Task<Result<IReadOnlyList<ProjectDto>>> ListAsync(ProjectFilter filter, CancellationToken ct = default)
     {
         if (_currentUser.UserId is null) return Result<IReadOnlyList<ProjectDto>>.Failure("غير مصرّح.", "auth.unauthenticated");
@@ -52,11 +75,13 @@ public class ProjectService : IProjectService
     public async Task<Result<ProjectDto>> GetAsync(Guid id, CancellationToken ct = default)
     {
         if (_currentUser.UserId is null) return Result<ProjectDto>.Failure("غير مصرّح.", "auth.unauthenticated");
-        var p = await _db.Projects.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
-        if (p is null) return Result<ProjectDto>.Failure("المشروع غير موجود.", "project.not_found");
-
+        // الترتيب مقصود: الرؤية أوّلًا ثمّ الوجود — فحالتا «غير موجود» و«خارج النطاق» تعودان
+        // بعقد واحد لا يُميَّز (نفس الرمز والرسالة) منعًا لتعداد معرّفات المشاريع.
         var vis = await _access.ResolveAsync(ct);
-        if (!vis.CanViewProject(id)) return Result<ProjectDto>.Failure("هذا المشروع خارج نطاق صلاحيتك.", "auth.forbidden");
+        if (!vis.CanViewProject(id)) return Result<ProjectDto>.Failure(ProjectNotFoundMessage, ProjectNotFoundCode);
+
+        var p = await _db.Projects.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (p is null) return Result<ProjectDto>.Failure(ProjectNotFoundMessage, ProjectNotFoundCode);
 
         return Result<ProjectDto>.Success((await MapManyAsync(new[] { p }, ct))[0]);
     }
@@ -85,11 +110,22 @@ public class ProjectService : IProjectService
             EndDate = request.EndDate,
             OwnerTeamId = request.OwnerTeamId,
             AccountManagerId = request.AccountManagerId,
-            Notes = request.Notes
+            Notes = request.Notes,
+            ProjectOwnerId = request.ProjectOwnerId,
+            TeamLeaderId = request.TeamLeaderId
         };
+
+        // GAP-01: أوّل مسار كتابة على الإطلاق لهذين الحقلين. كانا يُقرآن في التخويل والعرض
+        // ولا يُكتبان في أيّ مكان ⟹ صفر مشروع في الإنتاج يحمل أيّهما، فبقيت الصلاحيّة التشغيليّة
+        // بالمورد **نظريّة**، ولجأ المستخدمون إلى `AccountManagerId` كالتفاف يوسّع الصلاحيّات.
+        var roleError = await ValidateAssignedRolesAsync(request.ProjectOwnerId, request.TeamLeaderId, ct);
+        if (roleError is not null) return Result<ProjectDto>.Failure(roleError.Value.Message, roleError.Value.Code);
+
         _db.Projects.Add(project);
         await _db.SaveChangesAsync(ct);
         await _audit.LogAsync(uid, "project.created", nameof(Project), project.Id, ct: ct);
+        if (project.ProjectOwnerId is not null || project.TeamLeaderId is not null)
+            await _audit.LogAsync(uid, "project.roles_assigned", nameof(Project), project.Id, ct: ct);
 
         return Result<ProjectDto>.Success((await MapManyAsync(new[] { project }, ct))[0]);
     }
@@ -99,23 +135,40 @@ public class ProjectService : IProjectService
         if (_currentUser.UserId is not Guid uid) return Result<ProjectDto>.Failure("غير مصرّح.", "auth.unauthenticated");
         if (string.IsNullOrWhiteSpace(request.Name)) return Result<ProjectDto>.Failure("اسم المشروع مطلوب.", "project.name_required");
 
-        var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == id, ct);
-        if (project is null) return Result<ProjectDto>.Failure("المشروع غير موجود.", "project.not_found");
-
         var vis = await _access.ResolveAsync(ct);
-        if (!vis.CanViewProject(id)) return Result<ProjectDto>.Failure("هذا المشروع خارج نطاق صلاحيتك.", "auth.forbidden");
+        if (!vis.CanViewProject(id)) return Result<ProjectDto>.Failure(ProjectNotFoundMessage, ProjectNotFoundCode);
+
+        var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == id, ct);
+        if (project is null) return Result<ProjectDto>.Failure(ProjectNotFoundMessage, ProjectNotFoundCode);
+
+        // القدرة البنيويّة: الإدارة (Admin/CEO/GM/Manager) أو مالك المشروع المسنَد. قائد الفريق
+        // يراه ويحدّثه تشغيليًّا ولا يعدّل بنيته — هذا هو إصلاح انقلاب الصلاحيّات (GAP-06).
+        if (!HasStructuralCapability() && project.ProjectOwnerId != uid)
+            return Result<ProjectDto>.Failure(StructuralForbiddenMessage, "auth.forbidden");
 
         project.Name = request.Name.Trim();
         project.ServiceType = request.ServiceType;
         project.Status = request.Status;
         project.StartDate = request.StartDate;
         project.EndDate = request.EndDate;
+        var roleError = await ValidateAssignedRolesAsync(request.ProjectOwnerId, request.TeamLeaderId, ct);
+        if (roleError is not null) return Result<ProjectDto>.Failure(roleError.Value.Message, roleError.Value.Code);
+
+        // تغيير الإسناد يُرصَد **قبل** الكتابة: إسناد دور تشغيليّ يمنح صلاحيّة كتابة على المشروع،
+        // فيجب أن يترك أثرًا مستقلًّا في السجلّ لا أن يذوب داخل «project.updated».
+        var rolesChanged = project.ProjectOwnerId != request.ProjectOwnerId
+                        || project.TeamLeaderId != request.TeamLeaderId;
+
         project.OwnerTeamId = request.OwnerTeamId;
         project.AccountManagerId = request.AccountManagerId;
         project.Notes = request.Notes;
+        project.ProjectOwnerId = request.ProjectOwnerId;
+        project.TeamLeaderId = request.TeamLeaderId;
         project.UpdatedAtUtc = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct);
         await _audit.LogAsync(uid, "project.updated", nameof(Project), project.Id, ct: ct);
+        if (rolesChanged)
+            await _audit.LogAsync(uid, "project.roles_assigned", nameof(Project), project.Id, ct: ct);
 
         return Result<ProjectDto>.Success((await MapManyAsync(new[] { project }, ct))[0]);
     }
@@ -123,11 +176,14 @@ public class ProjectService : IProjectService
     public async Task<Result<ProjectDto>> ArchiveAsync(Guid id, CancellationToken ct = default)
     {
         if (_currentUser.UserId is not Guid uid) return Result<ProjectDto>.Failure("غير مصرّح.", "auth.unauthenticated");
-        var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == id, ct);
-        if (project is null) return Result<ProjectDto>.Failure("المشروع غير موجود.", "project.not_found");
-
         var vis = await _access.ResolveAsync(ct);
-        if (!vis.CanViewProject(id)) return Result<ProjectDto>.Failure("هذا المشروع خارج نطاق صلاحيتك.", "auth.forbidden");
+        if (!vis.CanViewProject(id)) return Result<ProjectDto>.Failure(ProjectNotFoundMessage, ProjectNotFoundCode);
+
+        var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == id, ct);
+        if (project is null) return Result<ProjectDto>.Failure(ProjectNotFoundMessage, ProjectNotFoundCode);
+
+        if (!HasStructuralCapability() && project.ProjectOwnerId != uid)
+            return Result<ProjectDto>.Failure("لا تملك صلاحية أرشفة هذا المشروع.", "auth.forbidden");
 
         project.Status = ProjectStatus.Closed;
         project.UpdatedAtUtc = DateTime.UtcNow;
@@ -140,11 +196,14 @@ public class ProjectService : IProjectService
     public async Task<Result<ProjectDto>> ReactivateAsync(Guid id, CancellationToken ct = default)
     {
         if (_currentUser.UserId is not Guid uid) return Result<ProjectDto>.Failure("غير مصرّح.", "auth.unauthenticated");
-        var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == id, ct);
-        if (project is null) return Result<ProjectDto>.Failure("المشروع غير موجود.", "project.not_found");
-
         var vis = await _access.ResolveAsync(ct);
-        if (!vis.CanViewProject(id)) return Result<ProjectDto>.Failure("هذا المشروع خارج نطاق صلاحيتك.", "auth.forbidden");
+        if (!vis.CanViewProject(id)) return Result<ProjectDto>.Failure(ProjectNotFoundMessage, ProjectNotFoundCode);
+
+        var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == id, ct);
+        if (project is null) return Result<ProjectDto>.Failure(ProjectNotFoundMessage, ProjectNotFoundCode);
+
+        if (!HasStructuralCapability() && project.ProjectOwnerId != uid)
+            return Result<ProjectDto>.Failure("لا تملك صلاحية إعادة تفعيل هذا المشروع.", "auth.forbidden");
 
         if (project.Status != ProjectStatus.Closed)
             return Result<ProjectDto>.Failure("المشروع غير مؤرشف.", "project.not_archived.conflict");
@@ -165,11 +224,15 @@ public class ProjectService : IProjectService
     public async Task<Result> DeleteAsync(Guid id, CancellationToken ct = default)
     {
         if (_currentUser.UserId is not Guid uid) return Result.Failure("غير مصرّح.", "auth.unauthenticated");
-        var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == id, ct);
-        if (project is null) return Result.Failure("المشروع غير موجود.", "project.not_found");
-
         var vis = await _access.ResolveAsync(ct);
-        if (!vis.CanViewProject(id)) return Result.Failure("هذا المشروع خارج نطاق صلاحيتك.", "auth.forbidden");
+        if (!vis.CanViewProject(id)) return Result.Failure(ProjectNotFoundMessage, ProjectNotFoundCode);
+
+        var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == id, ct);
+        if (project is null) return Result.Failure(ProjectNotFoundMessage, ProjectNotFoundCode);
+
+        // الحذف النهائيّ **للإدارة حصرًا** — بلا استثناء لمالك المشروع (أضيق الخيارات، صفر توسّع).
+        if (!HasStructuralCapability())
+            return Result.Failure("لا تملك صلاحية حذف هذا المشروع.", "auth.forbidden");
 
         var reason = await DeleteBlockReasonAsync(project.Id, ct);
         if (reason is not null)
@@ -184,11 +247,11 @@ public class ProjectService : IProjectService
     public async Task<Result<IReadOnlyList<LinkedReportRow>>> GetReportsAsync(Guid id, CancellationToken ct = default)
     {
         if (_currentUser.UserId is null) return Result<IReadOnlyList<LinkedReportRow>>.Failure("غير مصرّح.", "auth.unauthenticated");
-        var exists = await _db.Projects.AnyAsync(p => p.Id == id, ct);
-        if (!exists) return Result<IReadOnlyList<LinkedReportRow>>.Failure("المشروع غير موجود.", "project.not_found");
-
         var vis = await _access.ResolveAsync(ct);
-        if (!vis.CanViewProject(id)) return Result<IReadOnlyList<LinkedReportRow>>.Failure("هذا المشروع خارج نطاق صلاحيتك.", "auth.forbidden");
+        if (!vis.CanViewProject(id)) return Result<IReadOnlyList<LinkedReportRow>>.Failure(ProjectNotFoundMessage, ProjectNotFoundCode);
+
+        var exists = await _db.Projects.AnyAsync(p => p.Id == id, ct);
+        if (!exists) return Result<IReadOnlyList<LinkedReportRow>>.Failure(ProjectNotFoundMessage, ProjectNotFoundCode);
 
         var rows = await LinkedReportsAsync(s => s.ProjectId == id, ct);
         return Result<IReadOnlyList<LinkedReportRow>>.Success(rows);
@@ -197,11 +260,11 @@ public class ProjectService : IProjectService
     public async Task<Result<ProjectSummaryDto>> GetSummaryAsync(Guid id, CancellationToken ct = default)
     {
         if (_currentUser.UserId is null) return Result<ProjectSummaryDto>.Failure("غير مصرّح.", "auth.unauthenticated");
-        var project = await _db.Projects.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id, ct);
-        if (project is null) return Result<ProjectSummaryDto>.Failure("المشروع غير موجود.", "project.not_found");
-
         var vis = await _access.ResolveAsync(ct);
-        if (!vis.CanViewProject(id)) return Result<ProjectSummaryDto>.Failure("هذا المشروع خارج نطاق صلاحيتك.", "auth.forbidden");
+        if (!vis.CanViewProject(id)) return Result<ProjectSummaryDto>.Failure(ProjectNotFoundMessage, ProjectNotFoundCode);
+
+        var project = await _db.Projects.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id, ct);
+        if (project is null) return Result<ProjectSummaryDto>.Failure(ProjectNotFoundMessage, ProjectNotFoundCode);
 
         var subs = await _db.ReportSubmissions.AsNoTracking().Where(s => s.ProjectId == id).ToListAsync(ct);
         var total = subs.Count;
@@ -219,6 +282,33 @@ public class ProjectService : IProjectService
     }
 
     // ===== helpers =====
+
+    /// <summary>
+    /// المُسنَد إليه يجب أن يكون **مستخدمًا قائمًا ونشطًا**. مرجع ميت أو موظّف مغادر يعني
+    /// مشروعًا بلا مسؤول فعليّ مع بقاء الواجهة تعرض اسمًا — وهو أسوأ من غياب الإسناد.
+    /// المراجع تبقى <c>Guid?</c> بلا مفتاح أجنبيّ صلب (نفس نمط <c>AccountManagerId</c>)،
+    /// فالحارس هنا هو الضمانة الوحيدة.
+    /// </summary>
+    private async Task<(string Message, string Code)?> ValidateAssignedRolesAsync(Guid? projectOwnerId, Guid? teamLeaderId, CancellationToken ct)
+    {
+        var ids = new List<Guid>(2);
+        if (projectOwnerId is Guid po) ids.Add(po);
+        if (teamLeaderId is Guid tl) ids.Add(tl);
+        if (ids.Count == 0) return null;
+
+        var activeIds = await _db.Users.AsNoTracking()
+            .Where(u => ids.Contains(u.Id) && u.IsActive)
+            .Select(u => u.Id)
+            .ToListAsync(ct);
+
+        if (projectOwnerId is Guid p && !activeIds.Contains(p))
+            return ("مالك المشروع المحدَّد غير موجود أو غير نشط.", "project.owner_invalid");
+        if (teamLeaderId is Guid t && !activeIds.Contains(t))
+            return ("قائد الفريق المحدَّد غير موجود أو غير نشط.", "project.team_leader_invalid");
+
+        return null;
+    }
+
     private async Task<bool> CanOwnAsync(ClientProjectVisibility vis, Guid? amId, Guid? ownerTeamId, Guid clientId, Guid uid, CancellationToken ct)
     {
         if (vis.CanViewClient(clientId)) return true;
@@ -248,8 +338,16 @@ public class ProjectService : IProjectService
         var teamIds = projects.Where(p => p.OwnerTeamId != null).Select(p => p.OwnerTeamId!.Value).Distinct().ToList();
         var teamNames = teamIds.Count == 0 ? new Dictionary<Guid, string>()
             : await _db.Teams.Where(t => teamIds.Contains(t.Id)).ToDictionaryAsync(t => t.Id, t => t.NameAr, ct);
-        var amIds = projects.Where(p => p.AccountManagerId != null).Select(p => p.AccountManagerId!.Value);
-        var amNames = await UserNamesAsync(amIds, ct);
+        // اسم واحد لكلّ الأدوار الثلاثة في استعلام واحد — لا استعلام لكلّ دور ولا N+1.
+        var personIds = projects.SelectMany(p => new[] { p.AccountManagerId, p.ProjectOwnerId, p.TeamLeaderId })
+            .Where(x => x != null).Select(x => x!.Value);
+        var personNames = await UserNamesAsync(personIds, ct);
+
+        // **خريطة القدرات** (§12 · GAP-16): الخادم يُعلن ما يسمح به فتُخفي الواجهة ما يرفضه،
+        // بدل أن يكتشفه المستخدم بعد الحفظ. مشتقّة من **نفس** حارسَي الخدمة أعلاه حرفيًّا —
+        // خريطة تُحسَب بقاعدة ثانية هي وعدٌ كاذب أخطر من غيابها.
+        var structural = HasStructuralCapability();
+        var actorId = _currentUser.UserId;
 
         // عدّادات الارتباط لاحتساب canHardDelete دفعةً واحدة.
         var directReports = ids.Count == 0 ? new Dictionary<Guid, int>()
@@ -272,11 +370,20 @@ public class ProjectService : IProjectService
             var (canHardDelete, reason) = BuildDeleteGuard(
                 directReports.GetValueOrDefault(p.Id), inSections.Contains(p.Id),
                 risksByProject.GetValueOrDefault(p.Id), notesByProject.GetValueOrDefault(p.Id));
+            var canManageStructure = structural || (actorId is Guid a1 && p.ProjectOwnerId == a1);
+            var canOperate = canManageStructure
+                || (actorId is Guid a2 && (p.TeamLeaderId == a2 || p.AccountManagerId == a2));
+
             return new ProjectDto(
                 p.Id, p.ClientId, clientNames.GetValueOrDefault(p.ClientId), p.Name, p.ServiceType, p.Status,
                 p.StartDate, p.EndDate, p.OwnerTeamId, p.OwnerTeamId is Guid tid ? teamNames.GetValueOrDefault(tid) : null,
-                p.AccountManagerId, p.AccountManagerId is Guid aid ? amNames.GetValueOrDefault(aid) : null,
-                p.Notes, p.CreatedAtUtc, p.UpdatedAtUtc, canHardDelete, reason);
+                p.AccountManagerId, p.AccountManagerId is Guid aid ? personNames.GetValueOrDefault(aid) : null,
+                p.Notes, p.CreatedAtUtc, p.UpdatedAtUtc, canHardDelete, reason,
+                p.ProjectOwnerId, p.ProjectOwnerId is Guid poid ? personNames.GetValueOrDefault(poid) : null,
+                p.TeamLeaderId, p.TeamLeaderId is Guid tlid ? personNames.GetValueOrDefault(tlid) : null,
+                p.ProgressPercent, p.ProgressMode, p.ProgressCalculatedAtUtc, p.ProgressSourceDeliverableCount,
+                p.HealthStatus, p.HealthPercent, p.HealthComputedAtUtc,
+                canManageStructure, canOperate);
         }).ToList();
     }
 

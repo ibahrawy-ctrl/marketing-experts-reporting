@@ -70,20 +70,58 @@ public class Project360Authorization : IProject360Authorization
     internal const string ProjectNotFoundMessage = "المشروع غير موجود.";
 
     /// <summary>
-    /// الكتابة البنيويّة: أدوار الإدارة حصرًا (<c>Admin/CEO/GeneralManager/Manager</c>).
+    /// الكتابة البنيويّة داخل خطّة المشروع: أدوار الإدارة (<c>Admin/CEO/GeneralManager/Manager</c>)
+    /// **أو مالك المشروع المسنَد على هذا المشروع بعينه** (P360-WF-R2 §3.2).
     /// قائد الفريق ومدير الحساب **لا** يُنشئان ولا يحذفان أهدافًا أو مؤشّرات أو مخرَجات.
+    ///
+    /// <para>
+    /// مالك المشروع يملك «الخطّة البنيويّة» لمشروعه: الاستراتيجيّة والأهداف والمؤشّرات
+    /// والمخرَجات التعاقديّة ومسارات العمل. وهذه صلاحيّة **بالمورد** لا بالدور: امتلاكه
+    /// <c>ProjectOwnerId</c> على مشروع لا يمنحه شيئًا على أيّ مشروع آخر.
+    /// </para>
     /// </summary>
-    public Task<bool> CanManageProject360Async(Project360Context project, CancellationToken ct = default) =>
-        Task.FromResult(_currentUser.IsInAnyRole(Roles.ProjectPlanManagers));
+    public Task<bool> CanManageProject360Async(Project360Context project, CancellationToken ct = default)
+    {
+        if (_currentUser.IsInAnyRole(Roles.ProjectPlanManagers)) return Task.FromResult(true);
+        if (_currentUser.UserId is not Guid uid) return Task.FromResult(false);
+        return Task.FromResult(project.ProjectOwnerId == uid);
+    }
 
     /// <summary>
-    /// الكتابة التشغيليّة (D-07): الإدارة أو قائد الفريق المسؤول أو مدير الحساب المسؤول
-    /// **عن هذا المشروع بعينه** — لا عن أيّ مشروع آخر ولو كان مرئيًّا له.
+    /// الكتابة التشغيليّة (D-07 · موسَّعة في P360-WF-R2 §3): الإدارة أو **مالك المشروع** أو
+    /// قائد الفريق المسؤول أو مدير الحساب المسؤول **عن هذا المشروع بعينه** — لا عن أيّ مشروع
+    /// آخر ولو كان مرئيًّا له.
+    ///
+    /// <para>
+    /// مالك المشروع مشمول هنا صراحةً وليس ضمنًا عبر <see cref="CanManageProject360Async"/>:
+    /// كلّ قدرة تُفحَص عند نقطة استعمالها، فلو ضاقت البنيويّة لاحقًا بقيت التشغيليّة سليمة.
+    /// </para>
     /// </summary>
     public Task<bool> CanUpdateProject360ProgressAsync(Project360Context project, CancellationToken ct = default)
     {
         if (_currentUser.IsInAnyRole(Roles.ProjectPlanManagers)) return Task.FromResult(true);
         if (_currentUser.UserId is not Guid uid) return Task.FromResult(false);
-        return Task.FromResult(project.TeamLeaderId == uid || project.AccountManagerId == uid);
+        return Task.FromResult(
+            project.ProjectOwnerId == uid ||
+            project.TeamLeaderId == uid ||
+            project.AccountManagerId == uid);
     }
+
+    /// <summary>
+    /// خريطة القدرات = **استدعاء الحرّاس نفسها** لا إعادة كتابة شروطها. أيّ تضييق أو توسيع
+    /// لاحق في <see cref="CanManageProject360Async"/> أو <see cref="CanUpdateProject360ProgressAsync"/>
+    /// ينعكس هنا تلقائيًّا، فلا تنشأ حالة تعرض فيها الواجهة زرًّا يردّه الخادم.
+    ///
+    /// <para>
+    /// <c>CanWriteGovernance</c> بالدور وحده (<c>Roles.GovernanceWorkspaceUsers</c>) لأنّ ورشة
+    /// الحوكمة كيان مستقلّ عن ملكيّة المشروع؛ وهو مُقيَّد أصلًا برؤية المشروع لأنّ الخريطة
+    /// لا تُبنى إلّا بعد <see cref="LoadVisibleProjectAsync"/>.
+    /// </para>
+    /// </summary>
+    public async Task<ProjectCapabilitiesDto> BuildCapabilitiesAsync(
+        Project360Context project, CancellationToken ct = default)
+        => new(
+            CanManageStructure: await CanManageProject360Async(project, ct),
+            CanOperate: await CanUpdateProject360ProgressAsync(project, ct),
+            CanWriteGovernance: _currentUser.IsInAnyRole(Roles.GovernanceWorkspaceUsers));
 }

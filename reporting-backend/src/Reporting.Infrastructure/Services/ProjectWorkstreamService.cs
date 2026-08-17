@@ -57,7 +57,7 @@ public class ProjectWorkstreamService : IProjectWorkstreamService
         if (!vis.CanViewProject(projectId)) return Result<ProjectWorkstreamDto>.Failure("هذا المشروع خارج نطاق صلاحيتك.", "auth.forbidden");
 
         if (!await CanManagePlanAsync(projectId, uid, ct))
-            return Result<ProjectWorkstreamDto>.Failure("إدارة أهداف العمل من صلاحية إدارة الخطّة أو مدير حسابات المشروع فقط.", "auth.forbidden");
+            return Result<ProjectWorkstreamDto>.Failure("إدارة مسارات العمل من صلاحية إدارة الخطّة أو مسؤولي هذا المشروع (مالكه أو قائد فريقه أو مدير حسابه) فقط.", "auth.forbidden");
 
         var code = (request.WorkstreamTypeCode ?? string.Empty).Trim();
         if (string.IsNullOrWhiteSpace(code))
@@ -106,7 +106,7 @@ public class ProjectWorkstreamService : IProjectWorkstreamService
         if (!vis.CanViewProject(projectId)) return Result<ProjectWorkstreamDto>.Failure("هذا المشروع خارج نطاق صلاحيتك.", "auth.forbidden");
 
         if (!await CanManagePlanAsync(projectId, uid, ct))
-            return Result<ProjectWorkstreamDto>.Failure("إدارة أهداف العمل من صلاحية إدارة الخطّة أو مدير حسابات المشروع فقط.", "auth.forbidden");
+            return Result<ProjectWorkstreamDto>.Failure("إدارة مسارات العمل من صلاحية إدارة الخطّة أو مسؤولي هذا المشروع (مالكه أو قائد فريقه أو مدير حسابه) فقط.", "auth.forbidden");
 
         var entity = await _db.ProjectWorkstreams.FirstOrDefaultAsync(w => w.Id == id && w.ProjectId == projectId, ct);
         if (entity is null) return Result<ProjectWorkstreamDto>.Failure("تيار العمل غير موجود.", "workstream.not_found");
@@ -145,7 +145,7 @@ public class ProjectWorkstreamService : IProjectWorkstreamService
         if (!vis.CanViewProject(projectId)) return Result<ProjectWorkstreamDto>.Failure("هذا المشروع خارج نطاق صلاحيتك.", "auth.forbidden");
 
         if (!await CanManagePlanAsync(projectId, uid, ct))
-            return Result<ProjectWorkstreamDto>.Failure("إدارة أهداف العمل من صلاحية إدارة الخطّة أو مدير حسابات المشروع فقط.", "auth.forbidden");
+            return Result<ProjectWorkstreamDto>.Failure("إدارة مسارات العمل من صلاحية إدارة الخطّة أو مسؤولي هذا المشروع (مالكه أو قائد فريقه أو مدير حسابه) فقط.", "auth.forbidden");
 
         var entity = await _db.ProjectWorkstreams.FirstOrDefaultAsync(w => w.Id == id && w.ProjectId == projectId, ct);
         if (entity is null) return Result<ProjectWorkstreamDto>.Failure("تيار العمل غير موجود.", "workstream.not_found");
@@ -163,15 +163,25 @@ public class ProjectWorkstreamService : IProjectWorkstreamService
 
     // ===== helpers =====
     /// <summary>
-    /// بوّابة إدارة الخطّة بنطاق المشروع (لا بالدور وحده): إمّا دور إداري
-    /// (ProjectPlanManagers = Admin/CEO/GM/Manager، بلا TeamLeader)، أو مدير حسابات المشروع نفسه.
-    /// تُستدعى بعد فحص CanViewProject في الكتابة. مطابقة لنمط WorkstreamDeliverableService.
+    /// بوّابة إدارة مسارات العمل بنطاق المشروع (لا بالدور وحده): إمّا دور إداريّ
+    /// (<c>ProjectPlanManagers</c> = Admin/CEO/GM/Manager، بلا TeamLeader)، أو **أحد مسؤولي هذا
+    /// المشروع بعينه**: مالكه أو قائد فريقه المسنَد أو مدير حسابه.
+    ///
+    /// <para>
+    /// **لماذا وُسِّعت في P360-WF-R2؟** مسار العمل تنظيمُ تنفيذٍ لا التزامٌ تعاقديّ (§9)، ومن
+    /// يقود التنفيذ هو من يجب أن ينظّمه. قصرها على مدير الحساب كان يترك قائد الفريق المسؤول
+    /// عن التسليم عاجزًا عن إنشاء مسار عمل واحد لفريقه، فيدير تنفيذه خارج المنظومة.
+    /// التوسّع **بالمورد لا بالدور**: لا يمنح شيئًا على مشروع لم يُسنَد إليه.
+    /// </para>
+    ///
+    /// <para>تُستدعى بعد فحص <c>CanViewProject</c> في الكتابة. مطابقة لعقد <c>CanUpdateProject360ProgressAsync</c>.</para>
     /// </summary>
     private async Task<bool> CanManagePlanAsync(Guid projectId, Guid uid, CancellationToken ct)
     {
         if (_currentUser.IsInAnyRole(Roles.ProjectPlanManagers)) return true;
         return await _db.Projects.AsNoTracking()
-            .AnyAsync(p => p.Id == projectId && p.AccountManagerId == uid, ct);
+            .AnyAsync(p => p.Id == projectId
+                        && (p.AccountManagerId == uid || p.TeamLeaderId == uid || p.ProjectOwnerId == uid), ct);
     }
 
     private async Task<string?> ResolveActiveTypeNameArAsync(string code, CancellationToken ct) =>

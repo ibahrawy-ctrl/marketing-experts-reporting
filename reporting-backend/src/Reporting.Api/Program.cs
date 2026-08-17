@@ -71,6 +71,9 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy(Policies.ManagementOnly, p => p.RequireRole(Roles.Management));
     // إدارة نواة العميل (Client 360 — CPW-R1B): Admin/CEO/GM/Manager فقط (يستثني TeamLeader).
     options.AddPolicy(Policies.ClientCoreManagement, p => p.RequireRole(Roles.ClientCoreManagers));
+    // الكتابة البنيويّة على المشروع (P360-WF-R2 · GAP-06): Admin/CEO/GM/Manager فقط (يستثني TeamLeader).
+    // قائد الفريق يكتب تشغيليًّا بالمورد (Project.TeamLeaderId) لا بالدور.
+    options.AddPolicy(Policies.ProjectStructuralManage, p => p.RequireRole(Roles.ProjectStructuralManagers));
     options.AddPolicy(Policies.TeamManagement, p => p.RequireRole(Roles.TeamManagement));
     options.AddPolicy(Policies.TemplateGovernance, p => p.RequireRole(Roles.TemplateGovernance));
     // الاعتماد النهائي لطلبات الإجازة/الاستئذان (V1.0.1-A) — قدرة الموارد البشرية HR (+ تدخّل Admin/CEO/GM).

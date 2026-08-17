@@ -55,4 +55,11 @@ public interface IProject360Authorization
 
     /// <summary>هل يملك المستخدم الحاليّ تحديث **التقدّم/الحالة/القراءات** على هذا المشروع؟ (D-07)</summary>
     Task<bool> CanUpdateProject360ProgressAsync(Project360Context project, CancellationToken ct = default);
+
+    /// <summary>
+    /// **خريطة القدرات الواحدة** (§12) لهذا المشروع بعينه، مبنيّة من نفس الحرّاس أعلاه لا من
+    /// نسخة ثانية عنها. الواجهة تستهلكها لتخفي ما سيُرفَض، فلو بُنِيت من منطق مستقلّ لصار
+    /// انحرافها عن الحرّاس مسألة وقت — وأوّل عَرَض له زرٌّ ظاهر يردّ 403.
+    /// </summary>
+    Task<ProjectCapabilitiesDto> BuildCapabilitiesAsync(Project360Context project, CancellationToken ct = default);
 }

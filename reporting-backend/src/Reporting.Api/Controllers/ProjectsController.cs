@@ -35,27 +35,27 @@ public class ProjectsController : ApiControllerBase
         => FromResult(await _service.GetSummaryAsync(id, ct));
 
     [HttpPost]
-    [Authorize(Policy = Policies.ManagementOnly)]
+    [Authorize(Policy = Policies.ProjectStructuralManage)]
     public async Task<IActionResult> Create([FromBody] CreateProjectRequest request, CancellationToken ct)
         => FromResult(await _service.CreateAsync(request, ct));
 
     [HttpPut("{id:guid}")]
-    [Authorize(Policy = Policies.ManagementOnly)]
+    [Authorize(Policy = Policies.ProjectStructuralManage)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateProjectRequest request, CancellationToken ct)
         => FromResult(await _service.UpdateAsync(id, request, ct));
 
     [HttpPost("{id:guid}/archive")]
-    [Authorize(Policy = Policies.ManagementOnly)]
+    [Authorize(Policy = Policies.ProjectStructuralManage)]
     public async Task<IActionResult> Archive(Guid id, CancellationToken ct)
         => FromResult(await _service.ArchiveAsync(id, ct));
 
     [HttpPost("{id:guid}/reactivate")]
-    [Authorize(Policy = Policies.ManagementOnly)]
+    [Authorize(Policy = Policies.ProjectStructuralManage)]
     public async Task<IActionResult> Reactivate(Guid id, CancellationToken ct)
         => FromResult(await _service.ReactivateAsync(id, ct));
 
     [HttpDelete("{id:guid}")]
-    [Authorize(Policy = Policies.ManagementOnly)]
+    [Authorize(Policy = Policies.ProjectStructuralManage)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
         => FromResult(await _service.DeleteAsync(id, ct));
 }

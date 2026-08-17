@@ -48,6 +48,23 @@ public static class Roles
     };
 
     /// <summary>
+    /// **الكتابة البنيويّة على المشروع** (P360-WF-R2 · GAP-06): إنشاء/تعديل البيانات البنيويّة/أرشفة/
+    /// إعادة تفعيل/حذف المشروع، وإسناد أدواره (مالك/مدير حساب/قائد فريق/فريق مالك).
+    /// Admin / CEO / GM / Manager فقط — **عمدًا لا تشمل TeamLeader**.
+    ///
+    /// <para>
+    /// سبب الفصل عن <see cref="Management"/>: تلك المجموعة تشمل <c>TeamLeader</c> لأنّها مجموعة
+    /// «من يرى تجميعات أعلى من نفسه»، وربطها بسياسة الكتابة على المشروع كان يمنح كلّ قائد فريق
+    /// **تعديل وأرشفة وحذف** أيّ مشروع يراه (انقلاب صلاحيّات مثبَت). صلاحيّة قائد الفريق
+    /// **تشغيليّة بالمورد** (<c>Project.TeamLeaderId == uid</c>) لا بالدور.
+    /// </para>
+    /// </summary>
+    public static readonly string[] ProjectStructuralManagers =
+    {
+        Admin, Ceo, GeneralManager, Manager
+    };
+
+    /// <summary>
     /// أدوار الإدارة الأساسية للعميل (Client 360 — CPW-R1B): إنشاء/تعديل الملفّ الأساسيّ/أرشفة/إعادة تفعيل/حذف.
     /// Admin / CEO / GM / Manager فقط. عمدًا لا تشمل TeamLeader.
     /// المدير (Manager) لا يُمنَح رؤية شاملة تلقائيًّا — الإنشاء ضمن نطاقه فقط، وأيّ AccountManagerId مُسنَد
@@ -430,6 +447,12 @@ public static class Policies
 
     /// <summary>الإدارة الأساسية للعميل (Client 360 — CPW-R1B): Admin/CEO/GM/Manager — بلا TeamLeader.</summary>
     public const string ClientCoreManagement = "ClientCoreManagement";
+
+    /// <summary>
+    /// الكتابة البنيويّة على المشروع (P360-WF-R2): Admin/CEO/GM/Manager — **بلا TeamLeader**.
+    /// بوّابة خشنة على الحافّة؛ التحقّق بالمورد (النطاق/المالك) يبقى إلزاميًّا داخل الخدمة.
+    /// </summary>
+    public const string ProjectStructuralManage = "ProjectStructuralManage";
 
     public const string AdminOnly = "AdminOnly";
     public const string ExecutiveOnly = "ExecutiveOnly"; // Admin + CEO + GM

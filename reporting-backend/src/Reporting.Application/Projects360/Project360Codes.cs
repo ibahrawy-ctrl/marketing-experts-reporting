@@ -46,6 +46,9 @@ public static class Project360ErrorCodes
     public const string DeliverableWorkstreamMismatch = "project_deliverable.workstream_mismatch.conflict";
     public const string DeliverableQuantityInvalid = "project_deliverable.quantity_invalid";
 
+    /// <summary>وزن المخرَج خارج المجال 0..100 (P360-WF-R2 §6-1).</summary>
+    public const string DeliverableWeightInvalid = "project_deliverable.weight_invalid";
+
     // ===== تحقّق عامّ مشترك (W4 — ميكانيكيّ، لا يخالف عقد R2) =====
     public const string PercentInvalid = "project_360.percent_invalid";
     public const string WeightInvalid = "project_360.weight_invalid";

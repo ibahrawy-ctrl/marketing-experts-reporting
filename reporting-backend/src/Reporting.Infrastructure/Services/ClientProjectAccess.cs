@@ -58,10 +58,19 @@ public class ClientProjectAccess : IClientProjectAccess
             foreach (var et in extraTeamIds) teamSet.Add(et);
         }
 
-        // مشاريع: مدير حسابها داخل النطاق أو فريقها المسؤول يقوده أحد داخل النطاق.
+        // مشاريع: مدير حسابها داخل النطاق أو فريقها المسؤول يقوده أحد داخل النطاق،
+        // **أو أُسند إليه مالكًا/قائد فريق على المشروع بعينه** (P360-WF-R2 · GAP-01).
+        //
+        // إسنادٌ لا يُرى ليس إسنادًا: كان `Project.TeamLeaderId` و`ProjectOwnerId` يُقرآن في
+        // التخويل التشغيليّ (D-07) ولا يظهران في أيّ مصدر رؤية، فيُسنَد قائد الفريق إلى مشروع
+        // ثمّ يُمنع من فتحه ما لم يكن — مصادفةً — قائدًا لفريقه المالك. التوسّع هنا **مقصود
+        // ومحدود بالمورد**: لا يمنح إلّا المشروع الذي حمل اسمه، ولا يمسّ أيّ صلاحيّة كتابة
+        // (تلك تبقى محكومة بحارس القدرة داخل كلّ خدمة).
         var byAmOrTeam = await _db.Projects
             .Where(p => (p.AccountManagerId != null && uids.Contains(p.AccountManagerId.Value))
-                     || (p.OwnerTeamId != null && teamSet.Contains(p.OwnerTeamId.Value)))
+                     || (p.OwnerTeamId != null && teamSet.Contains(p.OwnerTeamId.Value))
+                     || (p.TeamLeaderId != null && uids.Contains(p.TeamLeaderId.Value))
+                     || (p.ProjectOwnerId != null && uids.Contains(p.ProjectOwnerId.Value)))
             .Select(p => p.Id)
             .ToListAsync(ct);
 
