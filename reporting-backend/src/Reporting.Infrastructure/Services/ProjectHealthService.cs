@@ -144,34 +144,85 @@ public class ProjectHealthService : IProjectHealthService
         var kpiScore = ProjectHealthPolicy.RollUpObjectiveScores(objectiveScores);
 
         var now = DateTime.UtcNow;
+        var today = DateOnly.FromDateTime(now);
+
+        // (3) المخرَجات التعاقديّة النشطة — مصدر التقدّم **والتأخّر** معًا في استعلام واحد
+        //     (P360-WF-R2 §6-1/§7 · GAP-02/03/21). كانت ProgressPercent تُقرأ صفرًا دائمًا
+        //     لأنّها بلا مسار كتابة، فتُبطِل 0.30 من المعادلة وتجعل الأخضر مستحيلًا (GAP-04).
+        var deliverables = await _db.ProjectDeliverables.AsNoTracking()
+            .Where(d => d.ProjectId == projectId && d.IsActive)
+            .Select(d => new { d.WeightPercentage, d.ProgressPercent, d.Status, d.DueDate })
+            .ToListAsync(ct);
+
+        var progress = ProjectHealthPolicy.ComputeProjectProgress(
+            deliverables
+                .Select(d => new ProjectHealthPolicy.DeliverableProgressInput(
+                    d.WeightPercentage, d.ProgressPercent, d.Status))
+                .ToList());
+
+        project.ProgressPercent = progress.Percent;
+        project.ProgressMode = progress.Mode;
+        project.ProgressSourceDeliverableCount = progress.SourceCount;
+        project.ProgressCalculatedAtUtc = now;
+
+        // (4) المخاطر المفتوحة على المشروع — استعلام واحد يُصنَّف في الذاكرة.
+        //     «مفتوح» = ليس Closed (بما فيه Mitigating وMonitoring: الخطر تحت المعالجة لا يزال قائمًا).
+        var openRiskSeverities = await _db.Risks.AsNoTracking()
+            .Where(r => r.ProjectId == projectId && r.Status != RiskStatus.Closed)
+            .Select(r => r.Severity)
+            .ToListAsync(ct);
+
+        // بانٍ واحد مشترك مع مسار القراءة (ProjectOverviewService) — لا نسختان للقاعدة الواحدة.
+        var signals = ProjectHealthPolicy.BuildOperationalSignals(
+            deliverables.Select(d => new ProjectHealthPolicy.DeliverableSignalInput(d.Status, d.DueDate)).ToList(),
+            openRiskSeverities,
+            today,
+            progress.Mode);
+
         var scheduleScore = ProjectHealthPolicy.ComputeScheduleScore(
-            project.StartDate, project.EndDate, DateOnly.FromDateTime(now), project.ProgressPercent, project.Status);
+            project.StartDate, project.EndDate, today, project.ProgressPercent, project.Status);
+
+        // مكوّن التقدّم يُستبعَد من المعادلة حين لا مصدر له أصلًا: «لا مخرَجات» ليس صفرًا في الأداء،
+        // وإدخاله صفرًا كان سيعيد إنتاج GAP-04 بصيغة أخرى.
+        decimal? progressComponent = progress.Mode == ProjectProgressMode.NoDeliverables
+            ? null
+            : progress.Percent;
 
         var snapshot = ProjectHealthPolicy.ComputeHealth(
-            kpiScore.Score, project.ProgressPercent, scheduleScore, now, kpiScore.AllWeightsZero);
+            kpiScore.Score, progressComponent, scheduleScore, now, kpiScore.AllWeightsZero, signals);
 
-        if (snapshot.IsEvaluated)
+        // النتيجة الرقميّة والختم يُكتبان فقط حين وُجد مكوّن محتسَب؛ أمّا **الحالة الظاهرة فتُكتب
+        // دائمًا** لأنّها قد تكون `Blocked` بلا معادلة، أو `NotEvaluated` وهي معلومة لا فراغ.
+        project.HealthStatus = snapshot.Status;
+        if (snapshot.Score is not null)
         {
-            project.HealthPercent = snapshot.Score!.Value;
-            project.HealthStatus = snapshot.Status;
+            project.HealthPercent = snapshot.Score.Value;
             project.HealthComputedAtUtc = snapshot.LastEvaluatedAtUtc;
         }
         else
         {
-            // «لم يُقيَّم» ≠ «صفر»: يُترك الختم فارغًا وهو العلامة الوحيدة، والعمودان يعودان
-            // لقيمتهما الافتراضيّة كي لا يُقرأ رقم قديم على أنّه حكم قائم.
+            // «لم يُقيَّم» ≠ «صفر»: يُترك الختم فارغًا وهو العلامة الوحيدة، والنسبة تعود صفرًا
+            // كي لا يُقرأ رقم قديم على أنّه حكم قائم.
             project.HealthPercent = 0m;
-            project.HealthStatus = ProjectHealthStatus.Green;
             project.HealthComputedAtUtc = null;
         }
 
         return (snapshot, project);
     }
 
-    /// <summary>تحويل لقطة الـPolicy إلى العقد الرسميّ — **بلا أيّ إعادة احتساب**.</summary>
+    /// <summary>
+    /// تحويل لقطة الـPolicy إلى العقد الرسميّ — **بلا أيّ إعادة احتساب**.
+    ///
+    /// <para>
+    /// **الحالة تُعاد دائمًا** (P360-WF-R2 §7): كانت تُطمَس إلى <c>null</c> حين لا نتيجة رقميّة،
+    /// لأنّ التعداد لم يملك قيمة «لم تُقيَّم» فكان <c>null</c> هو الحيلة. صار للتعداد
+    /// <see cref="ProjectHealthStatus.NotEvaluated"/> صراحةً، **ومشروع محجوب بلا مؤشّرات يجب أن
+    /// يُعلن محجوبًا لا فارغًا**. يبقى الحقل <c>nullable</c> في العقد حفاظًا على توافق المستهلكين.
+    /// </para>
+    /// </summary>
     internal static ProjectHealthDto Map(ProjectHealthSnapshot snapshot, DateTime? persistedAtUtc) =>
         new(snapshot.Score,
-            snapshot.IsEvaluated ? snapshot.Status : null,
+            snapshot.Status,
             snapshot.KpiScore,
             snapshot.ProgressPercent,
             snapshot.ScheduleScore,

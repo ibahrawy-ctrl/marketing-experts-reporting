@@ -242,6 +242,8 @@ public record ProjectContractDeliverableDto(
     int CompletedQuantity,
     ProjectDeliverableStatus Status,
     decimal ProgressPercent,
+    /// <summary>وزن المخرَج في تقدّم المشروع (P360-WF-R2 §6-1) — صفر يعني «غير موزون».</summary>
+    decimal WeightPercentage,
     DateOnly? StartDate,
     DateOnly? DueDate,
     DateTime? DeliveredAtUtc,
@@ -266,7 +268,8 @@ public record CreateProjectContractDeliverableRequest(
     DeliverablePriority Priority = DeliverablePriority.Medium,
     Guid? OwnerUserId = null,
     string? Notes = null,
-    int SortOrder = 0);
+    int SortOrder = 0,
+    decimal WeightPercentage = 0m);
 
 /// <summary>تعديل بنيويّ — <c>DeliverableTypeCode</c> **غير قابل للتعديل** (لقطة ثابتة).</summary>
 public record UpdateProjectContractDeliverableRequest(
@@ -280,7 +283,8 @@ public record UpdateProjectContractDeliverableRequest(
     DeliverablePriority Priority = DeliverablePriority.Medium,
     Guid? OwnerUserId = null,
     string? Notes = null,
-    int SortOrder = 0);
+    int SortOrder = 0,
+    decimal WeightPercentage = 0m);
 
 /// <summary>تحديث التقدّم/الحالة — مسموح لقائد الفريق/مدير الحساب المسؤول (D-07).</summary>
 public record UpdateProjectContractDeliverableProgressRequest(
@@ -338,7 +342,20 @@ public record ProjectOverviewCoreDto(
     Guid? ProjectOwnerId,
     Guid? TeamLeaderId,
     Guid? AccountManagerId,
-    Guid? OwnerTeamId);
+    Guid? OwnerTeamId,
+
+    // --- أسماء المسنَدين (§12): الشاشة تعرض بشرًا لا معرّفات ---
+    string? ProjectOwnerName = null,
+    string? TeamLeaderName = null,
+    string? AccountManagerName = null,
+    string? OwnerTeamName = null,
+
+    // --- شفافيّة احتساب التقدّم (§6-1): الرقم ومعه كيف حُسِب ومتى وعلى كم مخرَج ---
+    // بلا هذه الثلاثة يصير `ProgressPercent` رقمًا بلا نَسَب: لا يُعرَف أوزنَ أم سقط
+    // إلى التساوي، ولا متى حُسِب، فتُقرأ ٦٠٪ محسوبة على مخرَج واحد كأنّها ٦٠٪ للمشروع.
+    ProjectProgressMode ProgressMode = ProjectProgressMode.NotCalculated,
+    DateTime? ProgressCalculatedAtUtc = null,
+    int ProgressSourceDeliverableCount = 0);
 
 public record ProjectOverviewObjectivesDto(
     int Total,
@@ -358,12 +375,22 @@ public record ProjectOverviewKpisDto(
     decimal? AverageAchievementPercent,
     DateOnly? LastReadingDate);
 
+/// <summary>
+/// عدّادات المخرَجات التعاقديّة **بلا نسبة تقدّم خاصّة بها** (GAP-21).
+///
+/// <para>
+/// كان هنا <c>OverallProgressPercent</c> = متوسّط بسيط لنسب المخرَجات النشطة، يُحسَب لحظة
+/// القراءة ولا يدخل أيّ معادلة. فكان في الشاشة الواحدة رقما تقدّمٍ متناقضان (٦٢٫٥٠٪ مقابل
+/// ٠٫٠٠٪ على TEST) بلا ما يدلّ القارئ أيّهما الرسميّ. **رقم التقدّم الوحيد** هو
+/// <c>ProjectOverviewCoreDto.ProgressPercent</c> ومعه <c>ProgressMode</c> — والمخرَجات
+/// تُعَدّ هنا ولا تُنسِّب.
+/// </para>
+/// </summary>
 public record ProjectOverviewDeliverablesDto(
     int Total,
     int Completed,
     int Pending,
-    int Delayed,
-    decimal? OverallProgressPercent);
+    int Delayed);
 
 public record ProjectOverviewGovernanceDto(
     int RisksTotal,
@@ -389,7 +416,8 @@ public record ProjectOverviewDto(
     ProjectOverviewKpisDto Kpis,
     ProjectOverviewDeliverablesDto Deliverables,
     ProjectOverviewGovernanceDto Governance,
-    ProjectOverviewStrategyDto Strategy);
+    ProjectOverviewStrategyDto Strategy,
+    ProjectCapabilitiesDto Access);
 
 // ======================================================================
 // W5 — قراءات الحوكمة المرشَّحة بالمشروع (CPW-R3 · §17-19)

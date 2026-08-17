@@ -476,7 +476,8 @@ public class Project360FoundationTests
 
         Assert.Equal(1, dto.Deliverables.Total);
         Assert.Equal(1, dto.Deliverables.Completed);
-        Assert.Equal(100m, dto.Deliverables.OverallProgressPercent);
+        // رقم التقدّم الوحيد على اللوحة هو تقدّم المشروع نفسه — لا نسبة ثانية داخل بطاقة المخرَجات.
+        Assert.Equal(100m, dto.Project.ProgressPercent);
 
         Assert.Equal(1, dto.Governance.RisksTotal);
         Assert.Equal(1, dto.Governance.RisksOpen);
@@ -511,7 +512,10 @@ public class Project360FoundationTests
         Assert.True(overview.Succeeded, overview.Error);
         Assert.Equal(0, overview.Value!.Kpis.Total);
         Assert.Null(overview.Value.Kpis.AverageAchievementPercent);
-        Assert.Null(overview.Value.Deliverables.OverallProgressPercent);
+        // مشروع لم يُقَس قطّ: صفر **موسوم بـ`NotCalculated`** لا صفرًا مبهمًا يُقرأ تقدّمًا معدومًا.
+        Assert.Equal(0, overview.Value.Deliverables.Total);
+        Assert.Equal(ProjectProgressMode.NotCalculated, overview.Value.Project.ProgressMode);
+        Assert.Null(overview.Value.Project.ProgressCalculatedAtUtc);
         Assert.False(overview.Value.Strategy.Exists);
     }
 
@@ -704,7 +708,7 @@ public class Project360FoundationTests
                 new ProjectStrategyService(db, currentUser, auth, audit),
                 objectives,
                 new ProjectKpiService(db, currentUser, auth, audit, health),
-                new ProjectContractDeliverableService(db, currentUser, auth, audit),
+                new ProjectContractDeliverableService(db, currentUser, auth, audit, health),
                 new ProjectOverviewService(db, auth, objectives));
         }
     }

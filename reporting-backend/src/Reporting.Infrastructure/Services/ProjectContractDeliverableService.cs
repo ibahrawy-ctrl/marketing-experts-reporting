@@ -32,12 +32,20 @@ public class ProjectContractDeliverableService : IProjectContractDeliverableServ
     private readonly IProject360Authorization _auth;
     private readonly IAuditService _audit;
 
-    public ProjectContractDeliverableService(AppDbContext db, ICurrentUser currentUser, IProject360Authorization auth, IAuditService audit)
+    /// <summary>
+    /// **جسر الغلق لـGAP-03**: كانت هذه الخدمة تكتب حالة المخرَج ونسبته ثمّ تنتهي، فلا يتحرّك
+    /// تقدّم المشروع ولا صحّته. صار كلّ حدث يمسّ المخرَجات يمرّ بـ<c>SaveWithHealthAsync</c> —
+    /// **معاملة واحدة** تحكم الطفرة وإعادة الاحتساب معًا، فلا تبقى صحّة بائتة على طفرة ناجحة.
+    /// </summary>
+    private readonly IProjectHealthService _health;
+
+    public ProjectContractDeliverableService(AppDbContext db, ICurrentUser currentUser, IProject360Authorization auth, IAuditService audit, IProjectHealthService health)
     {
         _db = db;
         _currentUser = currentUser;
         _auth = auth;
         _audit = audit;
+        _health = health;
     }
 
     public async Task<Result<IReadOnlyList<ProjectContractDeliverableDto>>> ListAsync(Guid projectId, bool includeInactive, CancellationToken ct = default)
@@ -73,6 +81,7 @@ public class ProjectContractDeliverableService : IProjectContractDeliverableServ
         var invalid = Project360Guards.FirstError(
             Project360Guards.ValidateSortOrder(request.SortOrder),
             Project360Guards.ValidateDateRange(request.StartDate, request.DueDate),
+            ValidateWeight(request.WeightPercentage),
             ValidateQuantity(request.PlannedQuantity, completedQuantity: 0));
         if (invalid is not null) return Result<ProjectContractDeliverableDto>.Failure(invalid.Value.Message, invalid.Value.Code);
 
@@ -102,9 +111,10 @@ public class ProjectContractDeliverableService : IProjectContractDeliverableServ
             OwnerUserId = request.OwnerUserId,
             Notes = Project360Guards.Trim(request.Notes),
             SortOrder = request.SortOrder,
+            WeightPercentage = request.WeightPercentage,
         };
         _db.ProjectDeliverables.Add(entity);
-        await _db.SaveChangesAsync(ct);
+        await _health.SaveWithHealthAsync(projectId, ct);
         await _audit.LogAsync(gate.ActorId, "project_contract_deliverable.created", nameof(ProjectDeliverable), entity.Id, ct: ct);
 
         return await ReloadAsync(projectId, entity.Id, ct);
@@ -126,6 +136,7 @@ public class ProjectContractDeliverableService : IProjectContractDeliverableServ
             Project360Guards.ValidateName(request.Name),
             Project360Guards.ValidateSortOrder(request.SortOrder),
             Project360Guards.ValidateDateRange(request.StartDate, request.DueDate),
+            ValidateWeight(request.WeightPercentage),
             ValidateQuantity(request.PlannedQuantity, entity.CompletedQuantity));
         if (invalid is not null) return Result<ProjectContractDeliverableDto>.Failure(invalid.Value.Message, invalid.Value.Code);
 
@@ -143,9 +154,10 @@ public class ProjectContractDeliverableService : IProjectContractDeliverableServ
         entity.OwnerUserId = request.OwnerUserId;
         entity.Notes = Project360Guards.Trim(request.Notes);
         entity.SortOrder = request.SortOrder;
+        entity.WeightPercentage = request.WeightPercentage;
         entity.UpdatedAtUtc = DateTime.UtcNow;
 
-        await _db.SaveChangesAsync(ct);
+        await _health.SaveWithHealthAsync(projectId, ct);
         await _audit.LogAsync(gate.ActorId, "project_contract_deliverable.updated", nameof(ProjectDeliverable), entity.Id, ct: ct);
 
         return await ReloadAsync(projectId, entity.Id, ct);
@@ -178,7 +190,8 @@ public class ProjectContractDeliverableService : IProjectContractDeliverableServ
         entity.DeliveredAtUtc = request.DeliveredAtUtc ?? entity.DeliveredAtUtc;
         entity.UpdatedAtUtc = DateTime.UtcNow;
 
-        await _db.SaveChangesAsync(ct);
+        // **قلب GAP-03**: هنا كانت الطفرة تنتهي عند صفّ المخرَج ولا تصعد إلى المشروع إطلاقًا.
+        await _health.SaveWithHealthAsync(projectId, ct);
         await _audit.LogAsync(uid, "project_contract_deliverable.progress_updated", nameof(ProjectDeliverable), entity.Id, ct: ct);
 
         return await ReloadAsync(projectId, entity.Id, ct);
@@ -194,7 +207,8 @@ public class ProjectContractDeliverableService : IProjectContractDeliverableServ
 
         entity.IsActive = isActive;
         entity.UpdatedAtUtc = DateTime.UtcNow;
-        await _db.SaveChangesAsync(ct);
+        // التفعيل/التعطيل يغيّر **مقام** المتوسّط الموزون ⟹ إعادة احتساب إلزاميّة.
+        await _health.SaveWithHealthAsync(projectId, ct);
         await _audit.LogAsync(gate.ActorId, isActive ? "project_contract_deliverable.activated" : "project_contract_deliverable.deactivated", nameof(ProjectDeliverable), entity.Id, ct: ct);
 
         return await ReloadAsync(projectId, entity.Id, ct);
@@ -237,6 +251,15 @@ public class ProjectContractDeliverableService : IProjectContractDeliverableServ
         var dtos = await BuildAsync(projectId, includeInactive: true, ct);
         return Result<ProjectContractDeliverableDto>.Success(dtos.First(d => d.Id == deliverableId));
     }
+
+    /// <summary>
+    /// حارس الوزن: 0..100 لا غير. **لا يُفرَض مجموع 100 على المشروع** — فرضه يجعل إضافة مخرَج
+    /// واحد تُبطِل حفظ العقد كلّه، والمحرّك يطبّع على المجموع الفعليّ ويُنبّه عند نقص الأوزان.
+    /// </summary>
+    private static (string Message, string Code)? ValidateWeight(decimal weightPercentage)
+        => weightPercentage is < 0m or > 100m
+            ? ("وزن المخرَج يجب أن يكون بين 0 و100.", Project360ErrorCodes.DeliverableWeightInvalid)
+            : null;
 
     private static (string Message, string Code)? ValidateQuantity(int plannedQuantity, int completedQuantity)
     {
@@ -293,7 +316,7 @@ public class ProjectContractDeliverableService : IProjectContractDeliverableServ
             d.Id, d.ProjectId, d.ObjectiveId, d.WorkstreamId,
             d.DeliverableTypeCode, typeNames.GetValueOrDefault(d.DeliverableTypeCode),
             d.Name, d.Description, d.PlannedQuantity, d.CompletedQuantity,
-            d.Status, d.ProgressPercent, d.StartDate, d.DueDate, d.DeliveredAtUtc,
+            d.Status, d.ProgressPercent, d.WeightPercentage, d.StartDate, d.DueDate, d.DeliveredAtUtc,
             d.Priority, d.OwnerUserId,
             d.OwnerUserId is Guid oid ? ownerNames.GetValueOrDefault(oid) : null,
             d.Notes, d.SortOrder, d.IsActive,

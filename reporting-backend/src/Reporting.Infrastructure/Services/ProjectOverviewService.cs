@@ -10,7 +10,8 @@ namespace Reporting.Infrastructure.Services;
 /// لوحة النظرة العامّة للمشروع (CPW-R3 · W4 · §13 + §14 + §15).
 ///
 /// <para>
-/// **رحلة تطبيق واحدة بعدد استعلامات ثابت = 10** مهما بلغ عدد الأهداف أو المؤشّرات أو المخرَجات:
+/// **رحلة تطبيق واحدة بعدد استعلامات ثابت = 12** مهما بلغ عدد الأهداف أو المؤشّرات أو المخرَجات
+/// أو المسنَدين (الاستعلامان الأخيران: أسماء المسنَدين الثلاثة دفعةً واحدة + اسم الفريق المالك):
 /// <list type="number">
 ///   <item><description>نواة المشروع + اسم العميل (استعلام واحد بضمّ).</description></item>
 ///   <item><description>الأهداف — عبر <see cref="ProjectObjectiveService.BuildAsync"/> (3 استعلامات ثابتة داخله).</description></item>
@@ -32,6 +33,12 @@ namespace Reporting.Infrastructure.Services;
 /// <para>
 /// **مكوّن المؤشّرات موزون على مستويين** (DEC-W4-03) لا مسطَّحًا: نتيجة كلّ هدف تُحسَب من مؤشّراته
 /// ثمّ تُرجَّح بأوزان الأهداف. مثال الحَكَم يعطي **65** لا 66.67.
+/// </para>
+///
+/// <para>
+/// **رقم تقدّم واحد وحالة صحّة واحدة** (P360-WF-R2 · GAP-21): أُزيلت النسبة الثانية التي كانت
+/// تُحسَب هنا داخل بطاقة المخرَجات، ودخلت الإشارات التشغيليّة (معطِّل/متأخّر/خطر عالٍ) في احتساب
+/// الصحّة عبر **نفس** بانِي المسار الكاتب — فلا تختلف اللوحة عن العمود المخزَّن ولا عن القائمة.
 /// </para>
 /// </summary>
 public class ProjectOverviewService : IProjectOverviewService
@@ -60,7 +67,10 @@ public class ProjectOverviewService : IProjectOverviewService
                 Core = new ProjectOverviewCoreDto(
                     p.Id, p.Name, p.ClientId, p.Client!.Name, p.ServiceType, p.Status,
                     p.StartDate, p.EndDate, p.ProgressPercent, p.Summary,
-                    p.ProjectOwnerId, p.TeamLeaderId, p.AccountManagerId, p.OwnerTeamId),
+                    p.ProjectOwnerId, p.TeamLeaderId, p.AccountManagerId, p.OwnerTeamId,
+                    // الأسماء تُملأ بعد الاستعلام (11) — لا خاصّيّات تنقّل لهذه المراجع الثلاثة عمدًا.
+                    null, null, null, null,
+                    p.ProgressMode, p.ProgressCalculatedAtUtc, p.ProgressSourceDeliverableCount),
                 p.HealthComputedAtUtc,
             })
             .FirstOrDefaultAsync(ct);
@@ -77,15 +87,17 @@ public class ProjectOverviewService : IProjectOverviewService
             .Select(k => new { k.Weight, k.CurrentValue, k.TargetValue, k.Direction, k.LastReadingDate })
             .ToListAsync(ct);
 
-        // (6) المخرَجات التعاقديّة النشطة
+        // (6) المخرَجات التعاقديّة النشطة — بالوزن وتاريخ الاستحقاق أيضًا، لأنّ نفس الصفوف
+        // تخدم عدّادات البطاقة **وإشارات التأخّر** التي تحكم الحالة الظاهرة (§7).
         var deliverableRows = await _db.ProjectDeliverables.AsNoTracking()
             .Where(d => d.ProjectId == projectId && d.IsActive)
-            .Select(d => new { d.Status, d.ProgressPercent })
+            .Select(d => new { d.Status, d.ProgressPercent, d.WeightPercentage, d.DueDate })
             .ToListAsync(ct);
 
-        // (7-9) الحوكمة — إعادة استخدام كامل للكيانات القائمة بلا أيّ تعديل عليها
-        var riskStatuses = await _db.Risks.AsNoTracking()
-            .Where(r => r.ProjectId == projectId).Select(r => r.Status).ToListAsync(ct);
+        // (7-9) الحوكمة — إعادة استخدام كامل للكيانات القائمة بلا أيّ تعديل عليها.
+        // الشدّة تُجلَب مع الحالة: منها يُشتقّ «معطَّل» (Critical مفتوح) و«معرَّض للخطر» (High مفتوح).
+        var riskRows = await _db.Risks.AsNoTracking()
+            .Where(r => r.ProjectId == projectId).Select(r => new { r.Status, r.Severity }).ToListAsync(ct);
         var decisionStatuses = await _db.Decisions.AsNoTracking()
             .Where(d => d.ProjectId == projectId).Select(d => d.Status).ToListAsync(ct);
         var noteStatuses = await _db.ManagementNotes.AsNoTracking()
@@ -148,14 +160,11 @@ public class ProjectOverviewService : IProjectOverviewService
             Total: deliverableRows.Count,
             Completed: deliverableRows.Count(d => d.Status == ProjectDeliverableStatus.Delivered),
             Pending: deliverableRows.Count(d => d.Status is ProjectDeliverableStatus.NotStarted or ProjectDeliverableStatus.InProgress),
-            Delayed: deliverableRows.Count(d => d.Status == ProjectDeliverableStatus.Delayed),
-            OverallProgressPercent: deliverableRows.Count == 0
-                ? null
-                : ProjectHealthPolicy.Round(deliverableRows.Average(d => d.ProgressPercent)));
+            Delayed: deliverableRows.Count(d => d.Status == ProjectDeliverableStatus.Delayed));
 
         var governance = new ProjectOverviewGovernanceDto(
-            RisksTotal: riskStatuses.Count,
-            RisksOpen: riskStatuses.Count(s => s != RiskStatus.Closed),
+            RisksTotal: riskRows.Count,
+            RisksOpen: riskRows.Count(r => r.Status != RiskStatus.Closed),
             DecisionsTotal: decisionStatuses.Count,
             DecisionsPending: decisionStatuses.Count(s => s == DecisionStatus.Proposed),
             NotesTotal: noteStatuses.Count,
@@ -168,18 +177,64 @@ public class ProjectOverviewService : IProjectOverviewService
             AttributesCount: strategy?.AttributesCount ?? 0);
 
         var now = DateTime.UtcNow;
+        var today = DateOnly.FromDateTime(now);
         var scheduleScore = ProjectHealthPolicy.ComputeScheduleScore(
-            core.StartDate, core.EndDate, DateOnly.FromDateTime(now), core.ProgressPercent, core.Status);
+            core.StartDate, core.EndDate, today, core.ProgressPercent, core.Status);
+
+        // **نفس بانِي الإشارات الذي يستعمله مسار الكتابة** (ProjectHealthService) بحرفه: لولاه
+        // لأمكن أن تعرض اللوحة «أخضر» بينما الحالة المخزَّنة «معطَّل»، فيقرأ المدير طمأنينةً
+        // من الشاشة ويقرأ الفلتر تعطّلًا من العمود — والرقمان من نفس النظام.
+        var signals = ProjectHealthPolicy.BuildOperationalSignals(
+            deliverableRows.Select(d => new ProjectHealthPolicy.DeliverableSignalInput(d.Status, d.DueDate)).ToList(),
+            riskRows.Where(r => r.Status != RiskStatus.Closed).Select(r => r.Severity).ToList(),
+            today,
+            core.ProgressMode);
 
         var snapshot = ProjectHealthPolicy.ComputeHealth(
-            kpiScore.Score, core.ProgressPercent, scheduleScore, now, kpiScore.AllWeightsZero);
+            kpiScore.Score, core.ProgressPercent, scheduleScore, now, kpiScore.AllWeightsZero, signals);
 
         // نفس مُحوِّل المسار الآخر حرفيًّا — عقد صحّة واحد لا شكلان.
         // **قراءة خالصة**: لا كتابة على أعمدة الصحّة من مسار GET؛ الختم المخزَّن يُعرَض كما هو
         // في `PersistedAtUtc` ليعرف المستهلك متى جرى آخر احتساب **محفوظ**.
         var health = ProjectHealthService.Map(snapshot, coreRow.HealthComputedAtUtc);
 
+        // (11) أسماء المسنَدين — استعلامان ثابتان (مستخدمون + فريق) لا استعلام لكلّ دور.
+        var named = await ResolveAssigneeNamesAsync(core, ct);
+
+        var access = await _auth.BuildCapabilitiesAsync(scope.Value!, ct);
+
         return Result<ProjectOverviewDto>.Success(new ProjectOverviewDto(
-            core, health, objectivesDto, kpis, deliverables, governance, strategyDto));
+            named, health, objectivesDto, kpis, deliverables, governance, strategyDto, access));
+    }
+
+    /// <summary>
+    /// يملأ أسماء مالك المشروع وقائد الفريق ومدير الحساب والفريق المالك. الأسماء تُعرَض للبشر،
+    /// والمعرّفات تبقى كما هي للربط — فلا يُستبدَل أحدهما بالآخر.
+    /// </summary>
+    private async Task<ProjectOverviewCoreDto> ResolveAssigneeNamesAsync(
+        ProjectOverviewCoreDto core, CancellationToken ct)
+    {
+        var personIds = new[] { core.ProjectOwnerId, core.TeamLeaderId, core.AccountManagerId }
+            .Where(x => x is not null).Select(x => x!.Value).Distinct().ToList();
+
+        var personNames = personIds.Count == 0
+            ? new Dictionary<Guid, string>()
+            : await _db.Users.AsNoTracking().Where(u => personIds.Contains(u.Id))
+                .ToDictionaryAsync(u => u.Id, u => u.FullName, ct);
+
+        string? teamName = null;
+        if (core.OwnerTeamId is Guid teamId)
+            teamName = await _db.Teams.AsNoTracking().Where(t => t.Id == teamId)
+                .Select(t => t.NameAr).FirstOrDefaultAsync(ct);
+
+        string? Name(Guid? id) => id is Guid g && personNames.TryGetValue(g, out var n) ? n : null;
+
+        return core with
+        {
+            ProjectOwnerName = Name(core.ProjectOwnerId),
+            TeamLeaderName = Name(core.TeamLeaderId),
+            AccountManagerName = Name(core.AccountManagerId),
+            OwnerTeamName = teamName,
+        };
     }
 }
