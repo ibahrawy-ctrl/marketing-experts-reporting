@@ -996,6 +996,15 @@ function EditProjectForm({
   const [notes, setNotes] = useState(project.notes ?? '');
   const [err, setErr] = useState<string | null>(null);
 
+  // `/directory/users` مُنطَّق بالصلاحيّة: مديرٌ قد لا يرى فيه مَن أُسنِد إليه المشروع أصلًا
+  // (مثال مقيس على TEST: 4 مستخدمين للمدير مقابل 17 للمدير العامّ). وبلا خيارٍ مقابلٍ للقيمة
+  // القائمة يعرض المنتقي «— بدون —» على إسنادٍ **موجود فعلًا**، فيكذب النموذج على من يقرؤه.
+  // الاسم معروف سلفًا من `ProjectDto` نفسه، فإضافته خيارًا لا تكشف شيئًا لم يُكشف.
+  const withAssigned = (id: string, fullName: string | null) => {
+    const list = users.data ?? [];
+    return id && !list.some((u) => u.id === id) ? [{ id, fullName: fullName ?? id }, ...list] : list;
+  };
+
   async function submit() {
     setErr(null);
     if (!name.trim()) {
@@ -1061,7 +1070,7 @@ function EditProjectForm({
         <Field label="مدير العميل">
           <Select value={accountManagerId} onChange={(e) => setAccountManagerId(e.target.value)}>
             <option value="">— بدون —</option>
-            {(users.data ?? []).map((u) => (
+            {withAssigned(accountManagerId, project.accountManagerName).map((u) => (
               <option key={u.id} value={u.id}>
                 {u.fullName}
               </option>
@@ -1071,7 +1080,7 @@ function EditProjectForm({
         <Field label="مالك المشروع">
           <Select value={projectOwnerId} onChange={(e) => setProjectOwnerId(e.target.value)}>
             <option value="">— بدون —</option>
-            {(users.data ?? []).map((u) => (
+            {withAssigned(projectOwnerId, project.projectOwnerName).map((u) => (
               <option key={u.id} value={u.id}>
                 {u.fullName}
               </option>
@@ -1081,7 +1090,7 @@ function EditProjectForm({
         <Field label="قائد الفريق">
           <Select value={teamLeaderId} onChange={(e) => setTeamLeaderId(e.target.value)}>
             <option value="">— بدون —</option>
-            {(users.data ?? []).map((u) => (
+            {withAssigned(teamLeaderId, project.teamLeaderName).map((u) => (
               <option key={u.id} value={u.id}>
                 {u.fullName}
               </option>
