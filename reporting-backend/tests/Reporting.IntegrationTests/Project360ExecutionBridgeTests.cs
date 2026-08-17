@@ -287,8 +287,74 @@ public class Project360ExecutionBridgeTests
     }
 
     // ==================================================================
+    // R2.1 · GAP-R21-03 — أثر التحديث التشغيليّ المباشر
+    // ==================================================================
+
+    /// <summary>
+    /// التحديث المباشر (بلا ادّعاء) كان يكتب الرقم الجديد ويمحو السابق بلا أثر، فيتعذّر
+    /// بعدها معرفة مَن غيّر ماذا ومن أيّ قيمة. صار يُقيَّد في **نفس** سلسلة جسر التنفيذ:
+    /// صفّ محسوم سلفًا رافعه ومراجِعه الشخص نفسه — وبهذا التطابق وحده يُميَّز عن قبول
+    /// ادّعاء غيرِه، بلا عمود جديد ولا هجرة.
+    /// </summary>
+    [Fact]
+    public async Task DirectProgressUpdate_LeavesATrailRow_CarryingTheActorTheReasonAndThePreviousValue()
+    {
+        var fx = await NewFixtureAsync();
+
+        var first = await UpdateProgressDirectlyAsync(fx.OwnerTeamLeader, fx.ProjectId, fx.DeliverableId, 35m, "دفعة أولى");
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        var second = await UpdateProgressDirectlyAsync(fx.OwnerTeamLeader, fx.ProjectId, fx.DeliverableId, 60m, "دفعة ثانية");
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+
+        var trail = await GetAsync<List<ProjectExecutionProposalDto>>(
+            fx.OwnerTeamLeader, $"/api/projects/{fx.ProjectId}/execution-proposals");
+
+        var rows = trail.Where(r => r.DeliverableId == fx.DeliverableId).OrderBy(r => r.ProposedProgressPercent).ToList();
+        Assert.Equal(2, rows.Count);
+
+        // القيمة السابقة متسلسلة فعلًا (0 ⟵ 35 ⟵ 60): بلا هذا لا يكون الأثر قابلًا للمراجعة ولا للعكس.
+        Assert.Equal(0m, rows[0].PreviousProgressPercent);
+        Assert.Equal(35m, rows[1].PreviousProgressPercent);
+        Assert.Equal("دفعة ثانية", rows[1].ExecutionNote);
+
+        foreach (var row in rows)
+        {
+            Assert.Equal(ExecutionProposalStatus.Accepted, row.Status);
+            // علامة «التحديث المباشر»: الرافع هو المراجِع نفسه — الفعل من طرف واحد لا من طرفين.
+            Assert.Equal(row.ProposedById, row.ReviewedById);
+            Assert.NotNull(row.ReviewedAtUtc);
+            // ولا يُعرَض على أحد للمراجعة: لا شيء معلَّق ينتظر حسمًا.
+            Assert.False(row.CanReview);
+        }
+    }
+
+    /// <summary>
+    /// الأثر لا يُنشأ إلّا لمن سُمح له فعلًا: منع الموظّف من الكتابة المباشرة يجب ألّا
+    /// يترك خلفه صفًّا في السلسلة، وإلّا لصار السجلّ يروي محاولات لم تقع.
+    /// </summary>
+    [Fact]
+    public async Task DirectProgressUpdate_WhenForbidden_WritesNoTrailRowAtAll()
+    {
+        var fx = await NewFixtureAsync();
+
+        var res = await UpdateProgressDirectlyAsync(fx.TeamEmployee, fx.ProjectId, fx.DeliverableId, 45m, "محاولة غير مسموحة");
+        Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
+
+        var trail = await GetAsync<List<ProjectExecutionProposalDto>>(
+            fx.OwnerTeamLeader, $"/api/projects/{fx.ProjectId}/execution-proposals");
+        Assert.Empty(trail.Where(r => r.DeliverableId == fx.DeliverableId));
+    }
+
+    // ==================================================================
     // المساعدات
     // ==================================================================
+
+    private static Task<HttpResponseMessage> UpdateProgressDirectlyAsync(
+        HttpClient client, Guid projectId, Guid deliverableId, decimal percent, string? note) =>
+        client.PatchAsJsonAsync(
+            $"/api/projects/{projectId}/contract-deliverables/{deliverableId}/progress",
+            new UpdateProjectContractDeliverableProgressRequest(
+                ProjectDeliverableStatus.InProgress, percent, Note: note));
 
     private static async Task<ProjectExecutionProposalDto> ProposeAsync(
         HttpClient client,

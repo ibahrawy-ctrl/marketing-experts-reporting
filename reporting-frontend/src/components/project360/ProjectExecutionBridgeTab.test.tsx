@@ -232,6 +232,47 @@ describe('جسر التنفيذ — الحسم', () => {
     expect(screen.getByText(/ريم القحطاني/)).toBeInTheDocument();
   });
 
+  // ---- R2.1 · GAP-R21-03: تمييز التحديث المباشر عن قبول الادّعاء ----
+  // التحديث التشغيليّ المباشر صار يُقيَّد في السلسلة نفسها كي تُعرف قيمته السابقة وفاعله،
+  // ولولا التمييز لقُرِئ فعلُ طرفٍ واحد كأنّه مرّ بدورة مراجعة من طرفين.
+  it('يميّز التحديث المباشر حين يكون الرافع هو المراجِع نفسه', async () => {
+    getBodies[PROPOSALS_URL] = [
+      proposal({
+        status: 'Accepted',
+        canReview: false,
+        proposedById: 'user-tl',
+        proposedByFullName: 'قائد الفريق',
+        reviewedById: 'user-tl',
+        reviewedByFullName: 'قائد الفريق',
+        reviewedAtUtc: '2026-08-17T09:00:00Z',
+        previousProgressPercent: 30,
+      }),
+    ];
+    renderTab();
+    expect(await screen.findByText('تحديث مباشر')).toBeInTheDocument();
+    expect(screen.getByText(/حدّثه قائد الفريق/)).toBeInTheDocument();
+    expect(screen.getByText(/طُبِّق مباشرةً/)).toBeInTheDocument();
+    expect(screen.getByText(/كانت النسبة قبل التطبيق/)).toBeInTheDocument();
+  });
+
+  it('لا يصف قبول ادّعاء غيرِه بأنّه تحديث مباشر', async () => {
+    getBodies[PROPOSALS_URL] = [
+      proposal({
+        status: 'Accepted',
+        canReview: false,
+        proposedById: 'user-emp',
+        proposedByFullName: 'منفّذ',
+        reviewedById: 'user-tl',
+        reviewedByFullName: 'قائد الفريق',
+        reviewedAtUtc: '2026-08-17T09:00:00Z',
+        previousProgressPercent: 30,
+      }),
+    ];
+    renderTab();
+    expect(await screen.findByText(/رفعه منفّذ/)).toBeInTheDocument();
+    expect(screen.queryByText('تحديث مباشر')).not.toBeInTheDocument();
+  });
+
   it('يرشّح بالحالة عبر معامل الاستعلام لا في العميل', async () => {
     const spy = vi.spyOn(api, 'get');
     renderTab();

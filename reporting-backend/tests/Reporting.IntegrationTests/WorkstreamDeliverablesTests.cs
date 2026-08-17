@@ -410,14 +410,18 @@ public class WorkstreamDeliverablesTests
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
     }
 
-    // ===== 24: TeamLeader وله رؤية المشروع مُستثنى من إدارة الخطّة → 403 (البوّابة تستبعده) =====
+    // ===== 24: قيادة الفريق المالك وحدها لا تكفي لإدارة الخطّة → 403 =====
+    /// <summary>
+    /// **الرؤية ليست القدرة**: قائد الفريق المالك يرى المشروع لأنّ فريقه يملكه، لكنّه ليس
+    /// مسنَدًا على المشروع نفسه (<c>Project.TeamLeaderId</c> فارغ). الحاجز هنا هو **غياب
+    /// الإسناد** لا الدور — والاختبار 25 يقابله بنفس الدور ومعه الإسناد فيمرّ.
+    /// </summary>
     [Fact]
-    public async Task TeamLeader_With_Project_View_Cannot_Manage_Plan()
+    public async Task TeamLeader_Leading_OwnerTeam_Only_Cannot_Manage_Plan()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var (projectId, workstreamId) = await CreateProjectWorkstreamAsync(admin);
         var (tl, tlId) = await TestAuth.CreateUserAsync(_factory, Roles.TeamLeader);
-        // TeamLeader يقود الفريق المالك ⇒ يرى المشروع، لكنه ليس في ProjectPlanManagers ولا مدير حساباته.
         await SetOwnerTeamWithLeaderAsync(projectId, tlId);
 
         // يقرأ (رؤية) بنجاح لكن لا يدير.
@@ -430,7 +434,82 @@ public class WorkstreamDeliverablesTests
         Assert.Equal(HttpStatusCode.Forbidden, write.StatusCode);
     }
 
+    // ===== 25 (R2.1 · GAP-R21-01): قائد الفريق **المسنَد على المشروع** يدير خطّة أهدافه =====
+    /// <summary>
+    /// توسيع P360-WF-R2 مسّ <c>ProjectWorkstreamService</c> وحده وترك هذه الخدمة على الشرط
+    /// القديم، فصار قائد الفريق يملك تيّار العمل ولا يملك مخرَجات خطّته — تناقض داخل السطح
+    /// نفسه. الشرطان الآن متطابقان، وهذا الاختبار هو ما يمنع افتراقهما مجدَّدًا.
+    /// </summary>
+    [Fact]
+    public async Task AssignedTeamLeader_Can_Manage_Plan_Deliverables()
+    {
+        var admin = await TestAuth.LoginAsAdminAsync(_factory);
+        var (projectId, workstreamId) = await CreateProjectWorkstreamAsync(admin);
+        var (tl, tlId) = await TestAuth.CreateUserAsync(_factory, Roles.TeamLeader);
+        await SetProjectTeamLeaderAsync(projectId, tlId);
+
+        var created = await tl.PostAsJsonAsync(
+            $"/api/projects/{projectId}/workstreams/{workstreamId}/deliverables",
+            new CreateWorkstreamDeliverableRequest(TypePost, PlannedQuantity: 3));
+        Assert.Equal(HttpStatusCode.OK, created.StatusCode);
+        var id = (await created.ReadAsync<WorkstreamDeliverableDto>())!.Id;
+
+        var updated = await tl.PutAsJsonAsync(
+            $"/api/projects/{projectId}/workstreams/{workstreamId}/deliverables/{id}",
+            new UpdateWorkstreamDeliverableRequest(Name: "محدَّث بواسطة قائد الفريق", PlannedQuantity: 5));
+        Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
+    }
+
+    // ===== 26 (R2.1 · GAP-R21-01): مالك المشروع كذلك — نفس الشرط لا شرط ثانٍ =====
+    [Fact]
+    public async Task AssignedProjectOwner_Can_Manage_Plan_Deliverables()
+    {
+        var admin = await TestAuth.LoginAsAdminAsync(_factory);
+        var (projectId, workstreamId) = await CreateProjectWorkstreamAsync(admin);
+        var (owner, ownerId) = await TestAuth.CreateUserAsync(_factory, Roles.Employee);
+        await SetProjectOwnerAsync(projectId, ownerId);
+
+        var res = await owner.PostAsJsonAsync(
+            $"/api/projects/{projectId}/workstreams/{workstreamId}/deliverables",
+            new CreateWorkstreamDeliverableRequest(TypePost, PlannedQuantity: 3));
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+    }
+
+    // ===== 27 (R2.1 · GAP-R21-01): والإسناد لا يتسرّب — قائد مشروع آخر يُمنَع =====
+    [Fact]
+    public async Task AssignedTeamLeader_Of_Another_Project_Is_Still_Forbidden()
+    {
+        var admin = await TestAuth.LoginAsAdminAsync(_factory);
+        var (projectA, workstreamA) = await CreateProjectWorkstreamAsync(admin);
+        var (projectB, _) = await CreateProjectWorkstreamAsync(admin);
+        var (tlB, tlBId) = await TestAuth.CreateUserAsync(_factory, Roles.TeamLeader);
+        await SetProjectTeamLeaderAsync(projectB, tlBId);
+
+        var res = await tlB.PostAsJsonAsync(
+            $"/api/projects/{projectA}/workstreams/{workstreamA}/deliverables",
+            new CreateWorkstreamDeliverableRequest(TypePost, PlannedQuantity: 3));
+        Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
+    }
+
     // ===== مساعدون =====
+    private async Task SetProjectTeamLeaderAsync(Guid projectId, Guid userId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var project = await db.Projects.FirstAsync(p => p.Id == projectId);
+        project.TeamLeaderId = userId;
+        await db.SaveChangesAsync();
+    }
+
+    private async Task SetProjectOwnerAsync(Guid projectId, Guid userId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var project = await db.Projects.FirstAsync(p => p.Id == projectId);
+        project.ProjectOwnerId = userId;
+        await db.SaveChangesAsync();
+    }
+
     private static async Task DeactivateWorkstreamAsync(HttpClient admin, Guid projectId, Guid workstreamId)
         => (await admin.PatchAsync($"/api/projects/{projectId}/workstreams/{workstreamId}/deactivate", null))
             .EnsureSuccessStatusCode();

@@ -97,6 +97,8 @@ const uploadDoc = vi.fn().mockResolvedValue({});
 // صلاحية الكتابة: مدير أساسيّ مخوَّل، أو مدير الحساب للعميل (accountManagerId = 'am1').
 let canEditClientCore = true;
 let currentUserId = 'u-admin';
+// صفوف تبويب «مشاريع العميل» — تُملأ داخل الاختبار الذي يحتاجها.
+let projectRows: Record<string, unknown>[] = [];
 
 vi.mock('react-router-dom', () => ({
   useParams: () => ({ clientId: 'c1' }),
@@ -121,7 +123,7 @@ vi.mock('../lib/useClients', () => ({
   useClientReports: () => ({ data: [], isLoading: false, isError: false }),
   useUpdateClient: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useArchiveClient: () => ({ mutate: vi.fn(), isPending: false }),
-  useProjects: () => ({ data: [], isLoading: false, isError: false }),
+  useProjects: () => ({ data: projectRows, isLoading: false, isError: false }),
   useCreateProject: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useClientContacts: () => ({ data: [], isLoading: false, isError: false }),
   useCreateClientContact: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -162,6 +164,7 @@ import ClientDetailPage from './ClientDetailPage';
 beforeEach(() => {
   canEditClientCore = true;
   currentUserId = 'u-admin';
+  projectRows = [];
   docsState.data = [DOC];
   docsState.isLoading = false;
   usageState.data = USAGE;
@@ -479,4 +482,35 @@ it('يعرض ملفّ العميل لمدير العميل دون إظهار أ�
   expect(screen.getAllByText('عميل تجريبي').length).toBeGreaterThan(0);
   expect(screen.getAllByText('مدير العميل').length).toBeGreaterThan(0);
   expect(screen.queryByRole('button', { name: 'تعديل بيانات العميل' })).not.toBeInTheDocument();
+});
+
+// ---- R2.1 · GAP-R21-02: ملخّص مشاريع العميل يُظهر التقدّم والصحّة ----
+// سهم §5.4 «⟵ Client 360 / ملخّص المشاريع» كان مقطوعًا بصريًّا: الـDTO يحمل التقدّم والصحّة
+// منذ CPW-R3 والجدول لا يعرضهما، فيبدو أثر قبول الادّعاء وكأنّه لم يصل إلى ملفّ العميل.
+it('يعرض تبويب المشاريع نسبة التقدّم وطريقة احتسابها وحالة الصحّة كما وردت من الخادم', () => {
+  projectRows = [
+    {
+      id: 'p1', clientId: 'c1', clientName: 'عميل تجريبي', name: 'مشروع الموقع',
+      serviceType: 'Website', status: 'Active', ownerTeamId: null, ownerTeamName: 'فريق التطوير',
+      accountManagerId: 'am1', accountManagerName: 'مدير الحساب', startDate: null, endDate: null,
+      notes: null, createdAtUtc: '2026-07-01T00:00:00Z', updatedAtUtc: null,
+      canHardDelete: false, deleteBlockReason: null,
+      projectOwnerId: null, projectOwnerName: null, teamLeaderId: null, teamLeaderName: null,
+      progressPercent: 42.5, progressMode: 'Weighted', progressCalculatedAtUtc: '2026-08-17T10:00:00Z',
+      progressSourceDeliverableCount: 2,
+      healthStatus: 'AtRisk', healthPercent: 61.25, healthComputedAtUtc: '2026-08-17T10:00:00Z',
+      canManageStructure: true, canOperate: true,
+    },
+  ];
+  render(<ClientDetailPage />);
+  fireEvent.click(screen.getByRole('button', { name: 'المشاريع' }));
+
+  expect(screen.getByText('التقدّم')).toBeInTheDocument();
+  expect(screen.getByText('الصحّة')).toBeInTheDocument();
+  // النصّ الحرفيّ بالأرقام العربيّة-الهنديّة هو ما يقرؤه المستخدم فعلًا (`formatPercent` ⟵ `ar-EG`).
+  expect(screen.getByText('٤٢٫٥٪')).toBeInTheDocument();
+  // طريقة الاحتساب معروضة كي لا تُقرأ نسبةٌ سقطت أوزانها كأنّها موزونة.
+  expect(screen.getByText('متوسّط موزون بأوزان المخرَجات')).toBeInTheDocument();
+  // 61.25 مقرَّبة إلى منزلة واحدة ⟹ ٦١٫٣٪ — التقريب جزء من العقد المعروض لا تفصيل عرض.
+  expect(screen.getByText('٦١٫٣٪')).toBeInTheDocument();
 });

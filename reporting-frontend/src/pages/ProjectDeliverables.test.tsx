@@ -20,7 +20,8 @@ const updateMutate = vi.fn().mockResolvedValue({});
 const activateMutate = vi.fn();
 const deactivateMutate = vi.fn();
 
-// true ⇒ hasAnyRole يعيد true لأدوار الإدارة ⇒ canManagePlan=true.
+// **القدرة تأتي من الخادم لا من الدور (R2.1)**: `canManagePlan` صار قراءةً لـ`ProjectDto.canOperate`
+// المحسوبة بنفس حرّاس الخادم، فلا تُشتقّ من الدور في المتصفّح. هذا العلَم يحاكي ردّ الخادم.
 let planManager = true;
 
 vi.mock('react-router-dom', () => ({
@@ -42,6 +43,7 @@ vi.mock('../lib/useClients', () => ({
       id: 'p1', clientId: 'c1', clientName: 'عميل تجريبي', name: 'مشروع الموقع',
       serviceType: 'Website', status: 'Active', ownerTeamName: null, accountManagerName: null,
       accountManagerId: null, startDate: null, endDate: null, createdAtUtc: '2026-07-01T00:00:00Z', notes: null,
+      canOperate: planManager, canManageStructure: planManager,
     },
     isLoading: false, isError: false, refetch: vi.fn(),
   }),

@@ -17,6 +17,8 @@ const activateMutate = vi.fn();
 const deactivateMutate = vi.fn();
 
 let canManage = true;
+// حين يكون غير null يُغلِّب قدرة الخادم على علَم الدور — به وحده يُختبَر أنّ الشاشة تتبع الخادم.
+let serverCanOperate: boolean | null = null;
 
 vi.mock('react-router-dom', () => ({
   useParams: () => ({ projectId: 'p1' }),
@@ -37,6 +39,9 @@ vi.mock('../lib/useClients', () => ({
       id: 'p1', clientId: 'c1', clientName: 'عميل تجريبي', name: 'مشروع الموقع',
       serviceType: 'Website', status: 'Active', ownerTeamName: null, accountManagerName: null,
       startDate: null, endDate: null, createdAtUtc: '2026-07-01T00:00:00Z', notes: null,
+      // **القدرة تأتي من الخادم لا من الدور (R2.1)**: الشاشة تقرأ `canOperate` من ProjectDto،
+      // ولو بقي هذا المُثبَّت يحاكي الدور وحده لاختبرنا سلوكًا لم يعد موجودًا.
+      canOperate: serverCanOperate ?? canManage, canManageStructure: canManage,
     },
     isLoading: false, isError: false, refetch: vi.fn(),
   }),
@@ -89,6 +94,7 @@ beforeEach(() => {
   wsState.isLoading = false;
   wsState.isError = false;
   canManage = true;
+  serverCanOperate = null;
   createMutate.mockClear();
   updateMutate.mockClear();
   activateMutate.mockClear();
@@ -184,4 +190,27 @@ it('تعرض حالة الخطأ حين isError', () => {
   wsState.isError = true;
   render(<ProjectDetailPage />);
   expect(screen.getByText('تعذّر عرض أهداف العمل')).toBeInTheDocument();
+});
+
+// ---- 9 (R2.1 · GAP-R21-01): القدرة تُقرأ من الخادم لا من دور المتصفّح ----
+// قائد الفريق ليس من أدوار إدارة العملاء، ومع ذلك الخادم يمنحه `canOperate` على مشروعه
+// بعينه. قبل الإصلاح كانت الشاشة تشتقّ الصلاحيّة من الدور فتُخفي كلّ أزرار أهداف العمل
+// عنه بينما الخادم يقبل كتابته — شاشة تكذّب ردَّ الخادم.
+it('قائد الفريق يرى إدارة أهداف العمل حين يمنحه الخادم canOperate رغم أنّ دوره لا يدير العملاء', () => {
+  canManage = false;
+  serverCanOperate = true;
+  wsState.data = [ws({ name: 'تطوير الموقع' })];
+  render(<ProjectDetailPage />);
+  expect(screen.getByText('إضافة هدف عمل')).toBeInTheDocument();
+  expect(screen.getByText('تعديل')).toBeInTheDocument();
+});
+
+// ---- 10 (R2.1 · GAP-R21-01): ومنع الطرف المقابل — منع الخادم يُخفي الأزرار ----
+it('يُخفي إدارة أهداف العمل حين يمنع الخادم canOperate ولو كان الدور يدير العملاء', () => {
+  canManage = true;
+  serverCanOperate = false;
+  wsState.data = [ws({ name: 'تطوير الموقع' })];
+  render(<ProjectDetailPage />);
+  expect(screen.queryByText('إضافة هدف عمل')).not.toBeInTheDocument();
+  expect(screen.queryByText('تعديل')).not.toBeInTheDocument();
 });
