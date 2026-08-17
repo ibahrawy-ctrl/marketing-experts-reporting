@@ -10,7 +10,8 @@ namespace Reporting.Infrastructure.Services;
 /// <summary>
 /// إدارة تيّارات العمل (أهداف العمل) داخل المشروع (P1). القراءة مُنَطَّقة بنطاق رؤية المشروع (IClientProjectAccess).
 /// الكتابة محكومة بنطاق المشروع عبر <see cref="CanManagePlanAsync"/> (لا بالدور وحده): أدوار إدارة الخطّة
-/// (ProjectPlanManagers = Admin/CEO/GM/Manager، بلا TeamLeader) أو مدير حسابات المشروع نفسه — كنمط خطّة المخرَجات (P2).
+/// (ProjectPlanManagers = Admin/CEO/GM/Manager) أو **مالك المشروع أو قائد الفريق أو مدير الحساب المسنَد على هذا
+/// المشروع بعينه** — كنمط خطّة المخرَجات (P2).
 /// لا حذف نهائيّ — التعطيل فقط. نوع تيار العمل يُتحقَّق منه مقابل كتالوج التصنيفات (Domain=workstream_type) بلا مفتاح أجنبيّ.
 /// </summary>
 public class ProjectWorkstreamService : IProjectWorkstreamService

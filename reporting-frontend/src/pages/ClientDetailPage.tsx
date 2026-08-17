@@ -78,6 +78,12 @@ import {
   formatBytes,
 } from '../lib/format';
 import { apiErrorMessage } from '../lib/api';
+import {
+  percentOrDash,
+  projectHealthStatusLabel,
+  projectHealthStatusTone,
+  projectProgressModeLabel,
+} from '../lib/project360Format';
 import type {
   ClientStatus,
   ProjectStatus,
@@ -909,6 +915,8 @@ function ProjectsTab({ client: c, canManage }: { client: ClientDto; canManage: b
                 <th className="px-3 py-2.5 font-semibold">المشروع</th>
                 <th className="px-3 py-2.5 font-semibold">الخدمة</th>
                 <th className="px-3 py-2.5 font-semibold">الحالة</th>
+                <th className="px-3 py-2.5 font-semibold">التقدّم</th>
+                <th className="px-3 py-2.5 font-semibold">الصحّة</th>
                 <th className="px-3 py-2.5 font-semibold">الفريق</th>
                 <th className="px-3 py-2.5 font-semibold">البداية</th>
                 <th className="px-3 py-2.5 font-semibold">النهاية</th>
@@ -922,6 +930,21 @@ function ProjectsTab({ client: c, canManage }: { client: ClientDto; canManage: b
                   <td className="px-3 py-2.5 text-ink-2">{serviceTypeLabel[p.serviceType]}</td>
                   <td className="px-3 py-2.5">
                     <Badge tone={projectStatusTone(p.status)}>{projectStatusLabel[p.status]}</Badge>
+                  </td>
+                  {/* التقدّم والصحّة يصلان من الخادم داخل ProjectDto ذاته: الرقم هنا هو **نفس**
+                      رقم Project 360 لا احتسابًا ثانيًا في المتصفّح، ومعه طريقة احتسابه كي لا
+                      تُقرأ نسبةٌ سقطت أوزانها كأنّها نسبة موزونة. */}
+                  <td className="px-3 py-2.5">
+                    <span className="font-semibold text-navy">{percentOrDash(p.progressPercent)}</span>
+                    <span className="block text-[11px] text-ink-2">
+                      {projectProgressModeLabel[p.progressMode]}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <Badge tone={projectHealthStatusTone(p.healthStatus)}>
+                      {projectHealthStatusLabel[p.healthStatus]}
+                    </Badge>
+                    <span className="block text-[11px] text-ink-2">{percentOrDash(p.healthPercent)}</span>
                   </td>
                   <td className="px-3 py-2.5 text-ink-2">{p.ownerTeamName ?? '—'}</td>
                   <td className="px-3 py-2.5 text-ink-2">{formatDate(p.startDate)}</td>

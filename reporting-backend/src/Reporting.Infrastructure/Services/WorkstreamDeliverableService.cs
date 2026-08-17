@@ -12,7 +12,7 @@ namespace Reporting.Infrastructure.Services;
 /// ذات معرّف ثابت (مثل «١٢ منشور») — <b>ليست عنصرًا فرديًّا منفَّذًا</b>؛ لا يوجد كيان DeliverableItem الآن.
 /// القراءة مُنَطَّقة بنطاق رؤية المشروع (IClientProjectAccess). الكتابة محكومة داخل الخدمة عبر
 /// <see cref="CanManagePlanAsync"/> بنطاق المشروع (لا بالدور وحده): أدوار الإدارة (ProjectPlanManagers)
-/// أو مدير حسابات المشروع نفسه (Project.AccountManagerId == المستخدم الحالي). لا حذف نهائيّ — التعطيل فقط.
+/// أو **مالك المشروع أو قائد الفريق أو مدير الحساب المسنَد على هذا المشروع بعينه**. لا حذف نهائيّ — التعطيل فقط.
 /// نوع المخرَج يُتحقَّق منه مقابل كتالوج التصنيفات (Domain=deliverable) وسياق الاستخدام (Domain=usage_context)
 /// بلا مفتاح أجنبيّ. **سجلّ تخطيط فقط — لا يُسجَّل أيّ تنفيذ فعليّ هنا (يأتي في مرحلة لاحقة P4).**
 /// </summary>
@@ -182,15 +182,22 @@ public class WorkstreamDeliverableService : IWorkstreamDeliverableService
 
     /// <summary>
     /// حارس إدارة خطّة الإنتاج بنطاق المشروع (لا بالدور وحده). يُطبَّق بعد التحقّق من رؤية المشروع:
-    /// إمّا دور إداري (ProjectPlanManagers = Admin/CEO/GM/Manager، بلا TeamLeader)، أو مدير حسابات
-    /// هذا المشروع نفسه (Project.AccountManagerId == المستخدم الحالي). يمنع القائد/الموظّف من الكتابة،
-    /// ويمنع مدير حسابات مشروع آخر من الكتابة على مشروع ليس ضمن محفظته.
+    /// إمّا دور إداري (ProjectPlanManagers = Admin/CEO/GM/Manager)، أو **أحد أصحاب هذا المشروع
+    /// بعينه**: مالك المشروع أو قائد الفريق أو مدير الحساب. يمنع الموظّف من الكتابة، ويمنع أيًّا من
+    /// هؤلاء من الكتابة على مشروع ليس مسنَدًا إليه ولو كان مرئيًّا له.
+    ///
+    /// <para>
+    /// **لماذا وُسِّع (R2.1)**: توسيع P360-WF-R2 مسّ <c>ProjectWorkstreamService</c> وحده وترك هذه
+    /// الخدمة على الشرط القديم، فصار قائد الفريق يملك تيّار العمل ولا يملك مخرَجات خطّته — تناقض
+    /// في السطح نفسه لا في سطحين. الشرطان الآن متطابقان لفظًا لا بالمصادفة.
+    /// </para>
     /// </summary>
     private async Task<bool> CanManagePlanAsync(Guid projectId, Guid uid, CancellationToken ct)
     {
         if (_currentUser.IsInAnyRole(Roles.ProjectPlanManagers)) return true;
         return await _db.Projects.AsNoTracking()
-            .AnyAsync(p => p.Id == projectId && p.AccountManagerId == uid, ct);
+            .AnyAsync(p => p.Id == projectId
+                        && (p.AccountManagerId == uid || p.TeamLeaderId == uid || p.ProjectOwnerId == uid), ct);
     }
 
     /// <summary>

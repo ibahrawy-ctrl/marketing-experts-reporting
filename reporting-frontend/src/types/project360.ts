@@ -394,6 +394,8 @@ export interface UpdateProjectContractDeliverableProgressRequest {
   progressPercent: number;
   completedQuantity?: number | null;
   deliveredAtUtc?: string | null;
+  /** سبب التحديث المباشر — يُحفَظ في أثر تقدّم المخرَج (R2.1 §5.5). */
+  note?: string | null;
 }
 
 // ----------------------------------------------------------------------

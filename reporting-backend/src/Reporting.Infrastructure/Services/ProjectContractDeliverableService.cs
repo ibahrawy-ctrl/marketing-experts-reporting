@@ -3,6 +3,7 @@ using Reporting.Application.Audit;
 using Reporting.Application.Common;
 using Reporting.Application.Projects360;
 using Reporting.Domain.Entities.Projects360;
+using Reporting.Domain.Enums;
 using Reporting.Infrastructure.Persistence;
 
 namespace Reporting.Infrastructure.Services;
@@ -184,11 +185,33 @@ public class ProjectContractDeliverableService : IProjectContractDeliverableServ
             ValidateQuantity(entity.PlannedQuantity, completed));
         if (invalid is not null) return Result<ProjectContractDeliverableDto>.Failure(invalid.Value.Message, invalid.Value.Code);
 
+        var previousProgress = entity.ProgressPercent;
+
         entity.Status = request.Status;
         entity.ProgressPercent = request.ProgressPercent;
         entity.CompletedQuantity = completed;
         entity.DeliveredAtUtc = request.DeliveredAtUtc ?? entity.DeliveredAtUtc;
         entity.UpdatedAtUtc = DateTime.UtcNow;
+
+        // **أثر التحديث المباشر (R2.1 §5.5)**: التحديث التشغيليّ المباشر كان يكتب الرقم الجديد
+        // ويمحو السابق بلا أثر، فيتعذّر معرفة مَن غيّر ماذا ومن أيّ قيمة. يُقيَّد هنا في نفس
+        // سجلّ جسر التنفيذ كي يكون تاريخ تقدّم المخرَج **سلسلة واحدة** لا سلسلتين متوازيتين:
+        // صفّ محسوم سلفًا (`Accepted`) رافعه ومراجِعه الشخص نفسه — وبهذا التطابق وحده يُميَّز
+        // «تحديث مباشر» عن «قبول ادّعاء» بلا عمود جديد ولا هجرة.
+        var now = DateTime.UtcNow;
+        _db.ProjectExecutionUpdateProposals.Add(new ProjectExecutionUpdateProposal
+        {
+            ProjectId = projectId,
+            DeliverableId = entity.Id,
+            ProposedById = uid,
+            ProposedProgressPercent = entity.ProgressPercent,
+            ProposedStatus = entity.Status,
+            ExecutionNote = Project360Guards.Trim(request.Note),
+            Status = ExecutionProposalStatus.Accepted,
+            ReviewedById = uid,
+            ReviewedAtUtc = now,
+            PreviousProgressPercent = previousProgress,
+        });
 
         // **قلب GAP-03**: هنا كانت الطفرة تنتهي عند صفّ المخرَج ولا تصعد إلى المشروع إطلاقًا.
         await _health.SaveWithHealthAsync(projectId, ct);

@@ -212,13 +212,14 @@ export function ProjectContractDeliverablesTab({
                     <ProgressEditor
                       value={d.progressPercent}
                       disabled={progress.isPending}
-                      onCommit={(pct) =>
+                      onCommit={(pct, note) =>
                         progress.mutate({
                           deliverableId: d.id,
                           request: {
                             status: d.status,
                             progressPercent: pct,
                             completedQuantity: d.completedQuantity,
+                            note,
                           },
                         })
                       }
@@ -301,7 +302,11 @@ function WeightEditor({
   );
 }
 
-/** حقل تقدّم منفصل: الإرسال بالتأكيد لا بكلّ ضغطة مفتاح، وإلّا انهال على الخادم طلب لكلّ رقم. */
+/**
+ * حقل تقدّم منفصل: الإرسال بالتأكيد لا بكلّ ضغطة مفتاح، وإلّا انهال على الخادم طلب لكلّ رقم.
+ * حقل السبب اختياريّ لكنّه ليس تزيينًا: يُحفَظ في أثر تقدّم المخرَج فيبقى «لماذا تغيّر الرقم»
+ * مقروءًا بعد أشهر بدل أن يبقى الرقم وحده بلا تفسير.
+ */
 function ProgressEditor({
   value,
   disabled,
@@ -309,9 +314,10 @@ function ProgressEditor({
 }: {
   value: number;
   disabled?: boolean;
-  onCommit: (pct: number) => void;
+  onCommit: (pct: number, note: string | null) => void;
 }) {
   const [draft, setDraft] = useState(String(value));
+  const [note, setNote] = useState('');
   return (
     <div className="flex items-end gap-2">
       <Field label="نسبة التقدّم">
@@ -324,10 +330,21 @@ function ProgressEditor({
           onChange={(e) => setDraft(e.target.value)}
         />
       </Field>
+      <Field label="سبب التحديث (اختياريّ)">
+        <Input
+          className="w-56"
+          value={note}
+          placeholder="ما الذي تغيّر ولماذا"
+          onChange={(e) => setNote(e.target.value)}
+        />
+      </Field>
       <Button
         variant="ghost"
         disabled={disabled || draft === String(value)}
-        onClick={() => onCommit(Number(draft) || 0)}
+        onClick={() => {
+          onCommit(Number(draft) || 0, note.trim() || null);
+          setNote('');
+        }}
       >
         تحديث
       </Button>

@@ -286,12 +286,16 @@ public record UpdateProjectContractDeliverableRequest(
     int SortOrder = 0,
     decimal WeightPercentage = 0m);
 
-/// <summary>تحديث التقدّم/الحالة — مسموح لقائد الفريق/مدير الحساب المسؤول (D-07).</summary>
+/// <summary>
+/// تحديث التقدّم/الحالة — مسموح لقائد الفريق/مدير الحساب المسؤول (D-07).
+/// <c>Note</c> سبب التحديث المباشر: يُحفَظ في أثر تقدّم المخرَج (R2.1 §5.5) وليس حقل تزيين.
+/// </summary>
 public record UpdateProjectContractDeliverableProgressRequest(
     ProjectDeliverableStatus Status,
     decimal ProgressPercent,
     int? CompletedQuantity = null,
-    DateTime? DeliveredAtUtc = null);
+    DateTime? DeliveredAtUtc = null,
+    string? Note = null);
 
 // ======================================================================
 // §14 — لوحة النظرة العامّة (Overview)

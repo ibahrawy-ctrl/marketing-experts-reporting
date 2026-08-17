@@ -227,6 +227,7 @@ function ProposalCard({
   onReview: (accept: boolean, reviewNote: string | null) => void;
 }) {
   const [reviewNote, setReviewNote] = useState('');
+  const isDirect = p.reviewedById !== null && p.reviewedById === p.proposedById;
 
   return (
     <Card>
@@ -237,6 +238,12 @@ function ProposalCard({
             <Badge tone={executionProposalStatusTone(p.status)}>
               {executionProposalStatusLabel[p.status]}
             </Badge>
+            {isDirect ? (
+              // تطابق الرافع والمراجِع هو **علامة** التحديث المباشر لا عمود جديد: المسؤول
+              // حدّث المخرَج بنفسه بلا ادّعاء يراجعه، والتمييز ضروريّ كي لا يُقرأ فعلٌ من
+              // طرف واحد كأنّه مرّ بدورة مراجعة من طرفين.
+              <Badge tone="muted">تحديث مباشر</Badge>
+            ) : null}
           </div>
           <p className="mt-1 text-xs text-ink-2">
             {/* الحاليّ ⟵ المُدَّعى: المقارنة معروضة كي لا تقع بالسهو. */}
@@ -245,7 +252,8 @@ function ProposalCard({
             · الحالة المقترحة {projectDeliverableStatusLabel[p.proposedStatus]}
           </p>
           <p className="mt-1 text-xs text-ink-2">
-            رفعه {p.proposedByFullName ?? '—'} · {formatDateTime(p.createdAtUtc)}
+            {isDirect ? 'حدّثه' : 'رفعه'} {p.proposedByFullName ?? '—'} ·{' '}
+            {formatDateTime(p.createdAtUtc)}
             {p.submissionId ? ' · مستشهدًا بتقرير' : ''}
           </p>
           {p.executionNote ? (
@@ -277,8 +285,8 @@ function ProposalCard({
 
       {p.status !== 'Pending' ? (
         <div className="mt-3 border-t border-line pt-3 text-xs text-ink-2">
-          {executionProposalStatusLabel[p.status]} بواسطة {p.reviewedByFullName ?? '—'} ·{' '}
-          {formatDateTime(p.reviewedAtUtc)}
+          {isDirect ? 'طُبِّق مباشرةً' : `${executionProposalStatusLabel[p.status]} بواسطة ${p.reviewedByFullName ?? '—'}`}{' '}
+          · {formatDateTime(p.reviewedAtUtc)}
           {p.status === 'Accepted' && p.previousProgressPercent !== null ? (
             // اللقطة معروضة لأنّ الأثر بلا «ما كان قبله» غير قابل للمراجعة ولا للعكس.
             <> · كانت النسبة قبل التطبيق {percentOrDash(p.previousProgressPercent)}</>

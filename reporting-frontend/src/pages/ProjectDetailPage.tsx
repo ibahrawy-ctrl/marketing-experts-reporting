@@ -56,7 +56,7 @@ const SERVICE_TYPES: ServiceType[] = ['Social', 'Seo', 'MediaBuying', 'Website',
 
 export default function ProjectDetailPage() {
   const { projectId } = useParams<{ projectId: string }>();
-  const { canManageClients, user, hasAnyRole } = useAuth();
+  const { canManageClients } = useAuth();
   const project = useProject(projectId);
   const summary = useProjectSummary(projectId);
   const reports = useProjectReports(projectId);
@@ -76,10 +76,11 @@ export default function ProjectDetailPage() {
   const s = summary.data;
   const reportRows = reports.data ?? [];
 
-  // إدارة خطّة الإنتاج (المخرَجات): أدوار الإدارة (بلا TeamLeader) أو مدير حسابات هذا المشروع نفسه.
-  // مطابق لحارس الخادم CanManagePlanAsync (النطاق يُفرَض خادميًّا؛ هذا للعرض فقط).
-  const canManagePlan =
-    hasAnyRole('Admin', 'CEO', 'GeneralManager', 'Manager') || (!!user && user.userId === p.accountManagerId);
+  // **قدرة محسوبة خادمًا لا مشتقّة من الدور (R2.1 §7-16)**: كانت هذه السطور تعيد كتابة شرط
+  // `CanManagePlanAsync` في المتصفّح فتُسقِط قائد الفريق ومالك المشروع، فيرى الاثنان شاشة
+  // أهداف العمل بلا أيّ زرّ بينما الخادم يقبل كتابتهما. `canOperate` يأتي من الخادم بنفس
+  // الحرّاس التي تحكم الطلب ⟹ لا يمكن أن تفترق الشاشة عن الردّ.
+  const canManagePlan = p.canOperate;
 
   return (
     <div className="space-y-6">
@@ -158,7 +159,7 @@ export default function ProjectDetailPage() {
         <p className="text-sm text-ink-2">آخر تقرير مرتبط: {formatDate(s.lastReportAtUtc)}</p>
       )}
 
-      <WorkstreamsCard projectId={p.id} canManage={canManageClients} canManagePlan={canManagePlan} />
+      <WorkstreamsCard projectId={p.id} canManage={canManagePlan} canManagePlan={canManagePlan} />
 
       <LinkedReportsCard rows={reportRows} title="تقارير المشروع المرتبطة" />
     </div>
