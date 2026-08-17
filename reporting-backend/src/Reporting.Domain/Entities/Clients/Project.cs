@@ -38,8 +38,31 @@ public class Project : BaseEntity
     /// <summary>قائد الفريق المسؤول تشغيليًّا عن المشروع (D-07). مرجع مستخدم بلا مفتاح أجنبيّ صلب.</summary>
     public Guid? TeamLeaderId { get; set; }
 
-    /// <summary>نسبة التنفيذ المعلَنة **يدويًّا** (0–100). لا تُشتقّ من أيّ محرّك مهامّ — Manual-First.</summary>
+    /// <summary>
+    /// نسبة تنفيذ المشروع (0–100).
+    ///
+    /// <para>
+    /// **تغيّر مصدرها في P360-WF-R2 (GAP-02/03)**: كانت «معلَنة يدويًّا» — والحقيقة أنّها لم تكن
+    /// معلَنة إطلاقًا لأنّه لم يوجد لها مسار كتابة واحد، فبقيت صفرًا في كلّ صفوف الإنتاج وأبطلت
+    /// 0.30 من معادلة الصحّة وجعلت الأخضر مستحيلًا رياضيًّا (GAP-04). صارت الآن **مشتقّة حتميًّا**
+    /// من المخرَجات التعاقديّة النشطة بمتوسّط موزون، ويُعاد احتسابها عند كلّ حدث مؤثّر.
+    /// </para>
+    ///
+    /// <para>لا تُكتب يدويًّا بعد اليوم: الرقم بلا مصدر معلن ثقةٌ في غير موضعها.</para>
+    /// </summary>
     public decimal ProgressPercent { get; set; }
+
+    /// <summary>
+    /// **كيف** حُسِبت <see cref="ProgressPercent"/> (P360-WF-R2 §6-1). تُخزَّن مع النسبة لأنّ الرقم
+    /// وحده لا يميّز «صفر لأنّ لا مخرَجات» عن «صفر لأنّ لم يبدأ العمل» عن «لم يُحتسَب بعد».
+    /// </summary>
+    public ProjectProgressMode ProgressMode { get; set; } = ProjectProgressMode.NotCalculated;
+
+    /// <summary>ختم آخر احتساب للتقدّم — يكشف الرقم البائت. NULL ⟹ لم يُحتسَب قطّ.</summary>
+    public DateTime? ProgressCalculatedAtUtc { get; set; }
+
+    /// <summary>عدد المخرَجات النشطة التي دخلت الاحتساب فعلًا — يجعل النسبة قابلة للمراجعة لا مجرّد رقم.</summary>
+    public int ProgressSourceDeliverableCount { get; set; }
 
     /// <summary>خلفيّة المشروع وسياق نشأته.</summary>
     public string? Background { get; set; }
@@ -63,7 +86,11 @@ public class Project : BaseEntity
     /// تصنيف الصحّة المخزَّن (§5-2). يُعاد كتابته **حتميًّا** من طبقة التطبيق عند كلّ حدث مؤثّر،
     /// ويُخزَّن — لا يُشتقّ وقت القراءة — لتمكين الفرز والفلترة على قوائم المشاريع بلا N+1.
     /// </summary>
-    public ProjectHealthStatus HealthStatus { get; set; } = ProjectHealthStatus.Green;
+    /// <remarks>
+    /// **الافتراضيّ <see cref="ProjectHealthStatus.NotEvaluated"/> لا <c>Green</c>** (GAP-05):
+    /// مشروع أُنشئ للتوّ لم يُقَس قطّ، وإعلانه سليمًا اطمئنانٌ على ما لم يُفحَص.
+    /// </remarks>
+    public ProjectHealthStatus HealthStatus { get; set; } = ProjectHealthStatus.NotEvaluated;
 
     /// <summary>نسبة الصحّة المخزَّنة (0–100) المطابقة لـ<see cref="HealthStatus"/>.</summary>
     public decimal HealthPercent { get; set; }

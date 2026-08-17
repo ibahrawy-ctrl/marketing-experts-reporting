@@ -167,6 +167,9 @@ public class ProjectDeliverableConfiguration : IEntityTypeConfiguration<ProjectD
 
         b.Property(x => x.ProgressPercent).HasColumnType("numeric(9,2)");
 
+        // نفس دقّة كلّ نسب المنظومة (DN-05) — الوزن نسبة لا عدد صحيح.
+        b.Property(x => x.WeightPercentage).HasColumnType("numeric(9,2)");
+
         b.HasOne<Project>()
             .WithMany()
             .HasForeignKey(x => x.ProjectId)

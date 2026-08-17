@@ -80,6 +80,21 @@ public class ProjectDeliverable : BaseEntity
     /// </summary>
     public decimal ProgressPercent { get; set; }
 
+    /// <summary>
+    /// وزن المخرَج في تقدّم المشروع (P360-WF-R2 §6-1) — نسبة مئويّة معلَنة، لا مجموع مفروض.
+    ///
+    /// <para>
+    /// **لماذا لا يُفرَض مجموع 100؟** لأنّ فرضه يجعل إضافة مخرَج واحد تُبطِل حفظ العقد كلّه،
+    /// فيتحوّل الوزن من أداة دقّة إلى عائق إدخال. الأوزان تُطبَّع لحظة الاحتساب على مجموعها
+    /// الفعليّ؛ وإن كان المجموع صفرًا (أو كلّ الأوزان صفرًا) يسقط المحرّك إلى **توزيع متساوٍ**
+    /// ويُصدِر <see cref="Reporting.Domain.Enums.ProjectProgressMode.EqualWeightFallback"/>
+    /// — رقم صالح بمصدر معلن، مع تنبيه ظاهر أنّه ليس الترجيح الذي أراده مالك المشروع.
+    /// </para>
+    ///
+    /// <para>الافتراضيّ صفر ⟹ **صفر Backfill**: العقود القائمة تُقرأ بتوزيع متساوٍ حتّى تُوزَن.</para>
+    /// </summary>
+    public decimal WeightPercentage { get; set; }
+
     public DateOnly? StartDate { get; set; }
     public DateOnly? DueDate { get; set; }
 

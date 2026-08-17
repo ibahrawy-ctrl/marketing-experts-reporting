@@ -40,6 +40,36 @@ public static class ProjectHealthReasonCodes
     /// <summary>التقدّم الفعليّ متأخّر عن التقدّم المتوقَّع زمنيًّا.</summary>
     public const string ScheduleBehindPlan = "health.schedule.behind_plan";
 
+    // ===== الحجب والتأخّر والمخاطر (P360-WF-R2 §7) =====
+
+    /// <summary>
+    /// حاجب مفتوح مثبت على المشروع. **يتقدّم على كلّ حساب آخر** مهما بلغت المؤشّرات:
+    /// مشروع محجوب لا يكون أخضر لأنّ متوسّطه الرقميّ مرتفع.
+    /// <c>Detail</c> = عدد الحواجب المفتوحة.
+    /// </summary>
+    public const string OpenBlocker = "health.blocked.open_blocker";
+
+    /// <summary>
+    /// مخرَج تعاقديّ نشط تجاوز تاريخ استحقاقه ولم يُسلَّم. <c>Detail</c> = عدد المخرَجات المتأخّرة.
+    /// </summary>
+    public const string OverdueDeliverable = "health.delayed.overdue_deliverable";
+
+    /// <summary>
+    /// خطر مفتوح بخطورة مرتفعة أو حرجة. <c>Detail</c> = عدد المخاطر المرتفعة المفتوحة.
+    /// </summary>
+    public const string OpenHighRisk = "health.at_risk.open_high_risk";
+
+    // ===== وضع احتساب التقدّم (P360-WF-R2 §6-1) =====
+
+    /// <summary>
+    /// أوزان المخرَجات غير مضبوطة أو ناقصة ⟹ حُسِب التقدّم بتوزيع متساوٍ. **تنبيه لا حكم**:
+    /// الرقم صالح للقراءة ومصدره معلن، لكنّه ليس الترجيح الذي أراده مالك المشروع.
+    /// </summary>
+    public const string ProgressEqualWeightFallback = "health.progress.equal_weight_fallback";
+
+    /// <summary>لا مخرَجات تعاقديّة نشطة ⟹ لا مصدر لتقدّم المشروع (النسبة 0 بتفسير لا حكمًا).</summary>
+    public const string ProgressNoDeliverables = "health.progress.no_deliverables";
+
     // ===== أسباب عامّة =====
 
     /// <summary>لا مكوّن واحد متاح ⟹ الصحّة غير محتسَبة (لا تُعامَل صفرًا).</summary>

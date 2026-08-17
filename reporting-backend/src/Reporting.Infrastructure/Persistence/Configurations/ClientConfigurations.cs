@@ -147,7 +147,13 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
 
         b.Property(x => x.ProgressPercent).HasColumnType("numeric(9,2)");
         b.Property(x => x.HealthPercent).HasColumnType("numeric(9,2)");
+        // **مخزَّن نصًّا لا رقمًا** — ولهذا فإنّ إعادة تسمية قيم التعداد في P360-WF-R2
+        // (Yellow⟸AtRisk · Red⟸Delayed) **تغيير بيانات فعليّ** لا تغيير كود، وتلزمه هجرة
+        // تُعيد كتابة السلاسل المخزَّنة. أطول قيمة اليوم `NotEvaluated` (12) ⟹ السقف 20 يكفي.
         b.Property(x => x.HealthStatus).HasConversion<string>().HasMaxLength(20);
+
+        // ===== P360-WF-R2 — تقدّم المشروع المشتقّ (§6-1 · GAP-02/03/21) =====
+        b.Property(x => x.ProgressMode).HasConversion<string>().HasMaxLength(24);
 
         b.HasIndex(x => x.HealthStatus);
         b.HasIndex(x => x.ProjectOwnerId);

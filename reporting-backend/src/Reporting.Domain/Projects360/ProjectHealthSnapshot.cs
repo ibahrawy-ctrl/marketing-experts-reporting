@@ -64,10 +64,18 @@ public sealed record ProjectHealthSnapshot(
     decimal? ProgressPercent,
     decimal? ScheduleScore)
 {
-    /// <summary>«لم يُقيَّم بعد» — حالة مشروع أُنشئ للتوّ بلا مؤشّرات ولا تواريخ.</summary>
+    /// <summary>
+    /// «لم يُقيَّم بعد» — حالة مشروع أُنشئ للتوّ بلا مؤشّرات ولا تواريخ.
+    ///
+    /// <para>
+    /// **كانت هذه اللقطة تُعلن <c>Green</c>** (P360-WF-R2 · GAP-05): مشروع لم يُقَس قطّ كان يظهر
+    /// «سليمًا» بلا ختم تقييم واحد — وهو أسوأ من الخطأ لأنّه يطمئن المدير على ما لم يُفحَص.
+    /// الحالة الآن <see cref="ProjectHealthStatus.NotEvaluated"/> صراحةً: **الغياب يُعلَن ولا يُلوَّن**.
+    /// </para>
+    /// </summary>
     public static ProjectHealthSnapshot NotEvaluated { get; } = new(
         Score: null,
-        Status: ProjectHealthStatus.Green,
+        Status: ProjectHealthStatus.NotEvaluated,
         Reasons: new[] { new ProjectHealthReason(ProjectHealthReasonCodes.NoComponentAvailable) },
         LastEvaluatedAtUtc: null,
         KpiScore: null,

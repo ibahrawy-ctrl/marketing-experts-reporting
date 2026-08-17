@@ -447,16 +447,196 @@ public static class ProjectHealthPolicy
     }
 
     // ======================================================================
+    // §8-ب — تقدّم المشروع من المخرَجات التعاقديّة (P360-WF-R2 §6-1 · GAP-02/03/21)
+    // ======================================================================
+
+    /// <summary>مخرَج تعاقديّ واحد كما يدخل محرّك تقدّم المشروع.</summary>
+    /// <param name="WeightPercentage">الوزن المعلَن — سالبه يُعامَل صفرًا (حارس مدخلات).</param>
+    /// <param name="ProgressPercent">نسبة الإنجاز المعلَنة يدويًّا على المخرَج.</param>
+    /// <param name="Status">الحالة المعلَنة — <c>Delivered</c> تُقرأ 100 مهما كانت النسبة المسجَّلة.</param>
+    public readonly record struct DeliverableProgressInput(
+        decimal WeightPercentage,
+        decimal ProgressPercent,
+        ProjectDeliverableStatus Status);
+
+    /// <summary>نتيجة تقدّم المشروع: النسبة + **كيف** حُسِبت + على كم مخرَج.</summary>
+    public readonly record struct ProjectProgressResult(
+        decimal Percent,
+        ProjectProgressMode Mode,
+        int SourceCount);
+
+    /// <summary>
+    /// **تقدّم المشروع = متوسّط موزون لنسب إنجاز المخرَجات التعاقديّة النشطة** (§6-1).
+    ///
+    /// <para>
+    /// **لماذا مشتقّ لا معلَن؟** لأنّ الحقل المعلَن كان بلا مسار كتابة فبقي صفرًا في كلّ الصفوف،
+    /// فأبطل 0.30 من معادلة الصحّة وجعل الأخضر مستحيلًا (GAP-02 → GAP-04). المصدر الوحيد
+    /// المضبوط للتقدّم في هذه المنظومة هو **الالتزام التعاقديّ**، فمنه يُشتقّ.
+    /// </para>
+    ///
+    /// <list type="bullet">
+    /// <item><b>الملغى يخرج من البسط والمقام معًا</b>: التزام أُلغي لم يعد التزامًا، وعدّه صفرًا يعاقب المشروع على تخفيف نطاقه.</item>
+    /// <item><b>المُسلَّم = 100 حتمًا</b>: مخرَج مُسلَّم بنسبة 80 مسجَّلة تناقضٌ يُحسم لصالح الحالة لا الرقم المهمَل.</item>
+    /// <item><b>مجموع الأوزان صفر ⟹ توزيع متساوٍ</b> مع <see cref="ProjectProgressMode.EqualWeightFallback"/> — رقم صالح بمصدر معلن وتنبيه ظاهر، لا رفض ولا صفر.</item>
+    /// <item><b>لا مخرَج واحد ⟹ 0 مع <see cref="ProjectProgressMode.NoDeliverables"/></b> — الصفر هنا **مفسَّر** لا حكم.</item>
+    /// </list>
+    ///
+    /// <para>دالّة نقيّة: لا ساعة ولا قاعدة بيانات ولا تخويل. المرشِّح (<c>IsActive</c>) مسؤوليّة المستدعي.</para>
+    /// </summary>
+    public static ProjectProgressResult ComputeProjectProgress(IReadOnlyList<DeliverableProgressInput> deliverables)
+    {
+        var counted = new List<DeliverableProgressInput>(deliverables.Count);
+        foreach (var d in deliverables)
+        {
+            if (d.Status == ProjectDeliverableStatus.Cancelled) continue;
+            counted.Add(d);
+        }
+
+        if (counted.Count == 0)
+            return new ProjectProgressResult(PercentMin, ProjectProgressMode.NoDeliverables, 0);
+
+        // **الأوزان ناقصة = الأوزان غير مضبوطة**: يكفي مخرَج واحد بلا وزن موجب كي يسقط الاحتساب
+        // كلّه إلى التوزيع المتساوي. البديل — تجاهل عديم الوزن — كان سيُخرِج التزامًا تعاقديًّا من
+        // القياس **بصمت**، فيقرأ المدير نسبةً لا تصف عقده، وهو أسوأ من تنبيه صريح بأنّ الأوزان ناقصة.
+        decimal weightSum = 0m;
+        var equalWeights = false;
+        foreach (var d in counted)
+        {
+            if (d.WeightPercentage <= 0m) { equalWeights = true; break; }
+            weightSum += d.WeightPercentage;
+        }
+
+        decimal numerator = 0m;
+        foreach (var d in counted)
+        {
+            var effective = d.Status == ProjectDeliverableStatus.Delivered
+                ? PercentMax
+                : Clamp(d.ProgressPercent, PercentMin, PercentMax);
+
+            numerator += effective * (equalWeights ? 1m : d.WeightPercentage);
+        }
+
+        var denominator = equalWeights ? counted.Count : weightSum;
+        var percent = Round(Clamp(numerator / denominator, PercentMin, PercentMax));
+
+        return new ProjectProgressResult(
+            percent,
+            equalWeights ? ProjectProgressMode.EqualWeightFallback : ProjectProgressMode.Weighted,
+            counted.Count);
+    }
+
+    // ======================================================================
+    // §7-ب — بناء الإشارات التشغيليّة من صفوف الدومين (P360-WF-R2)
+    // ======================================================================
+
+    /// <summary>مخرَج كما يدخل إحصاء التأخّر: حالته وتاريخ استحقاقه لا غير.</summary>
+    public readonly record struct DeliverableSignalInput(ProjectDeliverableStatus Status, DateOnly? DueDate);
+
+    /// <summary>
+    /// **البانِي الوحيد للإشارات التشغيليّة** (§7). يُستدعى من مسار الكتابة (احتساب الصحّة
+    /// وحفظها) ومن مسار القراءة (لوحة Project 360) معًا.
+    ///
+    /// <para>
+    /// **لماذا دالّة مشتركة لا نسختان؟** لأنّ نسختين تعنيان أن تعرض اللوحة «أخضر» بينما القائمة
+    /// تعرض «محجوب» لنفس المشروع في نفس اللحظة — وهو بالضبط صنف التناقض الذي أُنشئت هذه
+    /// السياسة لمنعه. القاعدة تُكتب مرّة وتُقرأ من موضعين.
+    /// </para>
+    ///
+    /// <list type="bullet">
+    /// <item><b>المتأخّر يُحصى من التاريخ لا من الحالة المعلَنة</b>: <c>Delayed</c> إعلان يدويّ قد لا يُحدَّث، أمّا تجاوز الاستحقاق بلا تسليم فحقيقة.</item>
+    /// <item><b>الخطورة الحرجة = حاجب</b> والمرتفعة = خطر — التطبيق الوحيد المتاح لحالة <c>Blocked</c> بلا كيان «حاجب» مستقلّ، ويستعمل <c>Risk.ProjectId</c> القائم ⟹ صفر عمود جديد.</item>
+    /// <item><b>«مفتوح» = ليس <c>Closed</c></b> بما فيه <c>Mitigating</c>/<c>Monitoring</c>: الخطر تحت المعالجة لا يزال قائمًا، وعدّه مغلقًا اطمئنانٌ سابق لأوانه. ترشيح المفتوح مسؤوليّة المستدعي.</item>
+    /// </list>
+    /// </summary>
+    public static ProjectOperationalSignals BuildOperationalSignals(
+        IReadOnlyList<DeliverableSignalInput> activeDeliverables,
+        IReadOnlyList<RiskSeverity> openRiskSeverities,
+        DateOnly today,
+        ProjectProgressMode progressMode)
+    {
+        var overdue = 0;
+        foreach (var d in activeDeliverables)
+        {
+            if (d.DueDate is not DateOnly due) continue;
+            if (due >= today) continue;
+            if (d.Status is ProjectDeliverableStatus.Delivered or ProjectDeliverableStatus.Cancelled) continue;
+            overdue++;
+        }
+
+        var blockers = 0;
+        var highRisks = 0;
+        foreach (var s in openRiskSeverities)
+        {
+            if (s == RiskSeverity.Critical) blockers++;
+            else if (s == RiskSeverity.High) highRisks++;
+        }
+
+        return new ProjectOperationalSignals(blockers, overdue, highRisks, progressMode);
+    }
+
+    // ======================================================================
     // §9 — الصحّة النهائيّة (R2 §9-8-هـ)
     // ======================================================================
 
     /// <summary>
-    /// اللون من النتيجة: <c>≥ 80 أخضر</c> · <c>≥ 55 أصفر</c> · غير ذلك أحمر (§9-8-هـ).
+    /// اللون من النتيجة الرقميّة وحدها: <c>≥ 80 أخضر</c> · <c>≥ 55 في خطر</c> · غير ذلك متأخّر (§9-8-هـ).
+    ///
+    /// <para>
+    /// **العتبتان لم تتغيّرا** في P360-WF-R2، وإنّما تغيّرت أسماء الحالات لتصف الواقع التشغيليّ
+    /// بدل الألوان. هذه الدالّة هي **الطبقة الرقميّة** فقط؛ الحالة النهائيّة الظاهرة تمرّ
+    /// بـ<see cref="ResolveStatus(decimal?, ProjectOperationalSignals)"/> الذي يُعطي الحجب
+    /// والتأخّر أسبقيّةً على الرقم.
+    /// </para>
     /// </summary>
     public static ProjectHealthStatus ResolveStatus(decimal score) =>
         score >= GreenThreshold ? ProjectHealthStatus.Green
-        : score >= YellowThreshold ? ProjectHealthStatus.Yellow
-        : ProjectHealthStatus.Red;
+        : score >= YellowThreshold ? ProjectHealthStatus.AtRisk
+        : ProjectHealthStatus.Delayed;
+
+    /// <summary>
+    /// **الحالة الظاهرة النهائيّة** (P360-WF-R2 §7) — حتميّة ومرتَّبة الأسبقيّة:
+    ///
+    /// <list type="number">
+    /// <item><c>Blocked</c> — حاجب مفتوح. **يتقدّم على كلّ حساب**، فلا يصير مشروع محجوب أخضر بارتفاع مؤشّراته.</item>
+    /// <item><c>Delayed</c> — مخرَج أساسيّ تجاوز استحقاقه، أو انزلاق جدوليّ جوهريّ (نتيجة جدول ≤ <see cref="ScheduleBehindScore"/>)، أو نتيجة رقميّة دون عتبة الأصفر.</item>
+    /// <item><c>AtRisk</c> — خطر مرتفع مفتوح، أو نتيجة رقميّة دون العتبة الخضراء.</item>
+    /// <item><c>Green</c> — لا حاجب ولا تأخّر ولا خطر مرتفع، والنتيجة ≥ 80.</item>
+    /// </list>
+    ///
+    /// <para>
+    /// <paramref name="score"/> = <c>null</c> يعني «لم تُحتسَب» ⟹ <see cref="ProjectHealthStatus.NotEvaluated"/>
+    /// **إلّا** إذا وُجد حاجب: حقيقة الحجب معلومة بلا حاجة إلى معادلة، وإخفاؤها خلف «لم تُقيَّم» تضليل.
+    /// </para>
+    ///
+    /// <para>
+    /// **قابليّة الوصول إلى الأخضر مضمونة رياضيًّا**: مشروع بلا إشارات سلبيّة ومخرَجاته منجَزة
+    /// يعطي <c>progress = 100</c> و<c>schedule = 100</c>، فيكفيه <c>kpiScore ≥ 60</c> لبلوغ 80.
+    /// قبل هذه الجولة كان <c>progress ≡ 0</c> يفرض <c>kpiScore ≥ 130</c> — أي أخضر مستحيل (GAP-04).
+    /// </para>
+    /// </summary>
+    /// <param name="score">النتيجة الموزونة — <c>null</c> ⟹ لم تُحتسَب.</param>
+    /// <param name="signals">الإشارات التشغيليّة المُحصاة من الدومين.</param>
+    /// <param name="scheduleScore">
+    /// نتيجة الجدول — تُمرَّر كي يُعَدّ الانزلاق الجوهريّ (<c>≤ 50</c>، أي فجوة أشدّ من −10 يومًا
+    /// نسبيًّا) تأخّرًا صريحًا لا مجرّد خفضٍ للمتوسّط.
+    /// </param>
+    public static ProjectHealthStatus ResolveStatus(
+        decimal? score,
+        ProjectOperationalSignals signals,
+        decimal? scheduleScore = null)
+    {
+        if (signals.HasBlocker) return ProjectHealthStatus.Blocked;
+        if (score is null) return ProjectHealthStatus.NotEvaluated;
+
+        if (signals.HasOverdueDeliverable) return ProjectHealthStatus.Delayed;
+        if (scheduleScore is not null && scheduleScore.Value <= ScheduleBehindScore)
+            return ProjectHealthStatus.Delayed;
+
+        var numeric = ResolveStatus(score.Value);
+        if (numeric == ProjectHealthStatus.Delayed) return ProjectHealthStatus.Delayed;
+        if (signals.HasHighRisk) return ProjectHealthStatus.AtRisk;
+        return numeric;
+    }
 
     /// <summary>
     /// **الصحّة النهائيّة** (§9-8-هـ):
@@ -479,13 +659,19 @@ public static class ProjectHealthPolicy
     /// <param name="scheduleScore">مكوّن الجدول — <c>null</c> ⟹ مُستبعَد.</param>
     /// <param name="evaluatedAtUtc">ختم التقييم — يُمرَّر ولا يُقرأ من الساعة (نقاء الدالّة).</param>
     /// <param name="kpiWeightsAllZero">هل عوملت المؤشّرات بأوزان متساوية؟ (لإصدار سبب مفسِّر).</param>
+    /// <param name="signals">
+    /// الإشارات التشغيليّة (P360-WF-R2 §7): الحجب والتأخّر والمخاطر المرتفعة. غيابها يعني
+    /// «لا إشارة» فيبقى السلوك مطابقًا لما قبل هذه الجولة — ولذلك هي معامل اختياريّ في الذيل.
+    /// </param>
     public static ProjectHealthSnapshot ComputeHealth(
         decimal? kpiScore,
         decimal? progressPercent,
         decimal? scheduleScore,
         DateTime evaluatedAtUtc,
-        bool kpiWeightsAllZero = false)
+        bool kpiWeightsAllZero = false,
+        ProjectOperationalSignals? signals = null)
     {
+        var sig = signals ?? ProjectOperationalSignals.None;
         var normalizedKpi = kpiScore is null ? (decimal?)null : Clamp(kpiScore.Value, PercentMin, AchievementMax);
         var normalizedProgress = progressPercent is null ? (decimal?)null : Clamp(progressPercent.Value, PercentMin, PercentMax);
         var normalizedSchedule = scheduleScore is null ? (decimal?)null : Clamp(scheduleScore.Value, PercentMin, PercentMax);
@@ -511,15 +697,32 @@ public static class ProjectHealthPolicy
             weightedSum += ScheduleComponentWeight * normalizedSchedule.Value;
         }
 
+        // لا مكوّن رقميّ متاح ⟹ لا نتيجة (لا تُصفَّر) ولا ختم تقييم. **لكنّ الحالة الظاهرة قد لا
+        // تكون NotEvaluated**: الحجب حقيقة معلومة بلا معادلة، وإخفاؤها خلف «لم تُقيَّم» تضليل.
         if (availableWeight <= 0m)
-            return ProjectHealthSnapshot.NotEvaluated;
+        {
+            var emptyReasons = new List<ProjectHealthReason>(2)
+            {
+                new(ProjectHealthReasonCodes.NoComponentAvailable),
+            };
+            AppendSignalReasons(emptyReasons, sig);
+
+            return new ProjectHealthSnapshot(
+                Score: null,
+                Status: ResolveStatus(null, sig),
+                Reasons: emptyReasons,
+                LastEvaluatedAtUtc: null,
+                KpiScore: null,
+                ProgressPercent: null,
+                ScheduleScore: null);
+        }
 
         var score = Round(Clamp(weightedSum / availableWeight, PercentMin, PercentMax));
 
         return new ProjectHealthSnapshot(
             Score: score,
-            Status: ResolveStatus(score),
-            Reasons: BuildReasons(normalizedKpi, normalizedProgress, normalizedSchedule, kpiWeightsAllZero),
+            Status: ResolveStatus(score, sig, normalizedSchedule),
+            Reasons: BuildReasons(normalizedKpi, normalizedProgress, normalizedSchedule, kpiWeightsAllZero, sig),
             LastEvaluatedAtUtc: evaluatedAtUtc,
             KpiScore: normalizedKpi,
             ProgressPercent: normalizedProgress,
@@ -535,9 +738,14 @@ public static class ProjectHealthPolicy
         decimal? kpiScore,
         decimal? progressPercent,
         decimal? scheduleScore,
-        bool kpiWeightsAllZero)
+        bool kpiWeightsAllZero,
+        ProjectOperationalSignals signals)
     {
-        var reasons = new List<ProjectHealthReason>(4);
+        var reasons = new List<ProjectHealthReason>(8);
+
+        // الإشارات التشغيليّة تتصدّر القائمة لأنّها **سبب الحالة الظاهرة** لا مجرّد ملاحظة:
+        // مَن يقرأ «محجوب» يحتاج عدد الحواجب أوّلًا، لا انحراف المؤشّرات.
+        AppendSignalReasons(reasons, signals);
 
         if (kpiScore is null)
         {
@@ -563,5 +771,36 @@ public static class ProjectHealthPolicy
             reasons.Add(new ProjectHealthReason(ProjectHealthReasonCodes.AllComponentsHealthy));
 
         return reasons;
+    }
+
+    /// <summary>
+    /// إلحاق أسباب الإشارات التشغيليّة (P360-WF-R2 §7) — **حقائق مُحصاة لا أحكام**:
+    /// <c>Detail</c> يحمل العدد كي يقرأ المستخدم «٣ حواجب» لا «محجوب» فقط.
+    ///
+    /// <para>
+    /// <see cref="ProjectProgressMode"/> يُصدِر سببًا **مفسِّرًا** أيضًا: تقدّم بتوزيع متساوٍ رقمٌ
+    /// صالح لكنّه ليس الترجيح المقصود، وغياب المخرَجات يفسّر صفرًا لا يعني تعثّرًا.
+    /// </para>
+    /// </summary>
+    private static void AppendSignalReasons(List<ProjectHealthReason> reasons, ProjectOperationalSignals signals)
+    {
+        if (signals.HasBlocker)
+            reasons.Add(new ProjectHealthReason(ProjectHealthReasonCodes.OpenBlocker, signals.OpenBlockerCount));
+
+        if (signals.HasOverdueDeliverable)
+            reasons.Add(new ProjectHealthReason(ProjectHealthReasonCodes.OverdueDeliverable, signals.OverdueDeliverableCount));
+
+        if (signals.HasHighRisk)
+            reasons.Add(new ProjectHealthReason(ProjectHealthReasonCodes.OpenHighRisk, signals.OpenHighRiskCount));
+
+        switch (signals.ProgressMode)
+        {
+            case ProjectProgressMode.EqualWeightFallback:
+                reasons.Add(new ProjectHealthReason(ProjectHealthReasonCodes.ProgressEqualWeightFallback));
+                break;
+            case ProjectProgressMode.NoDeliverables:
+                reasons.Add(new ProjectHealthReason(ProjectHealthReasonCodes.ProgressNoDeliverables));
+                break;
+        }
     }
 }

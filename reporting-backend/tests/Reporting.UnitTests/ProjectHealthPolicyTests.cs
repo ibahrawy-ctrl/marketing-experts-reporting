@@ -316,7 +316,7 @@ public class ProjectHealthPolicyTests
         var snapshot = ProjectHealthPolicy.ComputeHealth(80m, 60m, 100m, Stamp);
 
         Assert.Equal(78m, snapshot.Score); // 0.50×80 + 0.30×60 + 0.20×100
-        Assert.Equal(ProjectHealthStatus.Yellow, snapshot.Status);
+        Assert.Equal(ProjectHealthStatus.AtRisk, snapshot.Status);
         Assert.True(snapshot.IsEvaluated);
     }
 
@@ -338,14 +338,16 @@ public class ProjectHealthPolicyTests
         Assert.Null(snapshot.Score);
         Assert.Null(snapshot.LastEvaluatedAtUtc);
         Assert.False(snapshot.IsEvaluated);
+        // GAP-05: كانت هذه الحالة تُعلن `Green` — «لم يُقيَّم» صار حالةً صريحة لا لونًا مطمئنًا.
+        Assert.Equal(ProjectHealthStatus.NotEvaluated, snapshot.Status);
         Assert.Equal(ProjectHealthReasonCodes.NoComponentAvailable, Assert.Single(snapshot.Reasons).Code);
     }
 
     [Theory]
-    [InlineData(80, ProjectHealthStatus.Green)]   // حدّ الأخضر بالضبط
-    [InlineData(79.99, ProjectHealthStatus.Yellow)]
-    [InlineData(55, ProjectHealthStatus.Yellow)]  // حدّ الأصفر بالضبط
-    [InlineData(54.99, ProjectHealthStatus.Red)]
+    [InlineData(80, ProjectHealthStatus.Green)]    // حدّ الأخضر بالضبط
+    [InlineData(79.99, ProjectHealthStatus.AtRisk)]
+    [InlineData(55, ProjectHealthStatus.AtRisk)]   // حدّ «في خطر» بالضبط
+    [InlineData(54.99, ProjectHealthStatus.Delayed)]
     public void ResolveStatus_UsesInclusiveThresholds(decimal score, ProjectHealthStatus expected)
         => Assert.Equal(expected, ProjectHealthPolicy.ResolveStatus(score));
 
