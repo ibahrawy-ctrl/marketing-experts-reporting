@@ -338,6 +338,12 @@ export interface ProjectContractDeliverableDto {
   completedQuantity: number;
   status: ProjectDeliverableStatus;
   progressPercent: number;
+  /**
+   * وزن المخرَج في تقدّم المشروع (§6-1) — صفر يعني «غير موزون».
+   * كان غائبًا عن هذه المرآة، فلم يكن للواجهة سبيل لإرساله ولا لعرضه، فبقي كلّ مخرَج
+   * بوزن صفر ⟹ `progressMode` عالق أبدًا على `EqualWeightFallback` ولا يبلغ `Weighted`.
+   */
+  weightPercentage: number;
   startDate: string | null;
   dueDate: string | null;
   deliveredAtUtc: string | null;
@@ -364,6 +370,7 @@ export interface CreateProjectContractDeliverableRequest {
   ownerUserId?: string | null;
   notes?: string | null;
   sortOrder?: number;
+  weightPercentage?: number;
 }
 
 /** `deliverableTypeCode` **غائب عمدًا**: لقطة ثابتة لا تُعدَّل بعد الإنشاء. */
@@ -379,6 +386,7 @@ export interface UpdateProjectContractDeliverableRequest {
   ownerUserId?: string | null;
   notes?: string | null;
   sortOrder?: number;
+  weightPercentage?: number;
 }
 
 export interface UpdateProjectContractDeliverableProgressRequest {

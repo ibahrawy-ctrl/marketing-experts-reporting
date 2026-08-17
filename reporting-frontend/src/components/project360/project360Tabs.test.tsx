@@ -157,6 +157,7 @@ function deliverable(over: Partial<ProjectContractDeliverableDto> = {}): Project
     completedQuantity: 0,
     status: 'InProgress',
     progressPercent: 30,
+    weightPercentage: 0,
     startDate: null,
     dueDate: '2026-08-31',
     deliveredAtUtc: null,
@@ -470,5 +471,50 @@ describe('تبويب المخرَجات التعاقديّة', () => {
     expect(await screen.findByText('تقرير أغسطس')).toBeInTheDocument();
     expect(screen.queryByLabelText('حالة المخرَج تقرير أغسطس')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'مخرَج تعاقديّ جديد' })).not.toBeInTheDocument();
+  });
+
+  // §6-1: بلا وزنٍ يصل الخادمَ من الواجهة يبقى كلّ مخرَج بوزن صفر، فلا يبلغ المشروع
+  // `Weighted` أبدًا ويعلق على `EqualWeightFallback`. هذه الاختبارات تقيس الحمولة نفسها.
+  it('يُرسل وزن المخرَج عند الإنشاء', async () => {
+    getBodies[`/projects/${P}/contract-deliverables/types`] = [
+      { code: 'catalog_type_x', nameAr: 'نوع الكتالوج س', sortOrder: 1 },
+    ];
+    renderTab(<ProjectContractDeliverablesTab projectId={P} access={MANAGER} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'مخرَج تعاقديّ جديد' }));
+    fireEvent.change(await screen.findByLabelText(/نوع المخرَج/), {
+      target: { value: 'catalog_type_x' },
+    });
+    fireEvent.change(screen.getByLabelText(/الوزن \(%\)/), { target: { value: '40' } });
+    fireEvent.click(screen.getByRole('button', { name: 'حفظ' }));
+    await waitFor(() => expect(posts).toHaveLength(1));
+    expect(posts[0].body).toMatchObject({ weightPercentage: 40 });
+  });
+
+  it('يعدّل وزن مخرَج قائم بلا محو بقيّة حقوله', async () => {
+    getBodies[`/projects/${P}/contract-deliverables`] = [
+      deliverable({ weightPercentage: 10, plannedQuantity: 7, notes: 'ملاحظة قائمة' }),
+    ];
+    renderTab(<ProjectContractDeliverablesTab projectId={P} access={MANAGER} />);
+    fireEvent.change(await screen.findByLabelText('وزن المخرَج تقرير أغسطس'), {
+      target: { value: '55' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'تحديث الوزن' }));
+    await waitFor(() => expect(puts).toHaveLength(1));
+    expect(puts[0].url).toBe(`/projects/${P}/contract-deliverables/del-1`);
+    // `PUT` يستبدل السجلّ: لو أُرسِل الوزن وحده لعادت الكمّيّة إلى ١ ولمُحيت الملاحظة.
+    expect(puts[0].body).toMatchObject({
+      weightPercentage: 55,
+      name: 'تقرير أغسطس',
+      plannedQuantity: 7,
+      notes: 'ملاحظة قائمة',
+      dueDate: '2026-08-31',
+    });
+  });
+
+  it('يُخفي تعديل الوزن عن المشغّل غير المخوَّل بالبنية', async () => {
+    getBodies[`/projects/${P}/contract-deliverables`] = [deliverable()];
+    renderTab(<ProjectContractDeliverablesTab projectId={P} access={OPERATOR} />);
+    expect(await screen.findByLabelText('حالة المخرَج تقرير أغسطس')).toBeInTheDocument();
+    expect(screen.queryByLabelText('وزن المخرَج تقرير أغسطس')).not.toBeInTheDocument();
   });
 });

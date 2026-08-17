@@ -24,9 +24,13 @@ import {
   useContractDeliverableTypes,
   useCreateContractDeliverable,
   useProjectContractDeliverables,
+  useUpdateContractDeliverable,
   useUpdateContractDeliverableProgress,
 } from '../../lib/useProject360';
-import type { ProjectDeliverableStatus } from '../../types/project360';
+import type {
+  ProjectContractDeliverableDto,
+  ProjectDeliverableStatus,
+} from '../../types/project360';
 
 const STATUSES: ProjectDeliverableStatus[] = [
   'NotStarted',
@@ -47,19 +51,21 @@ export function ProjectContractDeliverablesTab({
   const types = useContractDeliverableTypes(projectId);
   const create = useCreateContractDeliverable(projectId);
   const progress = useUpdateContractDeliverableProgress(projectId);
+  const update = useUpdateContractDeliverable(projectId);
 
   const [showForm, setShowForm] = useState(false);
   const [typeCode, setTypeCode] = useState('');
   const [name, setName] = useState('');
   const [planned, setPlanned] = useState('1');
   const [dueDate, setDueDate] = useState('');
+  const [weight, setWeight] = useState('0');
 
   if (list.isLoading) return <LoadingState />;
   if (list.isError) return <Project360QueryError error={list.error} onRetry={() => list.refetch()} />;
 
   const items = list.data ?? [];
   const typeOptions = types.data ?? [];
-  const mutationError = create.error ?? progress.error;
+  const mutationError = create.error ?? progress.error ?? update.error;
 
   return (
     <div className="space-y-4">
@@ -104,6 +110,18 @@ export function ProjectContractDeliverablesTab({
             <Field label="تاريخ الاستحقاق">
               <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
             </Field>
+            <Field
+              label="الوزن (%)"
+              help="حصّة المخرَج من تقدّم المشروع. اتركه صفرًا فيتقاسم المخرَجات الوزن بالتساوي."
+            >
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                value={weight}
+                onChange={(e) => setWeight(e.target.value)}
+              />
+            </Field>
           </div>
           <div className="mt-4 flex gap-2">
             <ActionButton
@@ -116,6 +134,7 @@ export function ProjectContractDeliverablesTab({
                     name: name.trim() || null,
                     plannedQuantity: Number(planned) || 1,
                     dueDate: dueDate || null,
+                    weightPercentage: Number(weight) || 0,
                   },
                   {
                     onSuccess: () => {
@@ -124,6 +143,7 @@ export function ProjectContractDeliverablesTab({
                       setName('');
                       setPlanned('1');
                       setDueDate('');
+                      setWeight('0');
                     },
                   },
                 )
@@ -159,12 +179,15 @@ export function ProjectContractDeliverablesTab({
                   </div>
                   <p className="mt-1 text-xs text-ink-2">
                     التقدّم {percentOrDash(d.progressPercent)} · المنجَز {d.completedQuantity} من{' '}
-                    {d.plannedQuantity} · الاستحقاق {formatDate(d.dueDate)}
+                    {d.plannedQuantity} · الاستحقاق {formatDate(d.dueDate)} · الوزن{' '}
+                    {d.weightPercentage > 0 ? `${d.weightPercentage}٪` : 'غير موزون'}
                   </p>
                 </div>
 
-                {access.canOperate ? (
+                {access.canOperate || access.canManage ? (
                   <div className="flex flex-wrap items-end gap-2">
+                    {access.canOperate ? (
+                      <>
                     <Select
                       className="w-40"
                       aria-label={`حالة المخرَج ${d.name}`}
@@ -200,6 +223,35 @@ export function ProjectContractDeliverablesTab({
                         })
                       }
                     />
+                      </>
+                    ) : null}
+                    {access.canManage ? (
+                      <WeightEditor
+                        deliverable={d}
+                        disabled={update.isPending}
+                        onCommit={(pct) =>
+                          update.mutate({
+                            deliverableId: d.id,
+                            // تعديل بنيويّ كامل: `PUT` يستبدل السجلّ، فإرسال الوزن وحده يمسح
+                            // بقيّة الحقول إلى قيمها الافتراضيّة. تُعاد القيم الحاليّة كما هي.
+                            request: {
+                              name: d.name,
+                              description: d.description,
+                              objectiveId: d.objectiveId,
+                              workstreamId: d.workstreamId,
+                              plannedQuantity: d.plannedQuantity,
+                              startDate: d.startDate,
+                              dueDate: d.dueDate,
+                              priority: d.priority,
+                              ownerUserId: d.ownerUserId,
+                              notes: d.notes,
+                              sortOrder: d.sortOrder,
+                              weightPercentage: pct,
+                            },
+                          })
+                        }
+                      />
+                    ) : null}
                   </div>
                 ) : null}
               </div>
@@ -207,6 +259,44 @@ export function ProjectContractDeliverablesTab({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * تعديل وزن المخرَج بعد إنشائه — بلا هذا الحقل يبقى كلّ مخرَج قديم بوزن صفر إلى الأبد،
+ * فلا يبلغ المشروع `Weighted` مهما ضُبِط في المخرَجات الجديدة (§6-1).
+ */
+function WeightEditor({
+  deliverable,
+  disabled,
+  onCommit,
+}: {
+  deliverable: ProjectContractDeliverableDto;
+  disabled?: boolean;
+  onCommit: (pct: number) => void;
+}) {
+  const [draft, setDraft] = useState(String(deliverable.weightPercentage));
+  return (
+    <div className="flex items-end gap-2">
+      <Field label="الوزن (%)">
+        <Input
+          className="w-24"
+          type="number"
+          min={0}
+          max={100}
+          aria-label={`وزن المخرَج ${deliverable.name}`}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+        />
+      </Field>
+      <Button
+        variant="ghost"
+        disabled={disabled || draft === String(deliverable.weightPercentage)}
+        onClick={() => onCommit(Number(draft) || 0)}
+      >
+        تحديث الوزن
+      </Button>
     </div>
   );
 }

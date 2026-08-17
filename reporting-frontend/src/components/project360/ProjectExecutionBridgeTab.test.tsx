@@ -66,6 +66,7 @@ function deliverable(
     completedQuantity: 4,
     status: 'InProgress',
     progressPercent: 40,
+    weightPercentage: 0,
     startDate: null,
     dueDate: null,
     deliveredAtUtc: null,
