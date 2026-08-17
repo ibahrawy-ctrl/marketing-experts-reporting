@@ -109,7 +109,9 @@ public class MultiTeamProjectVisibilityTests
         var list = await (await member.GetAsync("/api/projects?selectableOnly=true"))
             .ReadAsync<List<ProjectDto>>();
         Assert.DoesNotContain(list!, p => p.Id == extraProject.Id);
-        Assert.Equal(HttpStatusCode.Forbidden, (await member.GetAsync($"/api/projects/{extraProject.Id}")).StatusCode);
+        // **404 لا 403 (P360-WF-R2 §5)**: الخادم لا يميّز «غير موجود» عن «موجود خارج نطاقك»،
+        // وإلّا صار رمز الحالة نفسه أداةَ إحصاء تكشف وجود مشاريع لا يملك القارئ رؤيتها.
+        Assert.Equal(HttpStatusCode.NotFound, (await member.GetAsync($"/api/projects/{extraProject.Id}")).StatusCode);
     }
 
     // ===== 5: المستخدم بلا أي فريق لا يرى مشاريع غير مصرّح بها =====
@@ -125,7 +127,9 @@ public class MultiTeamProjectVisibilityTests
         var list = await (await member.GetAsync("/api/projects?selectableOnly=true"))
             .ReadAsync<List<ProjectDto>>();
         Assert.DoesNotContain(list!, p => p.Id == project.Id);
-        Assert.Equal(HttpStatusCode.Forbidden, (await member.GetAsync($"/api/projects/{project.Id}")).StatusCode);
+        // **404 لا 403 (P360-WF-R2 §5)**: الخادم لا يميّز «غير موجود» عن «موجود خارج نطاقك»،
+        // وإلّا صار رمز الحالة نفسه أداةَ إحصاء تكشف وجود مشاريع لا يملك القارئ رؤيتها.
+        Assert.Equal(HttpStatusCode.NotFound, (await member.GetAsync($"/api/projects/{project.Id}")).StatusCode);
     }
 
     // ===== 6: سيناريو مكافئ لشيماء (3 مشاريع أساسية + 4 إضافية = 7) =====

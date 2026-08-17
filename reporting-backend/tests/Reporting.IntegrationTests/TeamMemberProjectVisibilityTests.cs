@@ -80,7 +80,9 @@ public class TeamMemberProjectVisibilityTests
         var otherProject = await CreateProjectAsync(admin, "مشروع فريق آخر", otherTeam);
 
         var get = await member.GetAsync($"/api/projects/{otherProject.Id}");
-        Assert.Equal(HttpStatusCode.Forbidden, get.StatusCode);
+        // **404 لا 403 (P360-WF-R2 §5)**: الخادم لا يميّز «غير موجود» عن «موجود خارج نطاقك»،
+        // وإلّا صار رمز الحالة نفسه أداةَ إحصاء تكشف وجود مشاريع لا يملك القارئ رؤيتها.
+        Assert.Equal(HttpStatusCode.NotFound, get.StatusCode);
 
         var list = await (await member.GetAsync("/api/projects?selectableOnly=true"))
             .ReadAsync<List<ProjectDto>>();
@@ -139,7 +141,9 @@ public class TeamMemberProjectVisibilityTests
         Assert.Equal(HttpStatusCode.OK, (await leader.GetAsync($"/api/projects/{project.Id}")).StatusCode);
         // موظف غير منتمٍ لأي فريق لا يرى المشروع.
         var (stranger, _) = await TestAuth.CreateUserAsync(_factory, Roles.Employee);
-        Assert.Equal(HttpStatusCode.Forbidden, (await stranger.GetAsync($"/api/projects/{project.Id}")).StatusCode);
+        // **404 لا 403 (P360-WF-R2 §5)**: الخادم لا يميّز «غير موجود» عن «موجود خارج نطاقك»،
+        // وإلّا صار رمز الحالة نفسه أداةَ إحصاء تكشف وجود مشاريع لا يملك القارئ رؤيتها.
+        Assert.Equal(HttpStatusCode.NotFound, (await stranger.GetAsync($"/api/projects/{project.Id}")).StatusCode);
     }
 
     // ===== 6: حفظ/إرسال PRS ينجح لمشروع يملكه فريق العضو =====

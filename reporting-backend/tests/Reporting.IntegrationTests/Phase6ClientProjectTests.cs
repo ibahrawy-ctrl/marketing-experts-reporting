@@ -83,9 +83,9 @@ public class Phase6ClientProjectTests
         Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
     }
 
-    // ===== 3: مشروع خارج النطاق → 403 =====
+    // ===== 3: مشروع خارج النطاق → 404 (منع الإحصاء) =====
     [Fact]
-    public async Task OutOfScope_Project_Get_Returns_Forbidden()
+    public async Task OutOfScope_Project_Get_Returns_NotFound()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var org = await BuildOrgAsync();
@@ -94,7 +94,9 @@ public class Phase6ClientProjectTests
         var project = await CreateProjectAsync(admin, client.Id, "مشروع خاص", ServiceType.Social, amId: org.OtherMgr.Id);
 
         var res = await org.Mgr.C.GetAsync($"/api/projects/{project.Id}");
-        Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
+        // **404 لا 403 (P360-WF-R2 §5)**: الخادم لا يميّز «غير موجود» عن «موجود خارج نطاقك»،
+        // وإلّا صار رمز الحالة نفسه أداةَ إحصاء تكشف وجود مشاريع لا يملك القارئ رؤيتها.
+        Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
     }
 
     // ===== 4: الموظف ممنوع من إنشاء عميل =====
