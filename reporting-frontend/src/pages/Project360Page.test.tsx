@@ -226,7 +226,7 @@ describe('Project360Page — التحميل الأوّل والصحّة', () => 
 });
 
 describe('Project360Page — التبويبات', () => {
-  it('يعرض تبويبات R2 السبعة فقط', async () => {
+  it('يعرض تبويبات R2 الثمانية فقط', async () => {
     await renderLoaded();
     const names = screen.getAllByRole('tab').map((t) => t.textContent);
     expect(names).toEqual([
@@ -236,6 +236,7 @@ describe('Project360Page — التبويبات', () => {
       'الأهداف',
       'المؤشّرات والقراءات',
       'المخرَجات التعاقديّة',
+      'تحديثات التنفيذ',
       'القرارات والحوكمة',
     ]);
   });

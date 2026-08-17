@@ -28,6 +28,7 @@ import { LoadingState } from '../components/states';
 import { Tabs, type TabItem } from '../components/Tabs';
 import { ProjectBriefTab } from '../components/project360/ProjectBriefTab';
 import { ProjectContractDeliverablesTab } from '../components/project360/ProjectContractDeliverablesTab';
+import { ProjectExecutionBridgeTab } from '../components/project360/ProjectExecutionBridgeTab';
 import { ProjectGovernanceTab } from '../components/project360/ProjectGovernanceTab';
 import { ProjectHealthPanel } from '../components/project360/ProjectHealthPanel';
 import { ProjectKpisTab } from '../components/project360/ProjectKpisTab';
@@ -93,6 +94,11 @@ export default function Project360Page() {
       id: 'contract-deliverables',
       label: 'المخرَجات التعاقديّة',
       content: <ProjectContractDeliverablesTab projectId={projectId} access={access} />,
+    },
+    {
+      id: 'execution',
+      label: 'تحديثات التنفيذ',
+      content: <ProjectExecutionBridgeTab projectId={projectId} access={access} />,
     },
     {
       id: 'governance',

@@ -17,6 +17,10 @@ import type { QueryClient } from '@tanstack/react-query';
 import { api } from './api';
 import type {
   CreateProjectContractDeliverableRequest,
+  CreateProjectExecutionProposalRequest,
+  ExecutionProposalStatus,
+  ProjectExecutionProposalDto,
+  ReviewProjectExecutionProposalRequest,
   CreateProjectKpiReadingRequest,
   CreateProjectKpiRequest,
   CreateProjectObjectiveRequest,
@@ -54,7 +58,8 @@ type Resource =
   | 'deliverable-types'
   | 'risks'
   | 'decisions'
-  | 'notes';
+  | 'notes'
+  | 'execution-proposals';
 
 function key(projectId: string | undefined, resource: Resource, ...rest: unknown[]) {
   return [ROOT, projectId, resource, ...rest] as const;
@@ -549,5 +554,70 @@ export function useProjectNotes(projectId: string | undefined, openOnly = false)
           params: { openOnly },
         })
       ).data,
+  });
+}
+
+// ----------------------------------------------------------------------
+// §10 — جسر التنفيذ الهجين
+// ----------------------------------------------------------------------
+
+export function useProjectExecutionProposals(
+  projectId: string | undefined,
+  status?: ExecutionProposalStatus,
+) {
+  return useQuery({
+    queryKey: key(projectId, 'execution-proposals', status ?? 'all'),
+    enabled: !!projectId,
+    queryFn: async () =>
+      (
+        await api.get<ProjectExecutionProposalDto[]>(
+          `/projects/${projectId}/execution-proposals`,
+          { params: status ? { status } : undefined },
+        )
+      ).data,
+  });
+}
+
+/**
+ * رفع الادّعاء **لا يُبطِل اللوحة**: المقترح المعلَّق لا يمسّ رقمًا من أرقام المشروع،
+ * وإبطالها هنا كان سيوحي للمستخدم بأنّ ادّعاءه أثّر قبل أن يُقَرّ.
+ */
+export function useCreateProjectExecutionProposal(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (req: CreateProjectExecutionProposalRequest) =>
+      (
+        await api.post<ProjectExecutionProposalDto>(
+          `/projects/${projectId}/execution-proposals`,
+          req,
+        )
+      ).data,
+    onSuccess: () => invalidateResource(qc, projectId, 'execution-proposals'),
+  });
+}
+
+/**
+ * الحسم يُبطِل ثلاثة: المقترحات، والمخرَجات (القبول يكتب على المخرَج)، واللوحة (ومنها
+ * التقدّم والصحّة). إبطال المقترحات وحدها كان سيترك المخرَج معروضًا بنسبته القديمة
+ * بعد أن غيّرها القبول فعلًا في الخادم.
+ */
+export function useReviewProjectExecutionProposal(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (vars: {
+      proposalId: string;
+      request: ReviewProjectExecutionProposalRequest;
+    }) =>
+      (
+        await api.patch<ProjectExecutionProposalDto>(
+          `/projects/${projectId}/execution-proposals/${vars.proposalId}/review`,
+          vars.request,
+        )
+      ).data,
+    onSuccess: () => {
+      invalidateResource(qc, projectId, 'execution-proposals');
+      invalidateResource(qc, projectId, 'contract-deliverables');
+      invalidateOverview(qc, projectId);
+    },
   });
 }
