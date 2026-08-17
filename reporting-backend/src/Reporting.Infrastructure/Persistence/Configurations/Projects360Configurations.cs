@@ -267,3 +267,57 @@ public class ProjectStrategyAttributeConfiguration : IEntityTypeConfiguration<Pr
         b.HasIndex(x => x.SectionCode);
     }
 }
+
+/// <summary>
+/// إعداد **جسر التنفيذ الهجين** (P360-WF-R2 · §10).
+///
+/// <para>
+/// **حذف المشروع يجرف مقترحاته (<c>Cascade</c>)** — المقترح ادّعاء على مخرَجٍ داخل مشروع، ولا معنى
+/// لبقائه بعد زوال المشروع. وكذلك الحذف عبر المخرَج: مقترحٌ على مخرَجٍ محذوف ادّعاءٌ بلا هدف.
+/// </para>
+///
+/// <para>
+/// **<c>SubmissionId</c> بلا مفتاح أجنبيّ** — كما في <c>WorkstreamId</c> أعلاه: إشارة استدلاليّة إلى
+/// دورة التقارير لا ارتباط بنيويّ بها. ربطه بمفتاح أجنبيّ كان سيجعل دورة اعتماد التقارير قادرة على
+/// إسقاط سجلّ تنفيذٍ مُقَرّ، وهو ما تمنعه القاعدة «الجسر لا يملك دورة التقارير ولا تملكه».
+/// </para>
+///
+/// <para>
+/// **الفهرس <c>(DeliverableId, Status)</c>** يخدم السؤال التشغيليّ الوحيد المتكرّر: «ما المقترحات
+/// المعلَّقة على هذا المخرَج؟» — وهو نفسه حارس التعادليّة عند القبول.
+/// </para>
+/// </summary>
+public class ProjectExecutionUpdateProposalConfiguration : IEntityTypeConfiguration<ProjectExecutionUpdateProposal>
+{
+    public void Configure(EntityTypeBuilder<ProjectExecutionUpdateProposal> b)
+    {
+        b.ToTable("project_execution_update_proposals");
+        b.HasKey(x => x.Id);
+
+        b.Property(x => x.ExecutionNote).HasMaxLength(2000);
+        b.Property(x => x.ReviewNote).HasMaxLength(2000);
+
+        b.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+        b.Property(x => x.ProposedStatus).HasConversion<string>().HasMaxLength(20);
+
+        b.Property(x => x.ProposedProgressPercent).HasColumnType("numeric(9,2)");
+        b.Property(x => x.PreviousProgressPercent).HasColumnType("numeric(9,2)");
+
+        b.HasOne<Project>()
+            .WithMany()
+            .HasForeignKey(x => x.ProjectId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        b.HasOne(x => x.Deliverable)
+            .WithMany()
+            .HasForeignKey(x => x.DeliverableId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        b.HasIndex(x => x.ProjectId);
+        b.HasIndex(x => new { x.DeliverableId, x.Status })
+            .HasDatabaseName("IX_project_execution_update_proposals_DeliverableId_Status");
+        b.HasIndex(x => x.Status);
+        b.HasIndex(x => x.ProposedById);
+        b.HasIndex(x => x.SubmissionId);
+    }
+}

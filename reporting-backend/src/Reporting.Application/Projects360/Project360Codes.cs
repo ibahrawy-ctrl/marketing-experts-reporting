@@ -49,6 +49,21 @@ public static class Project360ErrorCodes
     /// <summary>وزن المخرَج خارج المجال 0..100 (P360-WF-R2 §6-1).</summary>
     public const string DeliverableWeightInvalid = "project_deliverable.weight_invalid";
 
+    // ===== جسر التنفيذ الهجين (P360-WF-R2 §10) =====
+    public const string ProposalNotFound = "project_execution_proposal.not_found";
+
+    /// <summary>مقترح على مخرَج معطَّل: التنفيذ لا يُدَّعى على التزام أُخرِج من العقد.</summary>
+    public const string ProposalDeliverableInactive = "project_execution_proposal.deliverable_inactive.conflict";
+
+    /// <summary>مُراجَعة مقترحٍ حُسِم من قبل — القبول والرفض قرار واحد لا يتكرّر.</summary>
+    public const string ProposalAlreadyReviewed = "project_execution_proposal.already_reviewed.conflict";
+
+    /// <summary>التسليم المُستشهَد به ليس من هذا المشروع ⟹ الادّعاء يعبر حدود المشاريع.</summary>
+    public const string ProposalSubmissionMismatch = "project_execution_proposal.submission_mismatch.conflict";
+
+    /// <summary>الرفض بلا سبب يترك المنفِّذ بلا ما يصحّحه (§10).</summary>
+    public const string ProposalRejectReasonRequired = "project_execution_proposal.reject_reason_required";
+
     // ===== تحقّق عامّ مشترك (W4 — ميكانيكيّ، لا يخالف عقد R2) =====
     public const string PercentInvalid = "project_360.percent_invalid";
     public const string WeightInvalid = "project_360.weight_invalid";

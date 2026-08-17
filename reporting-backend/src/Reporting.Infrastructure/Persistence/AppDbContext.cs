@@ -60,6 +60,9 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
     public DbSet<ProjectStrategy> ProjectStrategies => Set<ProjectStrategy>();
     public DbSet<ProjectStrategyAttribute> ProjectStrategyAttributes => Set<ProjectStrategyAttribute>();
 
+    // جسر التنفيذ الهجين (P360-WF-R2 §10) — يصل تنفيذ الفريق بالمخرَج التعاقديّ بالمعرّف لا بالاسم.
+    public DbSet<ProjectExecutionUpdateProposal> ProjectExecutionUpdateProposals => Set<ProjectExecutionUpdateProposal>();
+
     // خدمة المستندات — أوّل ارتباط مورد: العميل (CPW-R1B2)
     public DbSet<ClientDocument> ClientDocuments => Set<ClientDocument>();
     public DbSet<ClientDocumentVersion> ClientDocumentVersions => Set<ClientDocumentVersion>();

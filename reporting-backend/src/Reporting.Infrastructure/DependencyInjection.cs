@@ -141,6 +141,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Projects360.IProjectContractDeliverableService, ProjectContractDeliverableService>();
         services.AddScoped<Application.Projects360.IProjectOverviewService, ProjectOverviewService>();
         services.AddScoped<Application.Projects360.IProjectGovernanceReadService, ProjectGovernanceReadService>();
+        services.AddScoped<Application.Projects360.IProjectExecutionBridgeService, ProjectExecutionBridgeService>();
 
         return services;
     }
