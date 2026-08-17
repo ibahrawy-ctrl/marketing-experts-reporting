@@ -1,5 +1,10 @@
 // أنواع DTO المطابقة لطبقة الـAPI (التعدادات سلاسل نصية).
 
+// حالة الصحّة وطريقة احتساب التقدّم مُعرَّفتان مرّة واحدة في `./project360` بوصفهما مرآةً
+// لتعدادات الخادم. تُستورَدان هنا ولا تُكرَّران: تعريفان لنفس التعداد ينحرفان عند أوّل توسعة.
+// الاستيراد نوعيّ بحت (`import type`) فلا حلقة استيراد في زمن التشغيل.
+import type { ProjectHealthStatus, ProjectProgressMode } from './project360';
+
 export type Role =
   | 'Admin'
   | 'CEO'
@@ -2159,6 +2164,27 @@ export interface ProjectDto {
   updatedAtUtc: string | null;
   canHardDelete: boolean;
   deleteBlockReason: string | null;
+
+  // إسناد أدوار المشروع (P360-WF-R2 §4 · GAP-01).
+  projectOwnerId: string | null;
+  projectOwnerName: string | null;
+  teamLeaderId: string | null;
+  teamLeaderName: string | null;
+
+  // شفافيّة احتساب التقدّم (§6-1) — رقمٌ بلا طريقة احتسابه رقمٌ لا يُصحَّح.
+  progressPercent: number;
+  progressMode: ProjectProgressMode;
+  progressCalculatedAtUtc: string | null;
+  progressSourceDeliverableCount: number;
+
+  // الصحّة الظاهرة (§7) — الأسباب مصدرها `GET /projects/{id}/overview` وحده لا هذه القائمة.
+  healthStatus: ProjectHealthStatus;
+  healthPercent: number;
+  healthComputedAtUtc: string | null;
+
+  // خريطة القدرات (§12) — مرآة حرّاس الخادم، لا اشتقاق موازٍ لها في الواجهة.
+  canManageStructure: boolean;
+  canOperate: boolean;
 }
 
 // تيّار عمل داخل المشروع (P1 — منصّة التنفيذ العامة).
@@ -2259,6 +2285,10 @@ export interface CreateProjectRequest {
   accountManagerId?: string | null;
   notes?: string | null;
   status?: ProjectStatus;
+  // إسناد أدوار المشروع (P360-WF-R2 §4). الخادم يقبل الحقلَين منذ GAP-01، لكنّ غيابهما عن
+  // نوع الطلب كان يحجبهما عن كلّ نموذج في الواجهة ⟹ يُعرَضان للقراءة ولا يُسنَدان أبدًا.
+  projectOwnerId?: string | null;
+  teamLeaderId?: string | null;
 }
 export interface UpdateProjectRequest {
   name: string;
@@ -2269,6 +2299,8 @@ export interface UpdateProjectRequest {
   ownerTeamId?: string | null;
   accountManagerId?: string | null;
   notes?: string | null;
+  projectOwnerId?: string | null;
+  teamLeaderId?: string | null;
 }
 
 // تقرير مرتبط بعميل/مشروع.

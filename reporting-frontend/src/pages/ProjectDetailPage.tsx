@@ -991,6 +991,8 @@ function EditProjectForm({
   const [endDate, setEndDate] = useState(project.endDate ?? '');
   const [ownerTeamId, setOwnerTeamId] = useState(project.ownerTeamId ?? '');
   const [accountManagerId, setAccountManagerId] = useState(project.accountManagerId ?? '');
+  const [projectOwnerId, setProjectOwnerId] = useState(project.projectOwnerId ?? '');
+  const [teamLeaderId, setTeamLeaderId] = useState(project.teamLeaderId ?? '');
   const [notes, setNotes] = useState(project.notes ?? '');
   const [err, setErr] = useState<string | null>(null);
 
@@ -1008,6 +1010,8 @@ function EditProjectForm({
       endDate: endDate || null,
       ownerTeamId: ownerTeamId || null,
       accountManagerId: accountManagerId || null,
+      projectOwnerId: projectOwnerId || null,
+      teamLeaderId: teamLeaderId || null,
       notes: notes.trim() || null,
     };
     try {
@@ -1056,6 +1060,26 @@ function EditProjectForm({
         </Field>
         <Field label="مدير العميل">
           <Select value={accountManagerId} onChange={(e) => setAccountManagerId(e.target.value)}>
+            <option value="">— بدون —</option>
+            {(users.data ?? []).map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.fullName}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="مالك المشروع">
+          <Select value={projectOwnerId} onChange={(e) => setProjectOwnerId(e.target.value)}>
+            <option value="">— بدون —</option>
+            {(users.data ?? []).map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.fullName}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="قائد الفريق">
+          <Select value={teamLeaderId} onChange={(e) => setTeamLeaderId(e.target.value)}>
             <option value="">— بدون —</option>
             {(users.data ?? []).map((u) => (
               <option key={u.id} value={u.id}>

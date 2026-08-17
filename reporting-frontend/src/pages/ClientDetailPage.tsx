@@ -1195,6 +1195,8 @@ function CreateProjectForm({ clientId, onDone }: { clientId: string; onDone: () 
   const [endDate, setEndDate] = useState('');
   const [ownerTeamId, setOwnerTeamId] = useState('');
   const [accountManagerId, setAccountManagerId] = useState('');
+  const [projectOwnerId, setProjectOwnerId] = useState('');
+  const [teamLeaderId, setTeamLeaderId] = useState('');
   const [notes, setNotes] = useState('');
   const [err, setErr] = useState<string | null>(null);
 
@@ -1213,6 +1215,8 @@ function CreateProjectForm({ clientId, onDone }: { clientId: string; onDone: () 
       endDate: endDate || null,
       ownerTeamId: ownerTeamId || null,
       accountManagerId: accountManagerId || null,
+      projectOwnerId: projectOwnerId || null,
+      teamLeaderId: teamLeaderId || null,
       notes: notes.trim() || null,
     };
     try {
@@ -1265,6 +1269,26 @@ function CreateProjectForm({ clientId, onDone }: { clientId: string; onDone: () 
         </Field>
         <Field label="مدير العميل">
           <Select value={accountManagerId} onChange={(e) => setAccountManagerId(e.target.value)}>
+            <option value="">— بدون —</option>
+            {(users.data ?? []).map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.fullName}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="مالك المشروع">
+          <Select value={projectOwnerId} onChange={(e) => setProjectOwnerId(e.target.value)}>
+            <option value="">— بدون —</option>
+            {(users.data ?? []).map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.fullName}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="قائد الفريق">
+          <Select value={teamLeaderId} onChange={(e) => setTeamLeaderId(e.target.value)}>
             <option value="">— بدون —</option>
             {(users.data ?? []).map((u) => (
               <option key={u.id} value={u.id}>
