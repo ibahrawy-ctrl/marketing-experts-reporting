@@ -91,7 +91,11 @@ const KPI_FINANCE_EXPORT_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'HR'
 const ACCOUNT_PORTFOLIO_ROLES: Role[] = ['AccountPortfolioReader', 'Admin'];
 // مساحة عمل Project 360 (CPW-R3 · R2-W12) — الخادم يكتفي بـ[Authorize] ويحسم الرؤية بالنطاق،
 // فتُبقى بوّابة الواجهة واسعة بقدر من يملك مشاريع مرئيّة فعلًا بدل تضييق يُخفي مساحة مسموحة.
-const PROJECT_360_ROLES: Role[] = [...EXEC_ROLES, 'AccountPortfolioReader'];
+// `Employee` مضاف عمدًا (P360-WF-R2 §10): جسر التنفيذ الهجين يجعل **المنفِّذ** هو من يرفع
+// ادّعاء التنفيذ، والخادم يمنحه الرؤية فعلًا حين ينتمي لفريق المشروع. بلا هذا الدور كانت
+// البوّابة المحلّيّة تحجب الشاشة كلّها عمّن أذِن له الخادم صراحةً — اشتقاق تخويل موازٍ نفته §12.
+// من لا مشروع مرئيًّا له يرى الرسالة الموحّدة نفسها من الخادم، فلا تُكشف بذلك أيّ بيانات.
+const PROJECT_360_ROLES: Role[] = [...EXEC_ROLES, 'AccountPortfolioReader', 'Employee'];
 // ملفّ العميل الشامل Client 360 (CPW-R2) — نفس أدوار التنفيذ زائد مدير العميل (AccountPortfolioReader).
 // لا يُوسَّع EXEC_ROLES نفسه كي لا تُفتَح بقيّة الشاشات التنفيذيّة. الرؤية والتحرير مفروضان خادميًّا:
 // القراءة عبر Client.AccountManagerId، والتحرير الأساسيّ يبقى محصورًا بسياسة ClientCoreManagers.
