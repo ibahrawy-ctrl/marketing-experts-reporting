@@ -493,6 +493,12 @@ function MineTab({ onOpen }: { onOpen: (id: string) => void }) {
 
   const [reportTemplateId, setReportTemplateId] = useState('');
   const [periodKey, setPeriodKey] = useState(defaultPeriodKey);
+  // ربط التقرير بمشروع (P360-WF-R2 §9): اختياريّ، والخادم يشتقّ العميل من المشروع.
+  // كان `ReportSubmission.ProjectId` قابلًا للتعبئة في الخادم منذ Phase 6 لكنّ الواجهة
+  // لم ترسله قطّ، فبقي `null` دائمًا ⟹ التقرير لا يصل إلى مشروعه ولا يصلح دليلًا
+  // يستشهد به مقترح تنفيذ. القائمة مفلترة خادميًّا بنطاق رؤية المُرسِل.
+  const [projectId, setProjectId] = useState('');
+  const { data: linkableProjects } = useProjects({ selectableOnly: true });
   // اليوميّ: هل اليوم المختار مفتوح للإنشاء؟ (يُقفَل للعطلة/المستقبل عبر الخادم). الأسبوعيّ يعتمد وجود المفتاح.
   const [dayOpenForDraft, setDayOpenForDraft] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -502,9 +508,16 @@ function MineTab({ onOpen }: { onOpen: (id: string) => void }) {
   const hasSupplementary = (templates ?? []).some((t) => t.classification === 'Supplementary');
 
   const create = useMutation({
-    mutationFn: () => api.post<SubmissionDto>('/submissions', { reportTemplateId, periodType, periodKey }),
+    mutationFn: () =>
+      api.post<SubmissionDto>('/submissions', {
+        reportTemplateId,
+        periodType,
+        periodKey,
+        projectId: projectId || null,
+      }),
     onSuccess: (res) => {
       setPeriodKey(defaultPeriodKey());
+      setProjectId('');
       setDayOpenForDraft(false); // يُعاد ضبطه تلقائيًّا عند إعادة اختيار اليوم الحاليّ من المنتقي
       void qc.invalidateQueries({ queryKey: ['submissions-mine'] });
       onOpen(res.data.id);
@@ -573,6 +586,21 @@ function MineTab({ onOpen }: { onOpen: (id: string) => void }) {
                   <Badge tone="navy">{periodTypeLabel[periodType]}</Badge>
                 </div>
               </Field>
+            </div>
+            <div className="w-72">
+              <Field label="المشروع (اختياري)">
+                <Select value={projectId} onChange={(e) => setProjectId(e.target.value)}>
+                  <option value="">بلا ربط بمشروع</option>
+                  {linkableProjects?.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}{p.clientName ? ` — ${p.clientName}` : ''}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <div className="mt-1 text-xs text-navy/60">
+                الربط يجعل التقرير يظهر في مساحة المشروع ويصلح دليلًا يستشهد به تحديث التنفيذ. العميل يُشتقّ من المشروع تلقائيًّا.
+              </div>
             </div>
           </div>
 
