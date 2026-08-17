@@ -39,8 +39,14 @@ public class Project360ApiSurfaceTests
     /// <summary>
     /// <c>OVERVIEW_SQL_QUERY_COUNT</c> — عدد أوامر SQL لرحلة لوحة واحدة. **ثابت** لا يتناسب مع عدد
     /// الأهداف أو المؤشّرات؛ مثبَّت هنا رقمًا صريحًا كي يفشل أيّ انحدار يُدخل N+1 خِلسة.
+    ///
+    /// <para>
+    /// **12 ⟵ 14 في P360-WF-R2**: استعلامان ثابتان أُضيفا عمدًا — أسماء المسنَدين (§11) وخريطة
+    /// القدرات (§12). كلاهما لا يتناسب مع عدد الأهداف، والدليل أنّ مشروع الهدف الواحد ومشروع
+    /// العشرين هدفًا ما زالا متساويَين في الاختبار أدناه.
+    /// </para>
     /// </summary>
-    private const int OverviewSqlQueryCount = 12;
+    private const int OverviewSqlQueryCount = 14;
 
     private readonly CustomWebApplicationFactory _factory;
 

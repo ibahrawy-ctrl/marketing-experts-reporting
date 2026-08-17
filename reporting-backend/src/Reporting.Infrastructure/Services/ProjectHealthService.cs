@@ -182,11 +182,9 @@ public class ProjectHealthService : IProjectHealthService
         var scheduleScore = ProjectHealthPolicy.ComputeScheduleScore(
             project.StartDate, project.EndDate, today, project.ProgressPercent, project.Status);
 
-        // مكوّن التقدّم يُستبعَد من المعادلة حين لا مصدر له أصلًا: «لا مخرَجات» ليس صفرًا في الأداء،
-        // وإدخاله صفرًا كان سيعيد إنتاج GAP-04 بصيغة أخرى.
-        decimal? progressComponent = progress.Mode == ProjectProgressMode.NoDeliverables
-            ? null
-            : progress.Percent;
+        // مكوّن التقدّم يُستبعَد من المعادلة حين لا مصدر له أصلًا — القاعدة في `ProjectHealthPolicy`
+        // كي يستدعيها مسار القراءة بحرفها ولا يعرض رقمًا يخالف العمود المخزَّن.
+        var progressComponent = ProjectHealthPolicy.ToHealthProgressComponent(progress.Percent, progress.Mode);
 
         var snapshot = ProjectHealthPolicy.ComputeHealth(
             kpiScore.Score, progressComponent, scheduleScore, now, kpiScore.AllWeightsZero, signals);

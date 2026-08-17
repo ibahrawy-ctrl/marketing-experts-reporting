@@ -37,16 +37,17 @@ public class Project360HealthAndAuthorizationTests
     // ==================================================================
 
     /// <summary>
-    /// مشروع بلا أهداف ولا مؤشّرات ولا تواريخ: المكوّنان المستبعَدان يصدران سببيهما صراحةً
-    /// (<c>health.kpi.excluded</c> و<c>health.schedule.excluded</c>) ويُعاد توزيع وزنيهما،
-    /// ولا يُعامَل الغياب صفرًا.
+    /// مشروع بلا أهداف ولا مؤشّرات ولا تواريخ **ولا مخرَجات تعاقديّة**: المكوّنات الثلاثة كلّها
+    /// مستبعَدة ⟹ لا نتيجة رقميّة ولا ختم تقييم، والغياب لا يُعامَل صفرًا.
     ///
     /// <para>
-    /// **لماذا يبقى المشروع مقيَّمًا رغم ذلك؟** لأنّ <c>Project.ProgressPercent</c> عمود
-    /// **غير قابل للإفراغ** — فلا سبيل لتمثيل «تقدّم غير معلَن» في النموذج القائم، ومكوّن التقدّم
-    /// متاح دائمًا بحكم المخطَّط. حالة «لم يُقيَّم» (الختم <c>null</c>) تبقى مسارًا دفاعيًّا في
-    /// <c>ProjectHealthPolicy</c> لا يبلغه المشروع ما دام العمود على حاله. تغيير ذلك يستلزم
-    /// هجرة على العمود — **خارج نطاق هذه الحزمة** بالنصّ.
+    /// **تحوّل في P360-WF-R2 §6**: كان مكوّن التقدّم متاحًا دائمًا لأنّ <c>Project.ProgressPercent</c>
+    /// عمود غير قابل للإفراغ، فيُقرأ صفرًا بلا مصدر ويُبقي المشروع «مقيَّمًا» برقم لا يصف شيئًا
+    /// (GAP-04). بعد ربط التقدّم بالمخرَجات صار للغياب تمثيل صريح
+    /// (<see cref="ProjectProgressMode.NoDeliverables"/>) ⟹ المسار الدفاعيّ «لا مكوّن متاح» صار
+    /// **بالغًا فعلًا**، وهذا الاختبار هو ما يبلغه. لذا يُنتظَر <c>health.no_component</c> ومعه
+    /// السبب المفسِّر <c>health.progress.no_deliverables</c>، لا قائمة الاستبعادات المفصَّلة:
+    /// «لا مكوّن متاح» تقول ما تقوله الاستبعادات الثلاثة مجتمعةً.
     /// </para>
     /// </summary>
     [Fact]
@@ -58,15 +59,15 @@ public class Project360HealthAndAuthorizationTests
 
         Assert.Null(health.KpiScore);
         Assert.Null(health.ScheduleScore);
-        Assert.Contains(ProjectHealthReasonCodes.KpiComponentExcluded, health.ReasonCodes);
-        Assert.Contains(ProjectHealthReasonCodes.ScheduleComponentExcluded, health.ReasonCodes);
+        Assert.Null(health.ProgressPercent);
+        Assert.Contains(ProjectHealthReasonCodes.NoComponentAvailable, health.ReasonCodes);
+        Assert.Contains(ProjectHealthReasonCodes.ProgressNoDeliverables, health.ReasonCodes);
 
-        // مكوّن التقدّم وحده متاح ⟹ النتيجة تساويه بعد إعادة توزيع الأوزان، لا متوسّطًا مخفَّضًا.
-        Assert.Equal(health.ProgressPercent, health.Score);
+        // «لم يُقيَّم» ≠ «صفر»: لا نتيجة ولا ختم — والختم الفارغ هو العلامة الوحيدة على ذلك.
+        Assert.Null(health.Score);
 
-        var (percent, status, stamp) = await ReadStoredHealthAsync(fx.ProjectId);
-        Assert.NotNull(stamp);
-        Assert.Equal(health.Score, percent);
+        var (_, status, stamp) = await ReadStoredHealthAsync(fx.ProjectId);
+        Assert.Null(stamp);
         Assert.Equal(health.Status, status);
     }
 

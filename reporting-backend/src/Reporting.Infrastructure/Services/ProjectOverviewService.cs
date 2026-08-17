@@ -191,7 +191,9 @@ public class ProjectOverviewService : IProjectOverviewService
             core.ProgressMode);
 
         var snapshot = ProjectHealthPolicy.ComputeHealth(
-            kpiScore.Score, core.ProgressPercent, scheduleScore, now, kpiScore.AllWeightsZero, signals);
+            kpiScore.Score,
+            ProjectHealthPolicy.ToHealthProgressComponent(core.ProgressPercent, core.ProgressMode),
+            scheduleScore, now, kpiScore.AllWeightsZero, signals);
 
         // نفس مُحوِّل المسار الآخر حرفيًّا — عقد صحّة واحد لا شكلان.
         // **قراءة خالصة**: لا كتابة على أعمدة الصحّة من مسار GET؛ الختم المخزَّن يُعرَض كما هو

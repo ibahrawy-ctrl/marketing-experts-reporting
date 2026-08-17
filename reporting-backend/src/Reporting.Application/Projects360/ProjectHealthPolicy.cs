@@ -525,6 +525,20 @@ public static class ProjectHealthPolicy
             counted.Count);
     }
 
+    /// <summary>
+    /// مكوّن التقدّم كما يدخل معادلة الصحّة: يُستبعَد حين لا مصدر له أصلًا
+    /// (<see cref="ProjectProgressMode.NoDeliverables"/>)، لأنّ «لا مخرَجات» ليست صفرًا في الأداء
+    /// وإدخالها صفرًا يُبطِل 0.30 من المعادلة ويجعل الأخضر مستحيلًا (GAP-04).
+    ///
+    /// <para>
+    /// **قاعدة واحدة لمسارَين**: مسار الكتابة (<c>ProjectHealthService</c>) ومسار القراءة
+    /// (<c>ProjectOverviewService</c>) يستدعيان هذه الدالّة بعينها. حين كانت القاعدة مكتوبةً في
+    /// مسار الكتابة وحده كانت اللوحة تعرض رقمًا يخالف العمود المخزَّن لنفس المشروع.
+    /// </para>
+    /// </summary>
+    public static decimal? ToHealthProgressComponent(decimal percent, ProjectProgressMode mode) =>
+        mode == ProjectProgressMode.NoDeliverables ? null : percent;
+
     // ======================================================================
     // §7-ب — بناء الإشارات التشغيليّة من صفوف الدومين (P360-WF-R2)
     // ======================================================================
