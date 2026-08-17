@@ -9,6 +9,7 @@ import { UserPicker } from '../components/UserPicker';
 import { MetricTile, ProgressBar, SectionTitle } from '../components/dashboard';
 import { useAllSubmissions, useKpiSummary } from '../lib/useOrg';
 import { useDirectoryUsers } from '../lib/useDirectory';
+import { useProjects } from '../lib/useClients';
 import {
   riskSeverityLabel,
   riskStatusLabel,
@@ -137,7 +138,10 @@ function RisksTab({ isManagement }: { isManagement: boolean }) {
   const [title, setTitle] = useState('');
   const [severity, setSeverity] = useState<RiskSeverity>('Medium');
   const [nextAction, setNextAction] = useState('');
+  const [projectId, setProjectId] = useState('');
   const [err, setErr] = useState<string | null>(null);
+  // المشاريع المرئيّة للمستخدم كما يحسمها الخادم بالنطاق — لا ترشيح موازٍ هنا.
+  const { data: projects } = useProjects({});
 
   const create = useMutation({
     mutationFn: () =>
@@ -149,10 +153,14 @@ function RisksTab({ isManagement }: { isManagement: boolean }) {
         departmentId: null,
         mitigationPlan: null,
         nextAction: nextAction.trim() || null,
+        // ربط الخطر بمشروعه: الخادم يقبل `ProjectId` ويقرؤه تبويبُ حوكمة المشروع، لكنّ هذا
+        // النموذج — وهو مسار الكتابة الوحيد — لم يكن يرسله، فبقي التبويب فارغًا مهما سُجِّل.
+        projectId: projectId || null,
       }),
     onSuccess: () => {
       setTitle('');
       setNextAction('');
+      setProjectId('');
       void qc.invalidateQueries({ queryKey: ['risks'] });
     },
     onError: (e) => setErr(apiErrorMessage(e)),
@@ -190,6 +198,18 @@ function RisksTab({ isManagement }: { isManagement: boolean }) {
             <div className="flex-1 min-w-48">
               <Field label="الإجراء التالي" help="الخطوة المقترحة لمعالجة الخطر">
                 <Input value={nextAction} onChange={(e) => setNextAction(e.target.value)} placeholder="مثال: تصعيد للمدير العام" />
+              </Field>
+            </div>
+            <div className="w-56">
+              <Field label="المشروع" help="اربط الخطر بمشروعه فيظهر في حوكمة ذلك المشروع.">
+                <Select value={projectId} onChange={(e) => setProjectId(e.target.value)}>
+                  <option value="">بلا مشروع</option>
+                  {(projects ?? []).map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </Select>
               </Field>
             </div>
             <Button disabled={!title || create.isPending} onClick={() => { setErr(null); create.mutate(); }}>
