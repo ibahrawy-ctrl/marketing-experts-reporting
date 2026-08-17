@@ -30,17 +30,11 @@ const RISKS_URL = `/projects/${PROJECT_ID}/risks`;
 const RECOMPUTE_URL = `/projects/${PROJECT_ID}/health/recompute`;
 
 // ---------------------------------------------------------------------
-// حالة المصادقة — متغيّرة بين الاختبارات لقياس الأسطح الواعية بالصلاحيّة.
+// **لا تمويه لـ`useAuth` بعد الآن**: الصفحة لم تعد تشتقّ الصلاحيّة من الأدوار
+// والمعرّفات محلّيًّا (P360-WF-R2 §12) — مصدرها الوحيد `overview.access` القادم من
+// الخادم. إبقاء تمويه المصادقة كان سيسمح للاختبار بأن ينجح على قواعد لا وجود لها
+// في الشيفرة، وهو بالضبط الانحراف الذي أُزيل.
 // ---------------------------------------------------------------------
-let authUserId = 'user-manager';
-let authRoles: string[] = ['Manager'];
-
-vi.mock('../lib/auth', () => ({
-  useAuth: () => ({
-    user: { userId: authUserId, roles: authRoles },
-    hasAnyRole: (...roles: string[]) => roles.some((r) => authRoles.includes(r)),
-  }),
-}));
 
 // ---------------------------------------------------------------------
 // حمولة النظرة العامّة.
@@ -65,6 +59,15 @@ function overviewFixture(): ProjectOverviewDto {
       teamLeaderId: 'user-tl',
       accountManagerId: 'user-am',
       ownerTeamId: 'team-1',
+      // أسماء أشخاص لا تطابق تسميات الحقول: لو سُمّي المسنَد باسم حقله لصار الادّعاء
+      // يمرّ على التسمية نفسها ولا يثبت أنّ القيمة عُرِضت أصلًا.
+      projectOwnerName: 'سارة العتيبي',
+      teamLeaderName: 'ماجد الحربي',
+      accountManagerName: 'ريم القحطاني',
+      ownerTeamName: 'فريق المحتوى',
+      progressMode: 'Weighted',
+      progressCalculatedAtUtc: '2026-08-15T09:00:00Z',
+      progressSourceDeliverableCount: 2,
     },
     health: {
       score: 42.5,
@@ -94,7 +97,7 @@ function overviewFixture(): ProjectOverviewDto {
       averageAchievementPercent: 61,
       lastReadingDate: '2026-08-10',
     },
-    deliverables: { total: 2, completed: 1, pending: 1, delayed: 0, overallProgressPercent: 50 },
+    deliverables: { total: 2, completed: 1, pending: 1, delayed: 0 },
     governance: {
       risksTotal: 1,
       risksOpen: 1,
@@ -104,6 +107,7 @@ function overviewFixture(): ProjectOverviewDto {
       notesOpen: 0,
     },
     strategy: { exists: true, filledCoreFields: 6, totalCoreFields: 11, attributesCount: 2 },
+    access: { canManageStructure: true, canOperate: true, canWriteGovernance: true },
   };
 }
 
@@ -128,8 +132,6 @@ function countOf(list: string[], url: string) {
 
 beforeEach(() => {
   vi.restoreAllMocks();
-  authUserId = 'user-manager';
-  authRoles = ['Manager'];
   getCalls = [];
   postCalls = [];
   getFailures = {};
@@ -269,8 +271,20 @@ describe('Project360Page — التبويبات', () => {
   });
 });
 
-describe('Project360Page — الصلاحيّة وإعادة الاحتساب', () => {
-  it('يعرض زرّ إعادة الاحتساب للدور الإداريّ ويستدعي المسار المخصَّص', async () => {
+// ---------------------------------------------------------------------
+// خريطة القدرات مصدرًا وحيدًا (§12).
+//
+// كلّ ادّعاء هنا يغيّر **حمولة الخادم** لا أدوار المستخدم: هذا هو الفرق الذي تحرسه
+// التذكرة. لو عادت الصفحة إلى الاشتقاق المحلّيّ لسقطت هذه الاختبارات، لأنّ الأدوار
+// لم تعد تُموَّه أصلًا.
+// ---------------------------------------------------------------------
+function overviewWithAccess(access: Partial<ProjectOverviewDto['access']>): ProjectOverviewDto {
+  const base = overviewFixture();
+  return { ...base, access: { ...base.access, ...access } };
+}
+
+describe('Project360Page — خريطة القدرات وإعادة الاحتساب', () => {
+  it('يعرض زرّ إعادة الاحتساب حين تسمح خريطة القدرات ويستدعي المسار المخصَّص', async () => {
     await renderLoaded();
     fireEvent.click(screen.getByRole('button', { name: 'إعادة احتساب الصحّة' }));
     await waitFor(() => expect(countOf(postCalls, RECOMPUTE_URL)).toBe(1));
@@ -282,23 +296,20 @@ describe('Project360Page — الصلاحيّة وإعادة الاحتساب', 
     await waitFor(() => expect(countOf(getCalls, OVERVIEW_URL)).toBe(2));
   });
 
-  it('يُخفي زرّ إعادة الاحتساب عن مستخدم بلا دور ولا مسؤوليّة على المشروع', async () => {
-    authUserId = 'user-viewer';
-    authRoles = ['Viewer'];
+  it('يُخفي زرّ إعادة الاحتساب حين ينفي الخادم `canOperate`', async () => {
+    getBodies[OVERVIEW_URL] = overviewWithAccess({ canOperate: false, canManageStructure: false });
     await renderLoaded();
     expect(screen.queryByRole('button', { name: 'إعادة احتساب الصحّة' })).not.toBeInTheDocument();
   });
 
-  it('يُظهر الزرّ لمدير الحساب المسؤول عن المشروع بلا دور إداريّ', async () => {
-    authUserId = 'user-am';
-    authRoles = ['Employee'];
+  it('يُظهر الزرّ بـ`canOperate` وحدها ولو نفى الخادم الكتابة البنيويّة', async () => {
+    getBodies[OVERVIEW_URL] = overviewWithAccess({ canOperate: true, canManageStructure: false });
     await renderLoaded();
     expect(screen.getByRole('button', { name: 'إعادة احتساب الصحّة' })).toBeInTheDocument();
   });
 
-  it('يُخفي أزرار إنشاء الأهداف عن غير الإداريّين', async () => {
-    authUserId = 'user-tl';
-    authRoles = ['TeamLeader'];
+  it('يُخفي أزرار إنشاء الأهداف حين ينفي الخادم `canManageStructure`', async () => {
+    getBodies[OVERVIEW_URL] = overviewWithAccess({ canManageStructure: false });
     await renderLoaded();
     fireEvent.click(screen.getByRole('tab', { name: 'الأهداف' }));
     await waitFor(() => expect(countOf(getCalls, OBJECTIVES_URL)).toBe(1));
@@ -335,5 +346,34 @@ describe('Project360Page — العرض', () => {
     await renderLoaded();
     expect(screen.getByText('عميل الاختبار')).toBeInTheDocument();
     expect(getCalls).toEqual([OVERVIEW_URL]);
+  });
+
+  it('يعرض المسنَدين بأسمائهم لا بمعرّفاتهم', async () => {
+    await renderLoaded();
+    for (const name of ['سارة العتيبي', 'ماجد الحربي', 'ريم القحطاني', 'فريق المحتوى']) {
+      expect(screen.getByText(name)).toBeInTheDocument();
+    }
+    expect(screen.queryByText('user-owner')).not.toBeInTheDocument();
+  });
+
+  it('يعرض نسبة التقدّم مقرونة بطريقة احتسابها وعدد مخرَجات مصدرها (§6-1)', async () => {
+    await renderLoaded();
+    expect(screen.getByText('طريقة الاحتساب')).toBeInTheDocument();
+    expect(screen.getByText('متوسّط موزون بأوزان المخرَجات')).toBeInTheDocument();
+    expect(screen.getByText('مخرَجات المصدر')).toBeInTheDocument();
+  });
+
+  it('يُنذر صراحةً حين يسقط الاحتساب إلى الأوزان المتساوية', async () => {
+    getBodies[OVERVIEW_URL] = {
+      ...overviewFixture(),
+      project: { ...overviewFixture().project, progressMode: 'EqualWeightFallback' },
+    };
+    await renderLoaded();
+    expect(screen.getByText(/الرقم تقديريّ حتّى/)).toBeInTheDocument();
+  });
+
+  it('لا يُنذر حين يكون الاحتساب موزونًا', async () => {
+    await renderLoaded();
+    expect(screen.queryByText(/الرقم تقديريّ حتّى/)).not.toBeInTheDocument();
   });
 });

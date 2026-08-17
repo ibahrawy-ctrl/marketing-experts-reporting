@@ -67,7 +67,26 @@ export type ProjectDeliverableStatus =
   | 'Delayed'
   | 'Cancelled';
 
-export type ProjectHealthStatus = 'Green' | 'Yellow' | 'Red';
+/**
+ * حالات الصحّة الظاهرة (P360-WF-R2 §7) — **مطابِقة لتعداد الخادم حرفًا بحرف**.
+ *
+ * كان هذا النوع `'Green' | 'Yellow' | 'Red'` بينما الخادم يرسل
+ * `Green | AtRisk | Delayed | Blocked | NotEvaluated`؛ فمشروعٌ محجوب كان يصل بحالة لا
+ * تجد لها الواجهة تسمية، فتعرض شارة فارغة — أخطر ما يمكن أن تفعله لوحة: أن تصمت عن
+ * التعثّر. القيم هنا تُقرأ من الخادم لا تُخترَع، فأيّ فارق بينهما عيب في هذا السطر.
+ */
+export type ProjectHealthStatus = 'Green' | 'AtRisk' | 'Delayed' | 'Blocked' | 'NotEvaluated';
+
+/**
+ * كيف احتُسِب تقدّم المشروع (P360-WF-R2 §6-1). يُعرَض للمستخدم لأنّ رقم تقدّمٍ بلا طريقة
+ * احتسابه رقمٌ لا يمكن الوثوق به ولا تصحيحه: `EqualWeightFallback` تحديدًا تعني أنّ
+ * الأوزان لم تُضبَط بعد، وإخفاؤها يجعل الرقم يبدو مقصودًا وهو ناتج تراجُع.
+ */
+export type ProjectProgressMode =
+  | 'NotCalculated'
+  | 'Weighted'
+  | 'EqualWeightFallback'
+  | 'NoDeliverables';
 
 // ----------------------------------------------------------------------
 // §3 — الاستراتيجيّة
@@ -410,6 +429,30 @@ export interface ProjectOverviewCoreDto {
   teamLeaderId: string | null;
   accountManagerId: string | null;
   ownerTeamId: string | null;
+
+  // أسماء المسنَدين (§12): الشاشة تعرض بشرًا لا معرّفات.
+  projectOwnerName: string | null;
+  teamLeaderName: string | null;
+  accountManagerName: string | null;
+  ownerTeamName: string | null;
+
+  // شفافيّة احتساب التقدّم (§6-1).
+  progressMode: ProjectProgressMode;
+  progressCalculatedAtUtc: string | null;
+  progressSourceDeliverableCount: number;
+}
+
+/**
+ * **خريطة القدرات الواحدة** (§12) — يرسلها الخادم مشتقّة من حرّاسه نفسها.
+ *
+ * قبل هذا الحقل كانت الواجهة تعيد اشتقاق الصلاحيّة من الأدوار والمعرّفات محلّيًّا: نسخة
+ * موازية من قواعد الخادم تنحرف عنه عند أوّل تعديل، فتَعِد بزرٍّ يردّه الخادم أو تُخفي
+ * إجراءً مسموحًا. مرآة لا مصدر: الخادم يرفض بصرف النظر عمّا تعرضه الشاشة.
+ */
+export interface ProjectCapabilitiesDto {
+  canManageStructure: boolean;
+  canOperate: boolean;
+  canWriteGovernance: boolean;
 }
 
 export interface ProjectOverviewObjectivesDto {
@@ -432,12 +475,16 @@ export interface ProjectOverviewKpisDto {
   lastReadingDate: string | null;
 }
 
+/**
+ * أعداد فقط — **بلا نسبة تقدّم ثانية**. كان هنا `overallProgressPercent` يُحتسَب متوسّطًا
+ * بسيطًا لحظة القراءة بينما `project.progressPercent` متوسّط موزون مخزَّن، فتعرض اللوحة
+ * رقمَي تقدّم مختلفَين لنفس المشروع بلا ما يدلّ على أيّهما الرسميّ. الرقم الرسميّ واحد.
+ */
 export interface ProjectOverviewDeliverablesDto {
   total: number;
   completed: number;
   pending: number;
   delayed: number;
-  overallProgressPercent: number | null;
 }
 
 export interface ProjectOverviewGovernanceDto {
@@ -468,6 +515,7 @@ export interface ProjectOverviewDto {
   deliverables: ProjectOverviewDeliverablesDto;
   governance: ProjectOverviewGovernanceDto;
   strategy: ProjectOverviewStrategyDto;
+  access: ProjectCapabilitiesDto;
 }
 
 // ----------------------------------------------------------------------
@@ -517,4 +565,50 @@ export interface ProjectCatalogOptionDto {
   code: string;
   nameAr: string;
   sortOrder: number;
+}
+
+// ----------------------------------------------------------------------
+// §10 — جسر التنفيذ الهجين (OPTION B)
+// ----------------------------------------------------------------------
+
+export type ExecutionProposalStatus = 'Pending' | 'Accepted' | 'Rejected';
+
+/**
+ * ادّعاء تنفيذ على مخرَج تعاقديّ. `canReview` **مرآة حارس الخادم** لا نسخة منه:
+ * الواجهة لا تُظهر زرّ حسمٍ سيردّه الخادم، ولا تُخفي حسمًا مسموحًا.
+ */
+export interface ProjectExecutionProposalDto {
+  id: string;
+  projectId: string;
+  deliverableId: string;
+  deliverableName: string;
+  deliverableCurrentProgressPercent: number;
+  deliverableCurrentStatus: ProjectDeliverableStatus;
+  submissionId: string | null;
+  proposedById: string;
+  proposedByFullName: string | null;
+  proposedProgressPercent: number;
+  proposedStatus: ProjectDeliverableStatus;
+  executionNote: string | null;
+  status: ExecutionProposalStatus;
+  reviewedById: string | null;
+  reviewedByFullName: string | null;
+  reviewedAtUtc: string | null;
+  reviewNote: string | null;
+  previousProgressPercent: number | null;
+  createdAtUtc: string;
+  canReview: boolean;
+}
+
+export interface CreateProjectExecutionProposalRequest {
+  deliverableId: string;
+  proposedProgressPercent: number;
+  proposedStatus: ProjectDeliverableStatus;
+  executionNote: string | null;
+  submissionId?: string | null;
+}
+
+export interface ReviewProjectExecutionProposalRequest {
+  accept: boolean;
+  reviewNote: string | null;
 }

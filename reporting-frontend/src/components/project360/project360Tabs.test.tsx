@@ -28,9 +28,9 @@ import type { Project360Access } from './shared';
 const P = 'project-1';
 const OBJ = 'objective-1';
 
-const MANAGER: Project360Access = { canManage: true, canOperate: true };
-const OPERATOR: Project360Access = { canManage: false, canOperate: true };
-const READER: Project360Access = { canManage: false, canOperate: false };
+const MANAGER: Project360Access = { canManage: true, canOperate: true, canWriteGovernance: true };
+const OPERATOR: Project360Access = { canManage: false, canOperate: true, canWriteGovernance: false };
+const READER: Project360Access = { canManage: false, canOperate: false, canWriteGovernance: false };
 
 // ---------------------------------------------------------------------
 // تجسّس الشبكة — يسجّل المسار والحمولة لكلّ فعل.

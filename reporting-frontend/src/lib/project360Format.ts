@@ -12,8 +12,10 @@
 
 import { formatPercent } from './format';
 import type {
+  ExecutionProposalStatus,
   ProjectDeliverableStatus,
   ProjectHealthStatus,
+  ProjectProgressMode,
   ProjectKpiCategory,
   ProjectKpiDirection,
   ProjectKpiFrequency,
@@ -115,18 +117,49 @@ export function projectDeliverableStatusTone(
   return 'muted';
 }
 
+/**
+ * الحالات **الأربع الظاهرة** + «لم تُقيَّم» (§7). كانت هنا ثلاث تسميات فقط
+ * (`Green/Yellow/Red`) بينما يرسل الخادم خمس قيم، فمشروعٌ `Blocked` كان يصل بحالة بلا
+ * تسمية فتظهر شارته فارغة. الفرق بين «متأخّر» و«محجوب» ليس تدرّجًا في اللون: الأوّل
+ * يحتاج تسريعًا والثاني يحتاج قرارًا يرفع الحاجب، وطمسهما في «متعثّر» يخفي ما يجب فعله.
+ */
 export const projectHealthStatusLabel: Record<ProjectHealthStatus, string> = {
   Green: 'سليم',
-  Yellow: 'يحتاج متابعة',
-  Red: 'متعثّر',
+  AtRisk: 'معرّض للخطر',
+  Delayed: 'متأخّر',
+  Blocked: 'محجوب',
+  NotEvaluated: 'غير مقيَّمة',
 };
 
 export function projectHealthStatusTone(
   s: ProjectHealthStatus,
-): 'success' | 'gold' | 'alert' {
+): 'success' | 'gold' | 'alert' | 'muted' {
   if (s === 'Green') return 'success';
-  if (s === 'Yellow') return 'gold';
+  if (s === 'AtRisk') return 'gold';
+  if (s === 'NotEvaluated') return 'muted';
   return 'alert';
+}
+
+/** طريقة احتساب التقدّم (§6-1) — تُعرَض بجوار الرقم لا في سجلّ مخفيّ. */
+export const projectProgressModeLabel: Record<ProjectProgressMode, string> = {
+  NotCalculated: 'لم تُحتسَب بعد',
+  Weighted: 'متوسّط موزون بأوزان المخرَجات',
+  EqualWeightFallback: 'متوسّط بأوزان متساوية (تراجُع)',
+  NoDeliverables: 'لا مخرَجات نشطة',
+};
+
+export const executionProposalStatusLabel: Record<ExecutionProposalStatus, string> = {
+  Pending: 'بانتظار المراجعة',
+  Accepted: 'مقبول',
+  Rejected: 'مرفوض',
+};
+
+export function executionProposalStatusTone(
+  s: ExecutionProposalStatus,
+): 'gold' | 'success' | 'alert' {
+  if (s === 'Accepted') return 'success';
+  if (s === 'Rejected') return 'alert';
+  return 'gold';
 }
 
 /**
@@ -142,6 +175,15 @@ const healthReasonLabels: Record<string, string> = {
   'health.schedule.behind_plan': 'التقدّم الفعليّ متأخّر عن التقدّم المتوقَّع زمنيًّا.',
   'health.no_component': 'لا يوجد أيّ مكوّن متاح للاحتساب، فالصحّة غير محتسَبة (وليست صفرًا).',
   'health.all_healthy': 'كل المكوّنات المتاحة فوق العتبة الخضراء.',
+
+  // إشارات تشغيليّة (§7): تسبق الرقم في تحديد الحالة الظاهرة، لأنّ مخاطرة حرجة مفتوحة
+  // تحجب المشروع مهما بلغت نتيجته الحسابيّة.
+  'health.blocked.open_blocker': 'توجد مخاطرة حرجة مفتوحة تحجب تقدّم المشروع.',
+  'health.delayed.overdue_deliverable': 'يوجد مخرَج تعاقديّ تجاوز تاريخ استحقاقه ولم يُسلَّم.',
+  'health.at_risk.open_high_risk': 'توجد مخاطرة عالية مفتوحة على المشروع.',
+  'health.progress.equal_weight_fallback':
+    'أوزان المخرَجات غير مضبوطة، فاحتُسِب التقدّم بأوزان متساوية — الرقم تقديريّ حتّى تُضبَط الأوزان.',
+  'health.progress.no_deliverables': 'لا يوجد مخرَج تعاقديّ نشط يُشتقّ منه تقدّم المشروع.',
 };
 
 export function healthReasonLabel(code: string): string {

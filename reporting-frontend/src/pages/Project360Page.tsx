@@ -13,9 +13,15 @@
 //
 // **الصلاحيّة عرضٌ لا حماية**: `access` يخفي أزرارًا فقط؛ الخادم يرفض بصرف النظر
 // عمّا تعرضه هذه الصفحة (D-07 + FINDING-W6-04).
+//
+// **خريطة قدرات واحدة (P360-WF-R2 §12)**: `access` تأتي من `overview.access` الذي يبنيه
+// الخادم من حرّاسه نفسها. كانت الصفحة تشتقّها محلّيًّا من الأدوار والمعرّفات — نسخة ثانية
+// من قواعد التخويل تنحرف عن الأصل عند أوّل تعديل، فتَعِد بزرٍّ يردّه الخادم أو تُخفي
+// إجراءً مسموحًا (وهذا ما وقع فعلًا لمالك المشروع `ProjectOwnerId` الذي لم تكن الصيغة
+// المحلّيّة تعرفه أصلًا).
 // ======================================================================
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Badge, Card } from '../components/ui';
 import { LoadingState } from '../components/states';
@@ -28,31 +34,23 @@ import { ProjectKpisTab } from '../components/project360/ProjectKpisTab';
 import { ProjectObjectivesTab } from '../components/project360/ProjectObjectivesTab';
 import { ProjectOverviewTab } from '../components/project360/ProjectOverviewTab';
 import { ProjectStrategyTab } from '../components/project360/ProjectStrategyTab';
-import { Project360QueryError, type Project360Access } from '../components/project360/shared';
-import { useAuth } from '../lib/auth';
-import { formatDate, projectStatusLabel, projectStatusTone, serviceTypeLabel } from '../lib/format';
+import {
+  Detail,
+  Project360QueryError,
+  type Project360Access,
+} from '../components/project360/shared';
+import { formatDate, formatDateTime, projectStatusLabel, projectStatusTone, serviceTypeLabel } from '../lib/format';
+import { percentOrDash, projectProgressModeLabel } from '../lib/project360Format';
 import { useProjectOverview, useRecomputeProjectHealth } from '../lib/useProject360';
 
 export default function Project360Page() {
   const { projectId } = useParams<{ projectId: string }>();
-  const { user, hasAnyRole } = useAuth();
   const [tab, setTab] = useState('overview');
 
   const overview = useProjectOverview(projectId);
   const recompute = useRecomputeProjectHealth(projectId ?? '');
 
   const project = overview.data?.project;
-
-  // القدرتان تُشتقّان من نفس القاعدتين المطبَّقتين في الخادم كي لا تَعِد الواجهة بما يُرفَض:
-  // البنيويّة بالدور الإداريّ، والتشغيليّة بالدور **أو** بالمسؤوليّة عن هذا المشروع بعينه.
-  const access = useMemo<Project360Access>(() => {
-    const canManage = hasAnyRole('Admin', 'CEO', 'GeneralManager', 'Manager');
-    const isResponsible =
-      !!user &&
-      !!project &&
-      (user.userId === project.teamLeaderId || user.userId === project.accountManagerId);
-    return { canManage, canOperate: canManage || isResponsible };
-  }, [hasAnyRole, user, project]);
 
   if (!projectId) return null;
   if (overview.isLoading) return <LoadingState label="يتم تحميل مساحة عمل المشروع…" />;
@@ -61,6 +59,13 @@ export default function Project360Page() {
   if (!overview.data || !project) return null;
 
   const data = overview.data;
+
+  // تسمية فقط، بلا قاعدة: كلّ قرار تخويل اتُّخِذ في الخادم وهذه الأسطر تنقل نتيجته.
+  const access: Project360Access = {
+    canManage: data.access.canManageStructure,
+    canOperate: data.access.canOperate,
+    canWriteGovernance: data.access.canWriteGovernance,
+  };
 
   const items: TabItem[] = [
     {
@@ -123,6 +128,38 @@ export default function Project360Page() {
             العودة إلى صفحة المشروع
           </Link>
         </div>
+
+        {/* المسنَدون بالأسماء (§12): «من المسؤول» سؤال تشغيليّ لا يُجاب بمعرّف GUID. */}
+        <div className="mt-4 grid gap-3 border-t border-line pt-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Detail label="مالك المشروع">{project.projectOwnerName ?? '—'}</Detail>
+          <Detail label="قائد الفريق">{project.teamLeaderName ?? '—'}</Detail>
+          <Detail label="مدير الحساب">{project.accountManagerName ?? '—'}</Detail>
+          <Detail label="الفريق المالك">{project.ownerTeamName ?? '—'}</Detail>
+        </div>
+
+        {/* شفافيّة التقدّم (§6-1): الرقم لا يُعرَض عاريًا — معه طريقة احتسابه ومتى وعلى كم مخرَج. */}
+        <div className="mt-3 grid gap-3 border-t border-line pt-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Detail label="نسبة تقدّم المشروع">{percentOrDash(project.progressPercent)}</Detail>
+          <Detail label="طريقة الاحتساب">
+            {projectProgressModeLabel[project.progressMode]}
+          </Detail>
+          <Detail label="آخر احتساب">
+            {project.progressCalculatedAtUtc ? formatDateTime(project.progressCalculatedAtUtc) : '—'}
+          </Detail>
+          <Detail label="مخرَجات المصدر">{project.progressSourceDeliverableCount}</Detail>
+        </div>
+
+        {project.progressMode === 'EqualWeightFallback' ? (
+          <p className="mt-3 rounded-md bg-amber-50 p-3 text-xs text-amber-900">
+            أوزان المخرَجات غير مضبوطة، فاحتُسِبت النسبة بأوزان متساوية — الرقم تقديريّ حتّى
+            تُضبَط الأوزان في تبويب المخرَجات التعاقديّة.
+          </p>
+        ) : null}
+        {project.progressMode === 'NoDeliverables' ? (
+          <p className="mt-3 text-xs text-ink-2">
+            لا يوجد مخرَج تعاقديّ نشط يُشتقّ منه تقدّم المشروع.
+          </p>
+        ) : null}
       </Card>
 
       <ProjectHealthPanel
