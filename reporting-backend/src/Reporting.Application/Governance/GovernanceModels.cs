@@ -100,7 +100,10 @@ public record DecisionDto(
     DateTime? DecidedAtUtc,
     DateTime CreatedAtUtc,
     Guid? RelatedKpiEvaluationId = null,
-    string? NextAction = null);
+    string? NextAction = null,
+    // الربط بالمشروع كان يُكتَب ولا يُقرأ: يُنشئ المستخدم قرارًا على مشروع ثمّ لا يجد في أيّ
+    // استجابة ما يدلّ على أنّه ارتبط به. ربطٌ لا يُقرأ لا يمكن التحقّق منه ولا تصحيحه.
+    Guid? ProjectId = null);
 
 public record CreateDecisionRequest(
     string Title,

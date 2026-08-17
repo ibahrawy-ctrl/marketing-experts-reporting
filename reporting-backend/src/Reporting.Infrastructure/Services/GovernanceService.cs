@@ -3,6 +3,7 @@ using Reporting.Application.Audit;
 using Reporting.Application.Common;
 using Reporting.Application.Governance;
 using Reporting.Application.Notifications;
+using Reporting.Application.Projects360;
 using Reporting.Domain.Entities.Governance;
 using Reporting.Domain.Enums;
 using Reporting.Infrastructure.Persistence;
@@ -16,13 +17,21 @@ public class GovernanceService : IGovernanceService
     private readonly INotificationService _notifications;
     private readonly IAuditService _audit;
 
+    /// <summary>
+    /// **الحوكمة تُغيّر صحّة المشروع فعلًا** (P360-WF-R2 §7): خطر حرج مفتوح يعني «معطَّل»،
+    /// وإغلاقه يرفع التعطيل. بلا هذه الوصلة كانت المخاطرة تُسجَّل وتُغلَق والعمود المخزَّن
+    /// لا يتحرّك حتّى يمرّ حدث مخرَجات لا علاقة له بها.
+    /// </summary>
+    private readonly IProjectHealthService _health;
+
     public GovernanceService(AppDbContext db, ICurrentUser currentUser,
-        INotificationService notifications, IAuditService audit)
+        INotificationService notifications, IAuditService audit, IProjectHealthService health)
     {
         _db = db;
         _currentUser = currentUser;
         _notifications = notifications;
         _audit = audit;
+        _health = health;
     }
 
     // ===== Risks =====
@@ -30,6 +39,9 @@ public class GovernanceService : IGovernanceService
     {
         if (_currentUser.UserId is not Guid uid) return Result<RiskDto>.Failure("غير مصرّح.", "auth.unauthenticated");
         if (string.IsNullOrWhiteSpace(request.Title)) return Result<RiskDto>.Failure("عنوان المخاطرة مطلوب.", "risk.title_required");
+        // نفس حارس القرار حرفيًّا: ربطٌ بمشروع غير موجود يخلق مخاطرة يتيمة لا تظهر في أيّ لوحة.
+        if (request.ProjectId is Guid newPid && !await _db.Projects.AnyAsync(p => p.Id == newPid, ct))
+            return Result<RiskDto>.Failure("المشروع المرتبط غير موجود.", "risk.project.not_found");
 
         var risk = new Risk
         {
@@ -49,7 +61,7 @@ public class GovernanceService : IGovernanceService
             ProjectId = request.ProjectId
         };
         _db.Risks.Add(risk);
-        await _db.SaveChangesAsync(ct);
+        await SaveRiskAsync(risk, ct);
         await _audit.LogAsync(uid, "risk.created", nameof(Risk), risk.Id, ct: ct);
 
         return Result<RiskDto>.Success(await BuildRiskAsync(risk.Id, ct));
@@ -72,10 +84,21 @@ public class GovernanceService : IGovernanceService
             risk.ClosedAtUtc = request.Status == RiskStatus.Closed ? DateTime.UtcNow : null;
         }
         risk.UpdatedAtUtc = DateTime.UtcNow;
-        await _db.SaveChangesAsync(ct);
+        // تغيّر الشدّة أو الحالة يقلب حالة المشروع الظاهرة (معطَّل ⇄ سليم) ⟹ إعادة احتساب.
+        await SaveRiskAsync(risk, ct);
         await _audit.LogAsync(_currentUser.UserId, "risk.updated", nameof(Risk), risk.Id, ct: ct);
 
         return Result<RiskDto>.Success(await BuildRiskAsync(risk.Id, ct));
+    }
+
+    /// <summary>
+    /// يحفظ المخاطرة، وإن كانت مربوطة بمشروع أعاد احتساب صحّته في **نفس** وحدة العمل.
+    /// المخاطرة غير المربوطة تُحفَظ كما كانت بلا أيّ كلفة إضافيّة.
+    /// </summary>
+    private async Task SaveRiskAsync(Risk risk, CancellationToken ct)
+    {
+        if (risk.ProjectId is Guid pid) await _health.SaveWithHealthAsync(pid, ct);
+        else await _db.SaveChangesAsync(ct);
     }
 
     public async Task<Result<RiskDto>> GetRiskAsync(Guid id, CancellationToken ct = default)
@@ -332,7 +355,7 @@ public class GovernanceService : IGovernanceService
     private static DecisionDto MapDecision(Decision d, string? madeByName) =>
         new(d.Id, d.Title, d.Description, d.MadeById, madeByName, d.Status,
             d.RelatedSubmissionId, d.RelatedRiskId, d.RelatedEscalationId, d.DecidedAtUtc, d.CreatedAtUtc,
-            d.RelatedKpiEvaluationId, d.NextAction);
+            d.RelatedKpiEvaluationId, d.NextAction, d.ProjectId);
 
     private async Task<Dictionary<Guid, string>> UserNamesAsync(IEnumerable<Guid> ids, CancellationToken ct)
     {
