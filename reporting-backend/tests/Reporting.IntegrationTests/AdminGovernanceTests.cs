@@ -40,21 +40,45 @@ public class AdminGovernanceTests
         return (created.Id, manual!.Id, auto!.Id);
     }
 
-    /// <summary>ينشئ تقييمًا أسبوعيًّا، يحفظ نتائجه، ثم يُرسله (⇒ UnderReview) ويعيد الـDTO المُرسَل.</summary>
+    /// <summary>
+    /// ينشئ تقييمًا أسبوعيًّا، يحفظ نتائجه، ثم يُرسله (⇒ UnderReview) ويعيد الـDTO المُرسَل.
+    /// كلّ استدعاء مؤكَّد فورًا برمز الحالة ونصّ خطأ الخادم (BASELINE-DEFECT-01): <c>ReadAsync</c>
+    /// يفكّ ترميز الجسم أيًّا كان رمز الحالة، فإخفاق <c>/submit</c> كان يُنتِج DTO افتراضيًّا بـ
+    /// <c>Guid.Empty</c> يظهر لاحقًا على هيئة 404 مضلِّل يُبلّغ العرَض لا العلّة.
+    /// </summary>
     private static async Task<KpiEvaluationDto> SubmitEvalAsync(
         HttpClient evaluator, Guid templateId, Guid subjectId, Guid manualId, Guid autoId, string weekKey, decimal score = 70m)
     {
-        var ev = await (await evaluator.PostAsJsonAsync("/api/kpi-evaluations",
-            new CreateKpiEvaluationRequest(templateId, subjectId, PeriodType.Weekly, weekKey)))
-            .ReadAsync<KpiEvaluationDto>();
-        await evaluator.PutAsJsonAsync($"/api/kpi-evaluations/{ev!.Id}/results",
+        var createRes = await evaluator.PostAsJsonAsync("/api/kpi-evaluations",
+            new CreateKpiEvaluationRequest(templateId, subjectId, PeriodType.Weekly, weekKey));
+        await EnsureSuccessAsync(createRes, "إنشاء تقييم KPI");
+        var ev = await createRes.ReadAsync<KpiEvaluationDto>();
+        Assert.NotNull(ev);
+        Assert.NotEqual(Guid.Empty, ev!.Id);
+
+        var resultsRes = await evaluator.PutAsJsonAsync($"/api/kpi-evaluations/{ev.Id}/results",
             new SaveKpiResultsRequest(new[]
             {
                 new KpiResultInput(manualId, null, score, null),
                 new KpiResultInput(autoId, score, null, null)
             }));
-        return (await (await evaluator.PostAsync($"/api/kpi-evaluations/{ev.Id}/submit", null))
-            .ReadAsync<KpiEvaluationDto>())!;
+        await EnsureSuccessAsync(resultsRes, "حفظ نتائج تقييم KPI");
+
+        var submitRes = await evaluator.PostAsync($"/api/kpi-evaluations/{ev.Id}/submit", null);
+        await EnsureSuccessAsync(submitRes, "إرسال تقييم KPI");
+        var submitted = await submitRes.ReadAsync<KpiEvaluationDto>();
+        Assert.NotNull(submitted);
+        Assert.NotEqual(Guid.Empty, submitted!.Id);
+        Assert.NotNull(submitted.ReviewerId);
+        return submitted;
+    }
+
+    /// <summary>يُفشِل الاختبار فورًا برمز الخادم وجسمه عند أوّل استدعاء غير ناجح — لا تمرير DTO افتراضيّ.</summary>
+    private static async Task EnsureSuccessAsync(HttpResponseMessage response, string step)
+    {
+        if (response.IsSuccessStatusCode) return;
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Fail($"فشل «{step}»: {(int)response.StatusCode} {response.StatusCode} — {body}");
     }
 
     // ===================== مساعدو التقارير =====================
@@ -355,10 +379,17 @@ public class AdminGovernanceTests
         var (templateId, manualId, autoId) = await PublishKpiAsync(admin);
         // نطاق HR = «own» فقط (لا يتوسّع عبر ManagerId)، لذا يمرّ التعليق (المشروط بإمكانيّة العرض)
         // حين يكون HR هو موضوع التقييم. أمّا الإشارة/طلب إعادة الفتح فبالدور فقط (KpiReviewFlaggers) بلا اشتراط عرض.
-        var (hr, hrId) = await TestAuth.CreateUserAsync(_factory, "HR");
+        // مُراجِع صريح للموضوع: على قاعدة فارغة لا يوجد مسؤول أعلى غير الأدمن نفسه، وهو المُقيّم
+        // فيُستبعَد ⇒ ResolveReviewerAsync يعيد null ⇒ kpi_eval.no_reviewer.conflict ويسقط /submit.
+        // إسناد ManagerId للموضوع يجعل الإسناد حتميًّا من الخطوة الأولى (مدير الموضوع المباشر)
+        // على قاعدة فارغة أو مأهولة سواء، فلا يعتمد الاختبار على ترتيب تنفيذ ولا على بيانات سابقة.
+        var (_, hrManagerId) = await TestAuth.CreateUserAsync(_factory, "Manager");
+        var (hr, hrId) = await TestAuth.CreateUserAsync(_factory, "HR", hrManagerId);
 
         // الأدمن هو المُقيّم (مُصعَّد يستطيع تقييم أيّ موظّف) وموضوعه HR، والإرسال يُسنِد مُراجِعًا آليًّا.
         var submitted = await SubmitEvalAsync(admin, templateId, hrId, manualId, autoId, "2026-W29");
+        Assert.Equal(KpiEvaluationStatus.UnderReview, submitted.Status);
+        Assert.Equal(hrManagerId, submitted.ReviewerId);
 
         // مسموح لـ HR:
         var flag = await hr.PostAsJsonAsync($"/api/kpi-evaluations/{submitted.Id}/flag",
