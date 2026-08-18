@@ -28,6 +28,10 @@ vi.mock('./pages/HomePage', () => ({
   default: () => <div data-testid="home" />,
 }));
 
+vi.mock('./pages/ProjectDetailPage', () => ({
+  default: () => <div data-testid="project-detail" />,
+}));
+
 import App from './App';
 
 describe('App landing', () => {
@@ -66,6 +70,33 @@ describe('بوّابة مساحة عمل Project 360 (P360-WF-R2 §10 · §12)',
       </MemoryRouter>,
     );
     expect(screen.queryByTestId('project-360')).not.toBeInTheDocument();
+    expect(screen.getByTestId('home')).toBeInTheDocument();
+  });
+});
+
+describe('بوّابة صفحة تفاصيل المشروع (R2.1 · GAP-R21-05)', () => {
+  // شاشة مسارات العمل («أهداف العمل») لا وجود لها إلّا في هذه الصفحة، والخادم يمنح إدارتها
+  // بالمورد لا بالدور: مالك مشروع بدور Employee يقبله `CanManagePlanAsync` بينما كانت بوّابة
+  // المسار تُخرجه إلى `/app` قبل أن يرى الشاشة أصلًا. الاختبار يقيس التوجيه الفعليّ لأنّ
+  // قائمة الأدوار وحدها لا تُثبت أنّ المستخدم بلغ الشاشة.
+  it('يفتح صفحة المشروع للموظّف المُسنَد مالكًا فلا تنفصل الشاشة عن الخادم', () => {
+    roles.current = ['Employee'];
+    render(
+      <MemoryRouter initialEntries={['/app/projects/p1']}>
+        <App />
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId('project-detail')).toBeInTheDocument();
+  });
+
+  it('يبقى الحجب قائمًا لمن لا دور تنفيذيًّا ولا تنفيذ له', () => {
+    roles.current = ['Accountant'];
+    render(
+      <MemoryRouter initialEntries={['/app/projects/p1']}>
+        <App />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByTestId('project-detail')).not.toBeInTheDocument();
     expect(screen.getByTestId('home')).toBeInTheDocument();
   });
 });

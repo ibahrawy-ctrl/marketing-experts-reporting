@@ -19,6 +19,9 @@ const deactivateMutate = vi.fn();
 let canManage = true;
 // حين يكون غير null يُغلِّب قدرة الخادم على علَم الدور — به وحده يُختبَر أنّ الشاشة تتبع الخادم.
 let serverCanOperate: boolean | null = null;
+// قدرة الكتابة البنيويّة (Policies.ProjectStructuralManage) — **منفصلة عن `canManage`** عمدًا،
+// وإلّا لتعذّر إثبات أنّ قائد الفريق يملك التشغيل ولا يملك البنية (R2.1 · GAP-R21-06).
+let canManageStructureRole = true;
 
 vi.mock('react-router-dom', () => ({
   useParams: () => ({ projectId: 'p1' }),
@@ -28,6 +31,7 @@ vi.mock('react-router-dom', () => ({
 vi.mock('../lib/auth', () => ({
   useAuth: () => ({
     canManageClients: canManage,
+    canManageProjectStructure: canManageStructureRole,
     user: { userId: 'admin', roles: ['Admin'] },
     hasAnyRole: () => true,
   }),
@@ -95,6 +99,7 @@ beforeEach(() => {
   wsState.isError = false;
   canManage = true;
   serverCanOperate = null;
+  canManageStructureRole = true;
   createMutate.mockClear();
   updateMutate.mockClear();
   activateMutate.mockClear();
@@ -213,4 +218,27 @@ it('يُخفي إدارة أهداف العمل حين يمنع الخادم can
   render(<ProjectDetailPage />);
   expect(screen.queryByText('إضافة هدف عمل')).not.toBeInTheDocument();
   expect(screen.queryByText('تعديل')).not.toBeInTheDocument();
+});
+
+// ---- 11 (R2.1 · GAP-R21-06): الأزرار البنيويّة تتبع سياسة الخادم البنيويّة لا إدارة العملاء ----
+// `canManageClients` تضمّ TeamLeader بينما `Policies.ProjectStructuralManage` تستثنيه، فكان
+// قائد الفريق يرى «تعديل المشروع» و«أرشفة المشروع» ثمّ يردّ عليه الخادم 403. الاختبار يفصل
+// العلمَين: تشغيل مسموح + بنية ممنوعة في اللقطة نفسها.
+it('يُخفي تعديل المشروع وأرشفته عمّن يملك التشغيل ولا يملك الكتابة البنيويّة', () => {
+  canManage = true;
+  canManageStructureRole = false;
+  serverCanOperate = true;
+  render(<ProjectDetailPage />);
+  expect(screen.queryByText('تعديل المشروع')).not.toBeInTheDocument();
+  expect(screen.queryByText('أرشفة المشروع')).not.toBeInTheDocument();
+  // ولا يُصادَر عنه التشغيل في الوقت نفسه — وإلّا لكان الإخفاء إفراطًا لا دقّة.
+  expect(screen.getByText('إضافة هدف عمل')).toBeInTheDocument();
+});
+
+// ---- 12 (R2.1 · GAP-R21-06): والطرف المقابل — صاحب الصلاحيّة البنيويّة يراها ----
+it('يعرض تعديل المشروع وأرشفته لمن يملك الكتابة البنيويّة', () => {
+  canManageStructureRole = true;
+  render(<ProjectDetailPage />);
+  expect(screen.getByText('تعديل المشروع')).toBeInTheDocument();
+  expect(screen.getByText('أرشفة المشروع')).toBeInTheDocument();
 });

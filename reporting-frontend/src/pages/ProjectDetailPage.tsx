@@ -56,7 +56,11 @@ const SERVICE_TYPES: ServiceType[] = ['Social', 'Seo', 'MediaBuying', 'Website',
 
 export default function ProjectDetailPage() {
   const { projectId } = useParams<{ projectId: string }>();
-  const { canManageClients } = useAuth();
+  // الكتابة البنيويّة (تعديل/أرشفة) تُقاس بـ`canManageProjectStructure` لا بـ`canManageClients`:
+  // الأخيرة تضمّ TeamLeader بينما الخادم يحصر `Policies.ProjectStructuralManage` في
+  // Admin/CEO/GM/Manager ⟹ كان قائد الفريق يرى زرَّي «تعديل المشروع» و«أرشفة المشروع» ثمّ
+  // يصطدم بـ403 (R2.1 · GAP-R21-06). ظهر بعد أن فُتِحت هذه الصفحة له في GAP-R21-05.
+  const { canManageProjectStructure } = useAuth();
   const project = useProject(projectId);
   const summary = useProjectSummary(projectId);
   const reports = useProjectReports(projectId);
@@ -114,7 +118,7 @@ export default function ProjectDetailPage() {
             </Link>
           </div>
         </div>
-        {canManageClients && !editing && (
+        {canManageProjectStructure && !editing && (
           <div className="flex gap-2">
             <Button variant="ghost" onClick={() => setEditing(true)}>
               تعديل المشروع
@@ -124,7 +128,7 @@ export default function ProjectDetailPage() {
         )}
       </div>
 
-      {canManageClients && editing ? (
+      {canManageProjectStructure && editing ? (
         <EditProjectForm project={p} onDone={() => setEditing(false)} />
       ) : (
         <Card>

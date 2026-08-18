@@ -45,6 +45,9 @@ interface AuthContextValue {
   // صلاحية إدارة بيانات العميل الأساسية (Client 360 — إنشاء/تعديل/أرشفة/تفعيل/حذف) — تطابق سياسة
   // Policies.ClientCoreManagement بالخادم (Admin/CEO/GM/Manager؛ تستثني قائد الفريق).
   canEditClientCore: boolean;
+  // صلاحية الكتابة البنيويّة على المشروع (إنشاء/تعديل/أرشفة/تفعيل/حذف) — تطابق سياسة
+  // Policies.ProjectStructuralManage بالخادم (Admin/CEO/GM/Manager؛ تستثني قائد الفريق).
+  canManageProjectStructure: boolean;
   // هل المستخدم مندوب مبيعات فردي (SALES_B2C/SALES_B2B) ⇒ يرى لوحة «مبيعاتي».
   isSalesRep: boolean;
   // متغيّر لوحة المندوب حسب مسمّاه ('B2C' | 'B2B' | null لغير المندوب).
@@ -77,6 +80,11 @@ const CLIENT_MANAGEMENT_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'Mana
 // أدوار إدارة بيانات العميل الأساسية Client 360 (مطابقة لسياسة Policies.ClientCoreManagement بالخادم:
 // Admin/CEO/GM/Manager؛ تستثني قائد الفريق TeamLeader). القرار #2 في CPW-R1B.
 const CLIENT_CORE_MANAGEMENT_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'Manager'];
+// أدوار الكتابة البنيويّة على المشروع (مطابقة لـ Roles.ProjectStructuralManagers بالخادم:
+// Admin/CEO/GM/Manager؛ تستثني قائد الفريق TeamLeader — صلاحيّته تشغيليّة بالمورد لا بالدور).
+// تُميَّز عن CLIENT_MANAGEMENT_ROLES لأنّ الأخيرة تضمّ TeamLeader، فكانت أزرار «تعديل المشروع»
+// و«أرشفة المشروع» تُعرَض له بينما الخادم يردّ 403 (R2.1 · GAP-R21-06).
+const PROJECT_STRUCTURAL_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'Manager'];
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
@@ -177,6 +185,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => !!user && user.roles.some((r) => CLIENT_CORE_MANAGEMENT_ROLES.includes(r)),
     [user],
   );
+  const canManageProjectStructure = useMemo(
+    () => !!user && user.roles.some((r) => PROJECT_STRUCTURAL_ROLES.includes(r)),
+    [user],
+  );
   // متغيّر لوحة المندوب حسب مسمّاه ('B2C' | 'B2B' | null لغير المندوب) — يُشتَقّ من JobRoleCode.
   const salesRepType = useMemo<'B2C' | 'B2B' | null>(
     () => (user?.jobRoleCode ? SALES_REP_CODES[user.jobRoleCode] ?? null : null),
@@ -191,8 +203,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, loading, login, logout, changePassword, changeEmail, hasAnyRole, canApprove, canViewGovernance, canManageTeams, canManageTemplates, canManageClients, canEditClientCore, isSalesRep, salesRepType, isSalesB2cTeamLeader }),
-    [user, loading, login, logout, changePassword, changeEmail, hasAnyRole, canApprove, canViewGovernance, canManageTeams, canManageTemplates, canManageClients, canEditClientCore, isSalesRep, salesRepType, isSalesB2cTeamLeader],
+    () => ({ user, loading, login, logout, changePassword, changeEmail, hasAnyRole, canApprove, canViewGovernance, canManageTeams, canManageTemplates, canManageClients, canEditClientCore, canManageProjectStructure, isSalesRep, salesRepType, isSalesB2cTeamLeader }),
+    [user, loading, login, logout, changePassword, changeEmail, hasAnyRole, canApprove, canViewGovernance, canManageTeams, canManageTemplates, canManageClients, canEditClientCore, canManageProjectStructure, isSalesRep, salesRepType, isSalesB2cTeamLeader],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

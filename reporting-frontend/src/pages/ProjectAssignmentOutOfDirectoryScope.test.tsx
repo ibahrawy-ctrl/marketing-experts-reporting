@@ -15,7 +15,12 @@ vi.mock('react-router-dom', () => ({
 }));
 
 vi.mock('../lib/auth', () => ({
-  useAuth: () => ({ canManageClients: true, user: { userId: 'mgr', roles: ['Manager'] }, hasAnyRole: () => true }),
+  useAuth: () => ({
+    canManageClients: true,
+    canManageProjectStructure: true,
+    user: { userId: 'mgr', roles: ['Manager'] },
+    hasAnyRole: () => true,
+  }),
 }));
 
 vi.mock('../lib/useClients', () => ({

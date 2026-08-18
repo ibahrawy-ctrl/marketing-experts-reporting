@@ -25,7 +25,9 @@ const SERVICE_TYPES: ServiceType[] = ['Social', 'Seo', 'MediaBuying', 'Website',
 type ProjectView = 'active' | 'archived' | 'all';
 
 export default function ProjectsPage() {
-  const { canManageClients } = useAuth();
+  // أعمدة الإجراءات هنا كلّها بنيويّة (أرشفة/إعادة تفعيل/حذف) ⟹ تُقاس بسياسة الخادم
+  // `Policies.ProjectStructuralManage` لا بـ`canManageClients` التي تضمّ TeamLeader (R2.1 · GAP-R21-06).
+  const { canManageProjectStructure } = useAuth();
   const [view, setView] = useState<ProjectView>('active');
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | ''>('');
   const [serviceFilter, setServiceFilter] = useState<ServiceType | ''>('');
@@ -119,12 +121,12 @@ export default function ProjectsPage() {
                 <th className="px-3 py-2.5 font-semibold">البداية</th>
                 <th className="px-3 py-2.5 font-semibold">النهاية</th>
                 <th className="px-3 py-2.5 font-semibold"></th>
-                {canManageClients && <th className="px-3 py-2.5 font-semibold">إجراءات</th>}
+                {canManageProjectStructure && <th className="px-3 py-2.5 font-semibold">إجراءات</th>}
               </tr>
             </thead>
             <tbody>
               {rows.map((p) => (
-                <ProjectRow key={p.id} project={p} canManage={canManageClients} />
+                <ProjectRow key={p.id} project={p} canManage={canManageProjectStructure} />
               ))}
             </tbody>
           </table>

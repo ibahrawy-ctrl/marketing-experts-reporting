@@ -165,7 +165,14 @@ const APP_ROUTES: { path: string; element: ReactNode; roles?: Role[] }[] = [
   { path: '/app/clients', element: <ClientsPage />, roles: CLIENT_360_ROLES },
   { path: '/app/clients/:clientId', element: <ClientDetailPage />, roles: CLIENT_360_ROLES },
   { path: '/app/projects', element: <ProjectsPage />, roles: EXEC_ROLES },
-  { path: '/app/projects/:projectId', element: <ProjectDetailPage />, roles: EXEC_ROLES },
+  // تفاصيل المشروع (R2.1 · GAP-R21-05): البوّابة هنا **أوسع من EXEC_ROLES عمدًا** لأنّ شاشة
+  // مسارات العمل («أهداف العمل») لا وجود لها إلّا في هذه الصفحة، والخادم يمنح إدارتها لمالك
+  // المشروع وقائد الفريق ومدير الحساب المُسنَدين **بالمورد لا بالدور** (`CanManagePlanAsync`).
+  // بـEXEC_ROLES وحدها كان مالك مشروع بدور Employee يُحجَب عن الصفحة كلّها بينما الخادم يقبل
+  // كتابته — نفس انفصال الشاشة عن الخادم الذي أُغلِق في `Project360Page`. لا يُكشَف شيء إضافيّ:
+  // الرؤية تُحسَم خادمًا لكلّ مشروع (`404 project.not_found` خارج النطاق)، وأزرار التعديل
+  // والأرشفة تبقى خلف `canManageClients` وخلف `Policies.ProjectStructuralManage` خادميًّا.
+  { path: '/app/projects/:projectId', element: <ProjectDetailPage />, roles: PROJECT_360_ROLES },
   // مساحة عمل Project 360 (CPW-R3 · R2-W12): بوّابة الواجهة أوسع من EXEC_ROLES عمدًا لأنّ
   // مدير الحساب المسؤول من مستخدميها؛ ومع ذلك الرؤية الفعليّة تُحسَم خادمًا لكلّ مشروع على حدة.
   { path: '/app/projects/:projectId/360', element: <Project360Page />, roles: PROJECT_360_ROLES },
