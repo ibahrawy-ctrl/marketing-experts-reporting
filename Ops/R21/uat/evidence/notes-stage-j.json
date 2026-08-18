@@ -1,0 +1,18 @@
+{
+  "sink": {
+    "console": [
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 409 (Conflict)"
+      }
+    ],
+    "failedRequests": [],
+    "forbiddenHosts": [],
+    "httpErrors": [
+      {
+        "url": "https://test.emarketingacademy.net/api/projects/9e731196-f87f-4bbf-82cd-260d06d90b56/execution-proposals/19647992-f420-4607-8845-aaa91ac6e688/review",
+        "status": 409
+      }
+    ]
+  }
+}

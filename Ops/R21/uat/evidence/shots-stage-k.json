@@ -1,0 +1,37 @@
+[
+  {
+    "n": 1,
+    "file": "01-tl-deliverable-b-before.png",
+    "caption": "المخرَج B قبل التحديث المباشر: ٠٪",
+    "role": "TL",
+    "step": 28
+  },
+  {
+    "n": 2,
+    "file": "02-tl-direct-update-form.png",
+    "caption": "قائد الفريق يكتب النسبة الجديدة وسبب التحديث المباشر للمخرَج B",
+    "role": "TL",
+    "step": 28
+  },
+  {
+    "n": 3,
+    "file": "03-tl-deliverable-b-after.png",
+    "caption": "المخرَج B بعد التحديث المباشر: ٢٥٪",
+    "role": "TL",
+    "step": 28
+  },
+  {
+    "n": 4,
+    "file": "04-tl-direct-update-audit.png",
+    "caption": "سلسلة الأثر: التحديث المباشر موسوم ومعه الفاعل والسبب والقيمة السابقة",
+    "role": "TL",
+    "step": 33
+  },
+  {
+    "n": 5,
+    "file": "05-tl-progress-after-direct.png",
+    "caption": "تقدّم المشروع بعد التحديث المباشر: ٠٫٦×٥٠ + ٠٫٤×٢٥ = ٤٠٪",
+    "role": "TL",
+    "step": 28
+  }
+]

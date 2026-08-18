@@ -1,0 +1,9 @@
+{
+  "notes": [],
+  "sink": {
+    "console": [],
+    "failedRequests": [],
+    "forbiddenHosts": [],
+    "httpErrors": []
+  }
+}

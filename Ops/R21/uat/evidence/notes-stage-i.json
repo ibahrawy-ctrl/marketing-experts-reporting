@@ -1,0 +1,8 @@
+{
+  "sink": {
+    "console": [],
+    "failedRequests": [],
+    "forbiddenHosts": [],
+    "httpErrors": []
+  }
+}

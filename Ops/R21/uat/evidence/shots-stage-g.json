@@ -1,0 +1,44 @@
+[
+  {
+    "n": 1,
+    "file": "01-emp-p360-overview.png",
+    "caption": "عضو الفريق يفتح Project 360 للمشروع المسموح — يرى ولا يحسم",
+    "role": "EMP",
+    "step": 13
+  },
+  {
+    "n": 2,
+    "file": "02-emp-bridge-empty.png",
+    "caption": "تبويب تحديثات التنفيذ قبل رفع أيّ ادّعاء",
+    "role": "EMP",
+    "step": 13
+  },
+  {
+    "n": 3,
+    "file": "03-emp-claim-form.png",
+    "caption": "نموذج تسجيل التنفيذ معبّأ بحساب عضو الفريق (٣٥٪ على المخرَج A)",
+    "role": "EMP",
+    "step": 14
+  },
+  {
+    "n": 4,
+    "file": "04-emp-claim-pending.png",
+    "caption": "الادّعاء «بانتظار المراجعة» — بلا زرّ قبول أو رفض لعضو الفريق",
+    "role": "EMP",
+    "step": 15
+  },
+  {
+    "n": 5,
+    "file": "05-emp-deliverables-unchanged.png",
+    "caption": "المخرَجات لم تتغيّر: الادّعاء المعلَّق لا ينقل نسبة",
+    "role": "EMP",
+    "step": 15
+  },
+  {
+    "n": 6,
+    "file": "06-emp-overview-unchanged.png",
+    "caption": "تقدّم المشروع وصحّته دون تغيير ما دام الادّعاء معلَّقًا",
+    "role": "EMP",
+    "step": 15
+  }
+]

@@ -1,0 +1,18 @@
+{
+  "sink": {
+    "console": [
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 400 (Bad Request)"
+      }
+    ],
+    "failedRequests": [],
+    "forbiddenHosts": [],
+    "httpErrors": [
+      {
+        "url": "https://test.emarketingacademy.net/api/projects/9e731196-f87f-4bbf-82cd-260d06d90b56/execution-proposals/135d96f1-892d-40bf-86ff-6f004efbca47/review",
+        "status": 400
+      }
+    ]
+  }
+}

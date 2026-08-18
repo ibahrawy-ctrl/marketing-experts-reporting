@@ -1,0 +1,37 @@
+[
+  {
+    "n": 1,
+    "file": "01-tl-second-claim-pending.png",
+    "caption": "قائد الفريق أمام الادّعاء الثاني قبل القبول",
+    "role": "TL",
+    "step": 22
+  },
+  {
+    "n": 2,
+    "file": "02-tl-claim-accepted.png",
+    "caption": "الادّعاء مقبول: من قبِله ومتى، ومعه لقطة النسبة قبل التطبيق",
+    "role": "TL",
+    "step": 23
+  },
+  {
+    "n": 3,
+    "file": "03-tl-deliverable-after-accept.png",
+    "caption": "أثر القبول على المخرَج: A انتقل من ٠٪ إلى ٥٠٪",
+    "role": "TL",
+    "step": 24
+  },
+  {
+    "n": 4,
+    "file": "04-tl-project-progress-after-accept.png",
+    "caption": "تقدّم المشروع أُعيد احتسابه موزونًا (٠٫٦×٥٠ = ٣٠٪) والصحّة وأسبابها",
+    "role": "TL",
+    "step": "25-26"
+  },
+  {
+    "n": 5,
+    "file": "05-tl-idempotency-unchanged.png",
+    "caption": "بعد إعادة القبول ومحاولة عكسه: التقدّم كما هو ⟹ تعادليّة مثبَتة",
+    "role": "TL",
+    "step": 27
+  }
+]

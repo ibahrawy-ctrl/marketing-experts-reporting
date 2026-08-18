@@ -1,0 +1,44 @@
+[
+  {
+    "n": 1,
+    "file": "01-kpi-form-owner.png",
+    "caption": "إنشاء مؤشّر أداء مرتبط بالهدف بحساب مالك المشروع",
+    "role": "OWNER",
+    "step": 6
+  },
+  {
+    "n": 2,
+    "file": "02-kpi-saved.png",
+    "caption": "المؤشّر محفوظ تحت الهدف داخل تبويب المؤشّرات",
+    "role": "OWNER",
+    "step": 6
+  },
+  {
+    "n": 3,
+    "file": "03-deliverable-form-A.png",
+    "caption": "إنشاء المخرَج P360-R21-UAT-DELIVERABLE-A بوزن 60%",
+    "role": "OWNER",
+    "step": 8
+  },
+  {
+    "n": 4,
+    "file": "04-deliverables-weighted.png",
+    "caption": "المخرَجان التعاقديّان بوزنَي ٦٠٪ و٤٠٪ ومجموع ١٠٠٪",
+    "role": "OWNER",
+    "step": 8
+  },
+  {
+    "n": 5,
+    "file": "05-workstream-form-owner.png",
+    "caption": "إنشاء مسار عمل (هدف عمل) بحساب مالك المشروع",
+    "role": "OWNER",
+    "step": 7
+  },
+  {
+    "n": 6,
+    "file": "06-workstream-saved-owner.png",
+    "caption": "مسار العمل ظاهر في صفحة المشروع",
+    "role": "OWNER",
+    "step": 7
+  }
+]

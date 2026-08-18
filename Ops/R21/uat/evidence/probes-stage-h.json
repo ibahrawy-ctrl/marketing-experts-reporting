@@ -1,0 +1,14 @@
+{
+  "uiGuard": {
+    "found": true,
+    "disabled": true
+  },
+  "probes": [
+    {
+      "id": "SRV-REJECT-NO-REASON",
+      "status": 400,
+      "code": "project_execution_proposal.reject_reason_required",
+      "detail": "سبب الرفض مطلوب."
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+[
+  {
+    "n": 1,
+    "file": "01-tl-kpi-table.png",
+    "caption": "جدول المؤشّرات بعين قائد الفريق قبل تسجيل القراءة",
+    "role": "TL",
+    "step": 29
+  },
+  {
+    "n": 2,
+    "file": "02-tl-kpi-reading-form.png",
+    "caption": "نموذج تسجيل قراءة المؤشّر معبّأ بحساب قائد الفريق",
+    "role": "TL",
+    "step": 29
+  },
+  {
+    "n": 3,
+    "file": "03-tl-kpi-reading-saved.png",
+    "caption": "القراءة محفوظة ومنسوبة إلى قائد الفريق مع تاريخها",
+    "role": "TL",
+    "step": 29
+  },
+  {
+    "n": 4,
+    "file": "04-tl-kpi-current-value.png",
+    "caption": "القيمة الحاليّة ونسبة التحقّق للمؤشّر بعد القراءة",
+    "role": "TL",
+    "step": 29
+  }
+]

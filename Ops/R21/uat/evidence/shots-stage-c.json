@@ -1,0 +1,37 @@
+[
+  {
+    "n": 1,
+    "file": "01-p360-owner-overview.png",
+    "caption": "Project 360 — النظرة العامّة بعين مالك المشروع المُسنَد",
+    "role": "OWNER",
+    "step": 3
+  },
+  {
+    "n": 2,
+    "file": "02-strategy-form-owner.png",
+    "caption": "تسجيل الاستراتيجيّة بحساب مالك المشروع",
+    "role": "OWNER",
+    "step": 4
+  },
+  {
+    "n": 3,
+    "file": "03-strategy-saved.png",
+    "caption": "الاستراتيجيّة محفوظة ومعروضة داخل Project 360",
+    "role": "OWNER",
+    "step": 4
+  },
+  {
+    "n": 4,
+    "file": "04-objective-form-owner.png",
+    "caption": "إضافة هدف للمشروع بحساب مالك المشروع",
+    "role": "OWNER",
+    "step": 5
+  },
+  {
+    "n": 5,
+    "file": "05-objective-saved.png",
+    "caption": "الهدف محفوظ داخل تبويب الأهداف",
+    "role": "OWNER",
+    "step": 5
+  }
+]

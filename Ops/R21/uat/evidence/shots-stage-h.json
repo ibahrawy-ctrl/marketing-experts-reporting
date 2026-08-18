@@ -1,0 +1,51 @@
+[
+  {
+    "n": 1,
+    "file": "01-tl-project-details.png",
+    "caption": "قائد الفريق المُسنَد يرى تفاصيل المشروع وبطاقة أهداف العمل",
+    "role": "TL",
+    "step": 16
+  },
+  {
+    "n": 2,
+    "file": "02-tl-p360-overview.png",
+    "caption": "Project 360 بعين قائد الفريق: التقدّم والصحّة وأسبابها",
+    "role": "TL",
+    "step": 16
+  },
+  {
+    "n": 3,
+    "file": "03-tl-sees-pending-claim.png",
+    "caption": "قائد الفريق يرى الادّعاء المعلَّق وزرَّي القبول والرفض",
+    "role": "TL",
+    "step": 17
+  },
+  {
+    "n": 4,
+    "file": "04-tl-reject-disabled-no-reason.png",
+    "caption": "زرّ الرفض معطَّل ما دام حقل سبب الرفض فارغًا (حارس الواجهة)",
+    "role": "TL",
+    "step": 18
+  },
+  {
+    "n": 5,
+    "file": "05-tl-reject-with-reason.png",
+    "caption": "كتابة سبب الرفض تُفعّل الزرّ — الرفض لا يقع بلا سبب",
+    "role": "TL",
+    "step": 19
+  },
+  {
+    "n": 6,
+    "file": "06-tl-claim-rejected.png",
+    "caption": "الادّعاء مرفوض ومعه سبب الرفض ومن رفضه ومتى",
+    "role": "TL",
+    "step": 19
+  },
+  {
+    "n": 7,
+    "file": "07-tl-deliverables-after-reject.png",
+    "caption": "الرفض لم يغيّر تقدّم المخرَج: ما زال ٠٪",
+    "role": "TL",
+    "step": 20
+  }
+]

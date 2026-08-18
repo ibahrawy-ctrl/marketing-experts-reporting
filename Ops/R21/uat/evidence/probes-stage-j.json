@@ -1,0 +1,17 @@
+{
+  "probes": [
+    {
+      "id": "IDEMPOTENT-SAME-DECISION",
+      "status": 200,
+      "code": null,
+      "detail": ""
+    },
+    {
+      "id": "REVERSE-DECISION-BLOCKED",
+      "status": 409,
+      "code": "project_execution_proposal.already_reviewed.conflict",
+      "detail": "هذا المقترح حُسِم من قبل ولا يمكن عكس قراره."
+    }
+  ],
+  "acceptedProposalId": "19647992-f420-4607-8845-aaa91ac6e688"
+}

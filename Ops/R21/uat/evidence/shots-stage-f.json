@@ -1,0 +1,16 @@
+[
+  {
+    "n": 1,
+    "file": "01-deliverable-b-weight.png",
+    "caption": "ضبط وزن المخرَج B على ٤٠٪ ليكتمل مجموع الأوزان ١٠٠٪",
+    "role": "OWNER",
+    "step": 8
+  },
+  {
+    "n": 2,
+    "file": "02-deliverables-weighted-100.png",
+    "caption": "المخرَجان بوزنَي ٦٠٪ و٤٠٪ — مجموع صالح ١٠٠٪ ⟹ نموذج Weighted",
+    "role": "OWNER",
+    "step": 8
+  }
+]

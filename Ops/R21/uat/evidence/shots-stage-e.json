@@ -1,0 +1,16 @@
+[
+  {
+    "n": 1,
+    "file": "01-workstream-form-owner.png",
+    "caption": "إنشاء مسار عمل (هدف عمل) بحساب مالك المشروع المُسنَد بدور Employee",
+    "role": "OWNER",
+    "step": 7
+  },
+  {
+    "n": 2,
+    "file": "02-workstream-saved-owner.png",
+    "caption": "مسار العمل محفوظ وظاهر في صفحة المشروع",
+    "role": "OWNER",
+    "step": 7
+  }
+]

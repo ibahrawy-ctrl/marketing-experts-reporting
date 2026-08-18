@@ -1,0 +1,23 @@
+[
+  {
+    "n": 1,
+    "file": "01-tl-workstreams-card.png",
+    "caption": "بطاقة أهداف العمل مفتوحة لقائد الفريق المُسنَد مع أزرار الإدارة",
+    "role": "TL",
+    "step": 30
+  },
+  {
+    "n": 2,
+    "file": "02-tl-workstream-edit-form.png",
+    "caption": "نموذج تعديل هدف العمل مفتوح بحساب قائد الفريق",
+    "role": "TL",
+    "step": 30
+  },
+  {
+    "n": 3,
+    "file": "03-tl-workstream-saved.png",
+    "caption": "هدف العمل بعد التعديل التشغيليّ — الحفظ قبِله الخادم",
+    "role": "TL",
+    "step": 30
+  }
+]

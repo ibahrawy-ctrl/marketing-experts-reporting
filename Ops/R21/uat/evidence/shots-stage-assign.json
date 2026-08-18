@@ -1,0 +1,16 @@
+[
+  {
+    "n": 1,
+    "file": "01-project-assign-owner-and-leader.png",
+    "caption": "إسناد مالك المشروع (موظّف) وقائد الفريق ومدير العميل من نموذج تعديل المشروع",
+    "role": "ADMIN",
+    "step": "9-10"
+  },
+  {
+    "n": 2,
+    "file": "02-project-after-assignment.png",
+    "caption": "صفحة المشروع بعد الإسناد: المالك وقائد الفريق ومدير العميل",
+    "role": "ADMIN",
+    "step": "9-10"
+  }
+]
