@@ -246,9 +246,29 @@ function ProposalCard({
             ) : null}
           </div>
           <p className="mt-1 text-xs text-ink-2">
-            {/* الحاليّ ⟵ المُدَّعى: المقارنة معروضة كي لا تقع بالسهو. */}
-            من {percentOrDash(p.deliverableCurrentProgressPercent)} إلى{' '}
-            <span className="font-semibold text-ink">{percentOrDash(p.proposedProgressPercent)}</span>{' '}
+            {/* «من … إلى …» يجب أن يروي انتقالًا وقع فعلًا (R2.1 · GAP-R21-07).
+                `deliverableCurrentProgressPercent` قيمة المخرَج **الآن**، فهي المقارنة الصحيحة
+                للمعلَّق وحده. على الصفّ المقبول تساوي النسبة المطبَّقة فيُقرَأ «من ٥٠٪ إلى ٥٠٪»،
+                وعلى المرفوض تروي انتقالًا لم يقع أصلًا. لذلك: المقبول يُروى بلقطته المخزَّنة
+                `previousProgressPercent`، والمرفوض لا يُروى كانتقال لأنّ شيئًا لم يُطبَّق. */}
+            {p.status === 'Rejected' ? (
+              <>
+                نسبة مُدَّعاة{' '}
+                <span className="font-semibold text-ink">{percentOrDash(p.proposedProgressPercent)}</span>{' '}
+                — لم تُطبَّق على المخرَج
+              </>
+            ) : (
+              <>
+                من{' '}
+                {percentOrDash(
+                  p.status === 'Accepted' && p.previousProgressPercent !== null
+                    ? p.previousProgressPercent
+                    : p.deliverableCurrentProgressPercent,
+                )}{' '}
+                إلى{' '}
+                <span className="font-semibold text-ink">{percentOrDash(p.proposedProgressPercent)}</span>
+              </>
+            )}{' '}
             · الحالة المقترحة {projectDeliverableStatusLabel[p.proposedStatus]}
           </p>
           <p className="mt-1 text-xs text-ink-2">

@@ -10,6 +10,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { api } from '../../lib/api';
+import { percentOrDash } from '../../lib/project360Format';
 import type {
   ProjectContractDeliverableDto,
   ProjectExecutionProposalDto,
@@ -230,6 +231,53 @@ describe('جسر التنفيذ — الحسم', () => {
     renderTab();
     expect(await screen.findByText(/كانت النسبة قبل التطبيق/)).toBeInTheDocument();
     expect(screen.getByText(/ريم القحطاني/)).toBeInTheDocument();
+  });
+
+  // ---- R2.1 · GAP-R21-07: السرد يروي ما وقع فعلًا لا ما اقتُرِح ----
+  // `deliverableCurrentProgressPercent` قيمة المخرَج **الآن**، فهي المقارنة الصحيحة للمعلَّق
+  // وحده. على الصفّ المحسوم تكذب: المقبول يُقرَأ «من ٥٠٪ إلى ٥٠٪» بعد أن طُبِّقت نسبته،
+  // والمرفوض يُقرَأ كانتقال لم يقع أصلًا. الحُكم هنا على السرد لا على الرقم.
+  const narration = () =>
+    screen.findByText(
+      (_, el) => el?.tagName === 'P' && /· الحالة المقترحة/.test(el.textContent ?? ''),
+    );
+
+  it('لا يروي المقترح المرفوض انتقالًا لم يقع على المخرَج', async () => {
+    getBodies[PROPOSALS_URL] = [
+      proposal({
+        status: 'Rejected',
+        canReview: false,
+        proposedProgressPercent: 35,
+        deliverableCurrentProgressPercent: 50,
+        reviewedById: 'user-tl',
+        reviewedByFullName: 'قائد الفريق',
+        reviewedAtUtc: '2026-08-17T09:00:00Z',
+        reviewNote: 'النسبة المُدَّعاة غير مدعومة بدليل تنفيذ.',
+      }),
+    ];
+    renderTab();
+    const text = (await narration()).textContent ?? '';
+    expect(text).toContain('لم تُطبَّق على المخرَج');
+    expect(text).not.toMatch(/من .* إلى/);
+  });
+
+  it('يروي المقبول انتقاله من لقطته المخزَّنة لا من قيمة المخرَج بعد التطبيق', async () => {
+    getBodies[PROPOSALS_URL] = [
+      proposal({
+        status: 'Accepted',
+        canReview: false,
+        proposedProgressPercent: 50,
+        // بعد التطبيق تساوي قيمةُ المخرَج المُدَّعى — وهنا بالضبط كان يقع السرد الكاذب.
+        deliverableCurrentProgressPercent: 50,
+        previousProgressPercent: 0,
+        reviewedById: 'user-tl',
+        reviewedByFullName: 'قائد الفريق',
+        reviewedAtUtc: '2026-08-17T09:00:00Z',
+      }),
+    ];
+    renderTab();
+    const text = (await narration()).textContent ?? '';
+    expect(text).toContain(`من ${percentOrDash(0)} إلى ${percentOrDash(50)}`);
   });
 
   // ---- R2.1 · GAP-R21-03: تمييز التحديث المباشر عن قبول الادّعاء ----
