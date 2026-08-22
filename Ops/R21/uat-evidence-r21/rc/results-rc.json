@@ -1,0 +1,272 @@
+{
+ "origin": "https://rc-report.emarketingacademy.net",
+ "project": "c5a5eeb0-bce6-450a-bb72-9fc2e4951795",
+ "figures": [
+  {
+   "id": "fig-rc-001",
+   "caption": "emp داخل النطاق — النظرة العامّة لمساحة المشروع 360 (تقدّم 40%)."
+  },
+  {
+   "id": "fig-rc-002",
+   "caption": "emp داخل النطاق — تبويب «تحديثات التنفيذ» (يستطيع رفع ادّعاء تنفيذ)."
+  },
+  {
+   "id": "fig-rc-003",
+   "caption": "موظّف خارج النطاق — «المشروع غير موجود أو خارج نطاق صلاحيّتك» (404 حماية بالمورد)."
+  },
+  {
+   "id": "fig-rc-004",
+   "caption": "قائد الفريق — صفحة المشروع بلا زرَّي «تعديل/أرشفة المشروع» (منع بنيويّ)."
+  },
+  {
+   "id": "fig-rc-005",
+   "caption": "قائد الفريق — قائمة اقتراحات التنفيذ المعلّقة قبل الحسم."
+  },
+  {
+   "id": "fig-rc-006",
+   "caption": "قائد الفريق — بعد الرفض: الاقتراح «مرفوض» بسبب معلن (لم تُطبَّق أيّ نسبة)."
+  },
+  {
+   "id": "fig-rc-007",
+   "caption": "قائد الفريق — انتشار الأثر بعد القبول: إعادة احتساب تقدّم المشروع في النظرة العامّة."
+  },
+  {
+   "id": "fig-rc-015",
+   "caption": "قائد الفريق — تبويب «المؤشّرات والقراءات» (KPI مع قراءة)."
+  },
+  {
+   "id": "fig-rc-008",
+   "caption": "مالك المشروع — داخل النطاق مع أدوات التشغيل (النظرة العامّة)."
+  },
+  {
+   "id": "fig-rc-016",
+   "caption": "مالك المشروع — صفحة المشروع البنيويّة (تيّارات العمل/المخرَجات)."
+  },
+  {
+   "id": "fig-rc-009",
+   "caption": "مدير الحساب — داخل النطاق (النظرة العامّة للمشروع)."
+  },
+  {
+   "id": "fig-rc-014",
+   "caption": "مدير الحساب — ملفّ العميل الشامل (Client 360) مع انتشار المشروع."
+  },
+  {
+   "id": "fig-rc-010",
+   "caption": "الإدارة (Manager) — صفحة المشروع تُظهر أزرار «تعديل/أرشفة» البنيويّة (تباين مقابل قائد الفريق)."
+  },
+  {
+   "id": "fig-rc-011",
+   "caption": "الإدارة (Manager) — تبويب «القرارات والحوكمة»."
+  },
+  {
+   "id": "fig-rc-012",
+   "caption": "الإدارة (GM) — صفحة المشروع تُظهر الأزرار البنيويّة."
+  },
+  {
+   "id": "fig-rc-013",
+   "caption": "الإدارة (GM) — تبويب «القرارات والحوكمة»."
+  }
+ ],
+ "roleGate": {
+  "empIn": {
+   "consoleRaw": 1,
+   "consoleGenuine": 0,
+   "consoleGenuineList": [],
+   "http4xx": [
+    "403 /api/projects/c5a5eeb0-bce6-450a-bb72-9fc2e4951795/execution-proposals/b77ae73b-7a90-47e8-8a52-36535dbd3b98/review"
+   ],
+   "failed": 0,
+   "negotiate": [
+    200,
+    200
+   ],
+   "websockets": 2
+  },
+  "empOut": {
+   "consoleRaw": 3,
+   "consoleGenuine": 0,
+   "consoleGenuineList": [],
+   "http4xx": [
+    "404 /api/projects/c5a5eeb0-bce6-450a-bb72-9fc2e4951795/overview",
+    "404 /api/projects/c5a5eeb0-bce6-450a-bb72-9fc2e4951795/overview",
+    "404 /api/projects/c5a5eeb0-bce6-450a-bb72-9fc2e4951795/overview"
+   ],
+   "failed": 0,
+   "negotiate": [
+    200,
+    200
+   ],
+   "websockets": 2
+  },
+  "tl": {
+   "consoleRaw": 0,
+   "consoleGenuine": 0,
+   "consoleGenuineList": [],
+   "http4xx": [],
+   "failed": 0,
+   "negotiate": [
+    200,
+    200,
+    200,
+    200,
+    200
+   ],
+   "websockets": 5,
+   "tlEditVisible": 0,
+   "tlArchiveVisible": 0
+  },
+  "owner": {
+   "consoleRaw": 0,
+   "consoleGenuine": 0,
+   "consoleGenuineList": [],
+   "http4xx": [],
+   "failed": 0,
+   "negotiate": [
+    200,
+    200,
+    200
+   ],
+   "websockets": 3
+  },
+  "am": {
+   "consoleRaw": 0,
+   "consoleGenuine": 0,
+   "consoleGenuineList": [],
+   "http4xx": [],
+   "failed": 0,
+   "negotiate": [
+    200,
+    200,
+    200
+   ],
+   "websockets": 3
+  },
+  "mgr": {
+   "consoleRaw": 1,
+   "consoleGenuine": 0,
+   "consoleGenuineList": [],
+   "http4xx": [
+    "403 /api/reports/governance-summary"
+   ],
+   "failed": 0,
+   "negotiate": [
+    200,
+    200,
+    200
+   ],
+   "websockets": 3,
+   "mgrEditVisible": 1
+  },
+  "gm": {
+   "consoleRaw": 0,
+   "consoleGenuine": 0,
+   "consoleGenuineList": [],
+   "http4xx": [],
+   "failed": 0,
+   "negotiate": [
+    200,
+    200,
+    200
+   ],
+   "websockets": 3,
+   "gmEditVisible": 1
+  },
+  "ceo": {
+   "consoleRaw": 0,
+   "consoleGenuine": 0,
+   "consoleGenuineList": [],
+   "http4xx": [],
+   "failed": 0,
+   "negotiate": [
+    200,
+    200
+   ],
+   "websockets": 2
+  },
+  "viewer": {
+   "consoleRaw": 1,
+   "consoleGenuine": 0,
+   "consoleGenuineList": [],
+   "http4xx": [
+    "404 /api/projects/c5a5eeb0-bce6-450a-bb72-9fc2e4951795/overview"
+   ],
+   "failed": 0,
+   "negotiate": [
+    200
+   ],
+   "websockets": 1
+  }
+ },
+ "authMatrix": [
+  {
+   "actor": "empIn",
+   "action": "رفع ادّعاء P1",
+   "method": "POST",
+   "path": "/projects/c5a5eeb0-bce6-450a-bb72-9fc2e4951795/execution-proposals",
+   "status": 200
+  },
+  {
+   "actor": "empIn",
+   "action": "رفع ادّعاء P2",
+   "method": "POST",
+   "path": "/projects/c5a5eeb0-bce6-450a-bb72-9fc2e4951795/execution-proposals",
+   "status": 200
+  },
+  {
+   "actor": "empIn",
+   "action": "مراجعة (ممنوعة)",
+   "method": "PATCH",
+   "path": "/projects/c5a5eeb0-bce6-450a-bb72-9fc2e4951795/execution-proposals/b77ae73b-7a90-47e8-8a52-36535dbd3b98/review",
+   "status": 403
+  },
+  {
+   "actor": "empOut",
+   "action": "قراءة المشروع (خارج النطاق)",
+   "method": "GET",
+   "path": "/projects/c5a5eeb0-bce6-450a-bb72-9fc2e4951795/overview",
+   "status": 404
+  },
+  {
+   "actor": "tl",
+   "action": "رفض P1 بسبب",
+   "method": "PATCH",
+   "path": "/projects/c5a5eeb0-bce6-450a-bb72-9fc2e4951795/execution-proposals/b77ae73b-7a90-47e8-8a52-36535dbd3b98/review",
+   "status": 200
+  },
+  {
+   "actor": "tl",
+   "action": "قبول P2 وتطبيقه",
+   "method": "PATCH",
+   "path": "/projects/c5a5eeb0-bce6-450a-bb72-9fc2e4951795/execution-proposals/f18a0768-0703-478b-983c-9fd4fe4fba2b/review",
+   "status": 200
+  },
+  {
+   "actor": "owner",
+   "action": "قراءة المشروع",
+   "method": "GET",
+   "path": "/projects/c5a5eeb0-bce6-450a-bb72-9fc2e4951795/overview",
+   "status": 200
+  },
+  {
+   "actor": "am",
+   "action": "قراءة المشروع",
+   "method": "GET",
+   "path": "/projects/c5a5eeb0-bce6-450a-bb72-9fc2e4951795/overview",
+   "status": 200
+  },
+  {
+   "actor": "ceo",
+   "action": "قراءة المشروع",
+   "method": "GET",
+   "path": "/projects/c5a5eeb0-bce6-450a-bb72-9fc2e4951795/overview",
+   "status": 200
+  },
+  {
+   "actor": "viewer",
+   "action": "قراءة المشروع (خارج الدور)",
+   "method": "GET",
+   "path": "/projects/c5a5eeb0-bce6-450a-bb72-9fc2e4951795/overview",
+   "status": 404
+  }
+ ]
+}

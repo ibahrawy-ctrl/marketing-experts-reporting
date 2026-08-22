@@ -1,0 +1,288 @@
+{
+  "env": "TEST",
+  "origin": "https://test.emarketingacademy.net",
+  "sha": "7e063b493b50ad90ba6131e47042c7cd035fb65b",
+  "startedUtc": "2026-08-22T19:54:56.784Z",
+  "roles": {
+    "emp1": {
+      "console": [
+        "[2026-08-22T19:54:58.204Z] Error: Failed to complete negotiation with the server: TypeError: Failed to fetch",
+        "[2026-08-22T19:54:58.204Z] Error: Failed to start the connection: Error: Failed to complete negotiation with the server: TypeError: Failed to fetch"
+      ],
+      "failed": [],
+      "aborted": [
+        "https://test.emarketingacademy.net/api/dashboard/me :: net::ERR_ABORTED",
+        "https://test.emarketingacademy.net/api/notifications/unread-count :: net::ERR_ABORTED",
+        "https://test.emarketingacademy.net/hubs/notifications/negotiate?negotiateVersion=1 :: net::ERR_ABORTED",
+        "https://test.emarketingacademy.net/api/notifications :: net::ERR_ABORTED"
+      ],
+      "intentional404": [],
+      "external": [
+        "https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&family=Inter:wght@400;500;600;700;800&display=swap",
+        "https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&family=Inter:wght@400;500;600;700;800&display=swap",
+        "https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&family=Inter:wght@400;500;600;700;800&display=swap"
+      ],
+      "localhost": [],
+      "signalr": true
+    },
+    "out": {
+      "console": [
+        "[2026-08-22T19:55:09.470Z] Error: Failed to complete negotiation with the server: TypeError: Failed to fetch",
+        "[2026-08-22T19:55:09.470Z] Error: Failed to start the connection: Error: Failed to complete negotiation with the server: TypeError: Failed to fetch",
+        "Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "failed": [],
+      "aborted": [
+        "https://test.emarketingacademy.net/api/dashboard/me :: net::ERR_ABORTED",
+        "https://test.emarketingacademy.net/api/notifications/unread-count :: net::ERR_ABORTED",
+        "https://test.emarketingacademy.net/hubs/notifications/negotiate?negotiateVersion=1 :: net::ERR_ABORTED",
+        "https://test.emarketingacademy.net/api/notifications :: net::ERR_ABORTED"
+      ],
+      "intentional404": [
+        "404 https://test.emarketingacademy.net/api/projects/9e731196-f87f-4bbf-82cd-260d06d90b56/overview",
+        "404 https://test.emarketingacademy.net/api/projects/9e731196-f87f-4bbf-82cd-260d06d90b56/overview",
+        "404 https://test.emarketingacademy.net/api/projects/9e731196-f87f-4bbf-82cd-260d06d90b56/overview",
+        "404 https://test.emarketingacademy.net/api/projects/9e731196-f87f-4bbf-82cd-260d06d90b56/overview"
+      ],
+      "external": [
+        "https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&family=Inter:wght@400;500;600;700;800&display=swap",
+        "https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&family=Inter:wght@400;500;600;700;800&display=swap"
+      ],
+      "localhost": [],
+      "signalr": true
+    },
+    "tl": {
+      "console": [
+        "[2026-08-22T19:55:21.834Z] Error: Failed to complete negotiation with the server: TypeError: Failed to fetch",
+        "[2026-08-22T19:55:21.834Z] Error: Failed to start the connection: Error: Failed to complete negotiation with the server: TypeError: Failed to fetch"
+      ],
+      "failed": [],
+      "aborted": [
+        "https://test.emarketingacademy.net/api/dashboard/me :: net::ERR_ABORTED",
+        "https://test.emarketingacademy.net/api/notifications/unread-count :: net::ERR_ABORTED",
+        "https://test.emarketingacademy.net/api/notifications :: net::ERR_ABORTED",
+        "https://test.emarketingacademy.net/hubs/notifications/negotiate?negotiateVersion=1 :: net::ERR_ABORTED"
+      ],
+      "intentional404": [],
+      "external": [
+        "https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&family=Inter:wght@400;500;600;700;800&display=swap",
+        "https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&family=Inter:wght@400;500;600;700;800&display=swap",
+        "https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&family=Inter:wght@400;500;600;700;800&display=swap"
+      ],
+      "localhost": [],
+      "signalr": true
+    },
+    "emp1b": {
+      "console": [
+        "[2026-08-22T19:55:48.418Z] Error: Failed to complete negotiation with the server: TypeError: Failed to fetch",
+        "[2026-08-22T19:55:48.418Z] Error: Failed to start the connection: Error: Failed to complete negotiation with the server: TypeError: Failed to fetch"
+      ],
+      "failed": [],
+      "aborted": [
+        "https://test.emarketingacademy.net/api/dashboard/me :: net::ERR_ABORTED",
+        "https://test.emarketingacademy.net/hubs/notifications/negotiate?negotiateVersion=1 :: net::ERR_ABORTED",
+        "https://test.emarketingacademy.net/api/notifications :: net::ERR_ABORTED",
+        "https://test.emarketingacademy.net/api/notifications/unread-count :: net::ERR_ABORTED"
+      ],
+      "intentional404": [],
+      "external": [
+        "https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&family=Inter:wght@400;500;600;700;800&display=swap",
+        "https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&family=Inter:wght@400;500;600;700;800&display=swap"
+      ],
+      "localhost": [],
+      "signalr": true
+    },
+    "tl2": {
+      "console": [
+        "[2026-08-22T19:55:56.829Z] Error: Failed to complete negotiation with the server: TypeError: Failed to fetch",
+        "[2026-08-22T19:55:56.830Z] Error: Failed to start the connection: Error: Failed to complete negotiation with the server: TypeError: Failed to fetch"
+      ],
+      "failed": [],
+      "aborted": [
+        "https://test.emarketingacademy.net/api/notifications :: net::ERR_ABORTED",
+        "https://test.emarketingacademy.net/hubs/notifications/negotiate?negotiateVersion=1 :: net::ERR_ABORTED",
+        "https://test.emarketingacademy.net/api/notifications/unread-count :: net::ERR_ABORTED",
+        "https://test.emarketingacademy.net/api/dashboard/me :: net::ERR_ABORTED"
+      ],
+      "intentional404": [],
+      "external": [
+        "https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&family=Inter:wght@400;500;600;700;800&display=swap",
+        "https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&family=Inter:wght@400;500;600;700;800&display=swap",
+        "https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&family=Inter:wght@400;500;600;700;800&display=swap"
+      ],
+      "localhost": [],
+      "signalr": true
+    },
+    "owner": {
+      "console": [
+        "[2026-08-22T19:56:22.737Z] Error: Failed to complete negotiation with the server: TypeError: Failed to fetch",
+        "[2026-08-22T19:56:22.737Z] Error: Failed to start the connection: Error: Failed to complete negotiation with the server: TypeError: Failed to fetch"
+      ],
+      "failed": [],
+      "aborted": [
+        "https://test.emarketingacademy.net/api/notifications/unread-count :: net::ERR_ABORTED",
+        "https://test.emarketingacademy.net/hubs/notifications/negotiate?negotiateVersion=1 :: net::ERR_ABORTED",
+        "https://test.emarketingacademy.net/api/notifications :: net::ERR_ABORTED",
+        "https://test.emarketingacademy.net/api/dashboard/me :: net::ERR_ABORTED"
+      ],
+      "intentional404": [],
+      "external": [
+        "https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&family=Inter:wght@400;500;600;700;800&display=swap",
+        "https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&family=Inter:wght@400;500;600;700;800&display=swap"
+      ],
+      "localhost": [],
+      "signalr": true
+    },
+    "am": {
+      "console": [
+        "[2026-08-22T19:56:29.224Z] Error: Failed to complete negotiation with the server: TypeError: Failed to fetch",
+        "[2026-08-22T19:56:29.224Z] Error: Failed to start the connection: Error: Failed to complete negotiation with the server: TypeError: Failed to fetch"
+      ],
+      "failed": [],
+      "aborted": [
+        "https://test.emarketingacademy.net/api/notifications/unread-count :: net::ERR_ABORTED",
+        "https://test.emarketingacademy.net/api/notifications :: net::ERR_ABORTED",
+        "https://test.emarketingacademy.net/hubs/notifications/negotiate?negotiateVersion=1 :: net::ERR_ABORTED",
+        "https://test.emarketingacademy.net/api/dashboard/me :: net::ERR_ABORTED"
+      ],
+      "intentional404": [],
+      "external": [
+        "https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&family=Inter:wght@400;500;600;700;800&display=swap",
+        "https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&family=Inter:wght@400;500;600;700;800&display=swap"
+      ],
+      "localhost": [],
+      "signalr": true
+    },
+    "mgr": {
+      "console": [
+        "[2026-08-22T19:56:34.477Z] Error: Failed to complete negotiation with the server: TypeError: Failed to fetch",
+        "[2026-08-22T19:56:34.477Z] Error: Failed to start the connection: Error: Failed to complete negotiation with the server: TypeError: Failed to fetch"
+      ],
+      "failed": [],
+      "aborted": [
+        "https://test.emarketingacademy.net/api/dashboard/me :: net::ERR_ABORTED",
+        "https://test.emarketingacademy.net/api/notifications/unread-count :: net::ERR_ABORTED",
+        "https://test.emarketingacademy.net/hubs/notifications/negotiate?negotiateVersion=1 :: net::ERR_ABORTED",
+        "https://test.emarketingacademy.net/api/notifications :: net::ERR_ABORTED"
+      ],
+      "intentional404": [],
+      "external": [
+        "https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&family=Inter:wght@400;500;600;700;800&display=swap",
+        "https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&family=Inter:wght@400;500;600;700;800&display=swap",
+        "https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&family=Inter:wght@400;500;600;700;800&display=swap"
+      ],
+      "localhost": [],
+      "signalr": true
+    },
+    "gm": {
+      "console": [
+        "[2026-08-22T19:56:42.722Z] Error: Failed to complete negotiation with the server: TypeError: Failed to fetch",
+        "[2026-08-22T19:56:42.722Z] Error: Failed to start the connection: Error: Failed to complete negotiation with the server: TypeError: Failed to fetch"
+      ],
+      "failed": [],
+      "aborted": [
+        "https://test.emarketingacademy.net/api/dashboard/me :: net::ERR_ABORTED",
+        "https://test.emarketingacademy.net/hubs/notifications/negotiate?negotiateVersion=1 :: net::ERR_ABORTED",
+        "https://test.emarketingacademy.net/api/notifications/unread-count :: net::ERR_ABORTED",
+        "https://test.emarketingacademy.net/api/notifications :: net::ERR_ABORTED"
+      ],
+      "intentional404": [],
+      "external": [
+        "https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&family=Inter:wght@400;500;600;700;800&display=swap",
+        "https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&family=Inter:wght@400;500;600;700;800&display=swap",
+        "https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&family=Inter:wght@400;500;600;700;800&display=swap"
+      ],
+      "localhost": [],
+      "signalr": true
+    }
+  },
+  "steps": [
+    {
+      "id": "a1",
+      "role": "emp1",
+      "ok": true,
+      "detail": "in-scope overview loaded, heading count=1"
+    },
+    {
+      "id": "a2",
+      "role": "emp1",
+      "ok": true,
+      "detail": "submitted claim#1 resp=200"
+    },
+    {
+      "id": "a3",
+      "role": "emp1",
+      "ok": true,
+      "detail": "review controls hidden for emp1, acceptBtns=0"
+    },
+    {
+      "id": "b1",
+      "role": "out",
+      "ok": true,
+      "detail": "out-of-scope project blocked (no heading / error shown)"
+    },
+    {
+      "id": "c0",
+      "role": "tl",
+      "ok": true,
+      "detail": "structural buttons hidden for TL archive=0 edit=0"
+    },
+    {
+      "id": "c1",
+      "role": "tl",
+      "ok": true,
+      "detail": "rejected claim#1 with reason resp=n/a"
+    },
+    {
+      "id": "a4",
+      "role": "emp1",
+      "ok": true,
+      "detail": "submitted claim#2 (for acceptance)"
+    },
+    {
+      "id": "c2",
+      "role": "tl",
+      "ok": true,
+      "detail": "accepted claim#2 resp=n/a"
+    },
+    {
+      "id": "d1",
+      "role": "owner",
+      "ok": true,
+      "detail": "owner reached execution tab, action button count=1"
+    },
+    {
+      "id": "e1",
+      "role": "am",
+      "ok": true,
+      "detail": "account manager reached project overview seen=1"
+    },
+    {
+      "id": "f_mgr",
+      "role": "mgr",
+      "ok": true,
+      "detail": "management project detail archiveBtn=1"
+    },
+    {
+      "id": "f_gm",
+      "role": "gm",
+      "ok": true,
+      "detail": "management project detail archiveBtn=1"
+    }
+  ],
+  "finishedUtc": "2026-08-22T19:56:50.053Z",
+  "figCount": 13,
+  "gate": {
+    "figCount": 13,
+    "genuineConsoleErrors": 0,
+    "allConsoleErrors": 22,
+    "genuineFailed": 0,
+    "abortedTeardown": 36,
+    "intentional404": 4,
+    "localhostRequests": 0,
+    "signalrSeen": true
+  }
+}
