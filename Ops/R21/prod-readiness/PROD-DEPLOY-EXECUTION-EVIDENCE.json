@@ -1,0 +1,103 @@
+{
+  "title": "PROJECT360-R21 — Production LIVE Deploy EXECUTED (authorized, Option A DataProtection amendment)",
+  "date": "2026-08-23",
+  "target_sha": "7e063b493b50ad90ba6131e47042c7cd035fb65b",
+  "authorization": "Explicit separate owner authorization for LIVE production deploy + explicit Section V amendment approving Option A (infra-level HOME-based DataProtection persistence, NO code change).",
+
+  "SECTION_VII_BRIDGE": {
+    "db": "reporting_prod",
+    "dry_run": "9/9 pre-checks OK, full schema fingerprint MATCH, exactly the 2 candidate-lineage IDs absent",
+    "apply": "APPLIED — 2 alias rows inserted (history 30 -> 32), schema fingerprint UNCHANGED",
+    "alias_rows": ["20260622140138 (canon for legacy 20260622144900 KpiTemplateAssignmentsPhaseT1)", "20260626124527 (canon for legacy 20260626135944 AddReportViewGrants)"],
+    "rollback_sql": "/tmp/bridge-prod-out/bridge-rollback-reporting_prod-20260823T164417Z.sql"
+  },
+
+  "SECTION_VIII_ACTIVATION": {
+    "old_backend_tree_sha256": "ef0ea0235a47bdd02f18372d0843f3ffbe51c77f1f37a0d943ad58694abed1a9",
+    "old_frontend_tree_sha256": "68227cd97e490d35a428e7f7e8259c24b3d586194e6c673f8e9409717c424c35",
+    "new_backend_tree_sha256": "36d7f525dc0ee132a4490c08994479b0776e3e89430a7d125dcc0c56f7fc21b4",
+    "new_frontend_tree_sha256": "165bdd1a05bc42105315d1c20ff0c73bc3b5e6ace6cd4775ef5288685e591a97",
+    "backend_hash_match": "YES (== BACKEND_EXPECTED_HASH)",
+    "frontend_hash_match": "YES (== FRONTEND_EXPECTED_HASH prod)",
+    "embedded_backend_sha": "1.0.0+7e063b493b50ad90ba6131e47042c7cd035fb65b (== TARGET_SHA)",
+    "frontend_origin_audit": "PROD_ORIGIN=1, TEST=0, RC=0, LOCALHOST=0, SOURCEMAPS=0",
+    "ownership": "www-data:www-data on publish and dist",
+    "boot1_start_utc": "2026-08-23T16:48:06Z",
+    "boot1_health_200_after": "~12s (END OF DOWNTIME)",
+    "boot1_mainpid": 1449525,
+    "migrations_applied_this_boot": 10,
+    "p42P07_count": 0,
+    "error_lines": 0,
+    "history_after": 42,
+    "head_after": "20260817114129_AddProjectExecutionUpdateProposals",
+    "tables": 79,
+    "columns": 947,
+    "data_integrity": "users 34, audit_logs 1401 (no loss vs pre-deploy)"
+  },
+
+  "SECTION_V_OPTION_A_PROD_PROOF": {
+    "drop_in": "/etc/systemd/system/reporting-api.service.d/10-dataprotection-home.conf => Environment=HOME=/var/lib/reporting (reversible, backed up)",
+    "key_ring_dir": "/var/lib/reporting/.aspnet/DataProtection-Keys (0700 www-data)",
+    "boot1_key": "key-59f89eea-20e1-4294-83fe-71336d836631.xml",
+    "boot1_key_size": 1000,
+    "boot1_key_sha256": "d08d6f81d76af9342056349ef9146294ac4a43adf467c47136f78367e022f187",
+    "boot1_key_mtime": "2026-08-23 16:48:14.828184412 +0000",
+    "boot1_key_perms": "600 www-data:www-data",
+    "boot1_ephemeral_warning": "ABSENT (persistent provider active)",
+    "boot2_verification_restart": {
+      "mainpid": 1450106,
+      "health_200_after": "~8s",
+      "key_count": 1,
+      "post_key": "key-59f89eea-20e1-4294-83fe-71336d836631.xml",
+      "post_sha256": "d08d6f81d76af9342056349ef9146294ac4a43adf467c47136f78367e022f187",
+      "sha_unchanged": "YES",
+      "mtime_unchanged": "YES (loaded, not recreated)",
+      "ephemeral_boot2": 0,
+      "migrations_boot2": 0
+    },
+    "at_rest_note": "Keys unencrypted at rest ('No XML encryptor configured'); mitigated by 0700 dir owned by www-data + server access controls. Optional future hardening (X.509/KMS) recommended, NOT in this release.",
+    "no_code_change": "TARGET_SHA source untouched; DataProtection persistence achieved purely via infra HOME + default provider."
+  },
+
+  "SECTION_IX_SMOKE_READONLY": {
+    "origin": "https://reports.emarketingacademy.net",
+    "health": 200,
+    "clients_unauth": 401,
+    "projects_unauth": 401,
+    "swagger_app_html": 404,
+    "swagger_app_json": 404,
+    "swagger_note": "Origin returns 200 for /swagger/* ONLY as benign SPA nginx fallback (text/html index). The APP itself returns 404 => Swagger NOT exposed in prod.",
+    "cors_foreign_origin": "NO Access-Control-Allow-Origin header for https://evil.example.com (rejected)",
+    "spa_root": 200,
+    "bad_login": 400,
+    "no_user_leaked": "AspNetUsers still 34 after smoke"
+  },
+
+  "SECTION_X_SIDE_SERVICES_RESTORED": {
+    "restored_from": "/etc/reporting-api.env.pre-window-20260823T164353Z (only the 4 side-effect keys differed; FileStorage retained)",
+    "EmailNotifications__Mode": "Enabled",
+    "Reminders__Enabled": "true",
+    "ReportReminderScheduler__Enabled": "true",
+    "Scheduler__Enabled": "true",
+    "FileStorage__DocumentsRootPath": "/var/lib/reporting/documents (retained)",
+    "outbox_after_restart": "0 total / 0 unsent (no blast)"
+  },
+
+  "SECTION_XII_MONITOR": {
+    "window": "2026-08-23T16:51:12Z -> 2026-08-23T17:22:21Z (~31 min, 31 samples @60s)",
+    "mainpid_stable": 1450106,
+    "result": "ZERO ANOMALIES across all 31 samples — health=200, active, NRestarts=0, err60s=0, migrations=42, users=34, audit_logs=1401, outbox=0 throughout",
+    "log": "/tmp/r21-monitor.log (server)"
+  },
+
+  "BACKUP": "/opt/backups/prod-deploy-20260823T164012Z-r21 (0700) — pg_dump -Fc + -Fp.gz, publish/dist tars, env(0600), nginx, unit, dataprotection-keys, storage, CURRENT-STATE.txt, SHA256SUMS; verified by restore-and-compare.",
+  "ROLLBACK_READY": "tier1 app-artifact-only (additive migrations => old code schema-compatible with 42) + tier2 full restore; bridge rollback SQL generated.",
+
+  "GOVERNANCE": {
+    "product_code_changed": "NO",
+    "target_sha_changed": "NO",
+    "uat_data_on_production": "NO",
+    "origin_main_touched": "NO",
+    "secrets_printed": "NO"
+  }
+}

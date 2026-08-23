@@ -1,0 +1,74 @@
+{
+  "title": "PROJECT360-R21-PROD-DEPLOY — Section V HARD STOP RESOLVED via Option A (owner-approved)",
+  "date": "2026-08-23",
+  "decision": "HARD_STOP_RAISED_THEN_RESOLVED — owner approved Option A (infra-level HOME-based DataProtection persistence, no code change) and explicitly amended Section V",
+  "stage_reached": "Section II pre-checks GREEN; Section V isolated DataProtection gate PASSED; proceeding with authorized deployment",
+  "no_writes_performed": "Read-only + isolated-clone rehearsal only up to this point; production service/DB/config/artifacts untouched during the DP gate (verified MainPID 1305279 / NRestarts 0 / health 200 / 30 migrations after teardown)",
+
+  "OPTION_A_ISOLATED_GATE_RESULT": {
+    "verdict": "PASS",
+    "method": "candidate 7e063b4 booted as OS user www-data with HOME=/var/tmp/dpiso (default ASP.NET key path) against an isolated clone reporting_prod_dpiso (restored from prod dump, DB owner aligned to reporting_app, bridged 30->32, migrated 32->42, health 200)",
+    "source_home_dependency_scan": "NONE — TARGET_SHA src reads no HOME/SpecialFolder/GetFolderPath/LOCALAPPDATA/UserProfile/GetTempPath/CurrentDirectory; only ContentRootPath (FileStorage fallback), which is independent of HOME. Setting HOME affects ONLY DataProtection default key-ring discovery.",
+    "boot1_key_created": "key-85d539e3-7e4a-46ee-98d9-946f97ac2987.xml (size 998, sha256 d47cca3a526fab5dbaed3a203dbeb3c0d415c8af7fcb4a1e5e6e6b7746b65283)",
+    "boot1_ephemeral_warning": "ABSENT (GOOD) — EphemeralXmlRepository gone once HOME writable",
+    "boot2_restart": "health 200 in ~9s; KEY_COUNT=1; SAME key file; SHA_UNCHANGED=YES; MTIME_UNCHANGED=YES (loaded, not recreated); ephemeral ABSENT; migrations no-op (42)",
+    "protect_before_unprotect_after": "ENTAILED — key material byte-identical across restart (same GUID, same SHA256) => anything protected pre-restart is decryptable post-restart",
+    "unencrypted_at_rest": "documented limitation — 'No XML encryptor configured'; mitigated by keyring dir 0700 owned by www-data + server access controls; optional future hardening (X.509/KMS) noted, NOT in this release",
+    "teardown": "iso app stopped via :5098 PID; clone dropped (CLONE_EXISTS_AFTER_DROP=0); /var/tmp/dpiso + /tmp/bridge-iso* removed"
+  },
+
+  "SECTION_II_PRECHECKS": {
+    "PRODUCTION_SHA_EMBEDDED": "1.0.0+ce166662f46598ed3593beed0105ba67059fc3bc (OLD candidate — expected)",
+    "SERVICE": "reporting-api active/running, MainPID 1305279 (expected), NRestarts 0, health 200",
+    "DEPLOYED_BACKEND_TREE_SHA256": "ef0ea0235a47bdd02f18372d0843f3ffbe51c77f1f37a0d943ad58694abed1a9 (OLD — expected)",
+    "DEPLOYED_FRONTEND_TREE_SHA256": "68227cd97e490d35a428e7f7e8259c24b3d586194e6c673f8e9409717c424c35 (OLD prod frontend)",
+    "CANDIDATE_BACKEND_TREE_SHA256": "36d7f525dc0ee132a4490c08994479b0776e3e89430a7d125dcc0c56f7fc21b4 (MATCH expected)",
+    "CANDIDATE_FRONTEND_TREE_SHA256": "165bdd1a05bc42105315d1c20ff0c73bc3b5e6ace6cd4775ef5288685e591a97 (MATCH expected)",
+    "CANDIDATE_STAGING": "/opt/reporting-prod-staging/staging-r21-7e063b4-prod-20260823 (inert, unreferenced by service/nginx)",
+    "MIGRATIONS_COUNT": "30 (expected)",
+    "MIGRATION_HEAD": "20260724224053_AddReportApproverAndKpiReviewerOverrides (expected)",
+    "TABLES_COUNT": "57 (expected)",
+    "COLUMNS_COUNT": "637 (expected)",
+    "USERS_COUNT": 34,
+    "AUDIT_LOGS_COUNT": 1401,
+    "DIVERGENT_LINEAGE_IDS_PRESENT": "YES (20260622144900_KpiTemplateAssignmentsPhaseT1, 20260626135944_AddReportViewGrants — bridge targets confirmed)",
+    "OUTBOX": "email_outbox total 0 / unsent 0",
+    "DISK": "root fs 46% used, 52G avail",
+    "BRIDGE_SH": "/root/rc-build-4fddc20/Ops/MigrationHistoryBridge/bridge.sh (present on server)",
+    "SIDE_EFFECTS_LIVE": "EmailNotifications__Mode=Enabled, Email__Enabled=false(legacy/no-op), Reminders__Enabled=true, ReportReminderScheduler__Enabled=true, Scheduler__Enabled=true, BackgroundJobs__Enabled=false",
+    "FileStorage__DocumentsRootPath": "ABSENT (PROD-READINESS-01 blocker — closable in Section IV, config-only)",
+    "PRECHECKS_VERDICT": "ALL GREEN — production confirmed still on OLD candidate; candidate artifacts hash-match; DB exactly 30/57/637"
+  },
+
+  "SECTION_V_HARD_STOP": {
+    "requirement": "Inspect TARGET_SHA source for the ACTUAL DataProtection config key (no guessing); Hard Stop if source does not prove persistent DataProtection support.",
+    "evidence_source_7e063b4": [
+      "git grep -c -i 'dataprotection' 7e063b4 -- reporting-backend/src/* => NONE (zero matches in entire src)",
+      "reporting-backend/src/Reporting.Api/appsettings.json => no DataProtection section, no KeysPath",
+      "reporting-backend/src/Reporting.Infrastructure/DependencyInjection.cs => no DataProtection config",
+      "Only AddDataProtection() calls exist in reporting-backend/tools/* (OrgImporter, RoleAwareOverridePublisher) — NOT the API, and with no PersistKeysToFileSystem"
+    ],
+    "evidence_production_runtime": [
+      "www-data home = /var/www (nologin); no writable .aspnet; no key-*.xml under /var/www /var/lib/reporting /opt/reporting",
+      "journalctl reporting-api (boot 2026-08-20 06:34): 'EphemeralXmlRepository ... Neither user profile nor HKLM registry available. Using an ephemeral key repository. Protected data will be unavailable when application exits.'",
+      "'No XML encryptor configured' — keys would be unencrypted at rest even if persisted"
+    ],
+    "conclusion": "The TARGET_SHA source configures NO persistent DataProtection. The env key DataProtection__KeysPath the ticket assumed is a PHANTOM — the app never reads it, so setting it would be a forbidden guess. Production ALREADY runs ephemeral today (status quo since >= Aug 20), so this is not a regression introduced by the deploy.",
+    "verdict": "SECTION_V_HARD_STOP = TRIGGERED"
+  },
+
+  "IMPACT_ANALYSIS": {
+    "auth_model": "JWT Bearer (HMAC via Jwt__Key) — NOT DataProtection cookies. A restart does NOT log active users out; existing JWTs stay valid until expiry.",
+    "refresh_tokens": "custom random strings stored in refresh_tokens table — NOT DataProtection-protected.",
+    "what_ephemeral_actually_affects": "ASP.NET Identity default-token-provider artifacts only: outstanding password-reset links, email-confirmation links, and antiforgery tokens on open forms issued before a restart become invalid after it.",
+    "readiness_doc_correction": "Prior readiness docs said restart may cause 'session invalidation'. Because auth is JWT, that is OVERSTATED — active sessions are NOT invalidated. Only the token artifacts above are."
+  },
+
+  "OPTIONS_FOR_OWNER_DECISION": {
+    "A_infra_home_persist_NO_CODE": "Give www-data a stable writable HOME (systemd Environment=HOME=/var/lib/reporting) + create /var/lib/reporting/.aspnet/DataProtection-Keys (0700, www-data). The ASP.NET DEFAULT provider then persists keys there across restarts. Non-guessing, no code change, but relies on default-path discovery (not a config key) and keys unencrypted-at-rest (mitigated by 0700). DEVIATES from Section V literal wording (there is no config key) => needs owner OK.",
+    "B_accept_ephemeral_documented": "Keep status quo (ephemeral). Since auth is JWT, no active-session logout; only outstanding reset/confirm links + open-form antiforgery invalidate on the deploy restart. Prod already ephemeral today => no regression. Owner explicitly relaxes the Section V Hard Stop and accepts the documented limitation.",
+    "C_abort_fix_in_source": "Abort this deploy; add proper AddDataProtection().PersistKeysToFileSystem(...).SetApplicationName(...) reading a real config key to source, build a NEW candidate (new SHA != 7e063b4), re-test, re-authorize. Correct long-term fix but out of scope for TARGET_SHA and needs fresh authorization."
+  },
+
+  "NEXT_REQUIRED_ACTION": "Owner selects A, B, or C. No production write (backup/bridge/cutover) will occur until the owner resolves the Section V Hard Stop, per the ticket's own rule and 'stop on material deviation, do not bypass'."
+}
