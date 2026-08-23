@@ -1,0 +1,68 @@
+{
+  "title": "PROJECT360-R21 — RC SECURITY & VISUAL EVIDENCE MICROCLOSURE (v2)",
+  "date": "2026-08-23",
+  "origin": "https://rc-report.emarketingacademy.net",
+  "productSourceSha": "7e063b493b50ad90ba6131e47042c7cd035fb65b",
+  "scope": "إغلاق أخير محدود النطاق على RC — بلا إعادة نشر منتج وبلا تغيير هجرات وبلا مساس بـTEST/الإنتاج/origin-main.",
+  "backupBeforeAnyWrite": "/opt/backups/rc-microclosure-20260823T102841Z (reporting_rc.dump = 493 كائنًا + env.bak)",
+  "screenshots": [
+    {
+      "id": "fig-rc-003-v2-out-of-scope-final",
+      "replaces": "fig-rc-003 (لقطة سبينر التحميل)",
+      "role": "empOut",
+      "scenario": "out-of-scope final rejection (بعد انتهاء محاولات React Query)",
+      "shows": "رسالة «المشروع غير موجود أو أنّه خارج نطاق صلاحيّتك»",
+      "apiOverviewStatus": 404,
+      "capturedAtUtc": "2026-08-23T10:37:53.239Z",
+      "md5": "ba688cce651805a4b2091c76ff7a17ed",
+      "bytes": 36187
+    },
+    {
+      "id": "fig-rc-006-v2-rejected-final",
+      "replaces": "fig-rc-006 (كانت مطابقة بايتيًّا لـfig-rc-005)",
+      "role": "tl",
+      "scenario": "proposal rejected via real UI",
+      "shows": "الاقتراح «مرفوض» + سبب معلن + «نسبة مُدَّعاة ٦٠٪ — لم تُطبَّق على المخرَج»",
+      "proposalId": "e0697ccb-1814-438b-aaca-94cba18ec756",
+      "dbConfirmed": { "status": "Rejected", "proposedProgressPercent": "60.00", "reviewedById": "57d8d36f-d560-46ec-a9aa-87196aa74d8f (rc-uat-tl)" },
+      "capturedAtUtc": "2026-08-23T10:38:08.912Z",
+      "md5": "d28228aa2e205e6842995ac953fcbb5c",
+      "bytes": 137433
+    }
+  ],
+  "uniqueness": "كلتا اللقطتين v2 فريدتان مقابل الأصليّتين ومقابل بعضهما (لا تكرار بايتيّ).",
+  "cleanupMeasured": {
+    "tempAdmin": { "email": "uat-rc-admin@rc.local", "isActive": false, "oldPasswordLogin": 401, "refreshTokens": 0 },
+    "cleanupAdmin": "غير موجود (اعتُمد مسار قاعدة البيانات المباشر) — CLEANUP_ADMIN_IS_ACTIVE=NO",
+    "realActiveAdminsRemaining": 3,
+    "uatAccountsActive": 0,
+    "uatAccountsLogin401": ["uat-rc-admin@rc.local", "rc-uat-emp@rc-uat.local", "rc-uat-emp-out@rc-uat.local", "rc-uat-tl@rc-uat.local"],
+    "tempRefreshTokens": 0,
+    "realRefreshTokensUntouched": 250,
+    "empInTeamRestoredToNull": true,
+    "referenceValues": { "deliverableA": "50.00/InProgress", "deliverableB": "25.00/NotStarted", "projectProgressPercent": "40.00" },
+    "appendOnlyPreserved": { "executionProposals": 15, "auditLogs": 723 },
+    "rcHealth": 200,
+    "serviceActiveState": "active",
+    "serviceNRestarts": 0
+  },
+  "transactionSafety": "كلّ كتابة داخل معاملة محروسة (BEGIN → فحص عدد الصفوف → COMMIT) استهدفت حصرًا حسابات @rc.local/@rc-uat.local؛ حارس أكّد 4 أهداف معطَّلة و3 مديرين حقيقيّين نشطين قبل الاعتماد.",
+  "secretsHandling": "لم يُطبَع أيّ سرّ؛ shred -u على ملفّات الأسرار المؤقّتة المحلّيّة وملفّات SQL المؤقّتة على الخادم.",
+  "verdict": {
+    "RC_PRODUCT_REDEPLOYED": "NO",
+    "RC_MIGRATIONS_CHANGED": "NO",
+    "OUT_OF_SCOPE_VISUAL_EVIDENCE": "FULL",
+    "REJECTED_VISUAL_EVIDENCE": "FULL",
+    "DUPLICATE_SCREENSHOTS": 0,
+    "TEMP_ADMIN_IS_ACTIVE": "NO",
+    "CLEANUP_ADMIN_IS_ACTIVE": "NO",
+    "RC_UAT_ACCOUNTS_ACTIVE": 0,
+    "TEMP_REFRESH_TOKENS": 0,
+    "RC_HEALTH": 200,
+    "PRODUCT_CODE_CHANGE": "NONE",
+    "TEST_TOUCHED": "NO",
+    "PRODUCTION_TOUCHED": "NO",
+    "ORIGIN_MAIN_CHANGED": "NO",
+    "RC_EVIDENCE_CLOSED": "YES"
+  }
+}
