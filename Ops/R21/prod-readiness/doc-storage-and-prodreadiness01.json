@@ -1,0 +1,31 @@
+{
+  "title": "PROD-READINESS-01 — Document Storage Investigation & Target Design (not applied to production)",
+  "runtimeKeyConfirmed": {
+    "generalDocumentService": "FileStorageOptions.DocumentsRootPath",
+    "consumer": "Reporting.Infrastructure/Services/LocalFileStorage.cs:30-33",
+    "fallbackWhenBlank": "Path.Combine(env.ContentRootPath, 'App_Data', 'documents')",
+    "contentRootInProd": "/opt/reporting/publish (== WorkingDirectory)",
+    "effectiveFallbackPath": "/opt/reporting/publish/App_Data/documents (INSIDE the replaced publish dir => silent loss on every deploy)",
+    "separateKey": "FileStorageOptions.EmployeeServiceFinalDocumentsPath (distinct consumer: employee-service final docs; already set in prod to /var/lib/reporting/employee-service-requests/final-documents, OUTSIDE publish)",
+    "codeIdenticalToProductSourceSha": true,
+    "pathTraversalGuard": "LocalFileStorage.cs:17-18 SegmentPattern regex ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ on every key segment; identifiers-only storage keys (no original filename in path)"
+  },
+  "currentProductionExposure": {
+    "documentTablesInProd": 0,
+    "App_DataInPublish": "absent",
+    "documentRowsInProd": 0,
+    "documentFilesOnDisk": 0,
+    "interpretation": "Client/Project Document Service migrations are NOT yet applied in production (prod=30 migrations, ce166662, pre-CPW). Therefore no documents exist to lose TODAY; the blocker is prospective: it triggers the first time the candidate (with the document feature) is deployed AND a document is uploaded, unless DocumentsRootPath is set to a persistent path outside publish."
+  },
+  "targetDesign_NOT_APPLIED_TO_PROD": {
+    "documentsRootPath": "/var/lib/reporting/documents",
+    "rationale": "Mirrors the proven TEST pattern /var/lib/reporting-test/documents; outside /opt/reporting/publish so nginx/systemd/publish replacement never touches it; on the same disk (53G free).",
+    "owner": "www-data", "group": "www-data", "mode": "2750 (or 0750) — service RW, not world-readable, not served by nginx (nginx root is /opt/reporting/reporting-frontend/dist only)",
+    "envChange": "add FileStorage__DocumentsRootPath=/var/lib/reporting/documents to /etc/reporting-api.env (config-only; NO code change, NO migration)",
+    "migrationOfExistingFiles": "N/A for first deploy (0 existing documents); if any future App_Data/documents exists, rsync -a into new root then verify md5 before switching",
+    "verificationBeforeAfter": "empty→populate via upload; md5 of stored blob compared pre/post redeploy and pre/post restart",
+    "rollbackForStorage": "storage path is independent of app artifact; rolling back the app publish does NOT delete /var/lib/reporting/documents; env line can be removed to revert (but then feature falls back — so keep the dir persistent regardless)",
+    "preventFutureDeployDeletion": "root is outside publish; deploy replaces only /opt/reporting/publish and /opt/reporting/reporting-frontend/dist — neither contains /var/lib/reporting/documents"
+  },
+  "verdictBeforeRehearsal": "PROD-READINESS-01 = OPEN until proven on isolated rehearsal (upload/download/version/archive/restore/metadata + redeploy-no-loss + restart-no-loss with matching blob hashes)."
+}

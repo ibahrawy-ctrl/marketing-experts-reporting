@@ -1,0 +1,64 @@
+{
+  "title": "Phase 14 — Production Deployment Plan (20 steps, NOT executed) + Rollback Plan",
+  "candidate": {
+    "source_sha": "7e063b493b50ad90ba6131e47042c7cd035fb65b",
+    "staging": "/opt/reporting-prod-staging/staging-r21-7e063b4-prod-20260823 (inert, unreferenced by service/nginx)",
+    "backend_publish_tree_sha256": "36d7f525dc0ee132a4490c08994479b0776e3e89430a7d125dcc0c56f7fc21b4",
+    "frontend_dist_tree_sha256": "165bdd1a05bc42105315d1c20ff0c73bc3b5e6ace6cd4775ef5288685e591a97"
+  },
+  "target": {
+    "service": "reporting-api (systemd, user www-data, 127.0.0.1:5090)",
+    "db": "reporting_prod (current: 30 migrations, head 20260724224053)",
+    "backend_dir": "/opt/reporting/publish",
+    "frontend_dir": "/opt/reporting/reporting-frontend/dist",
+    "env": "/etc/reporting-api.env",
+    "nginx": "/etc/nginx/sites-available/reporting"
+  },
+  "preconditions": [
+    "explicit NEW deploy authorization message from the product owner (this ticket is NOT one)",
+    "PROD-READINESS-01 config decision approved (add FileStorage__DocumentsRootPath)",
+    "fresh triple backup verified immediately before (see backup-and-restore.json pattern)",
+    "maintenance window agreed (see EXPECTED_DOWNTIME)"
+  ],
+  "deploymentSteps": [
+    "1. Announce maintenance window; confirm no in-flight critical report submissions.",
+    "2. Take a FRESH full backup: pg_dump -Fc reporting_prod + -Fp gz; tar publish, dist, env(0600), service unit, nginx conf, DataProtection-Keys; write SHA256SUMS; store in /opt/backups/prod-deploy-<ts>-r21 (0700).",
+    "3. Verify backup: pg_restore --list count > 0; sha256sum -c all non-secret files; (optionally) restore into a throwaway clone and compare migration/table/column counts to prod.",
+    "4. Snapshot current prod state: record git SHA (ce166662), publish tree sha256, `__EFMigrationsHistory` count(=30)+head, service PID, NRestarts, /health=200.",
+    "5. Capture DataProtection keyring state for www-data (KNOWN OPEN ITEM: prod www-data keyring not found in backup => provision a persistent key ring dir owned by www-data BEFORE cutover, else all active sessions invalidate on restart).",
+    "6. Pre-stage the config-only edit for /etc/reporting-api.env: add FileStorage__DocumentsRootPath=/var/lib/reporting/documents (create dir, chown www-data, 0750) — do NOT restart yet.",
+    "7. Run the Migration History Bridge in DRY-RUN against reporting_prod: Ops/MigrationHistoryBridge/bridge.sh --db reporting_prod --env production (no --apply). Confirm 9/9 pre-checks OK, exactly the 2 candidate-lineage IDs absent, full schema fingerprint MATCH.",
+    "8. Stop the service: systemctl stop reporting-api (START OF DOWNTIME).",
+    "9. Apply the bridge for real: bridge.sh --db reporting_prod --env production --apply --allow-production. Confirm +2 alias rows (history 30 -> 32), schema fingerprint UNCHANGED, rollback SQL auto-generated and saved.",
+    "10. Deploy backend: rsync --delete the staging publish/ (36d7f525) into /opt/reporting/publish; chown -R www-data:www-data; verify tree sha256 == 36d7f525.",
+    "11. Deploy frontend: rsync --delete the staging dist/ (165bdd1a) into /opt/reporting/reporting-frontend/dist; chown www-data; verify tree sha256 == 165bdd1a.",
+    "12. Apply the env edit from step 6 (FileStorage__DocumentsRootPath) now (file already prepared).",
+    "13. Start the service: systemctl start reporting-api. EF MigrateAsync applies the 10 additive migrations in ID order (history 32 -> 42). Watch journalctl for 'Applying migration' x10 and zero 42P07.",
+    "14. Wait for readiness: poll http://127.0.0.1:5090/health until 200 (END OF DOWNTIME).",
+    "15. Verify migration head: `__EFMigrationsHistory` count == 42, head 20260817114129_AddProjectExecutionUpdateProposals; zero errors in journal.",
+    "16. Smoke via nginx origin (https://reports.emarketingacademy.net): /health 200; unauth /api/clients 401; a real admin login 200; Project360 overview 200; Client360 200.",
+    "17. Document persistence check: upload a throwaway doc, confirm blob lands under /var/lib/reporting/documents (OUTSIDE publish), download matches, then remove the throwaway.",
+    "18. Browser smoke: load the SPA, confirm no console errors, no localhost/TEST/RC network calls, SignalR connects.",
+    "19. Confirm no external side-effects: EmailNotifications mode as intended; outbox not blasting; scheduler behaves per config.",
+    "20. Post-deploy: record new prod SHA (7e063b4), publish/dist hashes, migration head=42, health=200, service NRestarts; announce window closed; keep backup for the agreed retention.",
+    "(post) Fast-forward origin/main to the released SHA is a SEPARATE authorized git action, not part of the server cutover."
+  ],
+  "rollbackPlan": {
+    "pointOfNoReturn": "step 13 start (MigrateAsync writes 10 additive migrations). Before step 13, rollback = restart old artifact + delete the 2 bridge rows (auto-generated SQL). After step 13, forward DB has 42 migrations.",
+    "tier1_appArtifactOnly": "if the app misbehaves but DB is intact and healthy: rsync the OLD publish (ce166662) + OLD dist back, revert the env edit, restart. SAFE because all 10 migrations are additive-only (ADD COLUMN/CREATE TABLE/CREATE INDEX, zero DROP) => the old code is schema-compatible with the forward (42) DB. Fastest rollback, no data loss.",
+    "tier2_fullRestore": "if the DB is corrupted or migration aborts mid-way: systemctl stop; drop/recreate reporting_prod; pg_restore the pre-deploy -Fc dump; restore OLD publish/dist/env; restart old service; verify 30 migrations, 57 tables, health 200, row counts match backup. AUTHORITATIVE rollback (returns to exact pre-deploy state).",
+    "bridgeRollback": "the bridge auto-generates DELETE-the-2-alias-rows SQL; only meaningful in the pre-step-13 window; after a forward migrate, tier2 full restore supersedes it.",
+    "decisionOwner": {
+      "steps_1_7": "release engineer (reversible, no downtime)",
+      "step_8_downtime_start": "product owner / on-call lead sign-off required",
+      "steps_9_15_migration": "release engineer executes; DBA/lead on standby; abort->tier2 decision by on-call lead",
+      "steps_16_20_verification": "release engineer verifies; product owner confirms acceptance to close the window"
+    },
+    "ROLLBACK_READY": "YES (proven: full DB restore verified on clone; migrations additive-only; bridge rollback SQL generated)"
+  },
+  "EXPECTED_DOWNTIME": "~2-5 minutes (service stop at step 8 -> health 200 at step 14). Dominated by the 10 additive migrations + app warmup; measured analog on the isolated rehearsal booted healthy with the same 10 migrations.",
+  "openItemsToCloseBeforeCutover": [
+    "PROD-READINESS-01: config-only add FileStorage__DocumentsRootPath (proven closable on clone; NOT yet applied to prod).",
+    "DataProtection keyring for www-data not present in backup => provision persistent keyring before restart or accept one-time session invalidation."
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "title": "Phase 10 — Build & Test Gates (real exit codes, candidate source 7e063b4, isolated local)",
+  "environment": "local mac; DOTNET 8.0.421; postgres@16; worktree /tmp/prod-cand-7e063b4-20260823",
+  "backendBuild": { "config": "Release", "result": "0 errors, 4 warnings", "exit": 0 },
+  "unitTests": { "project": "Reporting.UnitTests", "result": "359/359 passed", "exit": 0 },
+  "integrationTests": {
+    "project": "Reporting.IntegrationTests",
+    "db": "clean reporting_test + reporting_pfe_iso (recreated fresh; NEVER prod)",
+    "authoritativeRun": {
+      "mode": "SERIALIZED (xunit.runner.json parallelizeTestCollections=false, placed next to test DLL only — not part of shipped candidate)",
+      "result": "Passed! Failed: 0, Passed: 2011, Skipped: 0, Total: 2011",
+      "duration": "7m 38s",
+      "exit": 0
+    },
+    "parallelRunArtifact": {
+      "observation": "Default parallel run showed the 13 RepeatableNumericValidationIntegrationTests (collection PfeNumericIsolated, DB reporting_pfe_iso) FAILing at 00:00:01-02 during fixture init.",
+      "rootCause": "startup race: the isolated collections (PfeNumericIsolated/CalendarIsolated/ProjectFirstIsolated) initialize their fixtures in parallel with the heavy Integration collection; concurrent EF migrate/seed under CPU contention causes the isolated fixture to fail init.",
+      "proofItIsHarnessNotProduct": "the same 13 tests pass 13/13 when the PfeNumericIsolated collection runs alone; and the serialized full run passes 2011/2011 exit 0.",
+      "conclusion": "LOCAL TEST-HARNESS parallelism artifact, NOT a product defect. Consistent with the governing lesson 'لا يُصنَّف فشلٌ من جولة واحدة'."
+    },
+    "INTEGRATION_EXIT": 0
+  },
+  "targetedSmokeSuite": {
+    "filter": "Project360FoundationTests|Project360ExecutionBridgeTests|WorkstreamDeliverablesTests|ClientDocuments|AccountPortfolioTests",
+    "result": "Passed! Failed: 0, Passed: 91, Total: 91",
+    "exit": 0,
+    "note": "explicit named evidence for R2.1 change surface; also subsumed in the 2011/2011 serialized run"
+  },
+  "frontendBuildGate": "tsc -b && vite build proven deterministic in candidate-build.json (CSS byte-identical to RC).",
+  "frontendTests": {
+    "runner": "vitest v4.1.8 (default reporter)",
+    "result": "Test Files 50 passed (50); Tests 588 passed (588)",
+    "exit": 0,
+    "toolingNote": "`--reporter=basic` fails to load under rolldown-vite (ERR_LOAD_URL on loadCustomReporterModule) — a local reporter-module quirk only; the default reporter runs the full suite green."
+  },
+  "PHASE10_VERDICT": "PASS — backend build 0 errors, unit 359/359, integration 2011/2011 exit 0 (serialized authoritative), targeted smoke 91/91, frontend 588/588."
+}

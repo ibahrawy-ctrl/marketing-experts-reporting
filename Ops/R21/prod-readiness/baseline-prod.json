@@ -1,0 +1,98 @@
+{
+  "title": "PROJECT360-R21 — PRODUCTION READINESS · READ-ONLY BASELINE",
+  "measuredAtUtc": "2026-08-23",
+  "measurementMode": "READ_ONLY — no write to production DB/config/artifacts",
+  "provenance": {
+    "PRODUCT_SOURCE_SHA": "7e063b493b50ad90ba6131e47042c7cd035fb65b",
+    "DOCUMENTATION_HEAD": "d3d2e62 (origin/develop)",
+    "PRODUCTION_CURRENT_SHA": "ce166662f46598ed3593beed0105ba67059fc3bc",
+    "PRODUCTION_CURRENT_SHA_source": "SourceLink UTF-16LE embedded in /opt/reporting/publish/Reporting.Api.dll (strings -e l)"
+  },
+  "host": {
+    "os": "Ubuntu 24.04.4 LTS",
+    "nginx": "1.24.0",
+    "postgres": "16.15",
+    "dotnet": "8.0.130 (RID ubuntu.24.04-x64)"
+  },
+  "service": {
+    "unit": "/etc/systemd/system/reporting-api.service",
+    "name": "reporting-api.service",
+    "ActiveState": "active", "SubState": "running",
+    "MainPID": 1305279, "NRestarts": 0,
+    "ExecMainStartTimestamp": "Thu 2026-08-20 06:33:44 UTC",
+    "ExecStart": "/usr/bin/dotnet /opt/reporting/publish/Reporting.Api.dll",
+    "WorkingDirectory": "/opt/reporting/publish",
+    "EnvironmentFile": "/etc/reporting-api.env",
+    "User": "www-data",
+    "ASPNETCORE_URLS": "http://127.0.0.1:5090"
+  },
+  "ports_loopback": { "prod": 5090, "test": 5091, "rc": 5092 },
+  "coResidentServices": ["reporting-api (prod 5090)", "khubara-reporting-test (5091)", "khubara-reporting-rc (5092)"],
+  "health": { "local_5090": 200, "external_https": 200 },
+  "backend": {
+    "publishDir": "/opt/reporting/publish",
+    "fileCount": 86,
+    "mainDll": "Reporting.Api.dll (343040 bytes, Aug 7 08:52)",
+    "PUBLISH_AGG_SHA256_excl_cfg_logs": "2f24c9634213daa3b0f00d35da218bcbebedf7d79463ab3754e01058f91e98a3"
+  },
+  "frontend": {
+    "root_from_nginx": "/opt/reporting/reporting-frontend/dist",
+    "fileCount": 7,
+    "indexJs": "assets/index-Bok_mmjt.js (1347950 bytes, Aug 12 20:03)",
+    "DIST_AGG_SHA256": "68227cd97e490d35a428e7f7e8259c24b3d586194e6c673f8e9409717c424c35",
+    "apiOriginsBaked": { "https://reports.emarketingacademy.net/api": 1, "localhost_or_test_or_rc": 0 },
+    "sourceMaps": 0
+  },
+  "nginx_prod": {
+    "conf": "/etc/nginx/sites-available/reporting (enabled via sites-enabled/reporting symlink)",
+    "server_name": "reports.emarketingacademy.net",
+    "root": "/opt/reporting/reporting-frontend/dist",
+    "proxy_api": "http://127.0.0.1:5090 (/api /hubs /health)"
+  },
+  "env_config_nonsecret": {
+    "ASPNETCORE_ENVIRONMENT": "Production",
+    "App__BaseUrl": "https://reports.emarketingacademy.net",
+    "Cors__AllowedOrigins__0": "https://reports.emarketingacademy.net",
+    "EmailNotifications__Mode": "Enabled",
+    "EmailNotifications__RecipientSafetyMode": "Disabled",
+    "Email__Enabled": "false (legacy flag, non-authoritative)",
+    "Scheduler__Enabled": "true",
+    "Reminders__Enabled": "true",
+    "ReportReminderScheduler__Enabled": "true",
+    "BackgroundJobs__Enabled": "false",
+    "FileStorage__EmployeeServiceFinalDocumentsPath": "/var/lib/reporting/employee-service-requests/final-documents",
+    "FileStorage__DocumentsRootPath": "ABSENT (empty) — PROD-READINESS-01",
+    "Jwt__Issuer": "reporting-api", "Jwt__Audience": "reporting-spa",
+    "db": { "Host": "127.0.0.1", "Port": 5432, "Database": "reporting_prod" }
+  },
+  "secretsPresentKeysOnly": ["ConnectionStrings__Default","Jwt__Key","Email__Password","Seed__AdminPassword"],
+  "storage": {
+    "employeeServiceFinalDocs": { "path": "/var/lib/reporting/employee-service-requests/final-documents", "exists": true, "owner": "www-data", "files": 0 },
+    "publish_App_Data": "absent (no fallback dir present yet)",
+    "test_documents_model": "/var/lib/reporting-test/documents (drwxr-x--- www-data) — proves the DocumentsRootPath pattern used on TEST"
+  },
+  "dataProtectionKeys": {
+    "www-data_home": "/var/www",
+    "www-data_keyring": "NOT FOUND at /var/www/.aspnet/DataProtection-Keys — prod DP keyring location UNCONFIRMED (session/DP-payload invalidation on restart is a deployment consideration)",
+    "root_keyring_present": "/root/.aspnet/DataProtection-Keys/key-38b63a0c-...xml (root-owned, not the www-data runtime keyring)"
+  },
+  "database": {
+    "size": "18 MB",
+    "activeConnections": 1,
+    "migrations": {
+      "count": 30,
+      "head": "20260724224053_AddReportApproverAndKpiReviewerOverrides",
+      "PROD_MIGRATIONS_SETHASH": "9c92ac7af13d44eaa3fad7d1a5f22672eab1f80a09889b12f1100bf100f70b65"
+    },
+    "schema": { "tables": 57, "columns": 637, "indexes": 189, "constraints": 430, "PROD_SCHEMA_STRUCT_SHA256": "d90e1085b727f418775bd31ef46666a861a1a0eabe6807b7ebbbad6d16d6a77d" },
+    "documentTables": "NONE (no %document% table in production — client/project document feature not yet active in prod)",
+    "notificationTables": ["email_notifications","email_outbox","email_rules","email_templates","notifications"],
+    "keyCounts": { "audit_logs": 1401, "AspNetUsers": 34, "projects": 34, "clients": 11 }
+  },
+  "logs_24h": { "http_5xx": 0, "app_start_events_total": 2, "err_exc_fail_grep_lines": 689, "note": "689 dominated by EF Core Information-level SQL command logging (INSERT INTO email_notifications ...), NOT server faults; http_5xx=0 is authoritative" },
+  "existingBackups": {
+    "opt_backups_recent": ["rc-microclosure-20260823T102841Z","rc-predeploy-20260822T201749Z-r21","rc-preflight-20260818T145419Z-r21","test-predeploy-20260818T160622Z-r21"],
+    "diskFree": "53G free of 96G (46% used) on /"
+  },
+  "readOnlyProof": "All queries were SELECT/SHOW/find/ls/curl-health only. No UPDATE/INSERT/DELETE/DDL issued to reporting_prod; no service restart; no config/artifact modification."
+}

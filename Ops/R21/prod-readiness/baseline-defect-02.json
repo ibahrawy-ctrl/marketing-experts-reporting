@@ -1,0 +1,20 @@
+{
+  "title": "Phase 12 — BASELINE-DEFECT-02 Assessment (assessment only; NO code change made)",
+  "test": "Reporting.IntegrationTests.EmployeeProfileScopeTests.Profile_Summary_Reflects_Submitted_Kpi",
+  "location": "tests/Reporting.IntegrationTests/EmployeeProfileScopeTests.cs:137-155",
+  "whatItAsserts": "after an admin submits + a CEO approves a KPI evaluation, GET /api/dashboard/employee-profile/{id} reflects LastKpiScore != null, LastKpiPeriod == Cycle(1), KpiCount == 1.",
+  "affectedPart": "test-fixture flow SubmitEvalAsync (create eval -> save results -> submit -> approve via escalated CEO). Same defect CLASS as BASELINE-DEFECT-01: helper does not assert intermediate success, so under DB contamination/ordering an earlier step can yield an empty/undefined id and the profile summary shows 0.",
+  "presentInSHA": "the test code is present in candidate 7e063b4; the PRODUCT endpoint (employee-profile summary) is unchanged and healthy.",
+  "behaviorMeasuredThisCycle": {
+    "alone_on_clean_db": "Passed! 1/1",
+    "within_serialized_full_suite": "included in 2011/2011 exit 0 (Failed=0)",
+    "reproducesOnCleanSerialized": false
+  },
+  "productionImpact": "NONE — this is a test-harness/fixture contamination artifact, not a product regression. The employee-profile summary endpoint behaves correctly (proven by the passing test on clean serialized DB).",
+  "severity": "low (test-only, non-reproducing on clean serialized DB)",
+  "workaround": "run integration collections serialized (parallelizeTestCollections=false) or run isolated collections separately — already applied for the authoritative measurement.",
+  "blocksDeploy": false,
+  "fixMade": "NONE — per ticket, if a fix would require a code change it must NOT be made here; a test-fixture hardening (assert each step in SubmitEvalAsync, mirroring the BASELINE-DEFECT-01 close) is a code change and is therefore deferred to a dedicated test-isolation ticket, not this readiness ticket.",
+  "ticketNeeded": "yes — existing queued ticket 'عزل اختبار لـBASELINE-DEFECT-02 وحده' remains the owner.",
+  "BASELINE_DEFECT_02": "OPEN (test-fixture only) — NON-BLOCKING for production."
+}

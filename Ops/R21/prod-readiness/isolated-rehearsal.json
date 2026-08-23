@@ -1,0 +1,54 @@
+{
+  "title": "PROD-READINESS — Isolated Rehearsal (clone reporting_prod_rehearsal, candidate 7e063b4)",
+  "isolation": {
+    "db": "reporting_prod_rehearsal (fresh clone from prod backup; NEVER prod)",
+    "app": "candidate publish booted on http://127.0.0.1:5099 (loopback only)",
+    "throwawayRole": "rehearsal_app (random pw, granted+owner on clone only, to be dropped in cleanup)",
+    "integrationsDisabled": "EmailNotifications__Mode=Disabled, Scheduler/Reminders/ReportReminderScheduler/BackgroundJobs=false",
+    "outboundConnections": "candidate pid had EXACTLY ONE connection: 127.0.0.1:5432 (postgres). Zero SMTP/webhook/external.",
+    "docsRoot": "/var/lib/reporting-rehearsal/documents (isolated), DP keys /tmp/reh-dpkeys"
+  },
+  "migrationRehearsal": {
+    "start_history": 30,
+    "bridge": "applied via Ops/MigrationHistoryBridge/bridge.sh --env production --apply --allow-production => 2 alias rows (20260622140138_KpiTemplateAssignmentsPhaseT1, 20260626124527_AddReportViewGrants); 9/9 pre-checks OK incl line-by-line schema fingerprint match; schema fingerprint UNCHANGED after; rollback SQL auto-generated",
+    "after_bridge_history": 32,
+    "realMigrationsApplied": 10,
+    "realMigrationsList": ["20260620001156_FlexiblePositionsPhase1A","20260708232456_AddExecutionTaxonomyCatalog","20260709222126_AddProjectWorkstreams","20260709231845_AddWorkstreamDeliverables","20260712211952_AddClient360Foundation","20260807033602_ClientDocumentsAndExternalLinks","20260809165617_ClientDocumentVisibility","20260811142239_AddProject360Foundation","20260817101108_AddProjectProgressAndHealthStates","20260817114129_AddProjectExecutionUpdateProposals"],
+    "ownershipFix": "clone tables were owned by 'postgres'; ALTER TABLE requires ownership => reassigned all clone objects to rehearsal_app (ISOLATED clone only). This is a rehearsal-role artifact, NOT a production step (prod app role already owns prod tables).",
+    "final_history": 42,
+    "final_head": "20260817114129_AddProjectExecutionUpdateProposals",
+    "final_tables": 79,
+    "final_columns": 947,
+    "collision42P07": "NONE (bridge prevented re-running Up() on existing kpi_template_assignments / report_view_grants)",
+    "zeroDataLoss": { "audit_logs": 1401, "AspNetUsers": 34, "projects": 34, "clients": 11, "verdict": "all preserved = identical to prod baseline" },
+    "newTables": ["client_documents","client_document_versions","client_document_allowed_roles","client_document_allowed_users","execution_taxonomy_values","project_workstreams","workstream_deliverables","project_objectives","project_strategies","project_kpis","project_kpi_readings","project_deliverables","project_execution_update_proposals","project_strategy_attributes"],
+    "noOpReRun": "2nd boot => 0 'Applying migration', health 200, history stays 42",
+    "health": 200,
+    "expectedProdPath": "30 (prod) -> +2 bridge -> +10 real = 42 (matches RC)",
+    "ISOLATED_MIGRATION_REHEARSAL": "PASS"
+  },
+  "rollbackTest": {
+    "dbRestore": "full DB restore from backup proven when clone was created (30 migrations, 57 tables, schema struct MATCH prod) => operational DB rollback returns to prod state",
+    "bridgeRollback": "bridge.sh auto-generated rollback SQL (DELETE the 2 alias rows) present; NOT executed on migrated clone (would be a no-op-then-conflict scenario; DB restore is the authoritative rollback)",
+    "migrationsAdditiveOnly": "all 10 migrations are additive (ADD COLUMN/CREATE TABLE/CREATE INDEX, zero DROP) => app-artifact-only rollback to ce166662 is schema-compatible with a forward DB",
+    "ROLLBACK_READY": "YES"
+  },
+  "prodReadiness01Proof": {
+    "documentsRootPath": "/var/lib/reporting-rehearsal/documents (isolated mirror of target /var/lib/reporting/documents)",
+    "lifecycle": {
+      "upload_v1": "200, sha256 ebcba315...",
+      "metadata": "title/categoryCode=Report/versionCount=1/sizeBytes=62/sha256 match",
+      "download_v1": "DOWNLOAD_MATCH_V1=YES (ebcba315...)",
+      "addVersion_v2": "200, sha256 18510323...",
+      "download_latest_v2": "DOWNLOAD_MATCH_V2=YES (18510323...)",
+      "archive": "HTTP 200",
+      "unarchive_restore": "HTTP 200",
+      "blobsOnDisk": "2 blobs at /var/lib/reporting-rehearsal/documents/clients/{clientId}/{docId}/{versionGuid}.txt — OUTSIDE publish; identifier-only keys (path-traversal guard)"
+    },
+    "redeployNoLoss": "replaced publish dir (new tree=36d7f525 bit-identical) => blob aggregate hash IDENTICAL before/after (cbfc5888...); after-redeploy restart health 200, 0 migrations, download returns v2 (18510323) => REDEPLOY_NO_LOSS=YES",
+    "restartNoLoss": "covered by redeploy restart + earlier restarts (docs persist, hashes match)",
+    "noFallbackInPublish": "no App_Data/documents created inside publish (fallback path NOT used)",
+    "PROD_READINESS_01": "PROVEN CLOSED on isolated copy (config-only: add FileStorage__DocumentsRootPath=/var/lib/reporting/documents to /etc/reporting-api.env). NOT yet applied to production."
+  },
+  "note": "All actions on isolated clone/loopback only. Production DB, config, artifacts, service untouched."
+}

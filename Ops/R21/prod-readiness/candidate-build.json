@@ -1,0 +1,33 @@
+{
+  "title": "PROD-READINESS — Production Candidate Build (Staging, NOT activated)",
+  "stagingDir": "/opt/reporting-prod-staging/staging-r21-7e063b4-prod-20260823",
+  "unreferencedByServiceOrNginx": true,
+  "PRODUCT_SOURCE_SHA": "7e063b493b50ad90ba6131e47042c7cd035fb65b",
+  "backend": {
+    "strategy": "REUSED bit-identical RC-tested artifact (API origin is runtime config in /etc/reporting-api.env, NOT baked into DLL)",
+    "publish_tree_sha256": "36d7f525dc0ee132a4490c08994479b0776e3e89430a7d125dcc0c56f7fc21b4",
+    "publish_tree_matches_RC_tested": true,
+    "ReportingApiDll_sha256": "892250af835eaa9f395a33cf188ebdf703ef39eb9ee33f077c09ddfe057651e9",
+    "fileCount": 86,
+    "InformationalVersion": "1.0.0+7e063b493b50ad90ba6131e47042c7cd035fb65b"
+  },
+  "frontend": {
+    "strategy": "REBUILT from same source 7e063b4 with Production API base (fresh worktree /tmp/prod-cand-7e063b4-20260823, npm ci from pinned lock, tsc -b && vite build)",
+    "buildEnv": "VITE_API_BASE_URL=https://reports.emarketingacademy.net/api",
+    "toolchain": "node v26.0.0, tsc 6.0.3, rolldown-vite (all pinned by package-lock.json at 7e063b4)",
+    "dist_tree_sha256": "165bdd1a05bc42105315d1c20ff0c73bc3b5e6ace6cd4775ef5288685e591a97",
+    "dist_tree_matches_local_build": true,
+    "js": "assets/index-CMjXSPXr.js (1574679 bytes)",
+    "css": "assets/index-BejvRoEu.css (34148 bytes) — BYTE-IDENTICAL to RC-tested build (CSS has no API origin) => deterministic toolchain proof",
+    "fileCount": 7,
+    "sourceMaps": 0,
+    "apiOriginsBaked": { "https://reports.emarketingacademy.net/api": 1, "localhost_127_test_rc": 0 }
+  },
+  "determinismEvidence": "CSS byte-identical to RC build; JS differs ONLY by baked API origin string. TEST build (test origin) => index-D7JHWCts.js; RC build (rc origin) => index-DwS6KfdO.js; PROD build (prod origin) => index-CMjXSPXr.js. Same source, same CSS, origin-only delta.",
+  "manifestFiles": ["MANIFEST.md", "SHA256SUMS (94 lines)", "ENVIRONMENT-ASSERTIONS.md"],
+  "secretsInStaging": "none (no env file, no secret values)",
+  "PRODUCTION_CANDIDATE_BUILT": "YES",
+  "CANDIDATE_BACKEND_SHA256": "36d7f525dc0ee132a4490c08994479b0776e3e89430a7d125dcc0c56f7fc21b4",
+  "CANDIDATE_FRONTEND_SHA256": "165bdd1a05bc42105315d1c20ff0c73bc3b5e6ace6cd4775ef5288685e591a97",
+  "note": "Building the candidate does NOT authorize deployment; staging dir is inert."
+}

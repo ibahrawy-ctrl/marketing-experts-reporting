@@ -1,0 +1,41 @@
+{
+  "title": "PROD-READINESS — Full Backup & Restore Verification",
+  "backupDir": "/opt/backups/prod-readiness-20260823T113453Z-r21",
+  "mode": "0700 (root)",
+  "contents": [
+    "reporting_prod.dump (pg_dump -Fc, custom format)",
+    "reporting_prod.sql.gz (pg_dump -Fp plain, gzip -9)",
+    "backend-publish.tar (/opt/reporting/publish)",
+    "frontend-dist.tar (/opt/reporting/reporting-frontend/dist)",
+    "reporting-api.env (0600)",
+    "reporting-api.service (systemd unit)",
+    "nginx-reporting.conf (/etc/nginx/sites-available/reporting)",
+    "dataprotection-keys-root.tar (/root/.aspnet/DataProtection-Keys)",
+    "DP-KEYS-NOTE.txt (www-data runtime keyring not found)",
+    "storage-var-lib-reporting.tar (employee-service-requests)",
+    "CURRENT-STATE.txt",
+    "MANIFEST.md",
+    "SHA256SUMS (non-secret files)",
+    "SHA256SUMS.env (0600, env checksum only)"
+  ],
+  "verification": {
+    "sha256sum_c": "OK for all 10 checksummed files",
+    "pg_restore_list_objects": 276,
+    "restoreTargetDb": "reporting_prod_rehearsal (fresh isolated clone; NOT restored over any live DB)",
+    "restoreErrors": "none (only benign no-owner/no-privileges suppressed)",
+    "cloneVsProd": {
+      "migrations": "30 = 30 MATCH",
+      "tables": "57 = 57 MATCH",
+      "columns": "637 = 637 MATCH",
+      "audit_logs": "1401 = 1401 MATCH",
+      "AspNetUsers": "34 = 34 MATCH",
+      "projects": "34 = 34 MATCH",
+      "schema_struct_sha256": "d90e1085b727f418775bd31ef46666a861a1a0eabe6807b7ebbbad6d16d6a77d = MATCH"
+    }
+  },
+  "priorBackupsPreserved": "no prior backup deleted",
+  "secretsHandling": "no secret values printed; env checksum kept in 0600 file",
+  "PROD_BACKUP": "PASS",
+  "PROD_RESTORE_VERIFIED": "YES",
+  "note": "Backups do not authorize deployment."
+}

@@ -1,0 +1,41 @@
+{
+  "title": "Migration Lineage Audit — Production vs Candidate (Product Source SHA 7e063b4)",
+  "sets": {
+    "candidate_files_at_7e063b4": { "count": 40, "head": "20260817114129_AddProjectExecutionUpdateProposals", "sethash": "c1fc3179348663cffc8c9a049a23b49a5f3ecd8d52f1dc5704e8d84822c1124c" },
+    "TEST_rows": { "db": "reporting_test_uat", "count": 40, "head": "20260817114129_AddProjectExecutionUpdateProposals", "sethash": "c1fc3179348663cffc8c9a049a23b49a5f3ecd8d52f1dc5704e8d84822c1124c", "note": "IDENTICAL to candidate files" },
+    "RC_rows": { "db": "reporting_rc", "count": 42, "head": "20260817114129_AddProjectExecutionUpdateProposals", "sethash": "6405c6540212a4b142c483aa497464150efd49528dbf337de07623d825900bd7", "note": "40 develop-lineage + 2 prod-lineage bridge rows = 42" },
+    "PROD_rows": { "db": "reporting_prod", "count": 30, "head": "20260724224053_AddReportApproverAndKpiReviewerOverrides", "sethash": "9c92ac7af13d44eaa3fad7d1a5f22672eab1f80a09889b12f1100bf100f70b65" }
+  },
+  "divergentLineageCollision": {
+    "description": "Two logical migrations were authored under different MigrationIds on the prod-lineage vs the develop/candidate-lineage. Production applied the prod-lineage IDs; the candidate ships the develop-lineage IDs.",
+    "pairs": [
+      { "logical": "KpiTemplateAssignmentsPhaseT1", "prod_id": "20260622144900_KpiTemplateAssignmentsPhaseT1", "candidate_id": "20260622140138_KpiTemplateAssignmentsPhaseT1" },
+      { "logical": "AddReportViewGrants", "prod_id": "20260626135944_AddReportViewGrants", "candidate_id": "20260626124527_AddReportViewGrants" }
+    ],
+    "consequenceIfNaiveDeploy": "EF MigrateAsync() would treat 20260622140138 and 20260626124527 as PENDING and re-run their Up() → CREATE TABLE on already-existing kpi_template_assignments / report_view_grants → PostgreSQL 42P07 (relation already exists) → migration abort → service fails to start.",
+    "verdict": "LINEAGE NOT CLEAN — requires a history bridge (mark the 2 candidate-lineage IDs as already-applied WITHOUT running Up()), identical to the approach already proven on RC (42 rows)."
+  },
+  "pendingOnProd_perCandidate": {
+    "total": 12,
+    "bridgeOnly_alreadyExistsStructurally": [
+      "20260622140138_KpiTemplateAssignmentsPhaseT1",
+      "20260626124527_AddReportViewGrants"
+    ],
+    "realStructuralMigrations_10": [
+      "20260620001156_FlexiblePositionsPhase1A",
+      "20260708232456_AddExecutionTaxonomyCatalog",
+      "20260709222126_AddProjectWorkstreams",
+      "20260709231845_AddWorkstreamDeliverables",
+      "20260712211952_AddClient360Foundation",
+      "20260807033602_ClientDocumentsAndExternalLinks",
+      "20260809165617_ClientDocumentVisibility",
+      "20260811142239_AddProject360Foundation",
+      "20260817101108_AddProjectProgressAndHealthStates",
+      "20260817114129_AddProjectExecutionUpdateProposals"
+    ],
+    "outOfOrderNote": "20260620001156_FlexiblePositionsPhase1A has an earlier timestamp than already-applied prod migrations (up to 20260724); EF applies pending in ID order, so it runs first among pending. Must confirm on rehearsal it does not conflict with current prod schema.",
+    "prodNotInCandidate": "none logically new — the only prod-not-in-TEST rows are the two prod-lineage duplicates (20260622144900, 20260626135944), which are the OLD IDs of the same logical migrations",
+    "expectedFinalHistoryAfterBridgeAndMigrate": "30 prod + 2 bridge + 10 real = 42 rows (matches RC)"
+  },
+  "MIGRATION_LINEAGE": "NOT_CLEAN — reconciliation (bridge) required; NO-GO until bridge is proven on isolated rehearsal and a written Reconciliation plan is approved."
+}

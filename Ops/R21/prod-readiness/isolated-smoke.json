@@ -1,0 +1,29 @@
+{
+  "title": "Phase 13 — Isolated Smoke (candidate 7e063b4 on http://127.0.0.1:5099, clone reporting_prod_rehearsal, loopback only)",
+  "appPid": 1428973,
+  "checks": {
+    "1_health": "200",
+    "2_unauth_protected_clients": "401",
+    "3_invalid_login": "401",
+    "4_static_frontend_root": "GET / = 404 — EXPECTED: isolated boot is API-only; nginx serves dist/ in production. Candidate dist integrity verified separately (candidate-build.json dist_tree 165bdd1a).",
+    "5_spa_deep_route": "404 — same reason as #4 (SPA fallback is an nginx concern, not the API)",
+    "6_cors_foreign_origin": "OPTIONS from http://evil.example => NO Access-Control-Allow-Origin header (rejected)",
+    "6_cors_prod_origin": "OPTIONS from https://reports.emarketingacademy.net => Access-Control-Allow-Origin: https://reports.emarketingacademy.net (allowed) — candidate honors prod CORS config",
+    "7_signalr_negotiate_unauth": "401",
+    "8_authed_clients_list": "200 (login rehearsal-admin@rehearsal.local ok, token len 628)",
+    "9_project360_overview": "200 (project 76f235af-09c7-4616-8e1b-7f161071d101)",
+    "10_client360": "200 (client 60ac427c-089d-476f-8ad8-51aafb09616d)"
+  },
+  "isolation": {
+    "11_outbound_connections": "EXACTLY ONE: 127.0.0.1:5432 (postgres). Zero external.",
+    "12_smtp_sockets": "NONE (ports 25/465/587 absent)",
+    "13_email_outbox_unsent": "email_outbox table present, 0 rows (nothing queued/sent). notifications=899 are pre-existing in-DB clone rows, never emitted externally.",
+    "14_app_log_errors": "0 real errors — all 10 'error/exception/fail' regex hits were the literal column name AccessFailedCount inside AspNetUsers SELECT text.",
+    "no_localhost_test_rc_requests": "confirmed — single postgres outbound; candidate baked API origin = prod only (candidate-build.json apiOriginsBaked: prod=1, localhost/127/test/rc=0)",
+    "no_webhook": "no external 443 sockets from pid",
+    "scheduler_disabled": "Scheduler/Reminders/ReportReminderScheduler/BackgroundJobs=false (isolated-rehearsal.json integrationsDisabled)"
+  },
+  "ISOLATED_HEALTH": 200,
+  "ISOLATED_SMOKE": "PASS",
+  "note": "All probes over loopback against the throwaway clone. Production DB, config, service untouched."
+}

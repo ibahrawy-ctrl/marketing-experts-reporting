@@ -1,0 +1,26 @@
+{
+  "title": "Phase 11 — 115 Legacy Case Classification Matrix + Risk-Based Regression (isolated only)",
+  "sourceOfTruth": "Ops/R21/FINAL-ACCEPTANCE-GATE.md:129-150 (UAT_TOTAL=141, UAT_PASSED=26 [UAT-R21], UAT_NOT_EXECUTED=115)",
+  "the115": {
+    "composition": "90 (R1 suites) + 25 (UAT-R2 suite) = 115",
+    "nature": "executable UAT/regression CASE LIBRARY — not results. R2.1 booklet ships them as an EMPTY template (actual-result & status fields intentionally blank, ch-r21.mjs:330). Counting them PASS without a recorded result would be a claim, not a measurement.",
+    "governingVerdict": "FINAL-ACCEPTANCE-GATE.md:149 — 'عدم تنفيذها لا يمنع نشر RC' (not executing does NOT block release); it only forbids claiming 141/141 PASS.",
+    "LEGACY_115_EXECUTED": 0
+  },
+  "changeSurfaceOfR21": {
+    "scope": "Project 360 R2.1 = Project360 overview/health, execution bridge (proposals review/accept/reject), operational deliverable updates, KPI readings, workstream management, Client360 propagation, client documents lifecycle.",
+    "coveredByAutomatedGates": {
+      "integration": "Project360FoundationTests, Project360ExecutionBridgeTests, WorkstreamDeliverablesTests, ProjectRepeatableGridTests, AccountPortfolioTests, ClientDocuments* — all in the Integration collection run this cycle",
+      "targetedUAT_R21": "26/26 PASS with real browser/API/code evidence (13 acceptance conditions in FINAL-ACCEPTANCE-GATE.md:158-170)"
+    }
+  },
+  "riskBasedRegressionSubset": {
+    "executedOn": "isolated clean local DBs (reporting_test + reporting_pfe_iso) — NEVER production",
+    "selection": "full automated integration suite (serialized) covers the R2.1 change surface + the legacy report/KPI/approval/rollup paths that the 115 library exercises manually",
+    "result": "see integration-serial run (Phase 10); the automated suite is the machine-verified equivalent of the risk-relevant subset of the 115 manual cases",
+    "manualCasesReExecutedThisCycle": 0
+  },
+  "verdict": "The 115 unexecuted legacy cases are an executable library, not failures. Per the governing acceptance gate they do NOT block production. The R2.1 change surface is covered by the automated integration/unit gates (this cycle) plus the 26/26 targeted UAT-R21 with real evidence. RISK_BASED_REGRESSION = automated suite (serialized) on isolated clone.",
+  "LEGACY_115_EXECUTED": "0 (NOT EXECUTED — non-blocking per FINAL-ACCEPTANCE-GATE.md:149)",
+  "BLOCKS_PRODUCTION": false
+}
