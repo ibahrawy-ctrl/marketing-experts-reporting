@@ -18,4 +18,12 @@ public class ManagementNote : BaseEntity
     public ManagementNoteStatus Status { get; set; } = ManagementNoteStatus.Open;
     public Guid? ResolvedById { get; set; }
     public DateTime? ResolvedAtUtc { get; set; }
+
+    /// <summary>
+    /// تصنيف حسّاسيّة الملاحظة (P2-SEC-001) — عمود **إضافيّ nullable بلا Backfill**.
+    /// <c>null</c> = سجلّ سابق لإدخال التصنيف، ويُفسَّر داخل التطبيق <c>Internal</c>
+    /// (انظر <c>NoteSensitivity.Effective</c>) بلا أيّ كتابة على البيانات التاريخيّة.
+    /// مخزَّن كـ<c>int?</c> اتّساقًا مع تخزين بقيّة تعدادات المشروع.
+    /// </summary>
+    public int? Sensitivity { get; set; }
 }

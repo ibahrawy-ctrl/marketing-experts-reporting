@@ -586,4 +586,27 @@ public static class Policies
     // الوصول إلى «الأرشيف الإداريّ» واسترجاع العناصر المحذوفة إداريًّا (RESTORE-ARCHIVE-GOVERNANCE-R1) —
     // Admin/CEO/GM فقط (Roles.ArchiveGovernanceAccessors). قراءة الأرشيف + استرجاع Hybrid بلا حذف نهائيّ ولا إشعارات.
     public const string ArchiveGovernanceAccess = "ArchiveGovernanceAccess";
+
+    // ===== P2 — Employee 360 & HR Operations =====
+    // كلّ سياسات P2 التالية مبنيّة على **مطالبة صلاحيّة صريحة** (AppPermissions) لا على الدور،
+    // ⇒ لا يكتسبها أيّ مستخدم/دور مخزَّن تلقائيًّا — ولا حتّى Admin. التعيين الفعليّ قرار نشر لاحق.
+    // الرؤية الفعليّة داخل الطابور/اللوحة يحدّدها ScopeResolver خادميًّا، والخارج عن النطاق = 404 لا 403.
+
+    /// <summary>رؤية لوحة عمليّات الموارد البشريّة وطوابير الإجراءات — مطالبة <c>HrOperations.View</c>.</summary>
+    public const string HrOperationsView = "HrOperationsView";
+
+    /// <summary>تصدير لوحة/طوابير HR — مطالبة <c>HrOperations.Export</c> **مستقلّة تمامًا** عن الرؤية.</summary>
+    public const string HrOperationsExport = "HrOperationsExport";
+
+    /// <summary>
+    /// تسجيل بلاغ حضور. البوّابة تقبل قائد الفريق/المدير (بحكم الإشراف) **أو** حامل مطالبة
+    /// <c>Attendance.Report</c>؛ والنطاق الفعليّ (فريقه/إدارته فقط) يُفرَض في طبقة الخدمة.
+    /// </summary>
+    public const string AttendanceReport = "AttendanceReport";
+
+    /// <summary>مراجعة HR لواقعة حضور (تأكيد/رفض/تصحيح/مصالحة/إلغاء) — مطالبة <c>Attendance.Review</c> فقط.</summary>
+    public const string AttendanceReview = "AttendanceReview";
+
+    /// <summary>تصدير وقائع الحضور — مطالبة <c>Attendance.Export</c> مستقلّة عن الرؤية والمراجعة.</summary>
+    public const string AttendanceExport = "AttendanceExport";
 }

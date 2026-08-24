@@ -23,6 +23,7 @@ using Reporting.Application.Periods;
 using Reporting.Application.Positions;
 using Reporting.Application.Payroll;
 using Reporting.Application.Reports;
+using Reporting.Application.Security;
 using Reporting.Application.Submissions;
 using Reporting.Application.Templates;
 using Reporting.Infrastructure.Identity;
@@ -62,6 +63,8 @@ public static class DependencyInjection
         services.Configure<ReportReminderSchedulerOptions>(configuration.GetSection(ReportReminderSchedulerOptions.SectionName));
         // P1 — أعلام محرّك KPI الجديد وعتباته المركزيّة الاحتياطيّة. كلّ الأعلام false افتراضيًّا (§8).
         services.Configure<KpiFeatureOptions>(configuration.GetSection(KpiFeatureOptions.SectionName));
+        // P2 §9 — أعلام المرحلة الثانية، كلّها false افتراضيًّا. العلم ليس تفويضًا.
+        services.Configure<Phase2FeatureOptions>(configuration.GetSection(Phase2FeatureOptions.SectionName));
 
         services.AddHttpContextAccessor();
         services.AddSingleton<ISystemClock, SystemClock>();
@@ -71,6 +74,8 @@ public static class DependencyInjection
         services.AddScoped<IKpiCalculationService, KpiCalculationService>();
         services.AddScoped<ICurrentUser, CurrentUser>();
         services.AddScoped<IScopeResolver, ScopeResolver>();
+        // P2-SEC-001 — الطبقة الخادميّة المركزيّة للرؤية على مستوى الحقل/القسم.
+        services.AddScoped<IFieldVisibilityPolicy, FieldVisibilityPolicy>();
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IReportTemplateService, ReportTemplateService>();

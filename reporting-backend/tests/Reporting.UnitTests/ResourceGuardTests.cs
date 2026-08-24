@@ -10,6 +10,9 @@ public class ResourceGuardTests
         public Guid? UserId { get; init; }
         public bool IsAuthenticated { get; init; } = true;
         public IReadOnlyCollection<string> Roles { get; init; } = Array.Empty<string>();
+        // P2-SEC-001 — الأذونات الدقيقة غير مُمنَحة في هذا المزدوج الاختباريّ (قائمة فارغة).
+        public IReadOnlyCollection<string> Permissions => Array.Empty<string>();
+        public bool HasPermission(string permissionKey) => false;
         public bool IsInRole(string role) => Roles.Contains(role);
         public bool IsInAnyRole(params string[] roles) => roles.Any(IsInRole);
     }

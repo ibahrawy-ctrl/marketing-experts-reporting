@@ -40,6 +40,9 @@ public class UnifiedReportStatusTests
         public Guid? UserId => _id;
         public bool IsAuthenticated => _id is not null;
         public IReadOnlyCollection<string> Roles => _roles;
+        // P2-SEC-001 — الأذونات الدقيقة غير مُمنَحة في هذا المزدوج الاختباريّ (قائمة فارغة).
+        public IReadOnlyCollection<string> Permissions => Array.Empty<string>();
+        public bool HasPermission(string permissionKey) => false;
         public bool IsInRole(string role) => _roles.Contains(role);
         public bool IsInAnyRole(params string[] roles) => roles.Any(_roles.Contains);
     }

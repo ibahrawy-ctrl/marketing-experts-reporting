@@ -8,6 +8,7 @@ using Microsoft.IdentityModel.Tokens;
 using Reporting.Api.Realtime;
 using Reporting.Application.Common;
 using Reporting.Application.Notifications;
+using Reporting.Application.Security;
 using Reporting.Infrastructure;
 using Reporting.Infrastructure.Identity;
 using Reporting.Infrastructure.Persistence;
@@ -139,6 +140,23 @@ builder.Services.AddAuthorization(options =>
     // ===== RESTORE-ARCHIVE-GOVERNANCE-R1 — الأرشيف الإداريّ واسترجاع المحذوف =====
     // قراءة الأرشيف الإداريّ (تقارير + KPI محذوفة ناعمًا) واسترجاعها وفق Hybrid — Admin/CEO/GM فقط.
     options.AddPolicy(Policies.ArchiveGovernanceAccess, p => p.RequireRole(Roles.ArchiveGovernanceAccessors));
+    // ===== P2 — Employee 360 & HR Operations =====
+    // مبنيّة على مطالبة `perm` صريحة لا على الدور ⇒ لا يكتسبها أيّ مستخدم/دور مخزَّن تلقائيًّا (ولا Admin).
+    // Employee/TeamLeader/Manager/Governance/Admin بلا المطالبة ⇒ الوصول محجوب، والنقطة تُخفي وجود المورد.
+    options.AddPolicy(Policies.HrOperationsView,
+        p => p.RequireClaim(AppPermissions.ClaimType, AppPermissions.HrOperationsView));
+    // التصدير صلاحيّة منفصلة تمامًا — امتلاك الرؤية لا يكفي.
+    options.AddPolicy(Policies.HrOperationsExport,
+        p => p.RequireClaim(AppPermissions.ClaimType, AppPermissions.HrOperationsExport));
+    // تسجيل بلاغ الحضور: إشراف تشغيليّ (TeamLeader/Manager) أو مطالبة صريحة. النطاق يُفرَض في الخدمة.
+    options.AddPolicy(Policies.AttendanceReport, p => p.RequireAssertion(ctx =>
+        ctx.User.IsInRole(Roles.TeamLeader)
+        || ctx.User.IsInRole(Roles.Manager)
+        || ctx.User.HasClaim(AppPermissions.ClaimType, AppPermissions.AttendanceReport)));
+    options.AddPolicy(Policies.AttendanceReview,
+        p => p.RequireClaim(AppPermissions.ClaimType, AppPermissions.AttendanceReview));
+    options.AddPolicy(Policies.AttendanceExport,
+        p => p.RequireClaim(AppPermissions.ClaimType, AppPermissions.AttendanceExport));
 });
 
 // ===== Rate limiting لمنع التخمين على المصادقة =====

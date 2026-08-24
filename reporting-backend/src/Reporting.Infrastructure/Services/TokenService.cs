@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Reporting.Application.Auth;
+using Reporting.Application.Security;
 using Reporting.Infrastructure.Identity;
 
 namespace Reporting.Infrastructure.Services;
@@ -14,7 +15,8 @@ public class TokenService : ITokenService
 
     public TokenService(IOptions<JwtOptions> opt) => _opt = opt.Value;
 
-    public AccessToken CreateAccessToken(Guid userId, string email, string fullName, IEnumerable<string> roles)
+    public AccessToken CreateAccessToken(Guid userId, string email, string fullName, IEnumerable<string> roles,
+        IEnumerable<string>? permissions = null)
     {
         var expires = DateTime.UtcNow.AddMinutes(_opt.AccessTokenMinutes);
         var claims = new List<Claim>
@@ -26,6 +28,9 @@ public class TokenService : ITokenService
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
         claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
+        // P2 — الصلاحيّات الدقيقة الممنوحة صراحةً فقط. لا اشتقاق من الأدوار ⇒ لا مطالبة لأيّ مستخدم قائم.
+        if (permissions is not null)
+            claims.AddRange(permissions.Distinct().Select(p => new Claim(AppPermissions.ClaimType, p)));
 
         var key = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(_opt.Key));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);

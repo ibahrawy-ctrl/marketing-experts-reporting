@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Reporting.Application.Auth;
 using Reporting.Application.Common;
+using Reporting.Application.Security;
 using Reporting.Infrastructure.Identity;
 using Reporting.Infrastructure.Persistence;
 
@@ -148,7 +149,12 @@ public class AuthService : IAuthService
     private async Task<AuthResponse> IssueAsync(ApplicationUser user, CancellationToken ct)
     {
         var roles = await _users.GetRolesAsync(user);
-        var access = _tokens.CreateAccessToken(user.Id, user.Email ?? string.Empty, user.FullName, roles);
+        // P2 — مطالبات الصلاحيّات الدقيقة المُسنَدة صراحةً لهذا المستخدم في Identity (لا شيء افتراضيًّا).
+        var permissions = (await _users.GetClaimsAsync(user))
+            .Where(c => c.Type == AppPermissions.ClaimType)
+            .Select(c => c.Value)
+            .ToArray();
+        var access = _tokens.CreateAccessToken(user.Id, user.Email ?? string.Empty, user.FullName, roles, permissions);
 
         var jobRoleCode = user.JobRoleId is Guid jrid
             ? await _db.JobRoles.Where(j => j.Id == jrid).Select(j => j.Code).FirstOrDefaultAsync(ct)
