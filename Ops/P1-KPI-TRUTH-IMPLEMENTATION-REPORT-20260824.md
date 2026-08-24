@@ -30,6 +30,8 @@
 | 4 | `7269fbf` | فصل الكادنس وتوسيط ذو مرحلتين في نقطة التجميع + اختبارات عقد وأمن معزولة | 5 |
 | 5 | `3501b85` | واجهة KPI موحّدة تعرض أرقام الخادم ولا تشتقّها | 19 |
 | 6 | `7bf52ae` | اختبارات E2E لشاشة KPI + تقرير تنفيذ المرحلة الأولى | 2 |
+| 7 | `f1abb39` | تثبيت بصمة الالتزام السادس داخل التقرير | 1 |
+| 8 | *(انظر §13)* | إصلاح B-1: مفتاح أسبوع اللوحة يتبع دورة الرياض + 7 اختبارات انحدار | 3 |
 
 **لم يُنفَّذ أيّ `push` ولا `merge` ولا `tag`.** الفرع محلّيّ بالكامل.
 
@@ -127,8 +129,8 @@ Down: DropColumn("BelowTargetThreshold", "kpi_template_versions");
 
 | الفحص | الأمر | النتيجة |
 |---|---|---|
-| بناء الخادم | `dotnet build Reporting.sln` | **0 أخطاء · 4 تحذيرات** (الأربعة سابقة للمرحلة، في `UnifiedReportStatusTests.cs` وغيره) |
-| وحدوي الخادم | `dotnet test tests/Reporting.UnitTests --no-build` | **401/401** (Failed: 0 · Skipped: 0 · 29 ms) |
+| بناء الخادم | `dotnet build Reporting.sln --no-incremental` | **0 أخطاء · 4 تحذيرات** — الأربعة `CS8604` سابقة للمرحلة وكلّها في مشروع اختبارات التكامل (`UnifiedReportStatusTests.cs:322` · `ReportTemplateTests.cs:121` · `RoleAwarePersonalAccessE2ETests.cs:73,101`)، ولا علاقة لأيّ منها بملفّات المرحلة |
+| وحدوي الخادم | `dotnet test tests/Reporting.UnitTests --no-build` | **408/408** (Failed: 0 · Skipped: 0 · 33 ms) |
 | تكامل معزول | `dotnet test tests/Reporting.IntegrationTests --filter "FullyQualifiedName~KpiTruth"` | **20/20** (Failed: 0 · 4 s) على `reporting_kpi_truth_iso` |
 | فحص أنواع الواجهة | `npx tsc -b` | نظيف (بلا مخرجات) |
 | Vitest | `npx vitest run` | **599/599** في **51 ملفًّا** (11.85 s) |
@@ -215,6 +217,38 @@ expect(screen.queryByText(pct(85))).not.toBeInTheDocument();  // 85 لا تظه�
 | `?? 0` على درجة KPI | **0** كرقم معروض. أربع نتائج كلّها خارج المعنى: `salesDashboard.tsx:95` (حدّ أدنى لعرض شريط)، `KpiOverview.tsx:147` (عرض الشريط فقط — والرقم فوقه يقول «لا تقييم» صراحةً)، `RoleDashboards.tsx:1516,1517` (عدّادات تقارير لا درجات) |
 | عتبات KPI ثابتة (60/70/85) في الواجهة داخل حدود §7 | **0** |
 | عتبات KPI ثابتة خارج حدود §7 | **3** — موثَّقة في §11 أدناه |
+
+---
+
+## 10ب) عيب B-1 اكتُشف أثناء المراجعة النهائيّة وأُصلِح
+
+**الموضع:** `Reporting.Infrastructure/Services/DashboardService.cs` — الدالّة `CurrentWeekKey()`.
+
+**ما كان:**
+```csharp
+var now = DateTime.UtcNow;
+var week = ISOWeek.GetWeekOfYear(now);   // أسبوع ISO يبدأ الاثنين
+var year = ISOWeek.GetYear(now);         // وبتوقيت UTC لا الرياض
+return $"{year}-W{week:00}";
+```
+
+**لماذا هو عيب:** `PeriodKey` مخزَّن في التقييمات والتسليمات بدورة الرياض (**السبت → الجمعة**) عبر `ReportingCalendarPolicy.CycleKeyFor`، بينما اللوحة كانت تشتقّ مفتاحها استقلالًا بأسبوع ISO (**الاثنين → الأحد**) وبتوقيت UTC. والمفتاح **ليس ملصقًا** بل مُرشِّح البيانات في `DashboardService.cs:66,79,88,214,312`.
+
+**الأثر المقيس:** مقارنة الخوارزميّتين على كامل سنة 2026 أعطت اختلافًا في **104 أيّام من 365 (28%)** — كلّ **سبت وأحد**، وهما أوّل يومَي أسبوع العمل السعوديّ. في تلك الأيّام كانت اللوحة تُرشِّح على مفتاح **الأسبوع السابق**، فتعرض أرقام الأسبوع الماضي (بطاقة KPI، ودجت الاتجاه، حالة المتوقَّع) معنونةً **«الأسبوع الحالي»**. يضاف إلى ذلك انزياح إضافيّ عند الحدّ بسبب فارق UTC/الرياض (3 ساعات).
+
+**الإصلاح:** حذف الاشتقاق المستقلّ نهائيًّا والاعتماد على السياسة المعياريّة نفسها:
+```csharp
+private static string CurrentWeekKey() =>
+    ReportingCalendarPolicy.CycleKeyFor(
+        DateOnly.FromDateTime(DateTime.UtcNow.Add(ReportingCalendarPolicy.RiyadhOffset)));
+```
+كما حُذف `using System.Globalization;` لأنّه لم يعد له مستعمِل في الملفّ.
+
+**الاختبارات المانعة للانحدار** (`ReportingCalendarPolicyTests.cs`، 7 حالات جديدة):
+- `CycleKeyFor_OnSaturdayAndSunday_DiffersFromIsoWeek_AndFollowsRiyadhCycle` — 4 حالات (2026-01-03/04 و2026-08-22/23) تثبت الاختلاف عن ISO، وأنّ الدورة تبدأ سبتًا وتحتوي التاريخ فعلًا.
+- `CycleKeyFor_OnMondayToFriday_MatchesIsoWeek` — 3 حالات تثبت أنّ الفارق **محصور في حدّ بداية الدورة** لا عشوائيّ.
+
+**كيف اكتُشف:** إشعار مهمّة بحث خلفيّة عن مواضع بناء مفاتيح الفترة في اللوحة. الإشعار وصل متأخّرًا بعد إعلان اكتمال المرحلة، وكان نتيجةً حقيقيّة لا بائتة (خلافًا لإشعار البناء `bon7j1sfs` الذي ثبت بياته بمقارنة `mtime`)، فتُوبِع إلى نهايته.
 
 ---
 

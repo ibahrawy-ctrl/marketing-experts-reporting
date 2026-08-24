@@ -1,4 +1,3 @@
-using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Reporting.Application.Common;
@@ -566,13 +565,19 @@ public class DashboardService : IDashboardService
 
     // ===== الفترة =====
 
-    private static string CurrentWeekKey()
-    {
-        var now = DateTime.UtcNow;
-        var week = ISOWeek.GetWeekOfYear(now);
-        var year = ISOWeek.GetYear(now);
-        return $"{year}-W{week:00}";
-    }
+    /// <summary>
+    /// B-1 — مفتاح الدورة الجارية بدورة الرياض (السبت → الجمعة) عبر السياسة المعياريّة نفسها التي
+    /// تُخزَّن بها <c>PeriodKey</c> في التقييمات والتسليمات.
+    /// <para>
+    /// كان هنا اشتقاق مستقلّ بـ<c>ISOWeek.GetWeekOfYear(DateTime.UtcNow)</c>: أسبوع ISO يبدأ الاثنين
+    /// وبتوقيت UTC، فكان يعيد مفتاح **الأسبوع السابق** في كلّ سبت وأحد (104 أيّام من 365 = 28%).
+    /// والمفتاح ليس ملصقًا بل مُرشِّح البيانات، فكانت اللوحة تعرض أرقام الأسبوع الماضي معنونةً
+    /// «الأسبوع الحالي» في أوّل يومَي أسبوع العمل السعوديّ.
+    /// </para>
+    /// </summary>
+    private static string CurrentWeekKey() =>
+        ReportingCalendarPolicy.CycleKeyFor(
+            DateOnly.FromDateTime(DateTime.UtcNow.Add(ReportingCalendarPolicy.RiyadhOffset)));
 
     private static string PeriodLabel(string periodKey) =>
         periodKey == CurrentWeekKey() ? "الأسبوع الحالي" : periodKey;
