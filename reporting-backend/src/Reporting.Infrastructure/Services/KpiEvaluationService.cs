@@ -756,11 +756,21 @@ public class KpiEvaluationService : IKpiEvaluationService
         var canViewRows = !scope.SeesAll || request.SubjectUserId is not null
                           || request.TeamId is not null || request.DepartmentId is not null;
 
+        // B-6 — العتبة تُحسم على الخادم بالترتيب نفسه المعتمد في محرّك الحساب: نسخة قالب منشورة
+        // لهذا الكادنس أوّلًا، ثمّ الإعداد المركزيّ. الواجهة تستهلكها ولا تعرف رقمًا خاصًّا بها.
+        var versionThreshold = await (
+            from v in _db.KpiTemplateVersions.AsNoTracking()
+            join tpl in _db.KpiTemplates.AsNoTracking() on v.KpiTemplateId equals tpl.Id
+            where tpl.Cadence == cadence && tpl.IsActive && v.IsPublished && v.BelowTargetThreshold != null
+            orderby v.PublishedAtUtc descending
+            select v.BelowTargetThreshold).FirstOrDefaultAsync(ct);
+
         var dto = new KpiAggregateDto(
             granularity, label, from, to, average,
             weeks.Count, evaluationsCount, scope.ScopeType, canViewRows,
             canViewRows ? weeks : new List<KpiWeeklyPointDto>(),
-            cadence, employeeScores.Count);
+            cadence, employeeScores.Count,
+            versionThreshold ?? _kpiOptions.DefaultBelowTargetThreshold);
 
         return Result<KpiAggregateDto>.Success(dto);
     }

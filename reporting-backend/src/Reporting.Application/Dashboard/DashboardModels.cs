@@ -34,7 +34,10 @@ public record KpiTrendDto(Guid SubjectId, string SubjectName, IReadOnlyList<KpiT
 
 /// <summary>أداء عضو داخل النطاق: متوسط KPI واتجاهه + اكتمال تقاريره للفترة.</summary>
 public record MemberPerformanceDto(
-    Guid UserId, string Name, decimal? KpiAverage, string KpiTrend, int ReportsTotal, int ReportsCompleted);
+    Guid UserId, string Name, decimal? KpiAverage, string KpiTrend, int ReportsTotal, int ReportsCompleted,
+    // B-6: حكم «دون المستهدف» وعتبته يأتيان من الخادم — حقلان إضافيّان لا يكسران أيّ مستهلك قائم.
+    // `IsBelowTarget = null` تعني «لا تقييم» لا «مطابق».
+    bool? IsBelowTarget = null, decimal? AppliedBelowTargetThreshold = null);
 
 /// <summary>عنصر في خلاصة الأنشطة — أحدث التسليمات داخل النطاق.</summary>
 public record ActivityItemDto(

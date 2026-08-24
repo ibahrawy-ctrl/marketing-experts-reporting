@@ -2,12 +2,17 @@
 import { useState } from 'react';
 import { useDirectoryUsers, useTeams, useDepartments } from '../lib/useDirectory';
 import {
+  DEFAULT_KPI_FILTER,
+  appliedThreshold,
+  useKpiPerformance,
+  type KpiEmployeeScore,
+  type KpiGroupScore,
+} from '../lib/useKpi';
+import {
   useAllSubmissions,
-  useKpiSummary,
   useEscalations,
   useImprovementPlans,
   buildTeamAggregates,
-  avg,
   type TeamAggregate,
 } from '../lib/useOrg';
 import { Card, Select, Badge, Button } from '../components/ui';
@@ -66,7 +71,8 @@ export default function ComparisonsPage() {
   const teams = useTeams();
   const departments = useDepartments();
   const submissions = useAllSubmissions();
-  const kpi = useKpiSummary();
+  // P1-KPI-008: المقارنة تقارن أرقامًا محسوبة على الخادم لنفس الفترة والكادنس، لا أرقامًا تُشتقّ هنا.
+  const kpi = useKpiPerformance(DEFAULT_KPI_FILTER);
   const escalations = useEscalations('Open');
   const plans = useImprovementPlans();
 
@@ -90,15 +96,19 @@ export default function ComparisonsPage() {
     );
 
   const userList = users.data ?? [];
-  const kpiRows = kpi.data?.rows ?? [];
-  const kpiByUser = new Map(kpiRows.map((r) => [r.subjectUserId, r]));
+  const kpiEmployees = kpi.data?.employees ?? [];
+  const kpiDepartments = kpi.data?.departments ?? [];
+  // فهرسة لا طيّ: صفّ واحد لكلّ موظّف يأتي من الخادم أصلًا.
+  const kpiByUser = new Map(kpiEmployees.map((e) => [e.userId, e]));
 
   const teamAgg = buildTeamAggregates({
     teams: teams.data ?? [],
     users: userList,
     departments: departments.data ?? [],
     submissions: submissions.data ?? [],
-    kpiRows,
+    kpiEmployees,
+    kpiTeams: kpi.data?.teams ?? [],
+    kpiThreshold: appliedThreshold(kpi.data),
     escalations: escalations.data ?? [],
     plans: plans.data ?? [],
   });
@@ -126,7 +136,7 @@ export default function ComparisonsPage() {
     setBId('');
   };
 
-  const metrics = aId && bId && aId !== bId ? buildMetrics(kind, aId, bId, { aggById, kpiByUser, userList, departments: departments.data ?? [], teams: teams.data ?? [], kpiRows, submissions: subList }) : null;
+  const metrics = aId && bId && aId !== bId ? buildMetrics(kind, aId, bId, { aggById, kpiByUser, userList, departments: departments.data ?? [], teams: teams.data ?? [], kpiDepartments, submissions: subList }) : null;
   const nameOf = (id: string) => options.find((o) => o.id === id)?.name ?? '—';
 
   // مقترحات مقارنة جاهزة حسب الدور والبيانات المتاحة ضمن النطاق.
@@ -367,11 +377,12 @@ function buildMetrics(
   bId: string,
   ctx: {
     aggById: Map<string, TeamAggregate>;
-    kpiByUser: Map<string, { totalScore: number | null }>;
+    kpiByUser: Map<string, KpiEmployeeScore>;
     userList: { id: string; teamId: string | null; departmentId: string | null }[];
     departments: { id: string }[];
     teams: { id: string; departmentId: string }[];
-    kpiRows: { subjectUserId: string; totalScore: number | null }[];
+    /** متوسّطات الإدارات كما حسبها الخادم (B-2) — لا تُجمَّع من صفوف الموظّفين هنا. */
+    kpiDepartments: KpiGroupScore[];
     submissions: SubmissionListItem[];
   },
 ): Metric[] {
@@ -412,17 +423,22 @@ function buildMetrics(
     ];
   }
   if (kind === 'employee') {
-    const ka = ctx.kpiByUser.get(aId)?.totalScore ?? null;
-    const kb = ctx.kpiByUser.get(bId)?.totalScore ?? null;
-    return [{ label: 'مؤشر الأداء KPI', a: ka, b: kb, better: 'higher', fmt: formatPercent }];
+    const a = ctx.kpiByUser.get(aId);
+    const b = ctx.kpiByUser.get(bId);
+    return [
+      { label: 'مؤشر الأداء KPI', a: a?.measure.value ?? null, b: b?.measure.value ?? null, better: 'higher', fmt: formatPercent },
+      { label: 'التغطية', a: a?.measure.coverage ?? null, b: b?.measure.coverage ?? null, better: 'higher', fmt: (v) => `${Math.round(v * 100)}٪` },
+      { label: 'تقييمات معتمَدة', a: a?.measure.eligibleEvaluationCount ?? null, b: b?.measure.eligibleEvaluationCount ?? null, better: 'higher' },
+    ];
   }
-  // department: aggregate KPI across members.
+  // department: الرقم يأتي جاهزًا من الخادم (متوسّط متوسّطات الموظّفين) — لا تجميع في الواجهة.
   const deptKpi = (deptId: string) => {
-    const memberIds = ctx.userList.filter((u) => u.departmentId === deptId).map((u) => u.id);
-    const vals = ctx.kpiRows
-      .filter((r) => memberIds.includes(r.subjectUserId) && r.totalScore !== null)
-      .map((r) => r.totalScore as number);
-    return { kpi: avg(vals), members: memberIds.length, evaluated: vals.length };
+    const g = ctx.kpiDepartments.find((d) => d.groupId === deptId);
+    return {
+      kpi: g?.measure.value ?? null,
+      members: g?.totalMemberCount ?? ctx.userList.filter((u) => u.departmentId === deptId).length,
+      evaluated: g?.scoredMemberCount ?? null,
+    };
   };
   const deptTeams = (deptId: string) => ctx.teams.filter((t) => t.departmentId === deptId).length;
   const a = deptKpi(aId);

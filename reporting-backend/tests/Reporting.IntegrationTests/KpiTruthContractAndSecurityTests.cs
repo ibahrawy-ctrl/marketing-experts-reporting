@@ -120,6 +120,32 @@ public class KpiTruthContractAndSecurityTests
         Assert.Equal(1, lightRow.Measure.EligibleEvaluationCount);
     }
 
+    // ===== 1ب) نقطة التجميع القائمة تعيد العتبة والكادنس المطبَّقَين (B-6/B-3) =====
+    // بدون هذا الحقل تضطرّ الشاشات القديمة إلى ثوابت 60/85 محلّيّة — وهو ما تمنعه التذكرة.
+    [Fact]
+    public async Task Aggregate_ReturnsAppliedThresholdAndCadence_SoUiNeedsNoConstants()
+    {
+        var admin = await TestAuth.LoginAsAdminAsync(_factory);
+        var (templateId, manualId, autoId) = await PublishTemplateAsync(admin, KpiCadence.WeeklyPulse);
+        var (manager, managerId) = await TestAuth.CreateUserAsync(_factory, "Manager");
+        var (_, employee) = await TestAuth.CreateUserAsync(_factory, "Employee", managerId);
+
+        var weeks = (await ResolveWeekKeysAsync(manager, "Quarter", "2026-Q2")).Take(2).ToArray();
+        await ScoreAsync(manager, templateId, employee, manualId, autoId, weeks[0], 85m);
+        await ScoreAsync(manager, templateId, employee, manualId, autoId, weeks[1], 45m);
+
+        var dto = await (await manager.GetAsync(
+            $"/api/kpi-evaluations/aggregate?granularity=Quarterly&periodKey=2026-Q2&subjectUserId={employee}"))
+            .ReadAsync<KpiAggregateDto>();
+
+        Assert.NotNull(dto);
+        // متوسّط الموظّف = (85 + 45) / 2 = 65 — لا 85 (أعلى تقييم) ولا 45 (آخر تقييم).
+        Assert.Equal(65.00m, dto!.Average);
+        Assert.Equal(1, dto.EmployeesCount);
+        Assert.Equal(KpiCadence.WeeklyPulse, dto.AppliedCadence);
+        Assert.NotNull(dto.AppliedBelowTargetThreshold);
+    }
+
     // ===== 2) الكادنس إلزاميّ (B-3) — لا سقوط صامت إلى النبض الأسبوعيّ =====
     [Fact]
     public async Task Performance_WithoutCadence_FailsExplicitly()

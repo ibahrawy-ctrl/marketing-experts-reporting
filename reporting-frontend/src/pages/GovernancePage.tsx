@@ -7,7 +7,8 @@ import { Alert, Badge, Button, Card, Field, Input, Select } from '../components/
 import { LoadingState, QueryError } from '../components/states';
 import { UserPicker } from '../components/UserPicker';
 import { MetricTile, ProgressBar, SectionTitle } from '../components/dashboard';
-import { useAllSubmissions, useKpiSummary } from '../lib/useOrg';
+import { useAllSubmissions } from '../lib/useOrg';
+import { DEFAULT_KPI_FILTER, useKpiPerformance } from '../lib/useKpi';
 import { useDirectoryUsers } from '../lib/useDirectory';
 import { useProjects } from '../lib/useClients';
 import {
@@ -40,7 +41,7 @@ function GovernanceOverview() {
     queryFn: async () => (await api.get<GovernanceSummaryReport>('/reports/governance-summary')).data,
   });
   const submissions = useAllSubmissions();
-  const kpi = useKpiSummary();
+  const kpi = useKpiPerformance(DEFAULT_KPI_FILTER);
 
   if (submissions.isLoading || kpi.isLoading) return <LoadingState label="يتم تحميل نظرة الحوكمة العامة…" />;
   if (submissions.isError || kpi.isError)
@@ -59,8 +60,9 @@ function GovernanceOverview() {
   const completion = subs.length === 0 ? 100 : Math.round((closed / subs.length) * 100);
   const pending = subs.filter((s) => PENDING_STATES.includes(s.status)).length;
   const attention = subs.filter((s) => ATTENTION_STATES.includes(s.status)).length;
-  const belowTarget = kpi.data?.belowTarget ?? 0;
-  const notEvaluated = kpi.data?.rows ? Math.max(0, kpi.data.rows.length - kpi.data.evaluated) : 0;
+  // P1-KPI-008: العدّان من صفوف الخادم (صفّ لكلّ موظّف) لا من عدّادات العقد القديم.
+  const belowTarget = (kpi.data?.employees ?? []).filter((e) => e.isBelowTarget === true).length;
+  const notEvaluated = (kpi.data?.employees ?? []).filter((e) => e.measure.value === null).length;
 
   return (
     <div className="space-y-6">

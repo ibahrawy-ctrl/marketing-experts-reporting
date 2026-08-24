@@ -2,9 +2,9 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useDirectoryUsers, useTeams, useDepartments } from '../lib/useDirectory';
+import { DEFAULT_KPI_FILTER, appliedThreshold, useKpiPerformance } from '../lib/useKpi';
 import {
   useAllSubmissions,
-  useKpiSummary,
   useEscalations,
   useImprovementPlans,
   buildTeamAggregates,
@@ -27,7 +27,8 @@ export default function TeamsPage() {
   const teams = useTeams();
   const departments = useDepartments();
   const submissions = useAllSubmissions();
-  const kpi = useKpiSummary();
+  // P1-KPI-008: مصدر KPI الوحيد = الخادم (Approved فقط · آخر فترة مكتملة · نبض أسبوعيّ).
+  const kpi = useKpiPerformance(DEFAULT_KPI_FILTER);
   const escalations = useEscalations('Open');
   const plans = useImprovementPlans();
   const [view, setView] = useState<'cards' | 'table'>('cards');
@@ -55,7 +56,9 @@ export default function TeamsPage() {
     users: users.data ?? [],
     departments: departments.data ?? [],
     submissions: submissions.data ?? [],
-    kpiRows: kpi.data?.rows ?? [],
+    kpiEmployees: kpi.data?.employees ?? [],
+    kpiTeams: kpi.data?.teams ?? [],
+    kpiThreshold: appliedThreshold(kpi.data),
     escalations: escalations.data ?? [],
     plans: plans.data ?? [],
   });

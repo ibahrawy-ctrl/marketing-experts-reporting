@@ -1,7 +1,9 @@
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Reporting.Application.Common;
 using Reporting.Application.Dashboard;
+using Reporting.Application.Kpi;
 using Reporting.Application.Reports;
 using Reporting.Domain.Enums;
 using Reporting.Infrastructure.Persistence;
@@ -18,17 +20,20 @@ public class DashboardService : IDashboardService
     private readonly ICurrentUser _currentUser;
     private readonly IScopeResolver _scope;
     private readonly IExpectedSubmissionStatusResolver _expected;
+    private readonly KpiFeatureOptions _kpiOptions;
 
     public DashboardService(
         AppDbContext db,
         ICurrentUser currentUser,
         IScopeResolver scope,
-        IExpectedSubmissionStatusResolver expected)
+        IExpectedSubmissionStatusResolver expected,
+        IOptions<KpiFeatureOptions> kpiOptions)
     {
         _db = db;
         _currentUser = currentUser;
         _scope = scope;
         _expected = expected;
+        _kpiOptions = kpiOptions.Value;
     }
 
     private static readonly SubmissionStatus[] CompletedStatuses =
@@ -77,12 +82,17 @@ public class DashboardService : IDashboardService
 
         // ADMIN-GOVERNANCE-R1: لا يدخل التقييم النتائج النهائية إلا إذا كان معتمَدًا (Approved).
         // المحذوف إداريًّا (IsDeleted) مستبعَد تلقائيًّا عبر الفلتر العالميّ.
-        var kpiAvg = await _db.KpiEvaluations
+        // B-2 — توسيط ذو مرحلتين: متوسّط كلّ موظّف أوّلًا ثمّ متوسّط الموظّفين، فلا يزن من قُيّم
+        // عشر مرّات أكثر ممّن قُيّم مرّة. كان هنا متوسّطًا خامًا لكلّ التقييمات وهو ما يشوّه رقم المجموعة.
+        var kpiRows = await _db.KpiEvaluations
             .Where(e => scopeIds.Contains(e.SubjectUserId) && e.PeriodKey == key
                         && e.TotalScore != null && e.Status == KpiEvaluationStatus.Approved)
-            .Select(e => e.TotalScore!.Value)
+            .Select(e => new { e.SubjectUserId, Score = e.TotalScore!.Value })
             .ToListAsync(ct);
-        decimal? kpiAverage = kpiAvg.Count > 0 ? Math.Round(kpiAvg.Average(), 1) : null;
+        decimal? kpiAverage = KpiScorePolicy.Round(
+            KpiScorePolicy.GroupScore(kpiRows
+                .GroupBy(r => r.SubjectUserId)
+                .Select(g => KpiScorePolicy.EmployeePeriodScore(g.Sum(x => x.Score), g.Count())!.Value)));
 
         var cards = new List<SummaryCardDto>
         {
@@ -90,21 +100,28 @@ public class DashboardService : IDashboardService
             new("completedReports", "التقارير المكتملة", completed, completed >= total && total > 0 ? "green" : "neutral", "report-status"),
             new("pendingApproval", "في انتظار الاعتماد", pending, pending == 0 ? "green" : "amber", "report-status"),
             new("needsAction", "تحتاج إجراء", needsAction, needsAction == 0 ? "green" : "red", "report-status"),
-            new("kpiAverage", "متوسط KPI", kpiAverage, KpiStatus(kpiAverage), "kpi-summary"),
+            new("kpiAverage", "متوسط KPI", kpiAverage, KpiStatus(kpiAverage, _kpiOptions.DefaultBelowTargetThreshold), "kpi-summary"),
         };
 
         // ودجة اتجاه KPI: متوسط الدرجة لكل فترة (آخر 8 فترات) ضمن النطاق.
-        var trend = await _db.KpiEvaluations
+        // B-2 هنا أيضًا: نقطة كلّ فترة = متوسّط متوسّطات الموظّفين فيها لا متوسّط تقييماتها الخام.
+        var trendRows = await _db.KpiEvaluations
             .Where(e => scopeIds.Contains(e.SubjectUserId) && e.TotalScore != null
                         && e.Status == KpiEvaluationStatus.Approved)
-            .GroupBy(e => e.PeriodKey)
-            .Select(g => new { PeriodKey = g.Key, Avg = g.Average(x => x.TotalScore!.Value) })
-            .OrderByDescending(x => x.PeriodKey)
-            .Take(8)
+            .Select(e => new { e.PeriodKey, e.SubjectUserId, Score = e.TotalScore!.Value })
             .ToListAsync(ct);
-        var trendData = trend
-            .OrderBy(x => x.PeriodKey)
-            .Select(x => new { periodKey = x.PeriodKey, value = Math.Round(x.Avg, 1) })
+        var trendData = trendRows
+            .GroupBy(r => r.PeriodKey)
+            .OrderByDescending(g => g.Key)
+            .Take(8)
+            .OrderBy(g => g.Key)
+            .Select(g => new
+            {
+                periodKey = g.Key,
+                value = KpiScorePolicy.Round(KpiScorePolicy.GroupScore(g
+                    .GroupBy(x => x.SubjectUserId)
+                    .Select(u => KpiScorePolicy.EmployeePeriodScore(u.Sum(x => x.Score), u.Count())!.Value))),
+            })
             .ToList();
 
         var statusBreakdown = subs
@@ -220,7 +237,13 @@ public class DashboardService : IDashboardService
             var reportsTotal = memberSubs.Count;
             var reportsCompleted = memberSubs.Count(s => CompletedStatuses.Contains(s.Status));
 
-            result.Add(new MemberPerformanceDto(m.Id, m.FullName, avg, trend, reportsTotal, reportsCompleted));
+            // B-6 — الحكم «دون المستهدف» يقع هنا بالعتبة المركزيّة، لا في الواجهة بثابت 60.
+            // `null` تبقى `null`: غياب التقييم ليس ضعف أداء.
+            var threshold = _kpiOptions.DefaultBelowTargetThreshold;
+            bool? isBelowTarget = avg is null ? null : avg.Value < threshold;
+
+            result.Add(new MemberPerformanceDto(
+                m.Id, m.FullName, avg, trend, reportsTotal, reportsCompleted, isBelowTarget, threshold));
         }
 
         var ordered = result
@@ -554,11 +577,15 @@ public class DashboardService : IDashboardService
     private static string PeriodLabel(string periodKey) =>
         periodKey == CurrentWeekKey() ? "الأسبوع الحالي" : periodKey;
 
-    private static string KpiStatus(decimal? avg) => avg switch
+    /// <summary>
+    /// B-6 — نبرة البطاقة تُقاس على العتبة المركزيّة القابلة للضبط، لا على 85/70 مكتوبَين هنا.
+    /// <c>null</c> يبقى محايدًا: لا تقييم ≠ أداء ضعيف.
+    /// </summary>
+    private static string KpiStatus(decimal? avg, decimal threshold) => avg switch
     {
         null => "neutral",
-        >= 85 => "green",
-        >= 70 => "amber",
+        var v when v >= threshold => "green",
+        var v when v >= threshold * 0.75m => "amber",
         _ => "red"
     };
 }

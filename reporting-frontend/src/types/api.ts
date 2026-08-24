@@ -1481,6 +1481,10 @@ export interface MemberPerformanceDto {
   kpiTrend: KpiTrend;
   reportsTotal: number;
   reportsCompleted: number;
+  /** B-6: حكم الخادم بالعتبة المعتمدة. `null` = لا تقييم، لا «مطابق». */
+  isBelowTarget?: boolean | null;
+  /** B-6: العتبة المطبَّقة كما أعادها الخادم. */
+  appliedBelowTargetThreshold?: number | null;
 }
 export interface ActivityItemDto {
   submissionId: string;
@@ -1600,6 +1604,12 @@ export interface KpiAggregateDto {
   scopeType: string;
   canViewRows: boolean;
   weeks: KpiWeeklyPointDto[];
+  /** P1-KPI-007 (B-3): الكادنس المطبَّق فعليًّا كما حسمه الخادم — اختياريّ لتوافق المستهلكين القدامى. */
+  appliedCadence?: 'WeeklyPulse' | 'Quarterly';
+  /** B-2: عدد الموظّفين الذين دخلوا التوسيط ذا المرحلتين (لا عدد التقييمات). */
+  employeesCount?: number;
+  /** B-6: العتبة المطبَّقة من الخادم. `null`/غياب = لا حكم، لا «افترض 60». */
+  appliedBelowTargetThreshold?: number | null;
 }
 
 export interface ExpectedReporterRow {

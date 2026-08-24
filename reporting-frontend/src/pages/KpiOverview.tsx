@@ -1,132 +1,185 @@
-// نظرة KPI متعددة المستويات — الشركة ← الإدارة ← الفريق ← الموظف، مع المقارنات.
-import { useState } from 'react';
+// نظرة KPI متعددة المستويات — الشركة ← الإدارة ← الفريق ← الموظف.
+//
+// P1-KPI-008: كلّ رقم هنا يأتي من `/api/kpi/*` محسوبًا على الخادم بتوسيط ذي مرحلتين (B-2)
+// وعلى تقييمات Approved فقط داخل الفترة والكادنس المطلوبَين. **لا يُشتقّ أيّ رقم في هذا الملفّ**:
+// لا `avg()`، ولا ترتيب محلّيّ، ولا `new Map(subjectUserId → row)` الذي كان يطوي تقييمات الموظّف
+// إلى آخر صفّ فيُظهِر «أعلى تقييم» بدل المتوسّط، ولا `?? 0` يحوّل «لا تقييم» إلى صفر.
+// مُرشِّح واحد يقود البطاقات والرسم والجدول والترتيب والتفصيل معًا.
+import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { useDirectoryUsers, useTeams, useDepartments } from '../lib/useDirectory';
 import {
-  useAllSubmissions,
-  useKpiSummary,
-  useEscalations,
-  useImprovementPlans,
-  buildTeamAggregates,
-  avg,
-} from '../lib/useOrg';
+  DEFAULT_KPI_FILTER,
+  appliedThreshold,
+  dataQualityLabel,
+  dataQualityTone,
+  kpiTone,
+  trendLabel,
+  useKpiDrilldown,
+  useKpiPerformance,
+  useKpiRankings,
+  type KpiEmployeeScore,
+  type KpiFilter,
+  type KpiGroupScore,
+  type KpiMeasure,
+} from '../lib/useKpi';
+import { KpiFilterBar } from '../components/KpiFilterBar';
 import { Card, Badge, StatCard, Button } from '../components/ui';
 import { LoadingState, QueryError } from '../components/states';
 import { SectionTitle, ProgressBar } from '../components/dashboard';
 import { Donut } from '../components/Charts';
-import { kpiTrendDisplay, formatPercent } from '../lib/format';
+import { formatPercent } from '../lib/format';
 
-function kpiTone(score: number | null): 'success' | 'gold' | 'alert' | 'muted' {
-  if (score === null) return 'muted';
-  if (score >= 70) return 'success';
-  if (score >= 50) return 'gold';
-  return 'alert';
+/** «لا تقييم» ≠ صفر: الرقم الغائب يُعرَض غيابًا صريحًا لا رقمًا مصطنعًا. */
+function ScoreBadge({ measure, threshold }: { measure: KpiMeasure; threshold: number | null }) {
+  return (
+    <Badge tone={kpiTone(measure.value, threshold)}>
+      {measure.value === null ? (
+        <span title="لا يوجد تقييم معتمَد في هذه الفترة">لا تقييم</span>
+      ) : (
+        formatPercent(measure.value)
+      )}
+    </Badge>
+  );
+}
+
+function CoverageBadge({ measure }: { measure: KpiMeasure }) {
+  return (
+    <span className="flex items-center gap-1.5 text-xs text-ink-3">
+      <Badge tone={dataQualityTone[measure.dataQuality]}>{dataQualityLabel[measure.dataQuality]}</Badge>
+      <span title="التقييمات المعتمدة مقابل المتوقَّع بعد خصم الإعفاءات">
+        {measure.eligibleEvaluationCount}/{measure.adjustedExpectedCount}
+        {measure.coverage !== null && ` (${Math.round(measure.coverage * 100)}٪)`}
+      </span>
+      {measure.missingCount > 0 && <span title="التزامات بلا تقييم معتمَد">· {measure.missingCount} مفقود</span>}
+    </span>
+  );
+}
+
+function TrendChip({ measure }: { measure: KpiMeasure }) {
+  if (measure.trend === 'Unknown') return <span className="text-xs text-ink-3" title="لا مقارنة متاحة (فترة مفتوحة أو بلا بيانات سابقة)">—</span>;
+  const tone = measure.trend === 'Up' ? 'text-success' : measure.trend === 'Down' ? 'text-alert' : 'text-ink-2';
+  return (
+    <span className={`text-xs ${tone}`}>
+      {trendLabel[measure.trend]}
+      {measure.delta !== null && ` ${measure.delta > 0 ? '+' : ''}${measure.delta}`}
+    </span>
+  );
 }
 
 export function KpiOverview() {
-  const users = useDirectoryUsers();
-  const teams = useTeams();
-  const departments = useDepartments();
-  const submissions = useAllSubmissions();
-  const kpi = useKpiSummary();
-  const escalations = useEscalations('Open');
-  const plans = useImprovementPlans();
+  const [filter, setFilter] = useState<KpiFilter>(DEFAULT_KPI_FILTER);
   const [expandedTeam, setExpandedTeam] = useState<string | null>(null);
+  const [drillUser, setDrillUser] = useState<string | null>(null);
 
-  if (users.isLoading || teams.isLoading || kpi.isLoading)
-    return <LoadingState label="يتم تحميل ملخص المؤشّرات…" />;
-  if (users.isError || teams.isError || kpi.isError)
-    return (
+  const perf = useKpiPerformance(filter);
+  const rankings = useKpiRankings(filter);
+
+  // المُرشِّح يبقى ظاهرًا في كلّ الحالات: تغييره يُطلِق جلبًا جديدًا، وإخفاؤه أثناء الجلب يجعل
+  // المستخدم يفقد أداة التحكّم في منتصف التصفية.
+  const shell = (children: ReactNode) => (
+    <div className="space-y-6">
+      <KpiFilterBar filter={filter} onChange={setFilter} resolved={perf.data?.periodResolved} />
+      {children}
+    </div>
+  );
+
+  if (perf.isLoading) return shell(<LoadingState label="يتم تحميل ملخص المؤشّرات…" />);
+  if (perf.isError)
+    return shell(
       <QueryError
         onRetry={() => {
-          users.refetch();
-          teams.refetch();
-          kpi.refetch();
+          perf.refetch();
+          rankings.refetch();
         }}
         description="حدث خطأ أثناء جلب ملخص المؤشّرات. أعد المحاولة."
-      />
+      />,
     );
 
-  const userList = users.data ?? [];
-  const kpiRows = kpi.data?.rows ?? [];
-  const kpiByUser = new Map(kpiRows.map((r) => [r.subjectUserId, r]));
-  const companyAvg = kpi.data?.averageScore ?? null;
-  const belowTarget = kpi.data?.belowTarget ?? 0;
-
-  // مستوى الإدارة.
-  const deptRows = (departments.data ?? []).map((d) => {
-    const memberIds = userList.filter((u) => u.departmentId === d.id).map((u) => u.id);
-    const vals = memberIds
-      .map((id) => kpiByUser.get(id)?.totalScore)
-      .filter((v): v is number => v !== null && v !== undefined);
-    return { dept: d, avgKpi: avg(vals), evaluated: vals.length, members: memberIds.length };
-  });
-
-  // مستوى الفريق.
-  const teamAgg = buildTeamAggregates({
-    teams: teams.data ?? [],
-    users: userList,
-    departments: departments.data ?? [],
-    submissions: submissions.data ?? [],
-    kpiRows,
-    escalations: escalations.data ?? [],
-    plans: plans.data ?? [],
-  });
-
-  const expanded = teamAgg.find((t) => t.team.id === expandedTeam);
+  const data = perf.data!;
+  const company = data.company;
+  // العتبة تأتي من الخادم (نسخة القالب أوّلًا ثمّ الإعداد المركزيّ) — لا ثابت في الواجهة (B-6).
+  const threshold = appliedThreshold(data);
+  const belowTarget = data.employees.filter((e) => e.isBelowTarget === true).length;
+  const expanded = data.teams.find((t) => t.groupId === expandedTeam);
   const expandedMembers = expanded
-    ? userList
-        .filter((u) => expanded.memberIds.includes(u.id))
-        .map((u) => ({ user: u, row: kpiByUser.get(u.id) }))
-        .sort((a, b) => (b.row?.totalScore ?? -1) - (a.row?.totalScore ?? -1))
+    ? data.employees.filter((e) => e.teamId === expanded.groupId)
     : [];
 
-  return (
-    <div className="space-y-6">
-      {/* مستوى الشركة */}
+  return shell(
+    <>
+      {/* مستوى الشركة — متوسّط متوسّطات الموظّفين (B-2)، لا متوسّط خام على التقييمات. */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="متوسط مؤشر الشركة" value={companyAvg === null ? '—' : formatPercent(companyAvg)} />
-        <StatCard label="عدد التقييمات" value={kpi.data?.evaluated ?? 0} />
+        <StatCard
+          label="متوسط مؤشر الشركة"
+          value={company.measure.value === null ? '—' : formatPercent(company.measure.value)}
+        />
+        <StatCard label="موظّفون لهم درجة" value={`${company.scoredMemberCount}/${company.totalMemberCount}`} />
         <StatCard label="دون المستهدف" value={belowTarget} tone={belowTarget > 0 ? 'alert' : 'navy'} />
-        <StatCard label="الفرق" value={teamAgg.length} />
+        <StatCard label="الفرق" value={data.teams.length} />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3 text-sm">
+        <CoverageBadge measure={company.measure} />
+        <TrendChip measure={company.measure} />
+        {company.measure.excludedByStatusCount > 0 && (
+          <span className="text-xs text-ink-3" title="تقييمات موجودة لكنّها غير معتمَدة فلا تدخل الرقم">
+            · {company.measure.excludedByStatusCount} تقييم غير معتمَد مستبعَد
+          </span>
+        )}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* مستوى الإدارة */}
+        {/* مستوى الإدارة — متوسّط متوسّطات موظّفيها مباشرةً، لا متوسّط الفرق. */}
         <Card>
           <SectionTitle title="مؤشر الأداء حسب الإدارة" />
           <div className="space-y-3">
-            {deptRows.map((d) => (
-              <div key={d.dept.id}>
+            {data.departments.map((d: KpiGroupScore) => (
+              <div key={d.groupId ?? d.groupName}>
                 <div className="mb-1 flex items-center justify-between text-sm">
-                  <span className="font-medium text-navy">{d.dept.nameAr}</span>
+                  <span className="font-medium text-navy">{d.groupName ?? '—'}</span>
                   <span className="text-ink-2">
-                    {d.avgKpi === null ? '—' : formatPercent(d.avgKpi)} · {d.evaluated}/{d.members}
+                    {d.measure.value === null ? 'لا تقييم' : formatPercent(d.measure.value)} ·{' '}
+                    {d.scoredMemberCount}/{d.totalMemberCount}
                   </span>
                 </div>
+                {/* الشريط يعرض صفرًا للفارغ عمدًا لأنّه رسم لا رقم؛ الرقم نفسه أعلاه يقول «لا تقييم». */}
                 <ProgressBar
-                  value={d.avgKpi ?? 0}
-                  tone={d.avgKpi !== null && d.avgKpi >= 70 ? 'success' : 'orange'}
+                  value={d.measure.value ?? 0}
+                  tone={kpiTone(d.measure.value, threshold) === 'success' ? 'success' : 'orange'}
                 />
+                <CoverageBadge measure={d.measure} />
               </div>
             ))}
-            {deptRows.length === 0 && (
-              <p className="py-6 text-center text-sm text-ink-2">لا توجد إدارات ضمن نطاقك. تظهر متوسطات المؤشّرات لكل إدارة بمجرّد تقييم أعضائها.</p>
+            {data.departments.length === 0 && (
+              <p className="py-6 text-center text-sm text-ink-2">
+                لا توجد إدارات ضمن نطاقك. تظهر متوسطات المؤشّرات لكل إدارة بمجرّد تقييم أعضائها.
+              </p>
             )}
           </div>
         </Card>
 
-        {/* توزيع حالات الأداء */}
+        {/* توزيع مستوى الأداء — يُبنى من درجات الموظّفين (صفّ واحد لكلّ موظّف) لا من التقييمات. */}
         <Card>
-          <SectionTitle title="توزيع مستوى الأداء" hint="عدد الموظفين حسب فئة المؤشر" />
+          <SectionTitle title="توزيع مستوى الأداء" hint="عدد الموظفين حسب فئة المؤشر (بلا تكرار)" />
           <Donut
             slices={[
-              { label: 'ممتاز (≥70)', value: kpiRows.filter((r) => (r.totalScore ?? 0) >= 70).length },
               {
-                label: 'متوسط (50-69)',
-                value: kpiRows.filter((r) => (r.totalScore ?? 0) >= 50 && (r.totalScore ?? 0) < 70).length,
+                // الفئات تُشتقّ من نبرة العتبة القادمة من الخادم؛ غياب العتبة يجعل التصنيف محايدًا.
+                label: threshold === null ? 'بلغ المستهدف' : `ممتاز (≥${threshold})`,
+                value: data.employees.filter((e) => kpiTone(e.measure.value, threshold) === 'success').length,
               },
-              { label: 'دون المستهدف (<50)', value: kpiRows.filter((r) => (r.totalScore ?? 100) < 50).length },
+              {
+                label: threshold === null ? 'قريب من المستهدف' : `متوسط (≥${Math.round(threshold * 0.75)})`,
+                value: data.employees.filter((e) => kpiTone(e.measure.value, threshold) === 'gold').length,
+              },
+              {
+                label: threshold === null ? 'دون المستهدف' : `دون المستهدف (<${Math.round(threshold * 0.75)})`,
+                value: data.employees.filter((e) => kpiTone(e.measure.value, threshold) === 'alert').length,
+              },
+              {
+                label: 'لا تقييم',
+                value: data.employees.filter((e) => e.measure.value === null).length,
+              },
             ]}
           />
         </Card>
@@ -140,31 +193,42 @@ export function KpiOverview() {
             <thead className="border-b border-line text-xs text-ink-2">
               <tr>
                 <th className="px-2 py-2 font-semibold">الفريق</th>
-                <th className="px-2 py-2 font-semibold">القائد</th>
                 <th className="px-2 py-2 font-semibold">الأعضاء</th>
                 <th className="px-2 py-2 font-semibold">متوسط KPI</th>
+                <th className="px-2 py-2 font-semibold">التغطية</th>
                 <th className="px-2 py-2 font-semibold"></th>
               </tr>
             </thead>
             <tbody>
-              {teamAgg.map((t) => (
-                <tr key={t.team.id} className="border-b border-line last:border-0">
-                  <td className="px-2 py-2 font-medium text-navy">{t.team.nameAr}</td>
-                  <td className="px-2 py-2 text-ink-2">{t.leaderName}</td>
-                  <td className="px-2 py-2">{t.memberCount}</td>
+              {data.teams.map((t) => (
+                <tr key={t.groupId ?? t.groupName} className="border-b border-line last:border-0">
+                  <td className="px-2 py-2 font-medium text-navy">{t.groupName ?? '—'}</td>
                   <td className="px-2 py-2">
-                    <Badge tone={kpiTone(t.avgKpi)}>{t.avgKpi === null ? '—' : formatPercent(t.avgKpi)}</Badge>
+                    {t.scoredMemberCount}/{t.totalMemberCount}
+                  </td>
+                  <td className="px-2 py-2">
+                    <ScoreBadge measure={t.measure} threshold={threshold} />
+                  </td>
+                  <td className="px-2 py-2">
+                    <CoverageBadge measure={t.measure} />
                   </td>
                   <td className="px-2 py-2">
                     <button
-                      onClick={() => setExpandedTeam(expandedTeam === t.team.id ? null : t.team.id)}
+                      onClick={() => setExpandedTeam(expandedTeam === t.groupId ? null : t.groupId)}
                       className="text-sm font-semibold text-orange-600 hover:underline"
                     >
-                      {expandedTeam === t.team.id ? 'إخفاء' : 'تفصيل الأعضاء'}
+                      {expandedTeam === t.groupId ? 'إخفاء' : 'تفصيل الأعضاء'}
                     </button>
                   </td>
                 </tr>
               ))}
+              {data.teams.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="py-6 text-center text-sm text-ink-2">
+                    لا توجد فرق ضمن نطاقك.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -172,79 +236,132 @@ export function KpiOverview() {
         {expanded && (
           <div className="mt-4 rounded-xl border border-line bg-offwhite p-4">
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="font-bold text-navy">أعضاء فريق {expanded.team.nameAr}</h3>
-              <div className="flex gap-2">
-                <Link to="/app/analytics">
-                  <Button variant="ghost">قارن بالفترة السابقة</Button>
-                </Link>
-                <Link to={`/app/teams/${expanded.team.id}`}>
-                  <Button variant="ghost">صفحة الفريق</Button>
-                </Link>
-              </div>
+              <h3 className="font-bold text-navy">أعضاء فريق {expanded.groupName}</h3>
+              <Link to={`/app/teams/${expanded.groupId}`}>
+                <Button variant="ghost">صفحة الفريق</Button>
+              </Link>
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
-              {expandedMembers.map(({ user, row }) => {
-                const score = row?.totalScore ?? null;
-                const belowTarget = score != null && score < 60;
-                // سبب غياب التقييم / سبب الاتجاه — بدل ترك شرطة غامضة.
-                const reason =
-                  score == null
-                    ? 'لا تقييم لهذه الفترة — لم يُسجَّل بعد من المُقيِّم.'
-                    : belowTarget
-                      ? 'دون المستهدف (أقل من 60٪) — يُنصح بخطة تحسين.'
-                      : null;
-                return (
-                  <div key={user.id} className="rounded-lg border border-line bg-white px-3 py-2.5 text-sm">
-                    <div className="flex items-center justify-between gap-2">
-                      <Link to={`/app/employee/${user.id}`} className="font-medium text-navy hover:text-orange-600 hover:underline">{user.fullName}</Link>
-                      <span className="flex items-center gap-2">
-                        {row && <span className="text-xs text-ink-2">{kpiTrendDisplay(row.trend, score != null)}</span>}
-                        <Badge tone={kpiTone(score)}>
-                          {score == null ? <span title="لا يوجد تقييم لهذه الفترة">لا تقييم</span> : formatPercent(score)}
-                        </Badge>
-                      </span>
-                    </div>
-                    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                      {reason && <span className={belowTarget ? 'text-alert' : 'text-ink-3'}>{reason}</span>}
-                      <Link to={`/app/employee/${user.id}#kpi`} className="font-semibold text-orange-600 hover:underline">عرض التقييمات</Link>
-                      {belowTarget && (
-                        <Link to="/app/development" className="font-semibold text-orange-600 hover:underline">افتح خطة تحسين</Link>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+              {expandedMembers.map((e) => (
+                <EmployeeCard
+                  key={e.userId}
+                  employee={e}
+                  threshold={threshold}
+                  onDrill={() => setDrillUser(drillUser === e.userId ? null : e.userId)}
+                  drilling={drillUser === e.userId}
+                  filter={filter}
+                />
+              ))}
               {expandedMembers.length === 0 && <p className="text-sm text-ink-2">لا أعضاء.</p>}
             </div>
           </div>
         )}
       </Card>
 
-      {/* مستوى الموظف — أقوى/أضعف */}
+      {/* الترتيب — من الخادم مباشرةً بعد تطبيق شرط التغطية (B-5)، بلا فرز أو تصفية هنا. */}
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <SectionTitle title="الأعلى أداءً" />
-          <RankList rows={[...kpiRows].filter((r) => r.totalScore != null).sort((a, b) => (b.totalScore ?? 0) - (a.totalScore ?? 0)).slice(0, 6)} />
+          <SectionTitle
+            title="الأعلى أداءً"
+            hint={
+              rankings.data
+                ? `تغطية لا تقلّ عن ${Math.round(rankings.data.minimumCoverage * 100)}٪ · مستبعَدون لضعف التغطية: ${rankings.data.excludedForInsufficientCoverage}`
+                : undefined
+            }
+          />
+          <RankList rows={rankings.data?.topPerformers ?? []} threshold={threshold} />
         </Card>
         <Card>
           <SectionTitle title="الأكثر حاجة للدعم" />
-          <RankList rows={[...kpiRows].filter((r) => r.totalScore != null).sort((a, b) => (a.totalScore ?? 0) - (b.totalScore ?? 0)).slice(0, 6)} />
+          <RankList rows={rankings.data?.needsSupport ?? []} threshold={threshold} />
         </Card>
       </div>
+    </>,
+  );
+}
+
+function EmployeeCard({
+  employee,
+  threshold,
+  onDrill,
+  drilling,
+  filter,
+}: {
+  employee: KpiEmployeeScore;
+  threshold: number | null;
+  onDrill: () => void;
+  drilling: boolean;
+  filter: KpiFilter;
+}) {
+  const drill = useKpiDrilldown({ ...filter, subjectUserId: employee.userId }, drilling);
+  return (
+    <div className="rounded-lg border border-line bg-white px-3 py-2.5 text-sm">
+      <div className="flex items-center justify-between gap-2">
+        <Link
+          to={`/app/employee/${employee.userId}`}
+          className="font-medium text-navy hover:text-orange-600 hover:underline"
+        >
+          {employee.fullName}
+        </Link>
+        <span className="flex items-center gap-2">
+          <TrendChip measure={employee.measure} />
+          <ScoreBadge measure={employee.measure} threshold={threshold} />
+        </span>
+      </div>
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+        <CoverageBadge measure={employee.measure} />
+        {!employee.eligibleForRanking && employee.measure.value !== null && (
+          <span className="text-alert" title="يظهر في العرض الفرديّ لكنّه خارج الترتيب والمقارنة الرسميّة">
+            خارج الترتيب — تغطية غير كافية
+          </span>
+        )}
+        <button onClick={onDrill} className="font-semibold text-orange-600 hover:underline">
+          {drilling ? 'إخفاء التفصيل' : 'تفصيل الرقم'}
+        </button>
+      </div>
+
+      {/* التفصيل يعيد إنتاج الرقم نفسه من صفوفه — فيمكن للمستخدم التحقّق يدويًّا. */}
+      {drilling && drill.data && (
+        <div className="mt-2 rounded-lg border border-line bg-offwhite p-2 text-xs">
+          <p className="mb-1 text-ink-2">
+            {drill.data.rowCount} تقييم معتمَد · المتوسّط المُعاد حسابه:{' '}
+            {drill.data.recomputedValue === null ? 'لا تقييم' : formatPercent(drill.data.recomputedValue)}
+          </p>
+          <ul className="space-y-1">
+            {drill.data.rows.map((r) => (
+              <li key={r.evaluationId} className="flex justify-between gap-2">
+                <span className="text-ink-3">
+                  {r.periodKey} · {r.templateTitle}
+                </span>
+                <span className="font-medium text-navy">
+                  {r.totalScore === null ? '—' : formatPercent(r.totalScore)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
 
-function RankList({ rows }: { rows: { subjectUserId: string; subjectName: string; totalScore: number | null; trend: import('../types/api').KpiTrend }[] }) {
-  if (rows.length === 0) return <p className="py-6 text-center text-sm text-ink-2">لا توجد تقييمات في هذه الفترة بعد. يظهر الترتيب بمجرّد اعتماد تقييمات الأداء.</p>;
+function RankList({ rows, threshold }: { rows: KpiEmployeeScore[]; threshold: number | null }) {
+  if (rows.length === 0)
+    return (
+      <p className="py-6 text-center text-sm text-ink-2">
+        لا يوجد من يستوفي شرط التغطية في هذه الفترة بعد. يظهر الترتيب بمجرّد اعتماد تقييمات كافية.
+      </p>
+    );
   return (
     <ul className="space-y-2 text-sm">
-      {rows.map((r, i) => (
-        <li key={`${r.subjectUserId}-${i}`} className="flex items-center justify-between gap-2 border-b border-line py-2 last:border-0">
-          <Link to={`/app/employee/${r.subjectUserId}`} className="font-medium text-navy hover:text-orange-600 hover:underline">{r.subjectName}</Link>
+      {rows.map((r) => (
+        <li key={r.userId} className="flex items-center justify-between gap-2 border-b border-line py-2 last:border-0">
+          <Link to={`/app/employee/${r.userId}`} className="font-medium text-navy hover:text-orange-600 hover:underline">
+            {r.fullName}
+          </Link>
           <span className="flex items-center gap-2">
-            <span className="text-xs text-ink-2">{kpiTrendDisplay(r.trend, r.totalScore != null)}</span>
-            <Badge tone={kpiTone(r.totalScore)}>{r.totalScore == null ? <span title="لا يوجد تقييم لهذه الفترة">لا تقييم</span> : formatPercent(r.totalScore)}</Badge>
+            <TrendChip measure={r.measure} />
+            <ScoreBadge measure={r.measure} threshold={threshold} />
           </span>
         </li>
       ))}
