@@ -67,6 +67,8 @@ public static class DependencyInjection
         services.AddSingleton<ISystemClock, SystemClock>();
         // P1-KPI-002 — مصدر الحقيقة الوحيد لحدود الفترات (Asia/Riyadh).
         services.AddScoped<IPeriodService, CanonicalPeriodService>();
+        // P1-KPI-003 — المصدر الوحيد لحساب KPI المؤسّسيّ (Approved-only + توسيط ثنائي المرحلة).
+        services.AddScoped<IKpiCalculationService, KpiCalculationService>();
         services.AddScoped<ICurrentUser, CurrentUser>();
         services.AddScoped<IScopeResolver, ScopeResolver>();
         services.AddScoped<ITokenService, TokenService>();
