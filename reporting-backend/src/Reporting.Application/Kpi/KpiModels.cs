@@ -240,7 +240,11 @@ public record KpiAggregateRequest(
     DateOnly? To = null,
     Guid? SubjectUserId = null,
     Guid? TeamId = null,
-    Guid? DepartmentId = null);
+    Guid? DepartmentId = null,
+    // P1-KPI-007 (B-3): مُدخَل إضافيّ لا يكسر المستهلكين القائمين. غيابه ليس خلطًا صامتًا؛ هذه النقطة
+    // أسبوعيّة النطاق بحكم عقدها (PeriodType.Weekly ونقاط أسبوعيّة)، فتُطبَّق WeeklyPulse صراحةً
+    // ويُعاد الكادنس المطبَّق في AppliedCadence ليراه العميل.
+    KpiCadence? Cadence = null);
 
 public record KpiWeeklyPointDto(
     string PeriodKey, DateOnly WeekStart, DateOnly WeekEnd, decimal Score, int EvaluationsCount);
@@ -255,7 +259,11 @@ public record KpiAggregateDto(
     int EvaluationsCount,
     string ScopeType,
     bool CanViewRows,
-    IReadOnlyList<KpiWeeklyPointDto> Weeks);
+    IReadOnlyList<KpiWeeklyPointDto> Weeks,
+    // P1-KPI-007: الكادنس المطبَّق فعليًّا — حقل إضافيّ لا يكسر أيّ مستهلك قائم.
+    KpiCadence AppliedCadence = KpiCadence.WeeklyPulse,
+    // B-2: عدد الموظّفين الذين دخلوا التوسيط ذا المرحلتين — حقل إضافيّ.
+    int EmployeesCount = 0);
 
 // ===== تصدير KPI للمالية (KPI-FIN1) — قراءة/تصدير فقط على مستوى الشركة =====
 // صفّ لكل تقييم KPI أسبوعي معتمَد يقع داخل الربع المختار (لا متوسط ربع سنوي). إعلامي بحت:

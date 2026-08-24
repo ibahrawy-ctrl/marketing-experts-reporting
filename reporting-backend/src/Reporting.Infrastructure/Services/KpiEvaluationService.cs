@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Reporting.Application.Audit;
 using Reporting.Application.Common;
 using Reporting.Application.Kpi;
@@ -20,21 +21,21 @@ public class KpiEvaluationService : IKpiEvaluationService
     private readonly INotificationService _notifications;
     private readonly IAuditService _audit;
     private readonly IScopeResolver _scope;
+    private readonly KpiFeatureOptions _kpiOptions;
 
     // صيغة مفتاح الفترة الأسبوعية المعتمدة: YYYY-Www (مثال 2026-W25) — تمنع إدخال قيَم حرّة غير مفهومة.
     private static readonly Regex WeeklyPeriodKeyPattern = new(@"^\d{4}-W\d{2}$", RegexOptions.Compiled);
 
-    /// <summary>عتبة التنبيه: درجة إجمالية دونها تُعدّ تحت المستهدف.</summary>
-    private const decimal AlertThreshold = 60m;
-
     public KpiEvaluationService(AppDbContext db, ICurrentUser currentUser,
-        INotificationService notifications, IAuditService audit, IScopeResolver scope)
+        INotificationService notifications, IAuditService audit, IScopeResolver scope,
+        IOptions<KpiFeatureOptions> kpiOptions)
     {
         _db = db;
         _currentUser = currentUser;
         _notifications = notifications;
         _audit = audit;
         _scope = scope;
+        _kpiOptions = kpiOptions.Value;
     }
 
     public async Task<Result<KpiEvaluationDto>> CreateOrGetAsync(CreateKpiEvaluationRequest request, CancellationToken ct = default)
@@ -714,27 +715,41 @@ public class KpiEvaluationService : IKpiEvaluationService
         if (request.TeamId is Guid t) q = q.Where(e => e.TeamId == t);
         if (request.DepartmentId is Guid d) q = q.Where(e => e.DepartmentId == d);
 
-        var raw = await q.Select(e => new { e.PeriodKey, e.TotalScore }).ToListAsync(ct);
+        // P1-KPI-007 (B-3): فصل نبض الأسبوع عن التقييم الربعيّ الرسميّ. الكادنس يخصّ القالب لا التقييم،
+        // فيُربَط عبر نسخة القالب. الافتراض WeeklyPulse مُعلَن في العقد ويُعاد في AppliedCadence.
+        var cadence = request.Cadence ?? KpiCadence.WeeklyPulse;
+        q = q.Where(e => _db.KpiTemplateVersions
+            .Any(v => v.Id == e.KpiTemplateVersionId && v.KpiTemplate!.Cadence == cadence));
+
+        var raw = await q.Select(e => new { e.PeriodKey, e.SubjectUserId, e.TotalScore }).ToListAsync(ct);
 
         // 3) فلترة الأسابيع الواقعة داخل المدى (بحسب خميس بداية الأسبوع) ثم التجميع لكل أسبوع.
         var inRange = raw
             .Where(r => ReportCalendarPolicy.WeekInRange(r.PeriodKey, from, to))
             .ToList();
 
+        // B-2 — التوسيط ذو المرحلتين: داخل الأسبوع نحسب أوّلًا متوسّط كلّ موظّف على حدة، ثمّ نأخذ
+        // متوسّط الموظّفين. فمن قُيّم عشر مرّات لا يزن أكثر ممّن قُيّم مرّة واحدة.
         var weeks = inRange
             .GroupBy(r => r.PeriodKey)
             .Select(g =>
             {
                 var (ws, we) = ReportCalendarPolicy.WeekRange(g.Key);
-                return new KpiWeeklyPointDto(
-                    g.Key, ws, we,
-                    Math.Round(g.Average(x => x.TotalScore!.Value), 2),
-                    g.Count());
+                var perEmployee = g.GroupBy(x => x.SubjectUserId)
+                    .Select(u => KpiScorePolicy.EmployeePeriodScore(u.Sum(x => x.TotalScore!.Value), u.Count())!.Value);
+                return new KpiWeeklyPointDto(g.Key, ws, we, KpiScorePolicy.GroupScore(perEmployee)!.Value, g.Count());
             })
             .OrderBy(w => w.WeekStart)
             .ToList();
 
-        decimal? average = weeks.Count > 0 ? Math.Round(weeks.Average(w => w.Score), 2) : null;
+        // ومتوسّط الفترة كلّها يُبنى كذلك من متوسّط كلّ موظّف عبر الفترة، لا من متوسّط الأسابيع
+        // (وإلّا وزن الأسبوع القليل التقييمات كوزن الأسبوع الكامل).
+        var employeeScores = inRange
+            .GroupBy(r => r.SubjectUserId)
+            .Select(u => KpiScorePolicy.EmployeePeriodScore(u.Sum(x => x.TotalScore!.Value), u.Count())!.Value)
+            .ToList();
+
+        decimal? average = KpiScorePolicy.GroupScore(employeeScores);
         var evaluationsCount = inRange.Count;
 
         // المستخدم العادي يرى نتائجه فقط؛ تفاصيل الأسابيع تُعرض إذا لم يكن نطاقه شاملًا أو حدّد موظّفًا بعينه.
@@ -744,7 +759,8 @@ public class KpiEvaluationService : IKpiEvaluationService
         var dto = new KpiAggregateDto(
             granularity, label, from, to, average,
             weeks.Count, evaluationsCount, scope.ScopeType, canViewRows,
-            canViewRows ? weeks : new List<KpiWeeklyPointDto>());
+            canViewRows ? weeks : new List<KpiWeeklyPointDto>(),
+            cadence, employeeScores.Count);
 
         return Result<KpiAggregateDto>.Success(dto);
     }
@@ -1178,7 +1194,7 @@ public class KpiEvaluationService : IKpiEvaluationService
 
         var version = await _db.KpiTemplateVersions
             .Where(v => v.Id == e.KpiTemplateVersionId)
-            .Select(v => new { v.KpiTemplate!.Title, v.KpiTemplate.Cadence })
+            .Select(v => new { v.KpiTemplate!.Title, v.KpiTemplate.Cadence, v.BelowTargetThreshold })
             .FirstAsync(ct);
 
         var metrics = await _db.KpiMetrics.Where(m => m.KpiTemplateVersionId == e.KpiTemplateVersionId)
@@ -1200,7 +1216,10 @@ public class KpiEvaluationService : IKpiEvaluationService
         // التعديل متاح قبل الإرسال أو بعد طلب تعديل (NeedsRevision) لصاحب الإدخال أو الأدمن.
         var canEdit = (e.Status is KpiEvaluationStatus.Draft or KpiEvaluationStatus.InProgress or KpiEvaluationStatus.NeedsRevision)
                       && (_currentUser.UserId == e.EvaluatorId || _currentUser.IsInRole(Roles.Admin));
-        var isBelowTarget = e.TotalScore is decimal s && s < AlertThreshold;
+        // B-6: العتبة تُقرأ من نسخة القالب أوّلًا (فتبقى مرتبطة بتاريخ النسخة)، والإعداد المركزيّ
+        // احتياط فقط. لا ثابت 60 متناثر في الخدمات بعد اليوم.
+        var threshold = version.BelowTargetThreshold ?? _kpiOptions.DefaultBelowTargetThreshold;
+        var isBelowTarget = e.TotalScore is decimal s && s < threshold;
 
         // القدرات السياقيّة (لإظهار/إخفاء أزرار الواجهة؛ الفرض النهائيّ خادميّ في كل دالّة).
         var uid = _currentUser.UserId;
