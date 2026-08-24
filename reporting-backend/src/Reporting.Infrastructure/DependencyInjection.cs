@@ -19,6 +19,7 @@ using Reporting.Application.Governance;
 using Reporting.Application.Kpi;
 using Reporting.Application.Leave;
 using Reporting.Application.Notifications;
+using Reporting.Application.Periods;
 using Reporting.Application.Positions;
 using Reporting.Application.Payroll;
 using Reporting.Application.Reports;
@@ -59,9 +60,13 @@ public static class DependencyInjection
         services.Configure<EmailNotificationOptions>(configuration.GetSection(EmailNotificationOptions.SectionName));
         services.Configure<AppOptions>(configuration.GetSection(AppOptions.SectionName));
         services.Configure<ReportReminderSchedulerOptions>(configuration.GetSection(ReportReminderSchedulerOptions.SectionName));
+        // P1 — أعلام محرّك KPI الجديد وعتباته المركزيّة الاحتياطيّة. كلّ الأعلام false افتراضيًّا (§8).
+        services.Configure<KpiFeatureOptions>(configuration.GetSection(KpiFeatureOptions.SectionName));
 
         services.AddHttpContextAccessor();
         services.AddSingleton<ISystemClock, SystemClock>();
+        // P1-KPI-002 — مصدر الحقيقة الوحيد لحدود الفترات (Asia/Riyadh).
+        services.AddScoped<IPeriodService, CanonicalPeriodService>();
         services.AddScoped<ICurrentUser, CurrentUser>();
         services.AddScoped<IScopeResolver, ScopeResolver>();
         services.AddScoped<ITokenService, TokenService>();
