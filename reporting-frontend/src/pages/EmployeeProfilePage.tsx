@@ -20,6 +20,7 @@ import {
 } from '../lib/format';
 import type { EmployeeProfileDto, KpiAggregateDto, KpiGranularity } from '../types/api';
 import { ManagementNotesPanel } from '../components/ManagementNotesPanel';
+import { Employee360Panel } from '../components/Employee360Panel';
 import { LoadingState, QueryError } from '../components/states';
 import { Badge, Card, EmptyState, Field, Select, Spinner, StatCard } from '../components/ui';
 
@@ -44,10 +45,15 @@ export default function EmployeeProfilePage() {
   const { userId = '' } = useParams();
   const location = useLocation();
 
+  // P2-EMP-003 — وضع الذات: المسار `/app/employee/me` يُحَلّ **خادميًّا** عبر سطح 360،
+  // فلا نستدعي عرض الملفّ الإداريّ القديم (المبنيّ على معرّف صريح) ولا نشتقّ المعرّف محلّيًّا.
+  const isSelfRoute = userId === 'me';
+
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['employee-profile', userId],
     queryFn: async () => (await api.get<EmployeeProfileDto>(`/dashboard/employee-profile/${userId}`)).data,
     retry: false,
+    enabled: !isSelfRoute,
   });
 
   // عند الوصول عبر رابط «عرض التقييمات» (#kpi) ننتقل تلقائيًا لقسم تقييمات الأداء بعد تحميل البيانات.
@@ -56,6 +62,17 @@ export default function EmployeeProfilePage() {
     const el = document.querySelector(location.hash);
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [data, location.hash]);
+
+  // وضع الذات يعرض سطح 360 وحده: الموظّف يرى ما يخصّه فقط، ولا تُطلَب أيّ نقطة إداريّة
+  // تفترض صلاحيّة إشرافيّة. ما لا يُصرَّح به لا يصل من الخادم أصلًا فلا يُرسَم هنا.
+  if (isSelfRoute) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-bold text-navy">ملفّي</h1>
+        <Employee360Panel subject="me" />
+      </div>
+    );
+  }
 
   if (isLoading) return <Spinner />;
 
@@ -347,6 +364,9 @@ export default function EmployeeProfilePage() {
           )}
         </Card>
       </section>
+
+      {/* ===== (8) الملفّ الشامل 360 (P2-EMP-003) — إضافة لا استبدال ===== */}
+      <Employee360Panel subject={userId} />
     </div>
   );
 }
