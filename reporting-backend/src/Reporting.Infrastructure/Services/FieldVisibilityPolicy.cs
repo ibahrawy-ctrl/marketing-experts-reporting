@@ -57,10 +57,19 @@ public class FieldVisibilityPolicy : IFieldVisibilityPolicy
         if (subject is null) return SubjectRelation.None;
 
         var scope = await _scope.ResolveAsync(ct);
-        if (!scope.Contains(subjectId)) return SubjectRelation.None;
+
+        // وظيفة الموارد البشريّة مؤسّسيّة بطبيعتها في مصفوفة §7، بينما ScopeResolver القائم
+        // يُسقِط دور HR إلى نطاق "own" (RoleAccess.ScopeTypeFor). لا نُعدّل ScopeResolver كي لا
+        // يتغيّر سلوك أيّ شاشة قائمة؛ نوسّع **العلاقة** هنا فقط، داخل طبقة المرحلة الثانية.
+        // التوسيع لا يفتح شيئًا حسّاسًا: الدرجات الحسّاسة تبقى محكومة بإذن صريح لا بالدور.
+        var hrOrganizationWide = _currentUser.IsInRole(Roles.Hr);
+
+        if (!hrOrganizationWide && !scope.Contains(subjectId)) return SubjectRelation.None;
 
         if (subject.ManagerId == viewerId) return SubjectRelation.DirectTeam;
-        return scope.SeesAll ? SubjectRelation.Company : SubjectRelation.Department;
+        return scope.SeesAll || hrOrganizationWide
+            ? SubjectRelation.Company
+            : SubjectRelation.Department;
     }
 
     public bool CanSee(FieldVisibilityContext ctx, FieldSensitivity sensitivity) =>

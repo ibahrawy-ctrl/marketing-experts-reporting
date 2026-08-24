@@ -76,6 +76,8 @@ public static class DependencyInjection
         services.AddScoped<IScopeResolver, ScopeResolver>();
         // P2-SEC-001 — الطبقة الخادميّة المركزيّة للرؤية على مستوى الحقل/القسم.
         services.AddScoped<IFieldVisibilityPolicy, FieldVisibilityPolicy>();
+        // P2-EMP-002 — عرض قراءة بحت؛ لا يملك بيانات ولا يكتب شيئًا.
+        services.AddScoped<Application.Employee360.IEmployee360Service, Employee360Service>();
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IReportTemplateService, ReportTemplateService>();
