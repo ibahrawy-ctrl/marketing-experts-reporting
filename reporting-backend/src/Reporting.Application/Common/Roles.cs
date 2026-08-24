@@ -238,6 +238,18 @@ public static class Roles
     };
 
     /// <summary>
+    /// P1-KPI-004 — قراءة تحليلات KPI الموحّدة (v2): أداء تنظيميّ، ترتيب، وتفصيل.
+    /// قراءة فقط، و<b>ما يُعاد يحدّده <c>IScopeResolver</c> وحده</b> لا الدور: الموظّف يرى نفسه،
+    /// وقائد الفريق فريقه، وهكذا. الدور هنا بوّابة أولى لا مانحُ رؤية.
+    /// يُستثنى <see cref="AccountPortfolioReader"/> عمدًا — ممنوع من KPI وتقييمات الموظّفين بنصّ تعريفه.
+    /// </summary>
+    public static readonly string[] KpiAnalyticsViewers =
+    {
+        Admin, Ceo, GeneralManager, Manager, TeamLeader, Employee, CeoSupport, Viewer, Hr,
+        FinanceManager, Accountant
+    };
+
+    /// <summary>
     /// الأدوار المخوّلة بإدارة المستخدمين الكاملة (إنشاء/تعديل/تعطيل/حذف المستخدم وتعديل أدواره) عبر صفحة «إدارة فريق العمل» (GOV-R1):
     /// Admin / CEO فقط. عمدًا لا تشمل GM / HR / Manager / FinanceManager / Accountant / Employee / CeoSupport.
     /// منفصلة عن AdminOnly العامة (التي تبقى Admin-only لبقية الموارد) وعن UserPasswordReset. الحُرّاس الأمنية في الخدمة
@@ -522,6 +534,11 @@ public static class Policies
     // تصدير تقييمات KPI المعتمدة للمالية (KPI-FIN1) — Admin/CEO/GM/HR/CeoSupport (Roles.KpiFinanceExporters).
     // عرض/تصدير على مستوى الشركة (بلا ScopeResolver)، قراءة فقط؛ لا يحسب/يصرف مستحقات ولا يغيّر أيّ تقييم.
     public const string KpiFinanceExport = "KpiFinanceExport";
+
+    // P1-KPI-004 — قراءة تحليلات KPI الموحّدة v2 (أداء/ترتيب/تفصيل) — Roles.KpiAnalyticsViewers.
+    // بوّابة أولى عند نقطة النهاية فقط؛ حجم ما يُعاد يحدّده ScopeResolver خادميًّا، والخارج عن النطاق
+    // يُعاد بـ404 لا 403 كي لا يُسرَّب وجود المورد. AccountPortfolioReader مستثنى عمدًا.
+    public const string KpiAnalyticsView = "KpiAnalyticsView";
 
     // رؤية «محفظة مدير الحساب» (مشاريعي/عملائي — عرض فقط) — AccountPortfolioReader (+Admin تشغيليًّا)
     // عبر Roles.AccountPortfolioReaders. الرؤية مقصورة خادمًا على مشاريع المستخدم نفسه (AccountManagerId)

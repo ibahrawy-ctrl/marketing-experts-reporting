@@ -25,6 +25,12 @@ public interface IReportingService
     /// <summary>تجميع الالتزام حسب فريق/إدارة ضمن أسبوع ونطاق المستخدم (groupBy = "team" | "department").</summary>
     Task<Result<ComplianceBreakdownReport>> ComplianceBreakdownAsync(string? weekKey, string? groupBy, Guid? departmentId, Guid? teamId, CancellationToken ct = default);
 
+    /// <summary>
+    /// P1-KPI-005 — العقد القديم لـ<c>GET /api/reports/kpi-summary</c>. شكل الاستجابة ثابت لا يتغيّر أثناء الانتقال،
+    /// لكنّ الحساب داخليًّا يتحوّل إلى المحرّك الموحّد خلف العلم <c>Kpi:NewCalculationEngine</c>.
+    /// البديل: <c>GET /api/kpi/performance</c>.
+    /// </summary>
+    [Obsolete("P1-KPI-005: استعمل GET /api/kpi/performance — هذا العقد مؤقّت وسيُزال بعد المطابقة على TEST.")]
     Task<Result<KpiSummaryReport>> KpiSummaryAsync(ReportFilter filter, CancellationToken ct = default);
     Task<Result<GovernanceSummaryReport>> GovernanceSummaryAsync(CancellationToken ct = default);
 

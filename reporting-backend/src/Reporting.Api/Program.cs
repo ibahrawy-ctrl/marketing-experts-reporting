@@ -110,6 +110,8 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy(Policies.PayrollImpactManage, p => p.RequireRole(Roles.PayrollImpactManagers));
     // تصدير تقييمات KPI المعتمدة للمالية (KPI-FIN1) — Admin/CEO/GM/HR/CeoSupport. قراءة فقط على مستوى الشركة، لا يحسب/يصرف مستحقات.
     options.AddPolicy(Policies.KpiFinanceExport, p => p.RequireRole(Roles.KpiFinanceExporters));
+    // P1-KPI-004 — قراءة تحليلات KPI الموحّدة v2 (أداء/ترتيب/تفصيل). بوّابة دور أولى؛ الرؤية الفعليّة يحدّدها ScopeResolver خادميًّا.
+    options.AddPolicy(Policies.KpiAnalyticsView, p => p.RequireRole(Roles.KpiAnalyticsViewers));
     // محفظة مدير الحساب (مشاريعي/عملائي — عرض فقط) — AccountPortfolioReader (+Admin تشغيليًّا). الرؤية مقصورة خادمًا على مشاريع المستخدم نفسه.
     options.AddPolicy(Policies.AccountPortfolioRead, p => p.RequireRole(Roles.AccountPortfolioReaders));
     // ورشة الحوكمة العامة (GOV-GOVERNANCE-UX1) — Admin/CEO/GM/CeoSupport/Manager/TeamLeader/HR. Employee/Viewer ممنوعون.

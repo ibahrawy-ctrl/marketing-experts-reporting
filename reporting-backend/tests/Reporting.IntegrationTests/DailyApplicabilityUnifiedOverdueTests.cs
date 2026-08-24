@@ -4,8 +4,11 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Reporting.Application.Audit;
 using Reporting.Application.Common;
+using Reporting.Application.Kpi;
+using Reporting.Application.Periods;
 using Reporting.Application.Reports;
 using Reporting.Application.Submissions;
 using Reporting.Domain.Entities.Org;
@@ -1004,7 +1007,14 @@ public class DailyApplicabilityUnifiedOverdueTests
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var currentUser = new TestCurrentUser(tl, "TeamLeader");
-        var svc = new ReportingService(db, currentUser, new ScopeResolver(db, currentUser));
+        // P1-KPI-005: تبعيّتا محرّك KPI مطلوبتان للبناء اليدويّ؛ هذا الاختبار لا يمسّ KPI،
+        // والأعلام تُترك على قيمها الافتراضيّة (NewCalculationEngine = false).
+        var scopeResolver = new ScopeResolver(db, currentUser);
+        var kpiOptions = Options.Create(new KpiFeatureOptions());
+        var kpiCalc = new KpiCalculationService(
+            db, scopeResolver, currentUser, new CanonicalPeriodService(new SystemClock()),
+            new SystemClock(), kpiOptions);
+        var svc = new ReportingService(db, currentUser, scopeResolver, kpiCalc, kpiOptions);
 
         var r = await svc.SubmissionComplianceAsync(W28Key, null, null);
         Assert.True(r.Succeeded, r.Error);
