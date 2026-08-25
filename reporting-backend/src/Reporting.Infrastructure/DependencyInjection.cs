@@ -85,6 +85,8 @@ public static class DependencyInjection
         services.AddScoped<Application.Obligations.IObligationsService, ObligationsService>();
         // P2-HR-009 — لوحة العمليّات: البطاقة والتفصيل من مجموعة صفوف واحدة، والمطلوب/الناقص من محرّك الالتزامات وحده.
         services.AddScoped<Application.HrOperations.IHrOperationsService, HrOperationsService>();
+        // P2-HR-010 — قائمة الالتزام: الجدول الجديد يحمل البنود اليدويّة وحدها، والمحسوبة تُشتقّ في كلّ نداء.
+        services.AddScoped<Application.Checklist.IEmployeeChecklistService, EmployeeChecklistService>();
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IReportTemplateService, ReportTemplateService>();

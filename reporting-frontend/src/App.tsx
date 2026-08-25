@@ -184,7 +184,10 @@ const APP_ROUTES: { path: string; element: ReactNode; roles?: Role[] }[] = [
   { path: '/app/account-portfolio/clients/:id', element: <AccountPortfolioClientPage />, roles: ACCOUNT_PORTFOLIO_ROLES },
   // ملف أداء الموظف: متاح لكل مصادَق عليه — النطاق مفروض خادمًا (الموظف يرى نفسه فقط).
   // P2-EMP-003: «ملفّي» مسار صريح **إضافيّ** يُحَلّ معرّفه خادميًّا، ولا يستبدل المسار على المعرّف.
-  { path: '/app/employee/me', element: <EmployeeProfilePage /> },
+  // `selfRoute` ضروريّ لا زخرفيّ: المقطع الثابت `me` يفوز على `:userId` في المطابقة، فلا
+  // باراميتر أصلًا هنا ⇒ اشتقاق وضع الذات من `useParams` كان يُنتج معرّفًا فارغًا فيسقط
+  // المسار في العرض الإداريّ ويعرض شاشة المنع بدل ملفّ المستخدم نفسه.
+  { path: '/app/employee/me', element: <EmployeeProfilePage selfRoute /> },
   { path: '/app/employee/:userId', element: <EmployeeProfilePage /> },
   // مؤشرات أداء فردية (KPI-INDIVIDUAL-DASHBOARD-R1): «مؤشرات أدائي» للموظّف الحالي،
   // و«مؤشرات أداء الموظف» لموظّف بعينه — النطاق مفروض خادمًا (self-or-scope ⇒ 403/404 خارج النطاق).

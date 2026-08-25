@@ -609,4 +609,10 @@ public static class Policies
 
     /// <summary>تصدير وقائع الحضور — مطالبة <c>Attendance.Export</c> مستقلّة عن الرؤية والمراجعة.</summary>
     public const string AttendanceExport = "AttendanceExport";
+
+    /// <summary>
+    /// تحرير البنود اليدويّة في قائمة الالتزام — مطالبة <c>EmployeeChecklist.Manage</c>.
+    /// <b>قراءة القائمة ليست تحتها</b>: القراءة محكومة بالنطاق والحسّاسيّة، والتحرير مفتاح مستقلّ.
+    /// </summary>
+    public const string EmployeeChecklistManage = "EmployeeChecklistManage";
 }

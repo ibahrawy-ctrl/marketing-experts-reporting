@@ -33,6 +33,13 @@ public static class AppPermissions
     /// <summary>تصعيد واقعة حضور إلى الحوكمة.</summary>
     public const string AttendanceEscalate = "Attendance.Escalate";
 
+    // ===== قائمة خدمة الموظّف والالتزام =====
+    /// <summary>
+    /// تحرير البنود **اليدويّة** في قائمة الالتزام. مستقلّة عن قراءة القائمة عمدًا:
+    /// من يرى بندًا لا يحقّ له بالضرورة إغلاقه، والقراءة محكومة بالنطاق والحسّاسيّة وحدهما.
+    /// </summary>
+    public const string EmployeeChecklistManage = "EmployeeChecklist.Manage";
+
     // ===== حسّاسيّة الحقول =====
     /// <summary>قراءة الحقول المصنّفة <c>HrOnly</c> (سبب الإجازة الحسّاس، ملاحظات HR الداخليّة).</summary>
     public const string HrSensitiveRead = "Sensitivity.HrOnly.Read";
@@ -51,6 +58,7 @@ public static class AppPermissions
     {
         HrOperationsView, HrOperationsExport,
         AttendanceReport, AttendanceReview, AttendanceExport, AttendanceEscalate,
+        EmployeeChecklistManage,
         HrSensitiveRead, ManagementConfidentialRead, FinancialSensitiveRead, MedicalSensitiveRead
     };
 }

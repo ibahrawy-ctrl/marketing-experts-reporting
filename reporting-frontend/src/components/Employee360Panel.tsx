@@ -8,6 +8,7 @@ import { api } from '../lib/api';
 import { formatDate, formatDateTime } from '../lib/format';
 import { Badge, Card, EmptyState, StatCard } from '../components/ui';
 import { CardsSkeleton, QueryError, TableSkeleton } from '../components/states';
+import { EmployeeChecklistPanel } from './EmployeeChecklistPanel';
 import {
   EMPLOYEE_360_SECTION_ORDER,
   type Employee360Balance,
@@ -499,11 +500,29 @@ export function Employee360Panel({ subject }: { subject: string }) {
             </a>
           ))}
         </nav>
+
+        {/*
+          مرساة القائمة خارج شريط الأقسام عمدًا: عقد ذلك الشريط «لا يُرسَم إلّا ما وصل من
+          الخادم»، والقائمة لوحة محلّيّة لا قسمًا في `sections` — فإقحامها هناك يكذّب العقد.
+        */}
+        <a
+          href="#emp360-checklist"
+          className="mt-3 inline-block rounded-full border border-line px-3 py-1 text-xs text-navy hover:border-orange-500 focus:border-orange-500 focus:outline-none"
+        >
+          الانتقال إلى قائمة الالتزام
+        </a>
       </Card>
 
       {keys.map((k) => (
         <SectionCard key={k} section={data.sections[k]} onRetry={() => refetch()} />
       ))}
+
+      {/*
+        قائمة الالتزام (P2-HR-010) لوحة مستقلّة داخل الملفّ الشامل لا قسمًا ثاني عشر:
+        عقد `sections` الأحد عشر يبقى كما هو، ولها نداؤها ودورة تحميل/خطأ خاصّة بها
+        كي لا يُسقِط عطلُها بقيّةَ الملفّ ولا العكس.
+      */}
+      <EmployeeChecklistPanel subject={subject} />
     </div>
   );
 }

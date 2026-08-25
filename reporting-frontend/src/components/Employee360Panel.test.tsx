@@ -97,13 +97,30 @@ function fixture(): Employee360Dto {
   };
 }
 
+/**
+ * قائمة الالتزام (P2-HR-010) لوحة مستقلّة بنداء منفصل داخل الملفّ الشامل ⇒ المحاكاة
+ * تُوجَّه بالمسار. حمولة فارغة عمدًا: هذه الاختبارات تقيس عقد الأقسام لا القائمة.
+ */
+const emptyChecklist = {
+  subjectUserId: SUBJECT,
+  isSelf: false,
+  viewerRelation: 'DirectTeam',
+  summary: { applicable: 0, completed: 0, open: 0, notApplicable: 0, requiresMyAction: 0, completionRatio: 0 },
+  items: [],
+};
+
+/** نداءات الملفّ الشامل وحدها — نداء القائمة المستقلّ لا يُخلط بها في العدّ. */
+const profileCalls = () => getCalls.filter((c) => c.url.endsWith('/profile-360'));
+
 beforeEach(() => {
   vi.restoreAllMocks();
   getCalls = [];
   body = fixture();
   vi.spyOn(api, 'get').mockImplementation((url: string, config?: { params?: unknown }) => {
     getCalls.push({ url, params: config?.params });
-    return Promise.resolve({ data: body } as never);
+    return Promise.resolve({
+      data: url.endsWith('/checklist') ? emptyChecklist : body,
+    } as never);
   });
 });
 
@@ -122,15 +139,15 @@ describe('Employee360Panel — العقد مع الخادم', () => {
   it('ينادي مسار المعرّف مرّة واحدة بلا معامل فترة افتراضيّ', async () => {
     renderPanel();
     await screen.findByRole('heading', { name: 'الهويّة وحالة التوظيف' });
-    expect(getCalls).toHaveLength(1);
-    expect(getCalls[0].url).toBe(`/employees/${SUBJECT}/profile-360`);
-    expect(getCalls[0].params).toBeUndefined();
+    expect(profileCalls()).toHaveLength(1);
+    expect(profileCalls()[0].url).toBe(`/employees/${SUBJECT}/profile-360`);
+    expect(profileCalls()[0].params).toBeUndefined();
   });
 
   it('وضع الذات ينادي مسار me الخادميّ ولا يشتقّ معرّفًا في المتصفّح', async () => {
     renderPanel('me');
     await screen.findByRole('heading', { name: 'الهويّة وحالة التوظيف' });
-    expect(getCalls[0].url).toBe('/employees/me/profile-360');
+    expect(profileCalls()[0].url).toBe('/employees/me/profile-360');
   });
 
   it('يرسل مفتاح الفترة بعد تطبيقه فقط', async () => {
@@ -138,8 +155,8 @@ describe('Employee360Panel — العقد مع الخادم', () => {
     await screen.findByRole('heading', { name: 'الهويّة وحالة التوظيف' });
     fireEvent.change(screen.getByLabelText('مفتاح الفترة'), { target: { value: '2026-W30' } });
     fireEvent.click(screen.getByRole('button', { name: 'تطبيق الفترة' }));
-    await waitFor(() => expect(getCalls).toHaveLength(2));
-    expect(getCalls[1].params).toEqual({ period: '2026-W30' });
+    await waitFor(() => expect(profileCalls()).toHaveLength(2));
+    expect(profileCalls()[1].params).toEqual({ period: '2026-W30' });
   });
 
   it('يعرض الفترة والعلاقة كما حسمهما الخادم', async () => {
@@ -277,7 +294,7 @@ describe('Employee360Panel — مرشّحات الخطّ الزمنيّ', () => 
     fireEvent.click(screen.getByLabelText('يحتاج إجراءً منّي'));
     expect(screen.queryByText('تسليم تقرير أسبوعيّ')).toBeNull();
     expect(screen.getByText('طلب إجازة بانتظار الاعتماد')).toBeInTheDocument();
-    expect(getCalls).toHaveLength(1);
+    expect(profileCalls()).toHaveLength(1);
   });
 
   it('يرشّح على المصدر', async () => {

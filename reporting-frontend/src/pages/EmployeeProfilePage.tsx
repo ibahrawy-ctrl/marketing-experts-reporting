@@ -41,13 +41,16 @@ const statusTone: Record<string, 'success' | 'gold' | 'alert' | 'muted'> = {
  * + الملاحظات الإدارية + بنود الحوكمة + الخط الزمني.
  * النطاق مفروض خادمًا: من يفتح ملفًا خارج نطاقه يحصل 403/404 → نعرض حالة فارغة واضحة بدل بيانات.
  */
-export default function EmployeeProfilePage() {
+export default function EmployeeProfilePage({ selfRoute = false }: { selfRoute?: boolean }) {
   const { userId = '' } = useParams();
   const location = useLocation();
 
   // P2-EMP-003 — وضع الذات: المسار `/app/employee/me` يُحَلّ **خادميًّا** عبر سطح 360،
   // فلا نستدعي عرض الملفّ الإداريّ القديم (المبنيّ على معرّف صريح) ولا نشتقّ المعرّف محلّيًّا.
-  const isSelfRoute = userId === 'me';
+  //
+  // `selfRoute` يأتي من تعريف المسار لا من الباراميتر: المقطع الثابت `me` يفوز على `:userId`
+  // فلا باراميتر في تلك المطابقة، ولذلك `userId === 'me'` وحده لا يكفي.
+  const isSelfRoute = selfRoute || userId === 'me';
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['employee-profile', userId],

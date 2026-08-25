@@ -134,6 +134,10 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
     public DbSet<EmployeeServiceRequest> EmployeeServiceRequests => Set<EmployeeServiceRequest>();
     public DbSet<EmployeeServiceRequestEvent> EmployeeServiceRequestEvents => Set<EmployeeServiceRequestEvent>();
 
+    // قائمة خدمة الموظّف والالتزام (P2-HR-010) — **البنود اليدويّة وحدها**.
+    // البنود المحسوبة لا صفَّ لها هنا ولا في أيّ جدول: تُشتقّ من مصادرها في كلّ نداء.
+    public DbSet<EmployeeChecklistRecord> EmployeeChecklistRecords => Set<EmployeeChecklistRecord>();
+
     // حوادث الحضور (P2-ATT-005) — بلاغ مبدئيّ حتّى التأكيد، وبلا أيّ أثر ماليّ في أيّ حالة.
     public DbSet<AttendanceIncidentType> AttendanceIncidentTypes => Set<AttendanceIncidentType>();
     public DbSet<AttendanceIncident> AttendanceIncidents => Set<AttendanceIncident>();

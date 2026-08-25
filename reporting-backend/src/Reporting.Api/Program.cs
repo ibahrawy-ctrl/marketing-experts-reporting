@@ -157,6 +157,10 @@ builder.Services.AddAuthorization(options =>
         p => p.RequireClaim(AppPermissions.ClaimType, AppPermissions.AttendanceReview));
     options.AddPolicy(Policies.AttendanceExport,
         p => p.RequireClaim(AppPermissions.ClaimType, AppPermissions.AttendanceExport));
+    // تحرير البنود اليدويّة في قائمة الالتزام. قراءة القائمة **ليست** تحت هذه السياسة عمدًا:
+    // القراءة يحكمها النطاق وحسّاسيّة كلّ بند، والتحرير مفتاح مستقلّ لا يمنحه دور.
+    options.AddPolicy(Policies.EmployeeChecklistManage,
+        p => p.RequireClaim(AppPermissions.ClaimType, AppPermissions.EmployeeChecklistManage));
 });
 
 // ===== Rate limiting لمنع التخمين على المصادقة =====
