@@ -81,6 +81,8 @@ public static class DependencyInjection
         // P2-ATT-006 — وقائع الحضور: كلّ كتابة تمرّ ببوّابة الانتقال، ولا أثر ماليّ في أيّ مسار.
         services.AddScoped<Application.Attendance.IAttendanceService, AttendanceService>();
         services.AddHostedService<AttendanceSlaSweepService>();
+        // P2-HR-008 — المصدر الخادميّ الوحيد لاشتقاق الالتزامات؛ لا جدول موازٍ ولا إعادة حساب في سطح آخر.
+        services.AddScoped<Application.Obligations.IObligationsService, ObligationsService>();
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IReportTemplateService, ReportTemplateService>();
