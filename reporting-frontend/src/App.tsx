@@ -33,6 +33,7 @@ import EmailNotificationsPage from './pages/EmailNotificationsPage';
 import EmailControlCenterPage from './pages/EmailControlCenterPage';
 import EmployeeProfilePage from './pages/EmployeeProfilePage';
 import AttendancePage from './pages/AttendancePage';
+import HrOperationsPage from './pages/HrOperationsPage';
 import { MyKpiPage, EmployeeKpiPage } from './pages/IndividualKpiPage';
 import LeaveRequestsPage from './pages/LeaveRequestsPage';
 import MyBalancesPage from './pages/MyBalancesPage';
@@ -200,6 +201,11 @@ const APP_ROUTES: { path: string; element: ReactNode; roles?: Role[] }[] = [
   // طرفٌ أصيل في آلة الحالات (يقرّ أو يعترض)، وقصر الصفحة على الإدارة يُفقده حقّ الردّ. الرؤية
   // والإجراءات محسومة خادميًّا: خارج النطاق 404، والأزرار تُرسَم من `allowedActions` وحدها.
   { path: '/app/attendance', element: <AttendancePage /> },
+  // لوحة عمليّات الموارد البشريّة (P2-HR-009): مسار **جديد** لا يستبدل شيئًا. بلا بوّابة أدوار في
+  // الواجهة عمدًا — المفتاح `HrOperations.View` تخويل صريح لا يمنحه أيّ دور ضمنًا، فبوّابة الأدوار
+  // هنا كانت ستكذب في الاتّجاهين: تمنع حاملَ المفتاح، وتُوهم غير الحامل بأنّ له سطحًا. الخادم
+  // يردّ 403 بلا مفتاح و404 خارج النطاق، والصفحة تعرض ذلك رسالةً مفهومة.
+  { path: '/app/hr-operations', element: <HrOperationsPage /> },
   // خدمات الموظف (V1.1): الأرصدة وطلبات الموارد البشرية — متاح لكل مصادَق عليه (النطاق مفروض خادمًا).
   { path: '/app/balances', element: <MyBalancesPage /> },
   { path: '/app/hr-requests', element: <HrRequestsPage /> },

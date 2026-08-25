@@ -949,15 +949,10 @@ public class AttendanceService : IAttendanceService
     private static bool IsOfficial(AttendanceIncident i) =>
         AttendancePolicy.IsOfficialIncident(i.Status, i.HrDecision);
 
-    private DateTime? ComputeSlaDueAtUtc(AttendanceIncident i) => i.Status switch
-    {
-        AttendanceIncidentStatus.AwaitingEmployee => AttendancePolicy.EmployeeResponseDeadlineUtc(
-            i.UpdatedAtUtc ?? i.CreatedAtUtc, _options.AttendanceEmployeeResponseHours),
-        AttendanceIncidentStatus.AwaitingHr or AttendanceIncidentStatus.Corrected =>
-            AttendancePolicy.HrReviewDeadlineUtc(
-                i.UpdatedAtUtc ?? i.CreatedAtUtc, _options.AttendanceHrReviewWorkingDays),
-        _ => null
-    };
+    private DateTime? ComputeSlaDueAtUtc(AttendanceIncident i) =>
+        AttendancePolicy.CurrentSlaDueAtUtc(
+            i.Status, i.UpdatedAtUtc ?? i.CreatedAtUtc,
+            _options.AttendanceEmployeeResponseHours, _options.AttendanceHrReviewWorkingDays);
 
     private static string? NextActor(AttendanceIncidentStatus status) => status switch
     {

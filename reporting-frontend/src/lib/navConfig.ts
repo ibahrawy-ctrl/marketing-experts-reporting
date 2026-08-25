@@ -158,6 +158,9 @@ export const MODULES: NavModule[] = [
       // الإدارة يحرمه حقّ الردّ الذي تقوم عليه آلة الحالات كلّها. النطاق مفروض خادميًّا (404 خارجه)،
       // وعلم `Phase2:AttendanceEnabled` المطفأ يجعل السطح كلّه 404 قبل التفعيل.
       { to: '/app/attendance', label: 'الحضور والالتزام', keywords: 'غياب تأخير انصراف واقعة بلاغ' },
+      // P2-HR-009 — بلا `roles`: الوصول محكوم بمفتاح `HrOperations.View` وحده لا بالدور،
+      // ولا يمكن للواجهة أن تعرف حامله من قائمة أدوار ثابتة.
+      { to: '/app/hr-operations', label: 'عمليّات الموارد البشريّة', keywords: 'طوابير إجراءات متأخّر مهلة sla' },
       { to: '/app/balances', label: 'أرصدتي', keywords: 'رصيد' },
       { to: '/app/hr-requests', label: 'طلبات الموارد البشرية', keywords: 'hr خطاب' },
       { to: '/app/balance-management', label: 'إدارة الأرصدة', roles: BALANCE_MANAGEMENT },

@@ -83,6 +83,8 @@ public static class DependencyInjection
         services.AddHostedService<AttendanceSlaSweepService>();
         // P2-HR-008 — المصدر الخادميّ الوحيد لاشتقاق الالتزامات؛ لا جدول موازٍ ولا إعادة حساب في سطح آخر.
         services.AddScoped<Application.Obligations.IObligationsService, ObligationsService>();
+        // P2-HR-009 — لوحة العمليّات: البطاقة والتفصيل من مجموعة صفوف واحدة، والمطلوب/الناقص من محرّك الالتزامات وحده.
+        services.AddScoped<Application.HrOperations.IHrOperationsService, HrOperationsService>();
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IReportTemplateService, ReportTemplateService>();

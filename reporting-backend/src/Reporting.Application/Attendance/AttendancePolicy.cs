@@ -76,6 +76,22 @@ public static class AttendancePolicy
         return TimeZoneInfo.ConvertTimeToUtc(cursor, Riyadh);
     }
 
+    /// <summary>
+    /// موعد المهلة الجاري للحادثة بحسب حالتها — <b>التعريف الوحيد</b> الذي تقرؤه خدمة الحضور
+    /// ولوحة عمليّات الموارد البشريّة معًا، فلا يُصنَّف صفٌّ «مخروق المهلة» في سطح ويظهر سليمًا في آخر.
+    /// <para>الحالات التي لا مهلة جارية عليها تُعيد <c>null</c> — و«لا مهلة» ليست «مهلة مخروقة».</para>
+    /// </summary>
+    public static DateTime? CurrentSlaDueAtUtc(
+        AttendanceIncidentStatus status, DateTime lastChangeUtc, int employeeResponseHours, int hrReviewWorkingDays) =>
+        status switch
+        {
+            AttendanceIncidentStatus.AwaitingEmployee =>
+                EmployeeResponseDeadlineUtc(lastChangeUtc, employeeResponseHours),
+            AttendanceIncidentStatus.AwaitingHr or AttendanceIncidentStatus.Corrected =>
+                HrReviewDeadlineUtc(lastChangeUtc, hrReviewWorkingDays),
+            _ => null
+        };
+
     /// <summary>عدد أيّام العمل بين تاريخين (شاملًا الطرفين) — لقياس التقادم في الطوابير.</summary>
     public static int WorkingDaysBetween(DateOnly from, DateOnly to)
     {
