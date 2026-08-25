@@ -104,11 +104,14 @@ describe('شروط الظهور', () => {
     for (const to of [...single, ...admin]) expect(both.has(to)).toBe(true);
   });
 
-  it('الظهور بالمسمّى الوظيفيّ لا بالدور', () => {
+  it('المسمّى الوظيفيّ شرط إضافيّ لا بديل عن الدور', () => {
     const item = findItem('portfolio.account');
-    expect(isItemVisible(item, ctx({ roles: ['Admin'] }))).toBe(false);
+    // الدور وحده لا يكفي…
     expect(isItemVisible(item, ctx({ roles: ['AccountPortfolioReader'] }))).toBe(false);
-    expect(isItemVisible(item, ctx({ roles: ['Employee'], jobRoleCode: 'ACCOUNT_MGR' }))).toBe(true);
+    // …والمسمّى وحده لا يكفي (وإلّا ظهر رابط يمنعه حارس المسار عند فتحه)…
+    expect(isItemVisible(item, ctx({ roles: ['Employee'], jobRoleCode: 'ACCOUNT_MGR' }))).toBe(false);
+    // …ويلزم اجتماعهما.
+    expect(isItemVisible(item, ctx({ roles: ['AccountPortfolioReader'], jobRoleCode: 'ACCOUNT_MGR' }))).toBe(true);
   });
 });
 

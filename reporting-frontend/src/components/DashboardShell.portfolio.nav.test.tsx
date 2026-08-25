@@ -59,7 +59,9 @@ beforeEach(() => {
 });
 
 it('مدير الحساب (jobRoleCode === ACCOUNT_MGR) يرى وحدة «العملاء والمشروعات» في الشريط الجانبيّ', () => {
-  authState.roles = ['Employee'];
+  // P3-SEC-005: المسمّى شرط إضافيّ لا بديل — ومدير الحساب يحمل دور القراءة فعلًا،
+  // وحارس `/app/account-portfolio` يشترطه. القائمة تطابق الحارس ولا تتجاوزه.
+  authState.roles = ['AccountPortfolioReader'];
   authState.jobRoleCode = 'ACCOUNT_MGR';
   renderShell();
   // نحصر البحث في الشريط الجانبيّ: فتات الخبز تعرض اسم الوحدة أيضًا.

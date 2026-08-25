@@ -23,6 +23,7 @@ const ADMIN: Role[] = ['Admin'];
 const SALES_AGGREGATION: Role[] = ['Admin', 'CEO', 'GeneralManager', 'Manager'];
 const EXECUTION_REPORTS: Role[] = ['Admin', 'CEO', 'GeneralManager', 'Manager', 'TeamLeader', 'AccountPortfolioReader'];
 const TEAM_EXECUTION_DASHBOARD: Role[] = ['Admin', 'CEO', 'GeneralManager', 'Manager', 'TeamLeader'];
+const TEAM_SALES_DASHBOARD: Role[] = ['Admin', 'CEO', 'GeneralManager', 'Manager', 'TeamLeader'];
 const USERS_PAGE: Role[] = ['Admin', 'CEO', 'CeoSupport'];
 const GOVERNANCE: Role[] = ['Admin', 'CeoSupport', 'CEO', 'GeneralManager'];
 const TEMPLATE_GOVERNANCE: Role[] = ['Admin', 'CEO', 'GeneralManager'];
@@ -38,6 +39,7 @@ const GOVERNANCE_ACTION_ITEMS: Role[] = ['Admin', 'CEO', 'GeneralManager', 'CeoS
 const AUDIT: Role[] = ['Admin', 'CEO', 'GeneralManager'];
 const ARCHIVE_GOVERNANCE: Role[] = ['Admin', 'CEO', 'GeneralManager'];
 const CLIENT_360: Role[] = [...EXEC_VIEW, 'AccountPortfolioReader'];
+const ACCOUNT_PORTFOLIO: Role[] = ['AccountPortfolioReader', 'Admin'];
 
 // ===== مفاتيح القدرات الخادميّة (تطابق Reporting.Application.Security.AppPermissions حرفيًّا) =====
 export const PERMISSIONS = {
@@ -195,7 +197,7 @@ export const MODULES: NavModule[] = [
 
       { id: 'reports.analytics', label: 'التحليلات', target: '/app/analytics', order: 10, group: 'aggregations', roles: EXEC_VIEW, keywords: 'مقارنات تحليل' },
       { id: 'reports.sales-aggregation', label: 'تجميع المبيعات', target: '/app/sales-aggregation', order: 11, group: 'aggregations', roles: SALES_AGGREGATION, aliases: ['/app/sales-aggregate'] },
-      { id: 'reports.sales-team', label: 'لوحة مبيعات الفريق', target: '/app/sales/team-dashboard', order: 12, group: 'aggregations', jobRoleGate: 'salesTeamLeader' },
+      { id: 'reports.sales-team', label: 'لوحة مبيعات الفريق', target: '/app/sales/team-dashboard', order: 12, group: 'aggregations', jobRoleGate: 'salesTeamLeader', roles: TEAM_SALES_DASHBOARD },
       { id: 'reports.sales-mine', label: 'لوحة مبيعاتي', target: '/app/sales/my-dashboard', order: 13, group: 'aggregations', jobRoleGate: 'salesRep' },
       { id: 'reports.execution', label: 'تقارير التنفيذ', target: '/app/execution-reports', order: 14, group: 'aggregations', roles: EXECUTION_REPORTS },
       { id: 'reports.execution-team', label: 'لوحة تنفيذ الفريق', target: '/app/execution/team-dashboard', order: 15, group: 'aggregations', roles: TEAM_EXECUTION_DASHBOARD },
@@ -255,7 +257,7 @@ export const MODULES: NavModule[] = [
     items: [
       { id: 'portfolio.clients', label: 'العملاء', target: '/app/clients', order: 1, roles: CLIENT_360, matchPaths: ['/app/clients'] },
       { id: 'portfolio.projects', label: 'المشروعات', target: '/app/projects', order: 2, roles: EXEC_VIEW, matchPaths: ['/app/projects'] },
-      { id: 'portfolio.account', label: 'مشاريع عملائي', target: '/app/account-portfolio', order: 3, jobRoleGate: 'accountManager', matchPaths: ['/app/account-portfolio'], keywords: 'محفظة عملائي مدير العميل' },
+      { id: 'portfolio.account', label: 'مشاريع عملائي', target: '/app/account-portfolio', order: 3, jobRoleGate: 'accountManager', roles: ACCOUNT_PORTFOLIO, matchPaths: ['/app/account-portfolio'], keywords: 'محفظة عملائي مدير العميل' },
     ],
   },
 
@@ -296,10 +298,16 @@ export const MODULES: NavModule[] = [
 export function isItemVisible(item: NavItem, ctx: NavCtx): boolean {
   if (!ctx.authenticated) return false;
 
+  // شرطٌ **إضافيّ** لا بديل: لو قصر المسمّى الوظيفيّ وحده لظهر الرابط لدور يمنعه حارس المسار
+  // (موظّف بمسمّى مدير حساب مثلًا) فيصطدم بالمنع عند الفتح. القائمة لا تُعلن بابًا مُقفَلًا.
   if (item.jobRoleGate) {
-    if (item.jobRoleGate === 'salesRep') return ctx.isSalesRep;
-    if (item.jobRoleGate === 'salesTeamLeader') return ctx.isSalesB2cTeamLeader;
-    return ctx.jobRoleCode === 'ACCOUNT_MGR';
+    const gateOpen =
+      item.jobRoleGate === 'salesRep'
+        ? ctx.isSalesRep
+        : item.jobRoleGate === 'salesTeamLeader'
+          ? ctx.isSalesB2cTeamLeader
+          : ctx.jobRoleCode === 'ACCOUNT_MGR';
+    if (!gateOpen) return false;
   }
 
   if (item.permissionsAll && !item.permissionsAll.every((p) => ctx.permissions.has(p))) return false;
