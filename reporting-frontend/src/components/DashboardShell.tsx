@@ -4,7 +4,9 @@
 // **يستهلك سجلّ الملاحة ولا يقرّر شيئًا بنفسه**: لا شرط ظهور واحد مكتوب هنا. الحماية الفعليّة
 // مفروضة عبر `ProtectedRoute` وسياسات الخادم؛ ما هنا عرضٌ فقط.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+// `Link` لا `NavLink`: الوحدة تُعَدّ نشطة إن كان المسار الحاليّ داخلها ولو لم يطابق وجهتها
+// (قسم آخر، alias، مسار ديناميّ) — وهذا ما يعرفه السجلّ وحده.
+import { Link, useLocation } from 'react-router-dom';
 import { useNavCtx } from '../lib/useNavCtx';
 import { useNotificationRealtime } from '../lib/useNotifications';
 import { NotificationsBell } from './NotificationsBell';
@@ -104,7 +106,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
       {modules.map((m) => {
         const isActive = m.id === activeModule?.id;
         return (
-          <NavLink
+          <Link
             key={m.id}
             to={moduleTarget(m, ctx)}
             title={m.label}
@@ -118,7 +120,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
               className={`h-5 w-5 shrink-0 ${isActive ? 'text-white' : 'text-navy-600'}`}
             />
             <span className={`truncate ${collapsed ? 'lg:hidden' : ''}`}>{m.label}</span>
-          </NavLink>
+          </Link>
         );
       })}
     </nav>

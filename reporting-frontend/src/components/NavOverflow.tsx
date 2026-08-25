@@ -3,8 +3,11 @@
 // حدّ ثابت: **7 عناصر مرئيّة كحدّ أقصى** في الصفّ الأفقيّ، والباقي داخل قائمة «المزيد ⋯».
 // العنصر النشط إن وقع في الفائض يُبرَز الزرّ نفسه كنشط كي لا يفقد المستخدم موضعه.
 // القائمة قابلة للتنقّل بالكيبورد كاملًا (Escape للإغلاق، النقر خارجها يُغلقها).
+// **`Link` لا `NavLink` عمدًا:** حالة النشاط تُشتقّ من سجلّ الملاحة (`resolveActive`) الذي
+// يفهم الـaliases والمسارات الديناميّة، بينما `NavLink` يطابق الرابط بالمسار حرفيًّا فيُلغي
+// أيّ `aria-current` نمرّره ويُسقط الإبراز على المسارات المدمَجة والديناميّة.
 import { useEffect, useRef, useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 /// الحدّ الأقصى للعناصر المرئيّة قبل الطيّ في «المزيد ⋯».
 export const MAX_VISIBLE_TABS = 7;
@@ -59,7 +62,7 @@ export function NavOverflow({ tabs, activeId }: { tabs: OverflowTab[]; activeId:
       {/* `flex-wrap` لا `overflow-x-auto`: لا قصّ أفقيّ ولا تمرير غير مقصود على أيّ عرض. */}
       <div className="flex flex-wrap items-center gap-1" role="tablist" aria-label="أقسام الوحدة">
         {visible.map((t) => (
-          <NavLink
+          <Link
             key={t.id}
             to={t.to}
             role="tab"
@@ -71,7 +74,7 @@ export function NavOverflow({ tabs, activeId }: { tabs: OverflowTab[]; activeId:
           >
             {t.label}
             <TabBadge value={t.badge} />
-          </NavLink>
+          </Link>
         ))}
 
         {overflow.length > 0 && (
@@ -101,7 +104,7 @@ export function NavOverflow({ tabs, activeId }: { tabs: OverflowTab[]; activeId:
                       {showGroup && (
                         <div className="px-3 pb-1 pt-2 text-[11px] font-semibold text-ink-3">{t.groupLabel}</div>
                       )}
-                      <NavLink
+                      <Link
                         to={t.to}
                         role="menuitem"
                         onClick={() => setOpen(false)}
@@ -112,7 +115,7 @@ export function NavOverflow({ tabs, activeId }: { tabs: OverflowTab[]; activeId:
                       >
                         {t.label}
                         <TabBadge value={t.badge} />
-                      </NavLink>
+                      </Link>
                     </div>
                   );
                 })}

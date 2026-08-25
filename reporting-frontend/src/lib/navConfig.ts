@@ -457,7 +457,9 @@ export function buildBreadcrumbs(pathname: string, ctx: NavCtx, dynamicLabel?: s
   if (active.group) crumbs.push({ label: active.group.label, to: null });
 
   const canonical = canonicalPath(pathname);
-  const isLeaf = pathMatches(active.item.target, canonical, active.item.exact);
+  // «ورقة» = المسار هو الوجهة نفسها أو أحد مساراتها المعلَنة؛ وما زاد عن ذلك مقطع ديناميّ
+  // (معرّف مورد) يستحقّ فتاتة خاصّة. مطابقة البادئة هنا تبتلع المقطع الديناميّ وتُخفيه.
+  const isLeaf = canonical === active.item.target || (active.item.matchPaths ?? []).includes(canonical);
   crumbs.push({ label: active.item.label, to: isLeaf ? null : itemTarget(active.item, ctx) });
 
   if (!isLeaf) crumbs.push({ label: dynamicLabel && dynamicLabel.trim() ? dynamicLabel : 'التفاصيل', to: null });
