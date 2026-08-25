@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Reporting.Application.Attendance;
 using Reporting.Application.Common;
 using Reporting.Application.Employee360;
 using Reporting.Application.Periods;
@@ -21,17 +23,20 @@ public class Employee360Service : IEmployee360Service
     private readonly AppDbContext _db;
     private readonly IFieldVisibilityPolicy _visibility;
     private readonly IPeriodService _periods;
+    private readonly Phase2FeatureOptions _flags;
     private readonly ILogger<Employee360Service> _logger;
 
     public Employee360Service(
         AppDbContext db,
         IFieldVisibilityPolicy visibility,
         IPeriodService periods,
+        IOptions<Phase2FeatureOptions> flags,
         ILogger<Employee360Service> logger)
     {
         _db = db;
         _visibility = visibility;
         _periods = periods;
+        _flags = flags.Value;
         _logger = logger;
     }
 
@@ -87,7 +92,7 @@ public class Employee360Service : IEmployee360Service
                 Employee360Section.Kpi => await BuildKpiAsync(ctx, period, ct),
                 Employee360Section.LeaveAndPermissions => await BuildLeaveAsync(ctx, ct),
                 Employee360Section.RequestsAndBalances => await BuildRequestsAndBalancesAsync(ctx, ct),
-                Employee360Section.AttendanceAndCompliance => BuildAttendanceUnavailable(),
+                Employee360Section.AttendanceAndCompliance => await BuildAttendanceAsync(ctx, ct),
                 Employee360Section.Notes => await BuildNotesAsync(ctx, ct),
                 Employee360Section.Governance => await BuildGovernanceAsync(ctx, ct),
                 Employee360Section.DevelopmentAndTraining => await BuildDevelopmentAsync(ctx, ct),
@@ -464,15 +469,71 @@ public class Employee360Service : IEmployee360Service
     // ===== (7) الحضور والالتزام =====
 
     /// <summary>
-    /// وحدة الحضور تُبنى في P2-ATT-005/006. حتّى ذلك الحين يُعلن القسم صراحةً أنّه غير متاح
-    /// — ولا يُختلَق له جدول موازٍ ولا بيانات وهميّة (§3).
+    /// إسقاط قراءة فوق جدول وقائع الحضور — لا نسخة ولا جدول موازٍ.
+    ///
+    /// <para>حين يُطفأ علم <c>Phase2:AttendanceEnabled</c> يُعلن القسم أنّه غير متاح صراحةً،
+    /// ولا يُقدَّم صفرٌ مكان «لا بيانات»: الفرق بين «لا وقائع» و«لا وحدة» فرق جوهريّ.</para>
+    ///
+    /// <para>الموظّف على نفسه لا يرى المسودّة ولا البلاغ قبل إشعاره: البلاغ الذي لم يصله بعد
+    /// ليس واقعة في سجلّه، وكشفُه قبل اكتمال إجراء المُبلِّغ يفسد حقّه في ردٍّ على نصٍّ مستقرّ.</para>
     /// </summary>
-    private static Employee360SectionDto BuildAttendanceUnavailable() =>
-        new(SectionKey(Employee360Section.AttendanceAndCompliance),
-            TitleAr(Employee360Section.AttendanceAndCompliance),
-            Employee360SectionStatus.NoData, Employee360DataQuality.Unavailable,
-            null, null, Array.Empty<object>(),
-            "وحدة الحضور غير مفعّلة في هذا الإصدار.");
+    private async Task<Employee360SectionDto> BuildAttendanceAsync(
+        FieldVisibilityContext ctx, CancellationToken ct)
+    {
+        if (!_flags.AttendanceEnabled)
+            return new Employee360SectionDto(
+                SectionKey(Employee360Section.AttendanceAndCompliance),
+                TitleAr(Employee360Section.AttendanceAndCompliance),
+                Employee360SectionStatus.NoData, Employee360DataQuality.Unavailable,
+                null, null, Array.Empty<object>(),
+                "وحدة الحضور غير مفعّلة في هذا الإصدار.");
+
+        var subject = ctx.SubjectUserId;
+
+        var query = _db.AttendanceIncidents.AsNoTracking().Where(i => i.SubjectUserId == subject);
+
+        if (ctx.IsSelf)
+            query = query.Where(i => i.Status != AttendanceIncidentStatus.Draft
+                                     && i.Status != AttendanceIncidentStatus.Reported);
+
+        var rows = await query
+            .OrderByDescending(i => i.IncidentDate)
+            .ThenByDescending(i => i.CreatedAtUtc)
+            .Take(100)
+            .Join(_db.AttendanceIncidentTypes.AsNoTracking(), i => i.IncidentTypeId, t => t.Id,
+                (i, t) => new
+                {
+                    i.Id, t.Code, t.NameAr, i.IncidentDate, i.StartTime, i.ReturnTime,
+                    i.DurationMinutes, i.Status, i.HrDecision, i.CreatedAtUtc, i.UpdatedAtUtc
+                })
+            .ToListAsync(ct);
+
+        var items = rows
+            .Select(r => new Employee360AttendanceIncidentDto(
+                r.Id, r.Code, r.NameAr, r.IncidentDate, r.StartTime, r.ReturnTime,
+                r.DurationMinutes, r.Status.ToString(),
+                AttendancePolicy.IsOfficialIncident(r.Status, r.HrDecision), r.CreatedAtUtc))
+            .ToList();
+
+        if (items.Count == 0)
+            return Empty(Employee360Section.AttendanceAndCompliance, "لا توجد وقائع حضور مسجّلة.");
+
+        // «مؤكَّدة» و«بلاغات مفتوحة» عدّادان منفصلان عمدًا: خلطهما يوحي بإدانة لم تقع بعد.
+        var summary = new
+        {
+            confirmedCount = items.Count(i => i.IsConfirmed),
+            openCount = rows.Count(r => r.Status is not (AttendanceIncidentStatus.Closed
+                or AttendanceIncidentStatus.Cancelled or AttendanceIncidentStatus.Voided
+                or AttendanceIncidentStatus.Withdrawn)),
+            awaitingEmployeeCount = rows.Count(r => r.Status == AttendanceIncidentStatus.AwaitingEmployee),
+            totalConfirmedMinutes = items.Where(i => i.IsConfirmed).Sum(i => i.DurationMinutes ?? 0),
+            hasPayrollImpact = false
+        };
+
+        return Ready(Employee360Section.AttendanceAndCompliance, summary,
+            items.Cast<object>().ToList(),
+            rows.Max(r => r.UpdatedAtUtc ?? r.CreatedAtUtc));
+    }
 
     // ===== (8) الملاحظات =====
 
@@ -615,7 +676,29 @@ public class Employee360Service : IEmployee360Service
                 l.TeamLeaderReviewerId == viewer || l.ManagerReviewerId == viewer || l.HrReviewerId == viewer))
             .ToListAsync(ct);
 
-        var all = submissions.Concat(evaluations).Concat(leaves)
+        // الحضور يدخل الخطّ الزمنيّ بنفس شرط القسم (7): الموظّف لا يرى بلاغًا لم يصله بعد،
+        // وإلّا لكشف الخطّ الزمنيّ ما أخفاه القسم — وهو تسريب بالباب الخلفيّ.
+        var attendance = new List<Employee360TimelineEventDto>();
+        if (_flags.AttendanceEnabled &&
+            _visibility.CanSeeSection(ctx, Employee360Section.AttendanceAndCompliance))
+        {
+            var incidents = _db.AttendanceIncidents.AsNoTracking().Where(i => i.SubjectUserId == subject);
+            if (ctx.IsSelf)
+                incidents = incidents.Where(i => i.Status != AttendanceIncidentStatus.Draft
+                                                 && i.Status != AttendanceIncidentStatus.Reported);
+
+            attendance = await incidents
+                .OrderByDescending(i => i.CreatedAtUtc)
+                .Take(30)
+                .Join(_db.AttendanceIncidentTypes.AsNoTracking(), i => i.IncidentTypeId, t => t.Id,
+                    (i, t) => new Employee360TimelineEventDto(
+                        "AttendanceIncident", "AttendanceIncidents", i.Id,
+                        t.NameAr, i.CreatedAtUtc,
+                        i.SubjectUserId == viewer && i.Status == AttendanceIncidentStatus.AwaitingEmployee))
+                .ToListAsync(ct);
+        }
+
+        var all = submissions.Concat(evaluations).Concat(leaves).Concat(attendance)
             .OrderByDescending(e => e.AtUtc)
             .Take(60)
             .ToList();

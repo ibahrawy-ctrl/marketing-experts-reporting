@@ -10,6 +10,7 @@
 
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { api } from '../lib/api';
 import type { Employee360Dto, Employee360Section } from '../types/employee360';
@@ -109,9 +110,11 @@ beforeEach(() => {
 function renderPanel(subject = SUBJECT) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <QueryClientProvider client={qc}>
-      <Employee360Panel subject={subject} />
-    </QueryClientProvider>,
+    <MemoryRouter>
+      <QueryClientProvider client={qc}>
+        <Employee360Panel subject={subject} />
+      </QueryClientProvider>
+    </MemoryRouter>,
   );
 }
 
@@ -291,5 +294,106 @@ describe('Employee360Panel — مرشّحات الخطّ الزمنيّ', () => 
     fireEvent.change(screen.getByLabelText('نوع الحدث'), { target: { value: 'ReportSubmitted' } });
     fireEvent.click(screen.getByLabelText('يحتاج إجراءً منّي'));
     expect(screen.getByText('لا أحداث مطابقة')).toBeInTheDocument();
+  });
+});
+
+// ======================================================================
+// P2-ATT-007 — قسم الحضور داخل الملفّ الشامل.
+//
+// الادّعاء المقيس هنا ليس «هل ظهر الجدول»، بل **أنّ اللوحة لا تترجم حالةً إلى حكم**:
+// «مؤكَّدة» تُقرأ من `isConfirmed` الذي يحسمه الخادم، لا من اسم الحالة المعروض. لو اشتُقّت
+// محلّيًّا لصارت `Escalated` إدانةً في شاشةٍ وبراءةً في أخرى.
+// ======================================================================
+
+const INCIDENT_ID = '33333333-3333-3333-3333-333333333333';
+
+function attendanceSection(items: Record<string, unknown>[]) {
+  return section({ key: 'attendanceAndCompliance', titleAr: 'الحضور والالتزام', items });
+}
+
+function attendanceCard(): Promise<HTMLElement> {
+  return screen
+    .findByRole('heading', { name: 'الحضور والالتزام' })
+    .then((h) => h.closest('section') as HTMLElement);
+}
+
+describe('Employee360Panel — قسم الحضور والالتزام', () => {
+  it('يعرض وقائع الحضور بأعمدتها ولا يخترع أثرًا ماليًّا', async () => {
+    body.sections.attendanceAndCompliance = attendanceSection([
+      {
+        id: INCIDENT_ID,
+        typeCode: 'LATE',
+        typeNameAr: 'تأخّر عن الدوام',
+        incidentDate: '2026-08-18',
+        status: 'AwaitingEmployee',
+        isConfirmed: false,
+        createdAtUtc: '2026-08-18T06:30:00Z',
+      },
+    ]);
+    renderPanel();
+    const card = await attendanceCard();
+    expect(within(card).getByText('تأخّر عن الدوام')).toBeInTheDocument();
+    // «مؤكَّدة = لا» لبلاغ لم تُقرّه الموارد البشريّة بعد.
+    expect(within(card).getByRole('columnheader', { name: 'مؤكَّدة' })).toBeInTheDocument();
+    expect(within(card).getByText('لا')).toBeInTheDocument();
+    // لا عمود ولا نصّ يوحي بخصم أو أثر على الراتب.
+    expect(within(card).queryByText(/خصم|راتب|Payroll/i)).toBeNull();
+  });
+
+  it('«مؤكَّدة» تُقرأ من حسم الخادم لا من اسم الحالة', async () => {
+    // `Escalated` حالة تصعيد، والخادم وحده يقرّر إن كانت مبنيّة على تأكيد سابق.
+    body.sections.attendanceAndCompliance = attendanceSection([
+      {
+        id: INCIDENT_ID,
+        typeCode: 'ABSENCE',
+        typeNameAr: 'غياب',
+        incidentDate: '2026-08-19',
+        status: 'Escalated',
+        isConfirmed: true,
+        createdAtUtc: '2026-08-19T06:30:00Z',
+      },
+    ]);
+    renderPanel();
+    const card = await attendanceCard();
+    expect(within(card).getByText('نعم')).toBeInTheDocument();
+  });
+
+  it('يربط كلّ واقعة برابط مصدر إلى سطح الحضور بمعرّفها', async () => {
+    body.sections.attendanceAndCompliance = attendanceSection([
+      {
+        id: INCIDENT_ID,
+        typeCode: 'LATE',
+        typeNameAr: 'تأخّر عن الدوام',
+        incidentDate: '2026-08-18',
+        status: 'AwaitingEmployee',
+        isConfirmed: false,
+        createdAtUtc: '2026-08-18T06:30:00Z',
+      },
+    ]);
+    renderPanel();
+    const card = await attendanceCard();
+    expect(within(card).getByRole('link', { name: 'فتح التفاصيل' })).toHaveAttribute(
+      'href',
+      `/app/attendance?incident=${INCIDENT_ID}`,
+    );
+  });
+
+  it('لا يرسم عمود المصدر لقسم لا رابط مصدر له', async () => {
+    body.sections.requestsAndBalances = section({
+      key: 'requestsAndBalances',
+      titleAr: 'الطلبات والأرصدة',
+      items: [{ id: 'q-1', requestType: 'Letter', title: 'خطاب تعريف', status: 'Open' }],
+    });
+    renderPanel();
+    const card = (await screen.findByRole('heading', { name: 'الطلبات والأرصدة' })).closest(
+      'section',
+    ) as HTMLElement;
+    expect(within(card).queryByRole('columnheader', { name: 'المصدر' })).toBeNull();
+  });
+
+  it('قسم الحضور الغائب عن حمولة الخادم لا يُرسَم إطلاقًا', async () => {
+    renderPanel();
+    await screen.findByRole('heading', { name: 'الهويّة وحالة التوظيف' });
+    expect(screen.queryByRole('heading', { name: 'الحضور والالتزام' })).toBeNull();
   });
 });

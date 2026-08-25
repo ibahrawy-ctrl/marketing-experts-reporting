@@ -947,9 +947,7 @@ public class AttendanceService : IAttendanceService
     // ═══════════════════════════════ بناء العقود ═══════════════════════════════
 
     private static bool IsOfficial(AttendanceIncident i) =>
-        i.Status == AttendanceIncidentStatus.Confirmed
-        || (i.Status is AttendanceIncidentStatus.Closed or AttendanceIncidentStatus.Escalated
-            && i.HrDecision == AttendanceHrDecision.Confirm);
+        AttendancePolicy.IsOfficialIncident(i.Status, i.HrDecision);
 
     private DateTime? ComputeSlaDueAtUtc(AttendanceIncident i) => i.Status switch
     {

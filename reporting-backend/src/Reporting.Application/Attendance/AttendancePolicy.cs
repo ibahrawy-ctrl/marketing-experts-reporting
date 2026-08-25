@@ -1,3 +1,5 @@
+using Reporting.Domain.Enums;
+
 namespace Reporting.Application.Attendance;
 
 /// <summary>
@@ -17,6 +19,18 @@ public static class AttendancePolicy
     /// <summary>تاريخ الواقعة بتقويم الرياض من لحظة UTC.</summary>
     public static DateOnly RiyadhDate(DateTimeOffset utc) =>
         DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(utc, Riyadh).DateTime);
+
+    /// <summary>
+    /// **الفارق بين بلاغ وواقعة مؤكَّدة** — تعريف واحد يقرأه كلّ من يعرض الحضور
+    /// (خدمة الحضور، وعرض الموظّف 360، ولوحة الموارد البشريّة) فلا يتفرّق المعنى بينهم.
+    ///
+    /// <para>المؤكَّد هو ما قرّرته الموارد البشريّة صراحةً: <c>Confirmed</c>، أو ما أُغلِق/صُعِّد
+    /// بعد قرار تأكيد. الإغلاق بذاته ليس تأكيدًا — الواقعة تُغلَق مرفوضةً أيضًا.</para>
+    /// </summary>
+    public static bool IsOfficialIncident(AttendanceIncidentStatus status, AttendanceHrDecision decision) =>
+        status == AttendanceIncidentStatus.Confirmed
+        || (status is AttendanceIncidentStatus.Closed or AttendanceIncidentStatus.Escalated
+            && decision == AttendanceHrDecision.Confirm);
 
     /// <summary>يوم عمل حضور = الأحد حتّى الخميس. الجمعة والسبت خارج أيّام العمل.</summary>
     public static bool IsWorkingDay(DateOnly date) =>

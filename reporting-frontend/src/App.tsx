@@ -32,6 +32,7 @@ import ReportViewGrantsPage from './pages/ReportViewGrantsPage';
 import EmailNotificationsPage from './pages/EmailNotificationsPage';
 import EmailControlCenterPage from './pages/EmailControlCenterPage';
 import EmployeeProfilePage from './pages/EmployeeProfilePage';
+import AttendancePage from './pages/AttendancePage';
 import { MyKpiPage, EmployeeKpiPage } from './pages/IndividualKpiPage';
 import LeaveRequestsPage from './pages/LeaveRequestsPage';
 import MyBalancesPage from './pages/MyBalancesPage';
@@ -195,6 +196,10 @@ const APP_ROUTES: { path: string; element: ReactNode; roles?: Role[] }[] = [
   { path: '/app/my-reports', element: <SubmissionsPage personalOnly /> },
   // الإجازات والاستئذانات (V1.0.1): متاح لكل مصادَق عليه — النطاق والدور مفروضان خادمًا.
   { path: '/app/leave-requests', element: <LeaveRequestsPage /> },
+  // الحضور والالتزام (P2-ATT-007): مسار **جديد** لا يستبدل شيئًا. بلا بوّابة أدوار عمدًا — الموظّف
+  // طرفٌ أصيل في آلة الحالات (يقرّ أو يعترض)، وقصر الصفحة على الإدارة يُفقده حقّ الردّ. الرؤية
+  // والإجراءات محسومة خادميًّا: خارج النطاق 404، والأزرار تُرسَم من `allowedActions` وحدها.
+  { path: '/app/attendance', element: <AttendancePage /> },
   // خدمات الموظف (V1.1): الأرصدة وطلبات الموارد البشرية — متاح لكل مصادَق عليه (النطاق مفروض خادمًا).
   { path: '/app/balances', element: <MyBalancesPage /> },
   { path: '/app/hr-requests', element: <HrRequestsPage /> },

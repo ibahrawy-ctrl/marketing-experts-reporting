@@ -2,6 +2,7 @@
 // مبدأ أمنيّ حاكم: **الأقسام تُرسَم من مفاتيح الخادم حصرًا**. القسم غير المصرَّح به لا يصل
 // أصلًا في `sections`، فلا يوجد في هذا الملفّ أيّ إخفاء بصريّ ولا شرط صلاحيّة محسوب في المتصفّح.
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { formatDate, formatDateTime } from '../lib/format';
@@ -107,6 +108,18 @@ const SECTION_COLUMNS: Record<string, Column[]> = {
   ],
 };
 
+/**
+ * رابط المصدر لكلّ صفّ — «الرابط إلى المصدر» المطلوب في المواصفة. الوجهة سطحٌ مستقلّ
+ * يعيد فرض التخويل بنفسه؛ فالرابط اختصار تنقّل لا منح صلاحيّة. ومن لا يملك الواقعة يجد 404
+ * هناك كما يجدها لو كتب المسار بيده.
+ */
+type RowLink = (row: Record<string, unknown>) => string | null;
+
+const SECTION_ROW_LINK: Partial<Record<string, RowLink>> = {
+  attendanceAndCompliance: (row) =>
+    typeof row.id === 'string' ? `/app/attendance?incident=${row.id}` : null,
+};
+
 function cellValue(row: Record<string, unknown>, col: Column): string {
   const raw = row[col.field];
   if (raw === null || raw === undefined) return '—';
@@ -129,6 +142,7 @@ function visibleColumns(cols: Column[], rows: Record<string, unknown>[]): Column
 
 function SectionTable({ sectionKey, items }: { sectionKey: string; items: Record<string, unknown>[] }) {
   const cols = visibleColumns(SECTION_COLUMNS[sectionKey] ?? [], items);
+  const linkOf = SECTION_ROW_LINK[sectionKey];
   if (cols.length === 0) {
     return (
       <ul className="space-y-2 text-sm text-ink">
@@ -150,18 +164,33 @@ function SectionTable({ sectionKey, items }: { sectionKey: string; items: Record
                 {c.label}
               </th>
             ))}
+            {linkOf && <th scope="col" className="px-3 py-2 font-medium">المصدر</th>}
           </tr>
         </thead>
         <tbody>
-          {items.map((row, i) => (
-            <tr key={i} className="border-b border-line/60 last:border-0">
-              {cols.map((c) => (
-                <td key={c.field} className="px-3 py-2 text-ink">
-                  {cellValue(row, c)}
-                </td>
-              ))}
-            </tr>
-          ))}
+          {items.map((row, i) => {
+            const href = linkOf?.(row) ?? null;
+            return (
+              <tr key={i} className="border-b border-line/60 last:border-0">
+                {cols.map((c) => (
+                  <td key={c.field} className="px-3 py-2 text-ink">
+                    {cellValue(row, c)}
+                  </td>
+                ))}
+                {linkOf && (
+                  <td className="px-3 py-2">
+                    {href ? (
+                      <Link className="text-navy underline" to={href}>
+                        فتح التفاصيل
+                      </Link>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
+                )}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

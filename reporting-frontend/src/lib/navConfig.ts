@@ -154,6 +154,10 @@ export const MODULES: NavModule[] = [
     icon: 'calendar',
     tabs: [
       { to: '/app/leave-requests', label: 'الإجازات والاستئذانات', keywords: 'إجازة استئذان' },
+      // P2-ATT-007 — بلا `roles`: الموظّف يحتاج السطح ليرى بلاغًا يخصّه ويردّ عليه، وقصره على
+      // الإدارة يحرمه حقّ الردّ الذي تقوم عليه آلة الحالات كلّها. النطاق مفروض خادميًّا (404 خارجه)،
+      // وعلم `Phase2:AttendanceEnabled` المطفأ يجعل السطح كلّه 404 قبل التفعيل.
+      { to: '/app/attendance', label: 'الحضور والالتزام', keywords: 'غياب تأخير انصراف واقعة بلاغ' },
       { to: '/app/balances', label: 'أرصدتي', keywords: 'رصيد' },
       { to: '/app/hr-requests', label: 'طلبات الموارد البشرية', keywords: 'hr خطاب' },
       { to: '/app/balance-management', label: 'إدارة الأرصدة', roles: BALANCE_MANAGEMENT },
