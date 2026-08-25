@@ -431,8 +431,8 @@ AddColumn<int>("Sensitivity", "management_notes", type: "integer", nullable: tru
 | البند | القيمة |
 |---|---|
 | الفرع | `feature/p2-employee360-hr-ops-20260825` |
-| SHA النهائيّ الكامل | `8a680a7` → انظر السطر أدناه بعد التزام التقرير |
-| `git status --short` (الـworktree) | نظيف عدا هذا التقرير قبل التزامه |
+| SHA النهائيّ الكامل | `2eacdaed2686b50785065cc64d6d4b9a62fff024` (التقرير) — وآخر التزام كود `8a680a7` |
+| `git status --short` (الـworktree) | **نظيف تمامًا** — لا مخرَج |
 | الشجرة الرئيسيّة `HEAD` | `736b5c567b0dde2511dd91ac8fcb1c9cd466b951` — **لم تتغيّر** |
 | تعديلات المستخدم المحميّة | ` M CLAUDE.md` و`?? Ops/R21/RC-CANDIDATE-BUILD-AND-REHEARSAL-REPORT-20260823.md` — **باقيتان كما هما، لم تُمسّا** |
 | worktrees أخرى | لم تُفتَح ولم تُمسّ |
