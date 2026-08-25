@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Reporting.Domain.Entities.Attendance;
 using Reporting.Domain.Entities.Clients;
 using Reporting.Domain.Entities.Courses;
 using Reporting.Domain.Entities.Development;
@@ -132,6 +133,12 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
     public DbSet<BalancePolicy> BalancePolicies => Set<BalancePolicy>();
     public DbSet<EmployeeServiceRequest> EmployeeServiceRequests => Set<EmployeeServiceRequest>();
     public DbSet<EmployeeServiceRequestEvent> EmployeeServiceRequestEvents => Set<EmployeeServiceRequestEvent>();
+
+    // حوادث الحضور (P2-ATT-005) — بلاغ مبدئيّ حتّى التأكيد، وبلا أيّ أثر ماليّ في أيّ حالة.
+    public DbSet<AttendanceIncidentType> AttendanceIncidentTypes => Set<AttendanceIncidentType>();
+    public DbSet<AttendanceIncident> AttendanceIncidents => Set<AttendanceIncident>();
+    public DbSet<AttendanceIncidentEvent> AttendanceIncidentEvents => Set<AttendanceIncidentEvent>();
+    public DbSet<AttendanceIncidentAttachment> AttendanceIncidentAttachments => Set<AttendanceIncidentAttachment>();
 
     // المراجعة المالية لطلبات الإجازة/الاستئذان المؤثّرة على الراتب (FIN-L1 — عرض فقط، إعلامي)
     public DbSet<PayrollImpactReview> PayrollImpactReviews => Set<PayrollImpactReview>();

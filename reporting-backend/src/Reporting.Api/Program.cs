@@ -248,6 +248,8 @@ using (var scope = app.Services.CreateScope())
     await CourseSeeder.SeedAsync(scope.ServiceProvider);
     // كتالوج خدمات B2B (مصدر أسماء خدمات مبيعات B2B) — بذر أولي قابل للتعديل (idempotent، إضافيّ بحت).
     await ServiceSeeder.SeedAsync(scope.ServiceProvider);
+    // كتالوج أنواع حوادث الحضور (P2-ATT-005) — بذر مرجعيّ (idempotent، إضافيّ بحت). كتالوج لا بيانات موظّفين.
+    await AttendanceSeeder.SeedAsync(scope.ServiceProvider);
 
     // هيكل تنظيمي تمثيلي لاختبار نطاق الرؤية — بيئة التطوير فقط (لا يُزرع في الإنتاج).
     if (app.Environment.IsDevelopment())
