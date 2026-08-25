@@ -178,13 +178,40 @@ public class AttendanceActorRulesTests
         bool canReview = false, bool canEscalate = false, bool responded = false, bool isSystem = false) =>
         new(Guid.NewGuid(), isSubject, isReporter, canReport, canReview, canEscalate, responded, isSystem);
 
+    /// <summary>
+    /// انحدار P2-SEC-011: الصيغة الأولى كانت تفحص مُبلِّغًا **بلا** إذن مراجعة، فكانت تنجح
+    /// لسبب آخر تمامًا (غياب المفتاح) وتترك فصل الواجبات غير مُختبَر. الحالة الحاسمة هي
+    /// مُبلِّغ **يحمل** <c>Attendance.Review</c>: هي وحدها تفصل «لا مفتاح» عن «لا تؤكّد بلاغك».
+    /// </summary>
     [Fact]
-    public void Reporter_CannotConfirmOwnReport()
+    public void Reporter_CannotConfirmOwnReport_EvenWhenHoldingTheReviewKey()
     {
-        var result = _a.Authorize(AttendanceTrigger.HrConfirm, Ctx(isReporter: true, canReport: true));
+        var withoutKey = _a.Authorize(AttendanceTrigger.HrConfirm, Ctx(isReporter: true, canReport: true));
+        Assert.False(withoutKey.Allowed);
+        Assert.Equal("auth.forbidden", withoutKey.ErrorCode);
 
-        Assert.False(result.Allowed);
-        Assert.Equal("auth.forbidden", result.ErrorCode);
+        var withKey = _a.Authorize(
+            AttendanceTrigger.HrConfirm, Ctx(isReporter: true, canReport: true, canReview: true));
+        Assert.False(withKey.Allowed);
+        Assert.Equal("auth.forbidden", withKey.ErrorCode);
+
+        // ومراجِع آخر يحمل المفتاح نفسه يؤكّد بلا عائق — فالمنع فصلُ واجبات لا تعطيلًا للمراجعة.
+        Assert.True(_a.Authorize(AttendanceTrigger.HrConfirm, Ctx(canReview: true)).Allowed);
+    }
+
+    /// <summary>
+    /// الفصل مقصور على التأكيد: المُبلِّغ الحامل للمفتاح يظلّ يرفض ويصحّح ويصالح ويُبطِل —
+    /// توسيع المنع إلى هذه لكان تعطيلًا لمسارات لا تُنتج «واقعة رسميّة» أصلًا.
+    /// </summary>
+    [Fact]
+    public void DutySeparation_Binds_Confirm_Only_Not_The_Rest_Of_Hr_Review()
+    {
+        foreach (var tr in new[]
+                 {
+                     AttendanceTrigger.HrReject, AttendanceTrigger.HrCorrect,
+                     AttendanceTrigger.HrReconcile, AttendanceTrigger.ReturnToEmployee, AttendanceTrigger.Void
+                 })
+            Assert.True(_a.Authorize(tr, Ctx(isReporter: true, canReview: true)).Allowed);
     }
 
     [Fact]

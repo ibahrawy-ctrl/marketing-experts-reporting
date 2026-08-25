@@ -15,14 +15,28 @@ namespace Reporting.IntegrationTests;
 /// </summary>
 public static class Phase2TestAuth
 {
-    public static async Task<(HttpClient Client, Guid UserId)> CreateUserAsync(
+    public static Task<(HttpClient Client, Guid UserId)> CreateUserAsync(
         Phase2WebApplicationFactory factory,
         string role,
         Guid? managerId = null,
         Guid? teamId = null,
         Guid? departmentId = null,
         params string[] permissions)
+        => CreateWithRolesAsync(factory, new[] { role }, managerId, teamId, departmentId, permissions);
+
+    /// <summary>
+    /// نسخة متعدّدة الأدوار — لازمة لإثبات أنّ اجتماع الأدوار **اتّحاد لما مُنِح** لا فتح شامل.
+    /// الأدوار تُسنَد **قبل** تسجيل الدخول لأنّ الرمز يحمل لقطة الأدوار لحظة إصداره.
+    /// </summary>
+    public static async Task<(HttpClient Client, Guid UserId)> CreateWithRolesAsync(
+        Phase2WebApplicationFactory factory,
+        IReadOnlyList<string> roles,
+        Guid? managerId = null,
+        Guid? teamId = null,
+        Guid? departmentId = null,
+        params string[] permissions)
     {
+        var role = roles[0];
         var email = $"p2-{role.ToLowerInvariant()}-{Guid.NewGuid():N}@test.local";
         const string password = "Passw0rd#1";
         Guid userId;
@@ -42,7 +56,14 @@ public static class Phase2TestAuth
                 DepartmentId = departmentId
             };
             await users.CreateAsync(user, password);
-            await users.AddToRoleAsync(user, role);
+            foreach (var r in roles.Distinct())
+            {
+                var assigned = await users.AddToRoleAsync(user, r);
+                // إسناد صامت الفشل كان سيُنتج اختبار تعدّد أدوار «ينجح» بدور واحد فقط.
+                if (!assigned.Succeeded)
+                    throw new InvalidOperationException(
+                        $"تعذّر إسناد الدور '{r}': {string.Join("; ", assigned.Errors.Select(e => e.Description))}");
+            }
             foreach (var permission in permissions.Distinct())
                 await users.AddClaimAsync(user, new Claim(AppPermissions.ClaimType, permission));
             userId = user.Id;

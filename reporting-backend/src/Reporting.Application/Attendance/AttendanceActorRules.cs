@@ -65,7 +65,19 @@ public sealed class AttendanceActorRules
                 ? WorkflowTransitionResult.Ok()
                 : Deny("هذا انتقال يُجريه النظام لا المستخدم."),
 
-        AttendanceTrigger.HrConfirm or AttendanceTrigger.HrReject or AttendanceTrigger.HrCorrect
+        // فصل الواجبات على **التأكيد وحده**: `Confirmed` هي المخرج الوحيد الذي يجعل البلاغ
+        // «واقعة رسميّة» (AttendancePolicy.IsOfficialIncident)، ولا يُبلَغ إليها إلّا بهذا المُشغِّل.
+        // قبل هذا الشرط كان إذن المراجعة كافيًا وحده، فلو حمل المُبلِّغ نفسه `Attendance.Review`
+        // لأكّد بلاغه بنفسه — وكان الفصل يبدو قائمًا لأنّ قائد الفريق في الاختبارات لا يحمل المفتاح.
+        // الرفض هنا **403 لا 404** عن قصد: المُبلِّغ يرى واقعته أصلًا، فإخفاؤها عنه كذب لا حماية.
+        AttendanceTrigger.HrConfirm =>
+            !ctx.CanReview
+                ? Deny("هذا الإجراء يتطلّب إذن مراجعة الحضور.")
+                : ctx.IsReporter
+                    ? Deny("لا يؤكّد مُقدِّم البلاغ بلاغَه بنفسه — التأكيد لمراجِع آخر.")
+                    : WorkflowTransitionResult.Ok(),
+
+        AttendanceTrigger.HrReject or AttendanceTrigger.HrCorrect
             or AttendanceTrigger.HrReconcile or AttendanceTrigger.ReturnToEmployee or AttendanceTrigger.Void =>
             ctx.CanReview
                 ? WorkflowTransitionResult.Ok()
