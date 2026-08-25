@@ -31,6 +31,8 @@ export interface AuthResponse {
   expectedReportCadence: PeriodType;
   // رمز المسمّى الوظيفي (مثل SALES_B2C) — لتحديد لوحات المبيعات وعناصر التنقّل (null إن لم يُسنَد).
   jobRoleCode?: string | null;
+  permissions?: string[] | null;
+  scopeType?: string | null;
 }
 
 export type PeriodType = 'Daily' | 'Weekly' | 'Monthly' | 'Quarterly' | 'Yearly' | 'AdHoc';
@@ -45,6 +47,11 @@ export interface MeResponse {
   expectedReportCadence: PeriodType;
   // رمز المسمّى الوظيفي (مثل SALES_B2C) — لتحديد لوحات المبيعات وعناصر التنقّل (null إن لم يُسنَد).
   jobRoleCode?: string | null;
+  // P3-NAV-001 — قدرات هذا المستخدم كما يحسبها الخادم: مفاتيح `perm` المُسنَدة إليه صراحةً،
+  // ونوع نطاق رؤيته (own/team/department/company/governance). للعرض والتوجيه السياقيّ فقط؛
+  // التخويل الفعليّ خادميّ بالكامل. غيابها ⇒ إخفاء العناصر المشروطة (احتياطيّ آمن).
+  permissions?: string[] | null;
+  scopeType?: string | null;
 }
 
 /// سياق المبيعات الموثوق (RC-3 Task 1.1) — يُحسَب خادميًّا لتحديد الأقسام المعروضة ونوع المندوب.

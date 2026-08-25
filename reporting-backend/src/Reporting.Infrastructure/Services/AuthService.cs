@@ -80,8 +80,18 @@ public class AuthService : IAuthService
             ? await _db.JobRoles.Where(j => j.Id == jrid).Select(j => j.Code).FirstOrDefaultAsync(ct)
             : null;
         var cadence = ReportCadencePolicy.ExpectedCadence(jobRoleCode).ToString();
+        // P3-NAV-001 — قدرات هذا المستخدم نفسه: مفاتيح `perm` المُسنَدة إليه صراحةً + نوع نطاقه.
+        // نفس المصدر الذي تُبنى منه مطالبات الرمز في IssueAsync، فلا انفصال بين ما تراه الواجهة
+        // وما يفرضه الخادم. لا شيء افتراضيّ: غياب المفتاح ⇒ لا يظهر السطح، والخادم يحجب بأيّ حال.
+        var permissions = (await _users.GetClaimsAsync(user))
+            .Where(c => c.Type == AppPermissions.ClaimType)
+            .Select(c => c.Value)
+            .Distinct()
+            .ToArray();
+        var scopeType = RoleAccess.ScopeTypeFor(RoleAccess.PrimaryRole(roles));
         return Result<MeResponse>.Success(new MeResponse(
-            user.Id, user.FullName, user.Email ?? string.Empty, user.IsActive, roles.ToArray(), cadence, jobRoleCode));
+            user.Id, user.FullName, user.Email ?? string.Empty, user.IsActive, roles.ToArray(), cadence, jobRoleCode,
+            permissions, scopeType));
     }
 
     public async Task<Result> ChangePasswordAsync(Guid userId, ChangePasswordRequest request, CancellationToken ct = default)
@@ -172,6 +182,8 @@ public class AuthService : IAuthService
 
         return new AuthResponse(
             access.Token, refresh.Token, access.ExpiresUtc,
-            user.Id, user.FullName, user.Email ?? string.Empty, roles.ToArray(), cadence, jobRoleCode);
+            user.Id, user.FullName, user.Email ?? string.Empty, roles.ToArray(), cadence, jobRoleCode,
+            // P3-NAV-001 — نفس المفاتيح المحقونة في الرمز أعلاه، معادةً كقدرات للواجهة (قراءة فقط).
+            permissions, RoleAccess.ScopeTypeFor(RoleAccess.PrimaryRole(roles)));
     }
 }

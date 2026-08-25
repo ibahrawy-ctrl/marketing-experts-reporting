@@ -19,7 +19,10 @@ public record AuthResponse(
     // الدورية المتوقَّعة لتقارير هذا المستخدم (يومي لمندوبي المبيعات، أسبوعي لغيرهم).
     string ExpectedReportCadence,
     // رمز المسمّى الوظيفي (مثل SALES_B2C) — لتحديد لوحات المبيعات وعناصر التنقّل بالواجهة (null إن لم يُسنَد).
-    string? JobRoleCode = null);
+    string? JobRoleCode = null,
+    // P3-NAV-001 — قدرات المستخدم نفسه (انظر MeResponse).
+    IReadOnlyCollection<string>? Permissions = null,
+    string? ScopeType = null);
 
 public record MeResponse(
     Guid UserId,
@@ -30,4 +33,12 @@ public record MeResponse(
     // الدورية المتوقَّعة لتقارير هذا المستخدم (يومي لمندوبي المبيعات، أسبوعي لغيرهم) — تُعرض كقيمة ثابتة بالواجهة.
     string ExpectedReportCadence,
     // رمز المسمّى الوظيفي (مثل SALES_B2C) — لتحديد لوحات المبيعات وعناصر التنقّل بالواجهة (null إن لم يُسنَد).
-    string? JobRoleCode = null);
+    string? JobRoleCode = null,
+    // P3-NAV-001 — **قدرات المستخدم نفسه**: مفاتيح `perm` المُسنَدة إليه صراحةً في Identity.
+    // انعكاس قراءة فقط لما يحمله المستخدم بالفعل داخل رمزه (JWT) — لا يمنح شيئًا ولا يوسّع وصولًا،
+    // والخادم يبقى المُنفِّذ الوحيد للتخويل. الغرض: تجعل الواجهة تُخفي ما لا يملكه المستخدم بدل
+    // أن تُظهر سطحًا يردّ عليه الخادم 403، وبدل أن تُخمّن الملكيّة من قائمة أدوار ثابتة تكذب.
+    IReadOnlyCollection<string>? Permissions = null,
+    // نوع نطاق رؤية المستخدم كما يحسبه الخادم (own/team/department/company/governance).
+    // للعرض والتوجيه السياقيّ فقط (وضع الذات)؛ الفرز الفعليّ خادميّ عبر IScopeResolver.
+    string? ScopeType = null);
