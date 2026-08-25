@@ -91,7 +91,8 @@ public static class FieldVisibilityRules
         return ctx.HasAnyRole(Roles.TeamLeader, Roles.Manager) && IsSupervisoryRelation(ctx.Relation);
     }
 
-    private static bool IsSupervisoryRelation(SubjectRelation relation) =>
+    /// <summary>علاقة إشراف تشغيليّ فعليّ على الموضوع (لا مجرّد وجوده في النطاق).</summary>
+    public static bool IsSupervisoryRelation(SubjectRelation relation) =>
         relation is SubjectRelation.DirectTeam or SubjectRelation.Department or SubjectRelation.Company;
 
     /// <summary>

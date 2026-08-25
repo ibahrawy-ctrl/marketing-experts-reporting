@@ -78,6 +78,9 @@ public static class DependencyInjection
         services.AddScoped<IFieldVisibilityPolicy, FieldVisibilityPolicy>();
         // P2-EMP-002 — عرض قراءة بحت؛ لا يملك بيانات ولا يكتب شيئًا.
         services.AddScoped<Application.Employee360.IEmployee360Service, Employee360Service>();
+        // P2-ATT-006 — وقائع الحضور: كلّ كتابة تمرّ ببوّابة الانتقال، ولا أثر ماليّ في أيّ مسار.
+        services.AddScoped<Application.Attendance.IAttendanceService, AttendanceService>();
+        services.AddHostedService<AttendanceSlaSweepService>();
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IReportTemplateService, ReportTemplateService>();
