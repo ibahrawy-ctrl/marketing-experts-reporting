@@ -5,7 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { roleLabel } from '../lib/format';
 import { apiErrorMessage } from '../lib/api';
-import { searchableTabs } from '../lib/navConfig';
+import { isPathVisible, searchableItems } from '../lib/navConfig';
+import { useNavCtx } from '../lib/useNavCtx';
 
 // زرّ ترويسة بأيقونة موحّد الشكل.
 function HeaderButton({
@@ -108,12 +109,11 @@ function GlyphHelp() {
 
 // ===== البحث العام — تصفية التبويبات التي يراها المستخدم فقط =====
 function GlobalSearch() {
-  const { user, hasAnyRole, isSalesRep, isSalesB2cTeamLeader } = useAuth();
-  const jobRoleCode = user?.jobRoleCode ?? null;
+  const ctx = useNavCtx();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
-  const tabs = useMemo(() => searchableTabs({ hasAnyRole, isSalesRep, isSalesB2cTeamLeader, jobRoleCode }), [hasAnyRole, isSalesRep, isSalesB2cTeamLeader, jobRoleCode]);
+  const tabs = useMemo(() => searchableItems(ctx), [ctx]);
   const results = useMemo(() => {
     const term = q.trim();
     if (!term) return [];
@@ -164,14 +164,11 @@ function GlobalSearch() {
 
 // ===== إجراءات سريعة — اختصارات لمسارات متاحة للمستخدم فقط =====
 function QuickActions() {
-  const { user, hasAnyRole, isSalesRep, isSalesB2cTeamLeader, canApprove } = useAuth();
-  const jobRoleCode = user?.jobRoleCode ?? null;
+  const { canApprove } = useAuth();
+  const ctx = useNavCtx();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const allowed = useMemo(
-    () => new Set(searchableTabs({ hasAnyRole, isSalesRep, isSalesB2cTeamLeader, jobRoleCode }).map((t) => t.to)),
-    [hasAnyRole, isSalesRep, isSalesB2cTeamLeader, jobRoleCode],
-  );
+  const allowed = useMemo(() => (to: string) => isPathVisible(to, ctx), [ctx]);
   const shortcuts = useMemo(() => {
     const base = [
       { to: '/app/submissions', label: 'تقرير جديد / التقارير المقدَّمة' },
@@ -180,8 +177,8 @@ function QuickActions() {
       { to: '/app/my-kpi', label: 'مؤشرات أدائي' },
       { to: '/app/balances', label: 'أرصدتي' },
     ];
-    const list = base.filter((s) => allowed.has(s.to));
-    if (canApprove && allowed.has('/app/workflows')) list.push({ to: '/app/workflows', label: 'مسارات الاعتماد' });
+    const list = base.filter((s) => allowed(s.to));
+    if (canApprove && allowed('/app/workflows')) list.push({ to: '/app/workflows', label: 'مسارات الاعتماد' });
     return list;
   }, [allowed, canApprove]);
 

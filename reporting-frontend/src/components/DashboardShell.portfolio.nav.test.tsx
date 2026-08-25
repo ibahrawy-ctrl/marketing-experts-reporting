@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { it, expect, vi, beforeEach } from 'vitest';
 import type { Role } from '../types/api';
@@ -24,15 +24,21 @@ vi.mock('../lib/auth', () => ({
     hasAnyRole: (...r: Role[]) => r.some((x) => authState.roles.includes(x)),
     isSalesRep: authState.isSalesRep,
     isSalesB2cTeamLeader: authState.roles.includes('TeamLeader') && authState.jobRoleCode === 'SALES_B2C_TL',
+    permissions: new Set<string>(),
+    scopeType: null,
   }),
 }));
 vi.mock('../lib/useNotifications', () => ({ useNotificationRealtime: () => undefined }));
 vi.mock('./NotificationsBell', () => ({ NotificationsBell: () => null }));
 
 import { DashboardShell } from './DashboardShell';
+import { MODULES } from '../lib/navConfig';
 
-const PORTFOLIO_MODULE = 'المشاريع والعملاء';
-const PEOPLE_MODULE = 'الفرق والموظفون';
+// P3-NAV-002: صارت الوحدة «العملاء والمشروعات»، وصفحة المحفظة قسمٌ داخلها اسمه «مشاريع عملائي».
+// الوحدة نفسها تظهر لمن يرى العملاء أو المشروعات؛ **القسم** وحده مقصور على مسمّى مدير الحساب،
+// فالفحص يقع على القسم لا على عنوان الوحدة.
+const PORTFOLIO_MODULE = 'العملاء والمشروعات';
+const PORTFOLIO_ITEM = 'مشاريع عملائي';
 const OLD_LABEL = 'مشاريعي';
 
 function renderShell(route = '/app/account-portfolio') {
@@ -52,19 +58,21 @@ beforeEach(() => {
   authState.jobRoleCode = null;
 });
 
-it('مدير الحساب (jobRoleCode === ACCOUNT_MGR) يرى عنصر «المشاريع والعملاء» الرئيسيّ المباشر', () => {
+it('مدير الحساب (jobRoleCode === ACCOUNT_MGR) يرى وحدة «العملاء والمشروعات» في الشريط الجانبيّ', () => {
   authState.roles = ['Employee'];
   authState.jobRoleCode = 'ACCOUNT_MGR';
   renderShell();
-  expect(screen.getByText(PORTFOLIO_MODULE)).toBeInTheDocument();
+  // نحصر البحث في الشريط الجانبيّ: فتات الخبز تعرض اسم الوحدة أيضًا.
+  const side = within(screen.getByRole('navigation', { name: 'الوحدات الرئيسية' }));
+  expect(side.getByText(PORTFOLIO_MODULE)).toBeInTheDocument();
 });
 
-it('مدير الحساب لا يرى صفحة المحفظة داخل وحدة «الفرق والموظفون»', () => {
-  authState.roles = ['Employee'];
-  authState.jobRoleCode = 'ACCOUNT_MGR';
-  renderShell();
-  // «المشاريع والعملاء» عنصر رئيسيّ مستقلّ؛ وحدة «الفرق والموظفون» لا تظهر لمدير الحساب أصلًا.
-  expect(screen.queryByText(PEOPLE_MODULE)).toBeNull();
+it('صفحة المحفظة تنتمي لوحدة «العملاء والمشروعات» لا لوحدة «الموظفون»', () => {
+  const owner = MODULES.find((m) => m.items.some((i) => i.target === '/app/account-portfolio'));
+  expect(owner?.id).toBe('portfolio');
+  expect(MODULES.find((m) => m.id === 'people')?.items.map((i) => i.target)).not.toContain(
+    '/app/account-portfolio',
+  );
 });
 
 it('التسمية القديمة «مشاريعي» لم تعد موجودة في التنقّل', () => {
@@ -74,23 +82,28 @@ it('التسمية القديمة «مشاريعي» لم تعد موجودة ف
   expect(screen.queryByText(OLD_LABEL)).toBeNull();
 });
 
-it('حامل دور AccountPortfolioReader بلا مسمّى ACCOUNT_MGR لا يرى العنصر (الظهور بالمسمّى لا بالدور)', () => {
+it('حامل دور AccountPortfolioReader بلا مسمّى ACCOUNT_MGR لا يرى القسم (الظهور بالمسمّى لا بالدور)', () => {
   authState.roles = ['AccountPortfolioReader'];
   authState.jobRoleCode = null;
-  renderShell('/app/submissions');
-  expect(screen.queryByText(PORTFOLIO_MODULE)).toBeNull();
+  // نصيّر على «العملاء» لا على مسار المحفظة نفسه: فتات الخبز تصف الموضع الحاليّ دائمًا
+  // (حتّى عند الوصول المباشر بالرابط)، والمقصود هنا فحص **قائمة** الأقسام لا الموضع.
+  renderShell('/app/clients');
+  expect(screen.queryByText(PORTFOLIO_ITEM)).toBeNull();
 });
 
-it('الأدمن (بلا مسمّى ACCOUNT_MGR) لا يرى عنصر «المشاريع والعملاء»', () => {
+it('الأدمن (بلا مسمّى ACCOUNT_MGR) لا يرى قسم «مشاريع عملائي»', () => {
   authState.roles = ['Admin'];
   authState.jobRoleCode = null;
-  renderShell('/app/submissions');
-  expect(screen.queryByText(PORTFOLIO_MODULE)).toBeNull();
+  // نصيّر على «العملاء» لا على مسار المحفظة نفسه: فتات الخبز تصف الموضع الحاليّ دائمًا
+  // (حتّى عند الوصول المباشر بالرابط)، والمقصود هنا فحص **قائمة** الأقسام لا الموضع.
+  renderShell('/app/clients');
+  expect(screen.queryByText(PORTFOLIO_ITEM)).toBeNull();
 });
 
-it('الموظف العادي (بلا مسمّى ACCOUNT_MGR) لا يرى عنصر «المشاريع والعملاء»', () => {
+it('الموظف العادي (بلا مسمّى ACCOUNT_MGR) لا يرى قسم «مشاريع عملائي» ولا وحدته', () => {
   authState.roles = ['Employee'];
   authState.jobRoleCode = null;
   renderShell('/app/submissions');
+  expect(screen.queryByText(PORTFOLIO_ITEM)).toBeNull();
   expect(screen.queryByText(PORTFOLIO_MODULE)).toBeNull();
 });

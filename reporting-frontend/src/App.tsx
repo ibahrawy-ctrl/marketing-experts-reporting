@@ -2,6 +2,8 @@ import { Routes, Route, Link } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { DashboardShell } from './components/DashboardShell';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { AliasRedirect } from './components/AliasRedirect';
+import { ROUTE_ALIASES } from './lib/navConfig';
 import LoginPage from './pages/LoginPage';
 import HomePage from './pages/HomePage';
 import ExecutiveReportsPage from './pages/ExecutiveReportsPage';
@@ -219,6 +221,11 @@ const APP_ROUTES: { path: string; element: ReactNode; roles?: Role[] }[] = [
   { path: '/app/kpi-finance-export', element: <KpiFinanceExportPage />, roles: KPI_FINANCE_EXPORT_ROLES },
   { path: '/app/report-templates', element: <ReportTemplatesPage />, roles: TEMPLATE_GOVERNANCE_ROLES },
   { path: '/app/kpi', element: <KpiPage /> },
+  // لوحة الأداء الموحّدة (P3-NAV-002) — الهدف المرجعيّ لعنصر «لوحة الأداء» في القائمة.
+  // **نفس المكوّن ونفس البوّابة** الموجودَين في `/app/kpi`: لا سطح جديد ولا صلاحيّة جديدة، وإنّما
+  // اسم مرجعيّ واحد بدل رابطَين متنافسَين في القائمة. `/app/kpi` و`/app/my-kpi` يبقيان عاملَين
+  // بالوصول المباشر بلا تحويل، فلا تنكسر أيّ روابط عميقة قائمة. الرؤية محسومة خادميًّا كما هي.
+  { path: '/app/performance', element: <KpiPage /> },
   // تقويم التقارير والتجميع الدوري: متاح لكل مصادَق عليه — النطاق مفروض خادمًا.
   { path: '/app/report-calendar', element: <ReportCalendarPage /> },
   { path: '/app/kpi-templates', element: <KpiTemplatesPage />, roles: TEMPLATE_GOVERNANCE_ROLES },
@@ -277,6 +284,14 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       {APP_ROUTES.map((r) => (
         <Route key={r.path} path={r.path} element={<Protected roles={r.roles}>{r.element}</Protected>} />
+      ))}
+      {/*
+        مسارات الـalias (P3-NAV-003) — مشتقّة من سجلّ الملاحة وحده، فلا قائمة موازية تتباعد عنه.
+        كلّ alias يحوّل إلى مساره المرجعيّ **قبل** أيّ حراسة، والوجهة تُطبّق حارسها الأصليّ كاملًا:
+        لا تجاوز لحارس، ولا كشف لوجود مورد لمن لا يملكه، ولا حلقة تحويل (الوجهة ليست alias أبدًا).
+      */}
+      {ROUTE_ALIASES.map((a) => (
+        <Route key={`alias:${a.from}`} path={a.from} element={<AliasRedirect to={a.to} />} />
       ))}
     </Routes>
   );

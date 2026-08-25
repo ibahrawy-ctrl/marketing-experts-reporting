@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { it, expect, vi, beforeEach } from 'vitest';
 import type { Role } from '../types/api';
@@ -26,6 +26,9 @@ vi.mock('../lib/auth', () => ({
     hasAnyRole: (...r: Role[]) => r.some((x) => authState.roles.includes(x)),
     isSalesRep: authState.isSalesRep,
     isSalesB2cTeamLeader: authState.roles.includes('TeamLeader') && authState.jobRoleCode === 'SALES_B2C_TL',
+    // P3-NAV-001: قدرات الخادم كما تصل للواجهة — لا قدرة ولا نطاق في هذه الحالات.
+    permissions: new Set<string>(),
+    scopeType: null,
   }),
 }));
 
@@ -40,14 +43,19 @@ const TEAM = 'لوحة مبيعات الفريق';
 const MINE = 'لوحة مبيعاتي';
 
 // نصيّر على مسار من وحدة «التقارير» كي يظهر شريط تبويبات الوحدة (فيه تبويبات المبيعات).
+// شريط الأقسام يطوي ما بعد سبعة عناصر داخل «المزيد ⋯» (P3-NAV-004)، فنفتحه بعد التصيير
+// كي يشمل الفحص كلّ أقسام الوحدة لا المرئيّ منها فقط — إثباتًا/نفيًا على القائمة كاملة.
 function renderShell(route = '/app/submissions') {
-  return render(
+  const result = render(
     <MemoryRouter initialEntries={[route]}>
       <DashboardShell>
         <div>محتوى</div>
       </DashboardShell>
     </MemoryRouter>,
   );
+  const more = screen.queryByRole('button', { name: 'المزيد ⋯' });
+  if (more) fireEvent.click(more);
+  return result;
 }
 
 beforeEach(() => {
@@ -140,7 +148,9 @@ it('وحدات الشريط الجانبي وتبويبات وحدة التقا�
   // تبويبات وحدة التقارير النشطة (اللصيقة بالمسمّى الحرفي في navConfig).
   // ROLE-AWARE-PERSONAL-REPORT-SUBMISSION-ACCESS-R1: مساران متوازيان — «تقاريري» الشخصيّ (لكل مصادَق
   // عليه) و«تقارير الفريق» الإداريّ (EXEC_VIEW). الأدمن يرى كليهما دون أن يستبدل أحدهما الآخر.
-  expect(screen.getByText('تقاريري')).toBeInTheDocument();
-  expect(screen.getByText('تقارير الفريق')).toBeInTheDocument();
-  expect(screen.getByText('تقويم التقارير')).toBeInTheDocument();
+  // نحصر البحث في شريط الأقسام: فتات الخبز تعرض اسم القسم النشط أيضًا، فالبحث العامّ يلتبس.
+  const tabs = within(screen.getByRole('tablist'));
+  expect(tabs.getByText('تقاريري')).toBeInTheDocument();
+  expect(tabs.getByText('تقارير النطاق')).toBeInTheDocument();
+  expect(tabs.getByText('التقويم والاستحقاقات')).toBeInTheDocument();
 });
