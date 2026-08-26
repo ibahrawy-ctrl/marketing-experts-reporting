@@ -1,0 +1,29 @@
+=== BACKUP 20260826-P123 2026-08-26T19:16:15Z ===
+--- 1) database (pg_dump -Fc) ---
+size: 1424971 bytes  mtime: 2026-08-26 19:16
+7cd5e8888b97560f1e971890cda457d7b5a70a8298a5ed720169c304bcec4722  /var/backups/reporting/20260826-P123/reporting_prod-20260826-P123.dump
+--- TOC verification (pg_restore -l) ---
+toc_lines: 492
+toc_table_data_entries: 79
+toc_has_AspNetUsers: 1
+toc_has_report_submissions: 1
+toc_has_EFMigrationsHistory: 3
+--- 2) backend publish artifact ---
+size: 47398207
+93e6469aabad368a870d95929bca22c65ae066196a0481bba55ee412cfc4fb43  /var/backups/reporting/20260826-P123/publish-20260826-P123.tar.gz
+--- 3) frontend dist artifact ---
+size: 394527
+cccbd4157ebcd2f4c41b0261641872aa2a080392bf635ff892acaed3efb53543  /var/backups/reporting/20260826-P123/frontend-dist-20260826-P123.tar.gz
+--- 4) env + unit file (secrets NOT printed) ---
+afaac8b3ca9c61d09e16d7a75bc2bb7ea1f1d601eca75d9d631b8310860bd5c9  /var/backups/reporting/20260826-P123/reporting-api.env.bak
+1146b4f2e9674227a33a266f5fb35c6bdb207a2349fd8a705de770576064a1ff  /var/backups/reporting/20260826-P123/reporting-api.service.bak
+--- backup dir listing ---
+ 
+394527 frontend-dist-20260826-P123.tar.gz
+47398207 publish-20260826-P123.tar.gz
+1553 reporting-api.env.bak
+363 reporting-api.service.bak
+1424971 reporting_prod-20260826-P123.dump
+38768 toc-20260826-P123.txt
+BACKUP_ID=/var/backups/reporting/20260826-P123
+=== END BACKUP ===

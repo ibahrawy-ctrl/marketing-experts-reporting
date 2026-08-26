@@ -1,0 +1,72 @@
+[
+ {
+  "id": "RC001-S1",
+  "desc": "المسودّة لا تدخل items للموضوع",
+  "expected": "غائبة",
+  "measured": "status=Draft · seen=False",
+  "status": "PASS"
+ },
+ {
+  "id": "RC001-S2",
+  "desc": "totalCount لا يزيد بالمسودّة",
+  "expected": "1",
+  "measured": "before=1 after=1",
+  "status": "PASS"
+ },
+ {
+  "id": "RC001-S3",
+  "desc": "التفاصيل تردّ 404 للموضوع",
+  "expected": "404",
+  "measured": "HTTP 404",
+  "status": "PASS"
+ },
+ {
+  "id": "RC001-S4",
+  "desc": "المُبلِّغ يرى مسودّته في القائمة",
+  "expected": "حاضرة",
+  "measured": "seen=True",
+  "status": "PASS"
+ },
+ {
+  "id": "RC001-S5",
+  "desc": "غير المرتبط لا يكتشف المسودّة",
+  "expected": "404 + غائبة",
+  "measured": "detail=404 inList=False",
+  "status": "PASS"
+ },
+ {
+  "id": "RC001-S6",
+  "desc": "الترقيم بحجم كبير لا يُسرِّب المسودّة",
+  "expected": "غائبة",
+  "measured": "pageSize=100 seen=False totalCount=1",
+  "status": "PASS"
+ },
+ {
+  "id": "RC001-S7",
+  "desc": "الملغاة السابقة للإرسال تبقى محجوبة عن الموضوع",
+  "expected": "Cancelled + غائبة + 404",
+  "measured": "cancel=200 status=Cancelled inList=False detail=404",
+  "status": "PASS"
+ },
+ {
+  "id": "RC001-S8",
+  "desc": "بعد الإرسال يراها الموضوع في القائمة والتفاصيل",
+  "expected": "حاضرة + 200",
+  "measured": "status=AwaitingEmployee inList=True detail=200",
+  "status": "PASS"
+ },
+ {
+  "id": "RC001-S9",
+  "desc": "المراجع بمفتاح صريح يرى المسودّة",
+  "expected": "حاضرة + 200",
+  "measured": "inList=True detail=200",
+  "status": "PASS"
+ },
+ {
+  "id": "RC001-S10",
+  "desc": "الثابت القائمة ⊆ التفاصيل على كلّ الصفات",
+  "expected": "صفر انحراف",
+  "measured": "drift=0 []",
+  "status": "PASS"
+ }
+]

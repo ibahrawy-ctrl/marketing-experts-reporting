@@ -1,0 +1,32 @@
+المسار,الوصف,بند المخرجات,الحجم (بايت),md5,الموضع
+P123-PRODUCTION-DEPLOYMENT-REPORT-20260826.md,تقرير نشر الإنتاج (المخرَج الحاكم — Phases 10-18),"9,11,17",20778,d9855cc1c98bb64c84c0009d097fec0d,داخل الحزمة
+P123-PRODUCTION-DEPLOYMENT-REPORT-AR.docx,تقرير Word عربيّ RTL مطابق للتقرير الحاكم,15,49453,fbdb28c21a4ddaa3efe5b5b67c64288c,داخل الحزمة
+P123-PRODUCTION-DEPLOYMENT-REPORT-AR.pdf,PDF مولَّد من الـWord ومُراجَع بصريًّا (7 صفحات),16,352115,26d47cb203571ff99bffe4bea749301d,داخل الحزمة
+P123-PROD-ROLLBACK-PLAN-20260826.md,خطّة التراجع وجاهزيّتها + تصنيف الهجرات + Preflight الإنتاج,"6,12",9165,d8617389a98466f3df31ca62690a9151,داخل الحزمة
+P123-PROD-DEPLOYMENT-SCENARIO-MATRIX-20260826.csv,مصفوفة سيناريوهات الإنتاج — 46 صفًّا، كلّها PASS,10,15033,52154d9976bc76f050f08b42d75d6516,داخل الحزمة
+P123-PROD-DEFECT-REGISTER-20260826.csv,سجلّ العيوب المحدَّث (DEF-P123-RC-001 مغلق جذريًّا),5,2481,64e0f1137e9bb3c95604ed10c5bbb762,داخل الحزمة
+P123-PROD-CLOSURE-NOTE-20260826.md,مذكّرة الإغلاق وربط حزمة المخرجات الستّ عشرة,14,8985,e9419b68291a6c501627425ded07c8fb,داخل الحزمة
+evidence/prod-baseline-BEFORE.txt,خطّ الأساس قبل النشر — قراءة محضة (Phase 10),6,2796,03d2e99d8839b860b42a01773647f9b4,داخل الحزمة
+evidence/prod-preflight-uniqueness.txt,Preflight تفرّد الأسماء على بيانات الإنتاج الحيّة (0 تكرار),6,49,68d6cd337b67adc23867ab53f4995fac,داخل الحزمة
+evidence/prod-backup.txt,إثبات النسخ الاحتياطيّ + تحقّق TOC بـpg_restore -l,8,1406,e0a2478ddad35be9e6947564575c2960,داخل الحزمة
+evidence/prod-shadow-rehearsal.txt,البروفة الظلّيّة الكاملة على استعادة نسخة اليوم (42→47),7,5563,c00ba37efc3ec2e067f56cc7bf2191c3,داخل الحزمة
+evidence/shadow-attendance-seed.txt,بذر كتالوج أنواع حوادث الحضور على قاعدة الظلّ (idempotent),7,66,b97f30031c5caa5ceea4a7824ebf2a02,داخل الحزمة
+evidence/prod-deploy-execution.txt,نصّ تنفيذ النشر + حارس التراجع التلقائيّ (لم يُفعَّل),9,1493,e64453a1e393ee4d4cb7eb84e424132e,داخل الحزمة
+evidence/prod-deploy-errorlines.txt,أسطر الخطأ في سجلّ الإقلاع بعد النشر,9,442,9d10a2955125437f2371d1eab1d1ff23,داخل الحزمة
+evidence/prod-phase14-flags.txt,أعلام الميزات والصلاحيات قبل/بعد + إعادة البريد على مرحلتين,9,1799,7d5912ac624850b75119b67b0bcb1416,داخل الحزمة
+evidence/prod-phase15-verification.txt,التحقّق غير التدميريّ بعد النشر,10,1573,13942152195938d3c0e30fe9e44be837,داخل الحزمة
+evidence/prod-phase16-monitoring.txt,نافذة المراقبة — 8 عيّنات/60ث، 0 إعادة تشغيل,10,944,87cc271776cd932de2da0436b8b4a210,داخل الحزمة
+evidence/prod-phase17-reconciliation.txt,المصالحة BEFORE/AFTER ببصمات md5,11,1348,aff7b5a08573c2b9d0df4b027ba4ed9e,داخل الحزمة
+evidence/build-prod-matrix.py,مولّد المصفوفة — يفشل مغلقًا عند غياب أيّ مفتاح دليل,"10,13",19241,dce6f89a405bdff8b2db84e8f9fac6f2,داخل الحزمة
+screenshots/prod-ui-log.json,سجلّ التحقّق البصريّ المجهول (6 لقطات، 0 خطأ وحدة تحكّم),10,2295,44716884b6614f9dde602284a79eb21a,داخل الحزمة
+screenshots/prod-login-390.png,لقطة /login عرض 390,10,18401,d53931a174799d1d6ee7ef8b3043d189,داخل الحزمة
+screenshots/prod-login-768.png,لقطة /login عرض 768,10,20166,8df145ac768587f106511f56835bdc6a,داخل الحزمة
+screenshots/prod-login-1440.png,لقطة /login عرض 1440,10,22267,519ae32f0d064e351ddbea2a102f8561,داخل الحزمة
+screenshots/prod-app-390.png,لقطة /app عرض 390 (تحويل مجهول إلى /login),10,18401,d53931a174799d1d6ee7ef8b3043d189,داخل الحزمة
+screenshots/prod-app-768.png,لقطة /app عرض 768 (تحويل مجهول إلى /login),10,20166,8df145ac768587f106511f56835bdc6a,داخل الحزمة
+screenshots/prod-app-1440.png,لقطة /app عرض 1440 (تحويل مجهول إلى /login),10,22267,519ae32f0d064e351ddbea2a102f8561,داخل الحزمة
+../P123-RC001-HOTFIX-20260826/P123-RC001-HOTFIX-IMPLEMENTATION-REPORT-20260826.md,تقرير تنفيذ الهوتفكس (مرجع تاريخيّ — لم يُعدَّل),1,10811,e60b7ae11717ece6ee50ab69f3261a3e,مرجع تاريخيّ خارج الحزمة
+../P123-RC001-HOTFIX-20260826/P123-RC001-HOTFIX-TEST-REPORT-20260826.md,تقرير اختبارات الهوتفكس (مرجع تاريخيّ — لم يُعدَّل),2,6667,ca7b72eac61b5543a0873dbe6880f030,مرجع تاريخيّ خارج الحزمة
+../P123-RC-REVALIDATION-20260826/P123-RC-HOTFIX-VALIDATION-REPORT-20260826.md,تقرير إعادة نشر وتحقّق RC (مرجع تاريخيّ — لم يُعدَّل),3,15305,38cdf7009a01ddcb1c191b25093d4d1b,مرجع تاريخيّ خارج الحزمة
+../P123-RC-REVALIDATION-20260826/P123-RC-REVALIDATION-SCENARIO-MATRIX-20260826.csv,مصفوفة سيناريوهات RC — 99 سيناريو (مرجع تاريخيّ),4,27256,ff5164b8e1dd817ef9c85727fc97f1c6,مرجع تاريخيّ خارج الحزمة
+../P123-RC-20260826/P123-RC-DEPLOYMENT-AND-VALIDATION-REPORT-AR.docx,تقرير جولة RC السابقة (مرجع تاريخيّ — لم يُعدَّل),—,2761881,6dc63dd6db670aee72c8a5b39b53acd3,مرجع تاريخيّ خارج الحزمة

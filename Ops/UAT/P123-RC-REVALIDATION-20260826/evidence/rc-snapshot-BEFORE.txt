@@ -1,0 +1,20 @@
+=== RC BEFORE — قبل إعادة تحقّق المرشّح 897c9b18 (2026-08-26T18:39:42Z UTC) ===
+users_total|54
+users_synth_p123rc|5
+users_nonsynth|49
+userclaims_perm_total|0
+userclaims_perm_nonsynth|0
+departments_total|7
+departments_nonsynth|6
+teams_total|12
+teams_nonsynth|11
+attendance_incidents_total|5
+attendance_incidents_synth|5
+report_submissions_total|39
+report_templates_total|41
+migrations|47
+md5_users_nonsynth|d2e39bb254f05ddf8168d10f20cdb59d
+md5_departments_nonsynth|a2e0fd896804c41d4445c40acd6f925c
+md5_teams_nonsynth|963bb33b84a6ace6dadc45d74bfe7aee
+md5_submissions|d7206b3ed1eb86341dd42a769f6d7c79
+md5_perm_claims_nonsynth|EMPTY

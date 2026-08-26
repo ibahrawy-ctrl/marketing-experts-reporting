@@ -1,0 +1,23 @@
+=== PHASE 16 — POST-DEPLOYMENT MONITORING (8 samples / 60s) ===
+sample|utc|active|nrestarts|mainpid|rss_mb|health_s|health_code|unhandled_5m
+1|2026-08-26T19:40:37Z|active|0|1603719|311|0.001575|200|0
+2|2026-08-26T19:41:37Z|active|0|1603719|311|0.000998|200|0
+3|2026-08-26T19:42:37Z|active|0|1603719|315|0.001367|200|0
+4|2026-08-26T19:43:37Z|active|0|1603719|315|0.000956|200|0
+5|2026-08-26T19:44:37Z|active|0|1603719|315|0.003068|200|0
+6|2026-08-26T19:45:37Z|active|0|1603719|317|0.001525|200|0
+7|2026-08-26T19:46:37Z|active|0|1603719|317|0.001402|200|0
+8|2026-08-26T19:47:37Z|active|0|1603719|324|0.003709|200|0
+--- warning-or-worse log lines across the window ---
+-- No entries --
+warning_or_worse_lines=0
+--- db connections + long queries ---
+connections|2
+longest_query_s|0
+--- final service state ---
+MainPID=1603719
+NRestarts=0
+ExecMainStartTimestamp=Wed 2026-08-26 19:26:00 UTC
+ActiveState=active
+SubState=running
+=== END PHASE 16 ===

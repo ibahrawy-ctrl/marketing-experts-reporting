@@ -1,0 +1,7 @@
+Output format is unaligned.
+Field separator is "|".
+k|v
+dup_department_names|0
+dup_department_codes|0
+dup_team_names_in_department|0
+(3 rows)

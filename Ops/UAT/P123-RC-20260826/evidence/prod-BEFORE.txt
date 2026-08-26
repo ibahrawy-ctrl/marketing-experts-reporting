@@ -1,0 +1,6 @@
+=== PROD baseline ===
+ddf9598c0bf00f821a0aefe0c6cc1975  /opt/reporting/publish/Reporting.Api.dll
+2026-08-18 15:02:08.000000000 +0000
+MainPID=1556574
+ActiveEnterTimestamp=Wed 2026-08-26 06:22:54 UTC
+42|34|307

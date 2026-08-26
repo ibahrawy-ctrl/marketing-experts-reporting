@@ -1,0 +1,2 @@
+Aug 26 19:23:44 srv1747233 reporting-api[1603310]:               RAISE EXCEPTION 'P123-PREFLIGHT: % duplicate department NameAr group(s) block IX_departments_NameAr (e.g. %). Resolve the duplicates before applying this m
+Aug 26 19:23:44 srv1747233 reporting-api[1603310]:               RAISE EXCEPTION 'P123-PREFLIGHT: % duplicate team (DepartmentId, NameAr) group(s) block IX_teams_DepartmentId_NameAr (e.g. %). Resolve the duplicates befor

@@ -1,0 +1,7 @@
+6
+Absence
+Disconnection
+EarlyLeave
+Late
+Other
+UnauthorizedAbsence

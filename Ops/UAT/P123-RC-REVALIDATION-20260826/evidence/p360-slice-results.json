@@ -1,0 +1,58 @@
+[
+ {
+  "id": "P360-S1",
+  "desc": "المسار الجديد مُفعَّل ويطلب مصادقة",
+  "expected": "401 لا 404 توجيه",
+  "measured": "HTTP 401",
+  "status": "PASS"
+ },
+ {
+  "id": "P360-S2",
+  "desc": "صفة مخوَّلة تقرأ شريحة المشروع",
+  "expected": "200 + شريحة",
+  "measured": "HTTP 200 projectId=2c1e6a2f-a9d9-40d1-b81e-7bed55a08157 fields=1",
+  "status": "PASS"
+ },
+ {
+  "id": "P360-S3",
+  "desc": "الحمولة لا تحتوي أيّ مشروع شقيق من التسليم نفسه",
+  "expected": "صفر تسريب",
+  "measured": "siblings=3 leaked=0 []",
+  "status": "PASS"
+ },
+ {
+  "id": "P360-S4",
+  "desc": "عدد العناصر يساوي عناصر هذا المشروع فقط",
+  "expected": "1",
+  "measured": "entries=1",
+  "status": "PASS"
+ },
+ {
+  "id": "P360-S5",
+  "desc": "مشروع لا يخصّ التسليم يُرفَض",
+  "expected": "404",
+  "measured": "HTTP 404",
+  "status": "PASS"
+ },
+ {
+  "id": "P360-S6",
+  "desc": "فاعلون خارج نطاق المشروع لا يكتشفون الشريحة",
+  "expected": "404 للجميع",
+  "measured": "{'rc-emp': 404, 'rc-other': 404, 'rc-mgr': 404, 'rc-hr': 404}",
+  "status": "PASS"
+ },
+ {
+  "id": "P360-S7",
+  "desc": "المعرّف الوهميّ والمشروع الحقيقيّ المحجوب يتطابقان (لا قناة اكتشاف)",
+  "expected": "نفس الرمز ونفس الرسالة",
+  "measured": "ghost=404 real=404 sameDetail=True",
+  "status": "PASS"
+ },
+ {
+  "id": "P360-S8",
+  "desc": "تسليم غير موجود يُرفَض بلطف",
+  "expected": "404",
+  "measured": "HTTP 404",
+  "status": "PASS"
+ }
+]

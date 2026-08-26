@@ -1,0 +1,78 @@
+=== PROD BASELINE (read-only) 2026-08-26T19:14:36Z ===
+--- service ---
+MainPID=1556574
+NRestarts=0
+ExecMainStartTimestamp=Wed 2026-08-26 06:22:54 UTC
+ActiveState=active
+SubState=running
+--- deployed backend stamp ---
+mtime: 2026-08-18 15:02
+md5: ddf9598c0bf00f821a0aefe0c6cc1975
+1.0.0+7e063b493b50ad90ba6131e47042c7cd035fb65b
+--- deployed frontend bundle ---
+--- health ---
+{"status":"ok","service":"reporting-api"}
+--- migrations ---
+migrations_total|42
+last_migration|20260817114129_AddProjectExecutionUpdateProposals
+last_migration|20260817101108_AddProjectProgressAndHealthStates
+last_migration|20260811142239_AddProject360Foundation
+last_migration|20260809165617_ClientDocumentVisibility
+last_migration|20260807033602_ClientDocumentsAndExternalLinks
+--- row counts ---
+audit_logs_total|1464
+departments_total|4
+roles_total|12
+submissions_total|311
+teams_total|9
+userclaims_perm_total|0
+userroles_total|39
+users_active|33
+users_total|34
+--- attendance/outbox tables present? ---
+email_outbox
+employee_service_request_events
+employee_service_requests
+--- real-data fingerprints ---
+md5_departments|7d80557511c8efa0ca5616a4a59e8be7
+md5_submissions|08defb3b860a6d4ad97ec31f0ee1b5cc
+md5_teams|a874a3098deb7b4746d2cf6e630adb55
+md5_users|a6385875d3cfc436639864adfc3f4c0c
+--- feature flags / notification settings (non-secret) ---
+ASPNETCORE_ENVIRONMENT=Production
+ASPNETCORE_URLS=http://127.0.0.1:5090
+Jwt__Issuer=reporting-api
+Jwt__Audience=reporting-spa
+Cors__AllowedOrigins__0=https://reports.emarketingacademy.net
+Email__Enabled=false
+Email__Provider=GoogleWorkspace
+Email__SmtpHost=smtp.gmail.com
+Email__SmtpPort=587
+Email__UseSsl=false
+Email__UseStartTls=true
+Email__FromEmail=info@marketingexperts.com.sa
+FileStorage__EmployeeServiceFinalDocumentsPath=/var/lib/reporting/employee-service-requests/final-documents
+EmailNotifications__Mode=Enabled
+EmailNotifications__RecipientSafetyMode=Disabled
+App__BaseUrl=https://reports.emarketingacademy.net
+Scheduler__Enabled=true
+Reminders__Enabled=true
+BackgroundJobs__Enabled=false
+ReportReminderScheduler__Enabled=true
+ReportReminderScheduler__PollMinutes=15
+ReportReminderScheduler__DailyDueHour=16
+ReportReminderScheduler__WeeklyDueHour=9
+ReportReminderScheduler__OverdueHour=9
+ReportReminderScheduler__SummaryHour=9
+ReportReminderScheduler__ReviewHour=9
+FileStorage__DocumentsRootPath=/var/lib/reporting/documents
+--- disk ---
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda1        96G   46G   51G  48% /
+/dev/sda1        96G   46G   51G  48% /
+=== END ===
+--- prod frontend dist ---
+-rw-r--r-- 1 www-data www-data 1574679 2026-08-23 11:46 /opt/reporting/reporting-frontend/dist/assets/index-CMjXSPXr.js
+f37fd278b073dcf391549e4c1ab57318  /opt/reporting/reporting-frontend/dist/assets/index-CMjXSPXr.js
+--- has P360 slice route? ---
+0

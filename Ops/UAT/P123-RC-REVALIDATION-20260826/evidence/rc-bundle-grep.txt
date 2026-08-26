@@ -1,0 +1,4 @@
+ملفّ حزمة RC: /opt/reporting-rc/frontend/dist/assets/index-gPMunv-Q.js
+md5: 62c3bb1998b2004ccb2ada157943887f
+mtime: 2026-08-26 16:42:17.000000000 +0000
+grep /app/projects/:projectId/reports/:reportId => 1

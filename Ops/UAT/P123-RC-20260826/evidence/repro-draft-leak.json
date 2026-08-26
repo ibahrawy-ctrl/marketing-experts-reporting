@@ -1,0 +1,38 @@
+{
+  "created_status": "Draft",
+  "detail_as_subject": {
+    "status": 404,
+    "body": "{\"type\":\"attendance.not_found\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"لا توجد واقعة مطابقة.\",\"traceId\":\"00-5ff53b44fec14833fc3f1806ab0074fb-aeff100768723ee3-00\"}"
+  },
+  "list_as_subject": {
+    "status": 200,
+    "total": 2,
+    "leaked_item": {
+      "id": "2066dbe4-c592-4a74-9b7e-92daf3d4d78b",
+      "subjectUserId": "b334d9a5-73fa-41a1-b2a3-0b017a9e97d0",
+      "subjectName": "RC-P123 موظّف اصطناعيّ",
+      "incidentTypeId": "1d22a597-5a4b-4cf5-a845-fae0b1c59e90",
+      "typeCode": "Late",
+      "typeNameAr": "تأخّر عن بداية الدوام",
+      "incidentDate": "2026-08-23",
+      "status": "Draft",
+      "statusAr": "مسودّة",
+      "isOfficialIncident": false,
+      "durationMinutes": 30,
+      "ageingDays": 4,
+      "slaDueAtUtc": null,
+      "isOverdue": false,
+      "lastActionAtUtc": "2026-08-26T13:36:58.512026Z",
+      "nextActorAr": "مُقدِّم البلاغ"
+    }
+  },
+  "list_as_other": {
+    "status": 200,
+    "leaked": false
+  },
+  "cleanup": {
+    "status": 200,
+    "body": "",
+    "incidentId": "2066dbe4-c592-4a74-9b7e-92daf3d4d78b"
+  }
+}

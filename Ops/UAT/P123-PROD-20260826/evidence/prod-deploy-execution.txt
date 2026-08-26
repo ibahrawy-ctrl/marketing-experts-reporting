@@ -1,0 +1,38 @@
+=== PHASE 13 — PRODUCTION DEPLOY 2026-08-26T19:23:31Z ===
+--- 13.0 pre-restart blast-radius reduction (email + schedulers OFF) ---
+Email__Enabled=false
+EmailNotifications__Mode=Disabled
+Scheduler__Enabled=false
+Reminders__Enabled=false
+BackgroundJobs__Enabled=false
+ReportReminderScheduler__Enabled=false
+--- 13.1 stop service ---
+inactive
+--- 13.2 swap artifacts ---
+1.0.0+897c9b187ab4216213b4f453ec65948cd06dff27
+46e0a3a169c9ef2285aef3b8e9d7fe13  /opt/reporting/publish/Reporting.Api.dll
+218346d38e3103a2cf92914fdacd2f3d  /opt/reporting/reporting-frontend/dist/assets/index-CTofEn_d.js
+--- 13.3 start service ---
+HEALTH_OK=1 boot_seconds=10
+{"status":"ok","service":"reporting-api"}
+--- 13.4 post-start state ---
+MainPID=1603310
+NRestarts=0
+ExecMainStartTimestamp=Wed 2026-08-26 19:23:37 UTC
+ActiveState=active
+SubState=running
+migrations_total|47
+20260826073223_P123DirectoryNameUniqueness
+20260825111521_P2_HR010_EmployeeChecklistItems
+20260824233938_AddAttendanceIncidents
+20260824230015_AddManagementNoteSensitivity
+20260824195457_AddKpiTemplateVersionBelowTargetThreshold
+--- migration log lines ---
+Applying migration '20260824195457_AddKpiTemplateVersionBelowTargetThreshold
+Applying migration '20260824230015_AddManagementNoteSensitivity
+Applying migration '20260824233938_AddAttendanceIncidents
+Applying migration '20260825111521_P2_HR010_EmployeeChecklistItems
+Applying migration '20260826073223_P123DirectoryNameUniqueness
+--- errors in first minutes ---
+2
+=== END PHASE 13 ===

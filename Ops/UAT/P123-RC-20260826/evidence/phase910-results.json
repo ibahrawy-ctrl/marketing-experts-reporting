@@ -1,0 +1,570 @@
+{
+  "results": [
+    {
+      "id": "S-AUTH-rc-admin",
+      "desc": "تسجيل دخول rc-admin",
+      "expected": "200 + accessToken",
+      "measured": "HTTP 200",
+      "status": "PASS",
+      "sample": "{\"accessToken\":\"REDACTED-JWT-PROJECT360-R2-SECRET-SCAN"
+    },
+    {
+      "id": "S-ME-rc-admin",
+      "desc": "/auth/me لـrc-admin",
+      "expected": "200 + الأدوار",
+      "measured": "HTTP 200 | roles=['Admin']",
+      "status": "PASS",
+      "sample": "{\"userId\":\"973c0925-e54b-428a-a994-b318159b2f02\",\"fullName\":\"RC-P123 مدير نظام اصطناعيّ\",\"email\":\"rc-admin@p123.rc.test\",\"isActive\":true,\"roles\":[\"Admin\"],\"expectedReportCadence\":\"Weekly\",\"jobRoleCode\":null,\"permissions\""
+    },
+    {
+      "id": "S-AUTH-rc-hr",
+      "desc": "تسجيل دخول rc-hr",
+      "expected": "200 + accessToken",
+      "measured": "HTTP 200",
+      "status": "PASS",
+      "sample": "{\"accessToken\":\"REDACTED-JWT-PROJECT360-R2-SECRET-SCAN"
+    },
+    {
+      "id": "S-ME-rc-hr",
+      "desc": "/auth/me لـrc-hr",
+      "expected": "200 + الأدوار",
+      "measured": "HTTP 200 | roles=['HR']",
+      "status": "PASS",
+      "sample": "{\"userId\":\"7f0e7894-a5f9-4884-b999-9cbb4a0f1403\",\"fullName\":\"RC-P123 موارد بشريّة اصطناعيّ\",\"email\":\"rc-hr@p123.rc.test\",\"isActive\":true,\"roles\":[\"HR\"],\"expectedReportCadence\":\"Weekly\",\"jobRoleCode\":null,\"permissions\":[]"
+    },
+    {
+      "id": "S-AUTH-rc-mgr",
+      "desc": "تسجيل دخول rc-mgr",
+      "expected": "200 + accessToken",
+      "measured": "HTTP 200",
+      "status": "PASS",
+      "sample": "{\"accessToken\":\"REDACTED-JWT-PROJECT360-R2-SECRET-SCAN"
+    },
+    {
+      "id": "S-ME-rc-mgr",
+      "desc": "/auth/me لـrc-mgr",
+      "expected": "200 + الأدوار",
+      "measured": "HTTP 200 | roles=['Manager']",
+      "status": "PASS",
+      "sample": "{\"userId\":\"7cd90a3c-14a5-4167-8748-b156fbb586db\",\"fullName\":\"RC-P123 مدير اصطناعيّ\",\"email\":\"rc-mgr@p123.rc.test\",\"isActive\":true,\"roles\":[\"Manager\"],\"expectedReportCadence\":\"Weekly\",\"jobRoleCode\":null,\"permissions\":[],\""
+    },
+    {
+      "id": "S-AUTH-rc-emp",
+      "desc": "تسجيل دخول rc-emp",
+      "expected": "200 + accessToken",
+      "measured": "HTTP 200",
+      "status": "PASS",
+      "sample": "{\"accessToken\":\"REDACTED-JWT-PROJECT360-R2-SECRET-SCAN"
+    },
+    {
+      "id": "S-ME-rc-emp",
+      "desc": "/auth/me لـrc-emp",
+      "expected": "200 + الأدوار",
+      "measured": "HTTP 200 | roles=['Employee']",
+      "status": "PASS",
+      "sample": "{\"userId\":\"b334d9a5-73fa-41a1-b2a3-0b017a9e97d0\",\"fullName\":\"RC-P123 موظّف اصطناعيّ\",\"email\":\"rc-emp@p123.rc.test\",\"isActive\":true,\"roles\":[\"Employee\"],\"expectedReportCadence\":\"Weekly\",\"jobRoleCode\":null,\"permissions\":[]"
+    },
+    {
+      "id": "S-AUTH-rc-other",
+      "desc": "تسجيل دخول rc-other",
+      "expected": "200 + accessToken",
+      "measured": "HTTP 200",
+      "status": "PASS",
+      "sample": "{\"accessToken\":\"REDACTED-JWT-PROJECT360-R2-SECRET-SCAN"
+    },
+    {
+      "id": "S-ME-rc-other",
+      "desc": "/auth/me لـrc-other",
+      "expected": "200 + الأدوار",
+      "measured": "HTTP 200 | roles=['Employee']",
+      "status": "PASS",
+      "sample": "{\"userId\":\"ad71c008-78e4-4758-a54d-a9ffe663d21d\",\"fullName\":\"RC-P123 موظّف آخر اصطناعيّ\",\"email\":\"rc-other@p123.rc.test\",\"isActive\":true,\"roles\":[\"Employee\"],\"expectedReportCadence\":\"Weekly\",\"jobRoleCode\":null,\"permissio"
+    },
+    {
+      "id": "S-AUTH-BAD",
+      "desc": "دخول بكلمة مرور خاطئة",
+      "expected": "401",
+      "measured": "HTTP 401",
+      "status": "PASS",
+      "sample": "{\"type\":\"auth.invalid_credentials\",\"title\":\"Unauthorized\",\"status\":401,\"detail\":\"بيانات الدخول غير صحيحة.\",\"traceId\":\"00-7fecad04915daf38f54a975a686881cd-b326d25e16ac72fa-00\"}"
+    },
+    {
+      "id": "S-AUTH-ANON",
+      "desc": "/auth/me بلا رمز",
+      "expected": "401",
+      "measured": "HTTP 401",
+      "status": "PASS",
+      "sample": ""
+    },
+    {
+      "id": "S-PERM-DENY-rc-admin",
+      "desc": "لوحة HR قبل المنح (Admin)",
+      "expected": "403 منع افتراضيّ",
+      "measured": "HTTP 403",
+      "status": "PASS",
+      "sample": ""
+    },
+    {
+      "id": "S-PERM-DENY-rc-hr",
+      "desc": "لوحة HR قبل المنح (HR)",
+      "expected": "403 منع افتراضيّ",
+      "measured": "HTTP 403",
+      "status": "PASS",
+      "sample": ""
+    },
+    {
+      "id": "S-PERM-DENY-rc-mgr",
+      "desc": "لوحة HR قبل المنح (Manager)",
+      "expected": "403 منع افتراضيّ",
+      "measured": "HTTP 403",
+      "status": "PASS",
+      "sample": ""
+    },
+    {
+      "id": "S-PERM-DENY-rc-emp",
+      "desc": "لوحة HR قبل المنح (Employee)",
+      "expected": "403 منع افتراضيّ",
+      "measured": "HTTP 403",
+      "status": "PASS",
+      "sample": ""
+    },
+    {
+      "id": "S-PERM-HRDIR-ADMIN",
+      "desc": "دليل HR للمدير (سياسة دور لا مطالبة)",
+      "expected": "200",
+      "measured": "HTTP 200",
+      "status": "PASS",
+      "sample": "[{\"id\":\"7cd90a3c-14a5-4167-8748-b156fbb586db\",\"fullName\":\"RC-P123 مدير اصطناعيّ\",\"email\":\"rc-mgr@p123.rc.test\",\"isActive\":true,\"departmentId\":null,\"teamId\":null,\"managerId\":null,\"jobRoleId\":null,\"isSensitive\":false,\"canE"
+    },
+    {
+      "id": "S-DIR-DEP-CREATE",
+      "desc": "إنشاء إدارة اصطناعيّة",
+      "expected": "200/201",
+      "measured": "HTTP 200",
+      "status": "PASS",
+      "sample": "{\"id\":\"348143fd-b140-4def-93d0-5fcb7ffc2745\",\"nameAr\":\"RC-P123-إدارة اصطناعيّة\",\"nameEn\":\"RC-P123 Synthetic Dept\",\"code\":\"RC-P123-DEP\",\"managerId\":\"7cd90a3c-14a5-4167-8748-b156fbb586db\",\"isActive\":true}"
+    },
+    {
+      "id": "S-DIR-UNIQ-NAME",
+      "desc": "تكرار اسم إدارة",
+      "expected": "409 + ProblemDetails",
+      "measured": "HTTP 409 | ct=application/problem+json; charset=utf-8",
+      "status": "PASS",
+      "sample": "{\"type\":\"department.name.conflict\",\"title\":\"Conflict\",\"status\":409,\"detail\":\"توجد إدارة أخرى بهذا الاسم. اختر اسمًا مختلفًا.\",\"traceId\":\"00-a2447e09749d8617f89d0312b21cad40-0160fc2ae5e79ebd-00\"}"
+    },
+    {
+      "id": "S-DIR-UNIQ-CODE",
+      "desc": "تكرار رمز إدارة",
+      "expected": "409 + ProblemDetails",
+      "measured": "HTTP 409",
+      "status": "PASS",
+      "sample": "{\"type\":\"department.code.conflict\",\"title\":\"Conflict\",\"status\":409,\"detail\":\"توجد إدارة أخرى بهذا الرمز. اختر رمزًا مختلفًا.\",\"traceId\":\"00-e91ba9560569f134799bc30c57671a5a-e750e6c1ab81213d-00\"}"
+    },
+    {
+      "id": "S-DIR-TEAM-CREATE",
+      "desc": "إنشاء فريق اصطناعيّ",
+      "expected": "200/201",
+      "measured": "HTTP 200",
+      "status": "PASS",
+      "sample": "{\"id\":\"a2c06aff-06fe-42bf-abed-c211cf773b57\",\"nameAr\":\"RC-P123-فريق اصطناعيّ\",\"nameEn\":\"RC-P123 Synthetic Team\",\"departmentId\":\"348143fd-b140-4def-93d0-5fcb7ffc2745\",\"teamLeaderId\":\"7cd90a3c-14a5-4167-8748-b156fbb586db\","
+    },
+    {
+      "id": "S-DIR-UNIQ-TEAM",
+      "desc": "تكرار اسم فريق داخل الإدارة",
+      "expected": "409 + ProblemDetails",
+      "measured": "HTTP 409",
+      "status": "PASS",
+      "sample": "{\"type\":\"team.name.conflict\",\"title\":\"Conflict\",\"status\":409,\"detail\":\"يوجد فريق آخر بهذا الاسم داخل الإدارة نفسها. اختر اسمًا مختلفًا.\",\"traceId\":\"00-ab2811de73bc49a3eb8e48769746726b-031310290ef4a8bc-00\"}"
+    },
+    {
+      "id": "S-DIR-ORG-rc-mgr",
+      "desc": "إسناد تنظيميّ لـrc-mgr",
+      "expected": "200/204",
+      "measured": "HTTP 200",
+      "status": "PASS",
+      "sample": "{\"id\":\"7cd90a3c-14a5-4167-8748-b156fbb586db\",\"fullName\":\"RC-P123 مدير اصطناعيّ\",\"email\":\"rc-mgr@p123.rc.test\",\"isActive\":true,\"roles\":[\"Manager\"],\"departmentId\":\"348143fd-b140-4def-93d0-5fcb7ffc2745\",\"teamId\":\"a2c06aff-0"
+    },
+    {
+      "id": "S-DIR-ORG-rc-emp",
+      "desc": "إسناد تنظيميّ لـrc-emp",
+      "expected": "200/204",
+      "measured": "HTTP 200",
+      "status": "PASS",
+      "sample": "{\"id\":\"b334d9a5-73fa-41a1-b2a3-0b017a9e97d0\",\"fullName\":\"RC-P123 موظّف اصطناعيّ\",\"email\":\"rc-emp@p123.rc.test\",\"isActive\":true,\"roles\":[\"Employee\"],\"departmentId\":\"348143fd-b140-4def-93d0-5fcb7ffc2745\",\"teamId\":\"a2c06aff"
+    },
+    {
+      "id": "S-DIR-ORG-rc-other",
+      "desc": "إسناد تنظيميّ لـrc-other",
+      "expected": "200/204",
+      "measured": "HTTP 200",
+      "status": "PASS",
+      "sample": "{\"id\":\"ad71c008-78e4-4758-a54d-a9ffe663d21d\",\"fullName\":\"RC-P123 موظّف آخر اصطناعيّ\",\"email\":\"rc-other@p123.rc.test\",\"isActive\":true,\"roles\":[\"Employee\"],\"departmentId\":\"348143fd-b140-4def-93d0-5fcb7ffc2745\",\"teamId\":\"a2"
+    },
+    {
+      "id": "S-PERM-GRANT",
+      "desc": "منح المفاتيح الأدنى لـrc-hr",
+      "expected": "200/204",
+      "measured": "HTTP 200",
+      "status": "PASS",
+      "sample": "{\"userId\":\"7f0e7894-a5f9-4884-b999-9cbb4a0f1403\",\"permissions\":[\"Attendance.Review\",\"HrOperations.View\"]}"
+    },
+    {
+      "id": "S-PERM-READBACK",
+      "desc": "قراءة صلاحيات rc-hr",
+      "expected": "المفتاحان فقط",
+      "measured": "HTTP 200 | perms=['Attendance.Review', 'HrOperations.View']",
+      "status": "PASS",
+      "sample": "{\"userId\":\"7f0e7894-a5f9-4884-b999-9cbb4a0f1403\",\"permissions\":[\"Attendance.Review\",\"HrOperations.View\"]}"
+    },
+    {
+      "id": "S-PERM-OLDTOKEN",
+      "desc": "الرمز القديم بعد المنح",
+      "expected": "403 حتّى إعادة الدخول",
+      "measured": "HTTP 403",
+      "status": "PASS",
+      "sample": ""
+    },
+    {
+      "id": "S-PERM-ALLOW",
+      "desc": "لوحة HR بعد إعادة الدخول",
+      "expected": "200",
+      "measured": "HTTP 200",
+      "status": "PASS",
+      "sample": "{\"periodKeys\":[\"2026-W28\",\"2026-W29\",\"2026-W30\",\"2026-W31\",\"2026-W32\",\"2026-W33\",\"2026-W34\",\"2026-W35\"],\"scope\":{\"scopeType\":\"own\",\"userCount\":1},\"cards\":[{\"queue\":\"ReportsMissing\",\"key\":\"reports-missing\",\"titleAr\":\"تقار"
+    },
+    {
+      "id": "S-PERM-QUEUE",
+      "desc": "طابور HR بمفتاح الرؤية",
+      "expected": "200",
+      "measured": "HTTP 200",
+      "status": "PASS",
+      "sample": "{\"queue\":\"AttendanceAwaitingHr\",\"key\":\"attendance-awaiting-hr\",\"titleAr\":\"وقائع بانتظار مراجعة الموارد البشريّة\",\"totalCount\":0,\"breachedCount\":0,\"page\":1,\"pageSize\":25,\"rows\":[]}"
+    },
+    {
+      "id": "S-PERM-EXPORT-DENY",
+      "desc": "تصدير HR بلا مفتاح التصدير",
+      "expected": "403 (فصل المفاتيح)",
+      "measured": "HTTP 403",
+      "status": "PASS",
+      "sample": ""
+    },
+    {
+      "id": "S-PERM-UNAUTH",
+      "desc": "لوحة HR لموظّف بلا مفاتيح",
+      "expected": "403",
+      "measured": "HTTP 403",
+      "status": "PASS",
+      "sample": ""
+    },
+    {
+      "id": "S-ATT-TYPES",
+      "desc": "أنواع الوقائع",
+      "expected": "200 + قائمة",
+      "measured": "HTTP 200 | count=6",
+      "status": "PASS",
+      "sample": "[{\"id\":\"1d22a597-5a4b-4cf5-a845-fae0b1c59e90\",\"code\":\"Late\",\"nameAr\":\"تأخّر عن بداية الدوام\",\"requiresTimes\":true,\"requiresPolicyReference\":false,\"allowsMultiplePerDay\":false,\"order\":10},{\"id\":\"b9d534e3-593e-4f87-a7d3-6f"
+    },
+    {
+      "id": "S-ATT-DRAFT",
+      "desc": "إنشاء مسودّة واقعة (Late)",
+      "expected": "200/201 + Draft",
+      "measured": "HTTP 200 | status=Draft",
+      "status": "PASS",
+      "sample": "{\"id\":\"e85b693c-7dce-4285-9f07-63014efef653\",\"subjectUserId\":\"b334d9a5-73fa-41a1-b2a3-0b017a9e97d0\",\"subjectName\":\"RC-P123 موظّف اصطناعيّ\",\"incidentTypeId\":\"1d22a597-5a4b-4cf5-a845-fae0b1c59e90\",\"typeCode\":\"Late\",\"typeNa"
+    },
+    {
+      "id": "S-ATT-DRAFT-HIDDEN",
+      "desc": "المسودّة مخفيّة عن الموظّف",
+      "expected": "غير مدرجة",
+      "measured": "HTTP 200 | items=1 seen=True",
+      "status": "FAIL",
+      "sample": "{\"items\":[{\"id\":\"e85b693c-7dce-4285-9f07-63014efef653\",\"subjectUserId\":\"b334d9a5-73fa-41a1-b2a3-0b017a9e97d0\",\"subjectName\":\"RC-P123 موظّف اصطناعيّ\",\"incidentTypeId\":\"1d22a597-5a4b-4cf5-a845-fae0b1c59e90\",\"typeCode\":\"Lat"
+    },
+    {
+      "id": "S-ATT-DRAFT-DIRECT",
+      "desc": "وصول مباشر للمسودّة من الموظّف",
+      "expected": "403/404",
+      "measured": "HTTP 404",
+      "status": "PASS",
+      "sample": "{\"type\":\"attendance.not_found\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"لا توجد واقعة مطابقة.\",\"traceId\":\"00-30346fc7fb274287e3f6377518e0d736-860346111da0044c-00\"}"
+    },
+    {
+      "id": "S-ATT-SUBMIT",
+      "desc": "إرسال البلاغ",
+      "expected": "200 + AwaitingEmployee",
+      "measured": "HTTP 200 | status=AwaitingEmployee",
+      "status": "PASS",
+      "sample": "{\"id\":\"e85b693c-7dce-4285-9f07-63014efef653\",\"subjectUserId\":\"b334d9a5-73fa-41a1-b2a3-0b017a9e97d0\",\"subjectName\":\"RC-P123 موظّف اصطناعيّ\",\"incidentTypeId\":\"1d22a597-5a4b-4cf5-a845-fae0b1c59e90\",\"typeCode\":\"Late\",\"typeNa"
+    },
+    {
+      "id": "S-ATT-VISIBLE",
+      "desc": "ظهور البلاغ للموظّف بعد الإرسال",
+      "expected": "مدرَج",
+      "measured": "HTTP 200",
+      "status": "PASS",
+      "sample": "{\"items\":[{\"id\":\"e85b693c-7dce-4285-9f07-63014efef653\",\"subjectUserId\":\"b334d9a5-73fa-41a1-b2a3-0b017a9e97d0\",\"subjectName\":\"RC-P123 موظّف اصطناعيّ\",\"incidentTypeId\":\"1d22a597-5a4b-4cf5-a845-fae0b1c59e90\",\"typeCode\":\"Lat"
+    },
+    {
+      "id": "S-ATT-DETAIL-EMP",
+      "desc": "تفاصيل الواقعة للموظّف",
+      "expected": "200 بلا hrNote",
+      "measured": "HTTP 200 | keys_hrNote=False",
+      "status": "PASS",
+      "sample": "{\"id\":\"e85b693c-7dce-4285-9f07-63014efef653\",\"subjectUserId\":\"b334d9a5-73fa-41a1-b2a3-0b017a9e97d0\",\"subjectName\":\"RC-P123 موظّف اصطناعيّ\",\"incidentTypeId\":\"1d22a597-5a4b-4cf5-a845-fae0b1c59e90\",\"typeCode\":\"Late\",\"typeNa"
+    },
+    {
+      "id": "S-ATT-ACK",
+      "desc": "إقرار الموظّف",
+      "expected": "200 + AwaitingHr",
+      "measured": "HTTP 200 | status=AwaitingHr",
+      "status": "PASS",
+      "sample": "{\"id\":\"e85b693c-7dce-4285-9f07-63014efef653\",\"subjectUserId\":\"b334d9a5-73fa-41a1-b2a3-0b017a9e97d0\",\"subjectName\":\"RC-P123 موظّف اصطناعيّ\",\"incidentTypeId\":\"1d22a597-5a4b-4cf5-a845-fae0b1c59e90\",\"typeCode\":\"Late\",\"typeNa"
+    },
+    {
+      "id": "S-IDOR-ATT",
+      "desc": "موظّف آخر يطلب الواقعة",
+      "expected": "403/404",
+      "measured": "HTTP 404",
+      "status": "PASS",
+      "sample": "{\"type\":\"attendance.not_found\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"لا توجد واقعة مطابقة.\",\"traceId\":\"00-d6fb0d3278be90927eeade5196c0fa61-904cf9548a67187c-00\"}"
+    },
+    {
+      "id": "S-ATT-HRREVIEW-DENY",
+      "desc": "مراجعة HR من موظّف بلا مفتاح",
+      "expected": "403",
+      "measured": "HTTP 403",
+      "status": "PASS",
+      "sample": "{\"type\":\"auth.forbidden\",\"title\":\"Forbidden\",\"status\":403,\"detail\":\"هذا الإجراء يتطلّب إذن مراجعة الحضور.\",\"traceId\":\"00-80750397d9aab14743cb5c7a1ea34ca2-2b4fb8065001d94d-00\"}"
+    },
+    {
+      "id": "S-ATT-HRREVIEW",
+      "desc": "تأكيد HR بمفتاح Attendance.Review",
+      "expected": "200 + Confirmed",
+      "measured": "HTTP 200 | status=Confirmed",
+      "status": "PASS",
+      "sample": "{\"id\":\"e85b693c-7dce-4285-9f07-63014efef653\",\"subjectUserId\":\"b334d9a5-73fa-41a1-b2a3-0b017a9e97d0\",\"subjectName\":\"RC-P123 موظّف اصطناعيّ\",\"incidentTypeId\":\"1d22a597-5a4b-4cf5-a845-fae0b1c59e90\",\"typeCode\":\"Late\",\"typeNa"
+    },
+    {
+      "id": "S-ATT-CLOSE",
+      "desc": "إغلاق الواقعة",
+      "expected": "200 + Closed",
+      "measured": "HTTP 200 | status=Closed",
+      "status": "PASS",
+      "sample": "{\"id\":\"e85b693c-7dce-4285-9f07-63014efef653\",\"subjectUserId\":\"b334d9a5-73fa-41a1-b2a3-0b017a9e97d0\",\"subjectName\":\"RC-P123 موظّف اصطناعيّ\",\"incidentTypeId\":\"1d22a597-5a4b-4cf5-a845-fae0b1c59e90\",\"typeCode\":\"Late\",\"typeNa"
+    },
+    {
+      "id": "S-ATT-EVENTS",
+      "desc": "سجلّ أحداث الواقعة",
+      "expected": "≥4 أحداث",
+      "measured": "HTTP 200 | events=7",
+      "status": "PASS",
+      "sample": "[{\"id\":\"aabfa416-4918-4c50-8d68-075c986a6e2e\",\"actorUserId\":\"7cd90a3c-14a5-4167-8748-b156fbb586db\",\"actorName\":\"RC-P123 مدير اصطناعيّ\",\"action\":\"created\",\"fromStatus\":\"Draft\",\"toStatus\":\"Draft\",\"comment\":null,\"createdAtU"
+    },
+    {
+      "id": "S-360-ME",
+      "desc": "ملفّ 360 الشخصيّ",
+      "expected": "200",
+      "measured": "HTTP 200",
+      "status": "PASS",
+      "sample": "{\"subjectUserId\":\"b334d9a5-73fa-41a1-b2a3-0b017a9e97d0\",\"isSelf\":true,\"viewerRelation\":\"Self\",\"periodKey\":\"2026-W34\",\"sections\":{\"identity\":{\"key\":\"identity\",\"titleAr\":\"الهويّة وحالة التوظيف\",\"status\":\"Ready\",\"dataQualit"
+    },
+    {
+      "id": "S-360-IDOR",
+      "desc": "ملفّ 360 لموظّف آخر",
+      "expected": "403/404",
+      "measured": "HTTP 404",
+      "status": "PASS",
+      "sample": "{\"type\":\"employee360.not_found\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"الموظّف غير موجود أو خارج نطاقك.\",\"traceId\":\"00-c0662b507c5e5abe8e4b8fad813440db-d3bf4eedbc41cb5d-00\"}"
+    },
+    {
+      "id": "S-360-MGR",
+      "desc": "ملفّ 360 لمرؤوس من المدير",
+      "expected": "200",
+      "measured": "HTTP 200",
+      "status": "PASS",
+      "sample": "{\"subjectUserId\":\"b334d9a5-73fa-41a1-b2a3-0b017a9e97d0\",\"isSelf\":false,\"viewerRelation\":\"DirectTeam\",\"periodKey\":\"2026-W34\",\"sections\":{\"identity\":{\"key\":\"identity\",\"titleAr\":\"الهويّة وحالة التوظيف\",\"status\":\"Ready\",\"dat"
+    },
+    {
+      "id": "S-CHK-ME",
+      "desc": "قائمة الالتزام الشخصيّة",
+      "expected": "200",
+      "measured": "HTTP 200",
+      "status": "PASS",
+      "sample": "{\"subjectUserId\":\"b334d9a5-73fa-41a1-b2a3-0b017a9e97d0\",\"isSelf\":true,\"viewerRelation\":\"Self\",\"summary\":{\"applicable\":9,\"completed\":4,\"open\":5,\"notApplicable\":1,\"requiresMyAction\":0,\"completionRatio\":0.4444},\"items\":[{\"k"
+    },
+    {
+      "id": "S-CHK-MANAGE-DENY",
+      "desc": "تحرير بند الالتزام بلا مفتاح",
+      "expected": "403",
+      "measured": "HTTP 403",
+      "status": "PASS",
+      "sample": ""
+    },
+    {
+      "id": "S-RPT-TPL",
+      "desc": "قوالب التقارير",
+      "expected": "200",
+      "measured": "HTTP 200",
+      "status": "PASS",
+      "sample": "[{\"id\":\"05061575-bcc7-40d6-8543-d009621e6357\",\"title\":\"\\uD83D\\uDCCA تقرير Media Buyer حسب العميل\",\"description\":\"قالب مُهيكَل (ERDS Phase 3): جدول أداء الحملات لكل عميل + حقول نصية داعمة.\",\"jobRoleId\":null,\"defaultPeriod"
+    },
+    {
+      "id": "S-RPT-MINE",
+      "desc": "تسليماتي",
+      "expected": "200",
+      "measured": "HTTP 200",
+      "status": "PASS",
+      "sample": "[]"
+    },
+    {
+      "id": "S-RPT-DUE",
+      "desc": "حالة استحقاقي",
+      "expected": "200",
+      "measured": "HTTP 200",
+      "status": "PASS",
+      "sample": "{\"weekKey\":\"2026-W35\",\"weekLabel\":\"الأسبوع 35 — 2026 (السبت 22 أغسطس — الجمعة 28 أغسطس)\",\"weekStart\":\"2026-08-22\",\"weekEnd\":\"2026-08-28\",\"employeeDueDate\":\"2026-08-28\",\"expected\":false,\"submitted\":false,\"isOverdue\":false"
+    },
+    {
+      "id": "S-RPT-PENDING",
+      "desc": "بانتظار اعتمادي (مدير)",
+      "expected": "200",
+      "measured": "HTTP 200",
+      "status": "PASS",
+      "sample": "[]"
+    },
+    {
+      "id": "S-KPI-AGG",
+      "desc": "تجميع KPI",
+      "expected": "200",
+      "measured": "HTTP 400",
+      "status": "FAIL",
+      "sample": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.1\",\"title\":\"One or more validation errors occurred.\",\"status\":400,\"errors\":{\"granularity\":[\"The granularity field is required.\"]},\"traceId\":\"00-845a5200a4d661ff1d"
+    },
+    {
+      "id": "S-KPI-PERF",
+      "desc": "أداء KPI",
+      "expected": "200/400",
+      "measured": "HTTP 400",
+      "status": "PASS",
+      "sample": "{\"type\":\"kpi.cadence_required\",\"title\":\"Bad Request\",\"status\":400,\"detail\":\"يجب تحديد دوريّة التقييم صراحةً (WeeklyPulse أو Quarterly).\",\"traceId\":\"00-1759f4c00b1f3e59fef0d4d017800df2-7543c1d57e009d17-00\"}"
+    },
+    {
+      "id": "S-BAL-ME",
+      "desc": "أرصدتي",
+      "expected": "200",
+      "measured": "HTTP 200",
+      "status": "PASS",
+      "sample": "{\"year\":2026,\"annualLeave\":{\"balanceType\":\"AnnualLeave\",\"credited\":0,\"debited\":0,\"remaining\":0,\"isNegative\":false},\"permission\":{\"balanceType\":\"Permission\",\"credited\":0,\"debited\":0,\"remaining\":0,\"isNegative\":false},\"pend"
+    },
+    {
+      "id": "S-LEAVE-MY",
+      "desc": "طلبات إجازتي",
+      "expected": "200",
+      "measured": "HTTP 200",
+      "status": "PASS",
+      "sample": "[]"
+    },
+    {
+      "id": "S-LEAVE-PEND",
+      "desc": "إجازات بانتظار المدير",
+      "expected": "200",
+      "measured": "HTTP 200",
+      "status": "PASS",
+      "sample": "[]"
+    },
+    {
+      "id": "S-ESR-MY",
+      "desc": "طلباتي الخدميّة",
+      "expected": "200",
+      "measured": "HTTP 200",
+      "status": "PASS",
+      "sample": "[]"
+    },
+    {
+      "id": "S-DASH-ME",
+      "desc": "لوحتي",
+      "expected": "200",
+      "measured": "HTTP 200",
+      "status": "PASS",
+      "sample": "{\"dashboardType\":\"Employee\",\"period\":{\"periodKey\":\"2026-W35\",\"label\":\"الأسبوع الحالي\"},\"user\":{\"id\":\"b334d9a5-73fa-41a1-b2a3-0b017a9e97d0\",\"name\":\"RC-P123 موظّف اصطناعيّ\",\"role\":\"Employee\"},\"scope\":{\"type\":\"own\",\"ids\":[\""
+    },
+    {
+      "id": "S-DASH-MGR",
+      "desc": "لوحة المدير",
+      "expected": "200",
+      "measured": "HTTP 200",
+      "status": "PASS",
+      "sample": "{\"dashboardType\":\"Manager\",\"period\":{\"periodKey\":\"2026-W35\",\"label\":\"الأسبوع الحالي\"},\"user\":{\"id\":\"7cd90a3c-14a5-4167-8748-b156fbb586db\",\"name\":\"RC-P123 مدير اصطناعيّ\",\"role\":\"Manager\"},\"scope\":{\"type\":\"department\",\"ids"
+    },
+    {
+      "id": "S-GOV-DENY",
+      "desc": "governance-summary من مدير",
+      "expected": "403",
+      "measured": "HTTP 403",
+      "status": "PASS",
+      "sample": "{\"type\":\"auth.forbidden\",\"title\":\"Forbidden\",\"status\":403,\"detail\":\"لا تملك صلاحية عرض ملخص الحوكمة.\",\"traceId\":\"00-61029738e0a1347b1cb9a4ea7018f8c1-1d6ac2048a46b75b-00\"}"
+    },
+    {
+      "id": "S-DIR-USERS-EMP",
+      "desc": "دليل المستخدمين لموظّف",
+      "expected": "200 (بيانات عامّة)",
+      "measured": "HTTP 200",
+      "status": "PASS",
+      "sample": "[{\"id\":\"b334d9a5-73fa-41a1-b2a3-0b017a9e97d0\",\"fullName\":\"RC-P123 موظّف اصطناعيّ\",\"email\":\"rc-emp@p123.rc.test\",\"isActive\":true,\"roles\":[\"Employee\"],\"departmentId\":\"348143fd-b140-4def-93d0-5fcb7ffc2745\",\"teamId\":\"a2c06af"
+    },
+    {
+      "id": "S-PERM-READ-DENY",
+      "desc": "قراءة صلاحيات من موظّف",
+      "expected": "403",
+      "measured": "HTTP 403",
+      "status": "PASS",
+      "sample": ""
+    },
+    {
+      "id": "S-AUDIT-PERM",
+      "desc": "أثر تدقيق لتغيير الصلاحيات",
+      "expected": "قيد يوثّق التغيير",
+      "measured": "HTTP 404 | total=0 permHits=0",
+      "status": "FAIL",
+      "sample": ""
+    },
+    {
+      "id": "S-PERM-REVOKE",
+      "desc": "سحب كلّ المفاتيح من rc-hr",
+      "expected": "200/204",
+      "measured": "HTTP 200",
+      "status": "PASS",
+      "sample": "{\"userId\":\"7f0e7894-a5f9-4884-b999-9cbb4a0f1403\",\"permissions\":[]}"
+    },
+    {
+      "id": "S-PERM-REVOKE-EFFECT",
+      "desc": "لوحة HR بعد السحب وإعادة الدخول",
+      "expected": "403",
+      "measured": "HTTP 403",
+      "status": "PASS",
+      "sample": ""
+    },
+    {
+      "id": "S-PERM-REVOKE-READBACK",
+      "desc": "قراءة الصلاحيات بعد السحب",
+      "expected": "قائمة فارغة",
+      "measured": "HTTP 200 | perms=[]",
+      "status": "PASS",
+      "sample": "{\"userId\":\"7f0e7894-a5f9-4884-b999-9cbb4a0f1403\",\"permissions\":[]}"
+    }
+  ],
+  "created": {
+    "departments": [
+      "348143fd-b140-4def-93d0-5fcb7ffc2745"
+    ],
+    "teams": [
+      "a2c06aff-06fe-42bf-abed-c211cf773b57"
+    ],
+    "incidents": [
+      "e85b693c-7dce-4285-9f07-63014efef653"
+    ]
+  },
+  "dep": "348143fd-b140-4def-93d0-5fcb7ffc2745",
+  "team": "a2c06aff-06fe-42bf-abed-c211cf773b57",
+  "incident": "e85b693c-7dce-4285-9f07-63014efef653"
+}

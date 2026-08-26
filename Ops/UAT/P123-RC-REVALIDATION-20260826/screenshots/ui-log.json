@@ -1,0 +1,725 @@
+{
+ "origin": "https://rc-report.emarketingacademy.net",
+ "bundle": "copied verbatim from /opt/reporting-rc/frontend/dist",
+ "shots": [
+  {
+   "role": "anonymous",
+   "route": "/login",
+   "viewport": 390,
+   "file": "login-390.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [],
+   "bodyHead": "تسجيل الدخول نظام تقارير الأداء والتشغيل الداخلي البريد الإلكتروني كلمة المرور دخول رجوع للصفحة الرئيسية"
+  },
+  {
+   "role": "anonymous",
+   "route": "/login",
+   "viewport": 768,
+   "file": "login-768.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [],
+   "bodyHead": "تسجيل الدخول نظام تقارير الأداء والتشغيل الداخلي البريد الإلكتروني كلمة المرور دخول رجوع للصفحة الرئيسية"
+  },
+  {
+   "role": "anonymous",
+   "route": "/login",
+   "viewport": 1440,
+   "file": "login-1440.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [],
+   "bodyHead": "تسجيل الدخول نظام تقارير الأداء والتشغيل الداخلي البريد الإلكتروني كلمة المرور دخول رجوع للصفحة الرئيسية"
+  },
+  {
+   "role": "admin",
+   "route": "/app",
+   "landed": "https://rc-report.emarketingacademy.net/app",
+   "viewport": 390,
+   "file": "admin-app-390.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [
+    "الرئيسية",
+    "الموظفون",
+    "التقارير",
+    "الأداء وKPI",
+    "الحوكمة",
+    "العملاء والمشروعات",
+    "الإعدادات",
+    "الرئيسية"
+   ],
+   "bodyHead": "☰ 🔔 R الرئيسية › الرئيسية لوحة الإدارة والحوكمة نظرة شاملة على المستخدمين والفرق والتقارير والمؤشرات — وبوّاب"
+  },
+  {
+   "role": "admin",
+   "route": "/app",
+   "landed": "https://rc-report.emarketingacademy.net/app",
+   "viewport": 768,
+   "file": "admin-app-768.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [
+    "الرئيسية",
+    "الموظفون",
+    "التقارير",
+    "الأداء وKPI",
+    "الحوكمة",
+    "العملاء والمشروعات",
+    "الإعدادات",
+    "الرئيسية"
+   ],
+   "bodyHead": "☰ نظام تقارير الأداء والتشغيل 🔔 R RC-P123 مدير نظام اصطناعيّ مدير النظام الرئيسية › الرئيسية لوحة الإدارة وال"
+  },
+  {
+   "role": "admin",
+   "route": "/app",
+   "landed": "https://rc-report.emarketingacademy.net/app",
+   "viewport": 1440,
+   "file": "admin-app-1440.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [
+    "الرئيسية",
+    "الموظفون",
+    "التقارير",
+    "الأداء وKPI",
+    "الحوكمة",
+    "العملاء والمشروعات",
+    "الإعدادات",
+    "الرئيسية"
+   ],
+   "bodyHead": "☰ نظام تقارير الأداء والتشغيل 🔔 R RC-P123 مدير نظام اصطناعيّ مدير النظام الرئيسية الموظفون التقارير الأداء وK"
+  },
+  {
+   "role": "admin",
+   "route": "/app/attendance",
+   "landed": "https://rc-report.emarketingacademy.net/app",
+   "viewport": 390,
+   "file": "admin-app-attendance-390.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [
+    "الرئيسية",
+    "الموظفون",
+    "التقارير",
+    "الأداء وKPI",
+    "الحوكمة",
+    "العملاء والمشروعات",
+    "الإعدادات",
+    "الموظفون"
+   ],
+   "bodyHead": "☰ 🔔 R الموظفون › الحضور والالتزام ملفي دليل الموظفين فرق العمل الحضور والالتزام الإجازات والاستئذانات الطلبات"
+  },
+  {
+   "role": "admin",
+   "route": "/app/attendance",
+   "landed": "https://rc-report.emarketingacademy.net/app",
+   "viewport": 768,
+   "file": "admin-app-attendance-768.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [
+    "الرئيسية",
+    "الموظفون",
+    "التقارير",
+    "الأداء وKPI",
+    "الحوكمة",
+    "العملاء والمشروعات",
+    "الإعدادات",
+    "الموظفون"
+   ],
+   "bodyHead": "☰ نظام تقارير الأداء والتشغيل 🔔 R RC-P123 مدير نظام اصطناعيّ مدير النظام الموظفون › الحضور والالتزام ملفي دلي"
+  },
+  {
+   "role": "admin",
+   "route": "/app/attendance",
+   "landed": "https://rc-report.emarketingacademy.net/app",
+   "viewport": 1440,
+   "file": "admin-app-attendance-1440.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [
+    "الرئيسية",
+    "الموظفون",
+    "التقارير",
+    "الأداء وKPI",
+    "الحوكمة",
+    "العملاء والمشروعات",
+    "الإعدادات",
+    "الموظفون"
+   ],
+   "bodyHead": "☰ نظام تقارير الأداء والتشغيل 🔔 R RC-P123 مدير نظام اصطناعيّ مدير النظام الرئيسية الموظفون التقارير الأداء وK"
+  },
+  {
+   "role": "admin",
+   "route": "/app/projects",
+   "landed": "https://rc-report.emarketingacademy.net/app",
+   "viewport": 390,
+   "file": "admin-app-projects-390.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [
+    "الرئيسية",
+    "الموظفون",
+    "التقارير",
+    "الأداء وKPI",
+    "الحوكمة",
+    "العملاء والمشروعات",
+    "الإعدادات",
+    "العملاء والمشروعات"
+   ],
+   "bodyHead": "☰ 🔔 R العملاء والمشروعات › المشروعات العملاء المشروعات المشاريع كل المشاريع ضمن نطاق صلاحيتك. تُدار المشاريع "
+  },
+  {
+   "role": "admin",
+   "route": "/app/projects",
+   "landed": "https://rc-report.emarketingacademy.net/app",
+   "viewport": 768,
+   "file": "admin-app-projects-768.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [
+    "الرئيسية",
+    "الموظفون",
+    "التقارير",
+    "الأداء وKPI",
+    "الحوكمة",
+    "العملاء والمشروعات",
+    "الإعدادات",
+    "العملاء والمشروعات"
+   ],
+   "bodyHead": "☰ نظام تقارير الأداء والتشغيل 🔔 R RC-P123 مدير نظام اصطناعيّ مدير النظام العملاء والمشروعات › المشروعات العمل"
+  },
+  {
+   "role": "admin",
+   "route": "/app/projects",
+   "landed": "https://rc-report.emarketingacademy.net/app",
+   "viewport": 1440,
+   "file": "admin-app-projects-1440.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [
+    "الرئيسية",
+    "الموظفون",
+    "التقارير",
+    "الأداء وKPI",
+    "الحوكمة",
+    "العملاء والمشروعات",
+    "الإعدادات",
+    "العملاء والمشروعات"
+   ],
+   "bodyHead": "☰ نظام تقارير الأداء والتشغيل 🔔 R RC-P123 مدير نظام اصطناعيّ مدير النظام الرئيسية الموظفون التقارير الأداء وK"
+  },
+  {
+   "role": "hr",
+   "route": "/app",
+   "landed": "https://rc-report.emarketingacademy.net/app",
+   "viewport": 390,
+   "file": "hr-app-390.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [
+    "الرئيسية",
+    "الموظفون",
+    "التقارير",
+    "الأداء وKPI",
+    "الحوكمة",
+    "الإعدادات",
+    "الرئيسية"
+   ],
+   "bodyHead": "☰ 🔔 R الرئيسية › الرئيسية لوحة الموارد البشرية أهلاً، RC-P123 موارد بشريّة اصطناعيّ — طلبات الموظفين والأرصدة"
+  },
+  {
+   "role": "hr",
+   "route": "/app",
+   "landed": "https://rc-report.emarketingacademy.net/app",
+   "viewport": 768,
+   "file": "hr-app-768.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [
+    "الرئيسية",
+    "الموظفون",
+    "التقارير",
+    "الأداء وKPI",
+    "الحوكمة",
+    "الإعدادات",
+    "الرئيسية"
+   ],
+   "bodyHead": "☰ نظام تقارير الأداء والتشغيل 🔔 R RC-P123 موارد بشريّة اصطناعيّ الموارد البشرية الرئيسية › الرئيسية لوحة المو"
+  },
+  {
+   "role": "hr",
+   "route": "/app",
+   "landed": "https://rc-report.emarketingacademy.net/app",
+   "viewport": 1440,
+   "file": "hr-app-1440.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [
+    "الرئيسية",
+    "الموظفون",
+    "التقارير",
+    "الأداء وKPI",
+    "الحوكمة",
+    "الإعدادات",
+    "الرئيسية"
+   ],
+   "bodyHead": "☰ نظام تقارير الأداء والتشغيل 🔔 R RC-P123 موارد بشريّة اصطناعيّ الموارد البشرية الرئيسية الموظفون التقارير ال"
+  },
+  {
+   "role": "hr",
+   "route": "/app/attendance",
+   "landed": "https://rc-report.emarketingacademy.net/app",
+   "viewport": 390,
+   "file": "hr-app-attendance-390.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [
+    "الرئيسية",
+    "الموظفون",
+    "التقارير",
+    "الأداء وKPI",
+    "الحوكمة",
+    "الإعدادات",
+    "الموظفون"
+   ],
+   "bodyHead": "☰ 🔔 R الموظفون › الحضور والالتزام ملفي دليل الموظفين الحضور والالتزام الإجازات والاستئذانات الطلبات الأرصدة إ"
+  },
+  {
+   "role": "hr",
+   "route": "/app/attendance",
+   "landed": "https://rc-report.emarketingacademy.net/app",
+   "viewport": 768,
+   "file": "hr-app-attendance-768.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [
+    "الرئيسية",
+    "الموظفون",
+    "التقارير",
+    "الأداء وKPI",
+    "الحوكمة",
+    "الإعدادات",
+    "الموظفون"
+   ],
+   "bodyHead": "☰ نظام تقارير الأداء والتشغيل 🔔 R RC-P123 موارد بشريّة اصطناعيّ الموارد البشرية الموظفون › الحضور والالتزام م"
+  },
+  {
+   "role": "hr",
+   "route": "/app/attendance",
+   "landed": "https://rc-report.emarketingacademy.net/app",
+   "viewport": 1440,
+   "file": "hr-app-attendance-1440.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [
+    "الرئيسية",
+    "الموظفون",
+    "التقارير",
+    "الأداء وKPI",
+    "الحوكمة",
+    "الإعدادات",
+    "الموظفون"
+   ],
+   "bodyHead": "☰ نظام تقارير الأداء والتشغيل 🔔 R RC-P123 موارد بشريّة اصطناعيّ الموارد البشرية الرئيسية الموظفون التقارير ال"
+  },
+  {
+   "role": "hr",
+   "route": "/app/projects",
+   "landed": "https://rc-report.emarketingacademy.net/app",
+   "viewport": 390,
+   "file": "hr-app-projects-390.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [
+    "الرئيسية",
+    "الموظفون",
+    "التقارير",
+    "الأداء وKPI",
+    "الحوكمة",
+    "الإعدادات",
+    "الرئيسية"
+   ],
+   "bodyHead": "☰ 🔔 R الرئيسية › الرئيسية لوحة الموارد البشرية أهلاً، RC-P123 موارد بشريّة اصطناعيّ — طلبات الموظفين والأرصدة"
+  },
+  {
+   "role": "hr",
+   "route": "/app/projects",
+   "landed": "https://rc-report.emarketingacademy.net/app",
+   "viewport": 768,
+   "file": "hr-app-projects-768.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [
+    "الرئيسية",
+    "الموظفون",
+    "التقارير",
+    "الأداء وKPI",
+    "الحوكمة",
+    "الإعدادات",
+    "الرئيسية"
+   ],
+   "bodyHead": "☰ نظام تقارير الأداء والتشغيل 🔔 R RC-P123 موارد بشريّة اصطناعيّ الموارد البشرية الرئيسية › الرئيسية لوحة المو"
+  },
+  {
+   "role": "hr",
+   "route": "/app/projects",
+   "landed": "https://rc-report.emarketingacademy.net/app",
+   "viewport": 1440,
+   "file": "hr-app-projects-1440.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [
+    "الرئيسية",
+    "الموظفون",
+    "التقارير",
+    "الأداء وKPI",
+    "الحوكمة",
+    "الإعدادات",
+    "الرئيسية"
+   ],
+   "bodyHead": "☰ نظام تقارير الأداء والتشغيل 🔔 R RC-P123 موارد بشريّة اصطناعيّ الموارد البشرية الرئيسية الموظفون التقارير ال"
+  },
+  {
+   "role": "manager",
+   "route": "/app",
+   "landed": "https://rc-report.emarketingacademy.net/app",
+   "viewport": 390,
+   "file": "manager-app-390.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [
+    "الرئيسية",
+    "الموظفون",
+    "التقارير",
+    "الأداء وKPI",
+    "الحوكمة",
+    "العملاء والمشروعات",
+    "الرئيسية"
+   ],
+   "bodyHead": "☰ 🔔 2 R الرئيسية › الرئيسية لوحة مدير القسم أهلاً، RC-P123 مدير اصطناعيّ — أداء القسم وسير الاعتماد والاختناق"
+  },
+  {
+   "role": "manager",
+   "route": "/app",
+   "landed": "https://rc-report.emarketingacademy.net/app",
+   "viewport": 768,
+   "file": "manager-app-768.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [
+    "الرئيسية",
+    "الموظفون",
+    "التقارير",
+    "الأداء وKPI",
+    "الحوكمة",
+    "العملاء والمشروعات",
+    "الرئيسية"
+   ],
+   "bodyHead": "☰ نظام تقارير الأداء والتشغيل 🔔 2 R RC-P123 مدير اصطناعيّ مدير الرئيسية › الرئيسية لوحة مدير القسم أهلاً، RC-"
+  },
+  {
+   "role": "manager",
+   "route": "/app",
+   "landed": "https://rc-report.emarketingacademy.net/app",
+   "viewport": 1440,
+   "file": "manager-app-1440.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [
+    "الرئيسية",
+    "الموظفون",
+    "التقارير",
+    "الأداء وKPI",
+    "الحوكمة",
+    "العملاء والمشروعات",
+    "الرئيسية"
+   ],
+   "bodyHead": "☰ نظام تقارير الأداء والتشغيل 🔔 2 R RC-P123 مدير اصطناعيّ مدير الرئيسية الموظفون التقارير الأداء وKPI الحوكمة"
+  },
+  {
+   "role": "manager",
+   "route": "/app/attendance",
+   "landed": "https://rc-report.emarketingacademy.net/app",
+   "viewport": 390,
+   "file": "manager-app-attendance-390.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [
+    "الرئيسية",
+    "الموظفون",
+    "التقارير",
+    "الأداء وKPI",
+    "الحوكمة",
+    "العملاء والمشروعات",
+    "الموظفون"
+   ],
+   "bodyHead": "☰ 🔔 2 R الموظفون › الحضور والالتزام ملفي فرق العمل الحضور والالتزام الإجازات والاستئذانات الطلبات الأرصدة الت"
+  },
+  {
+   "role": "manager",
+   "route": "/app/attendance",
+   "landed": "https://rc-report.emarketingacademy.net/app",
+   "viewport": 768,
+   "file": "manager-app-attendance-768.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [
+    "الرئيسية",
+    "الموظفون",
+    "التقارير",
+    "الأداء وKPI",
+    "الحوكمة",
+    "العملاء والمشروعات",
+    "الموظفون"
+   ],
+   "bodyHead": "☰ نظام تقارير الأداء والتشغيل 🔔 2 R RC-P123 مدير اصطناعيّ مدير الموظفون › الحضور والالتزام ملفي فرق العمل الح"
+  },
+  {
+   "role": "manager",
+   "route": "/app/attendance",
+   "landed": "https://rc-report.emarketingacademy.net/app",
+   "viewport": 1440,
+   "file": "manager-app-attendance-1440.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [
+    "الرئيسية",
+    "الموظفون",
+    "التقارير",
+    "الأداء وKPI",
+    "الحوكمة",
+    "العملاء والمشروعات",
+    "الموظفون"
+   ],
+   "bodyHead": "☰ نظام تقارير الأداء والتشغيل 🔔 2 R RC-P123 مدير اصطناعيّ مدير الرئيسية الموظفون التقارير الأداء وKPI الحوكمة"
+  },
+  {
+   "role": "manager",
+   "route": "/app/projects",
+   "landed": "https://rc-report.emarketingacademy.net/app",
+   "viewport": 390,
+   "file": "manager-app-projects-390.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [
+    "الرئيسية",
+    "الموظفون",
+    "التقارير",
+    "الأداء وKPI",
+    "الحوكمة",
+    "العملاء والمشروعات",
+    "العملاء والمشروعات"
+   ],
+   "bodyHead": "☰ 🔔 2 R العملاء والمشروعات › المشروعات العملاء المشروعات المشاريع كل المشاريع ضمن نطاق صلاحيتك. تُدار المشاري"
+  },
+  {
+   "role": "manager",
+   "route": "/app/projects",
+   "landed": "https://rc-report.emarketingacademy.net/app",
+   "viewport": 768,
+   "file": "manager-app-projects-768.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [
+    "الرئيسية",
+    "الموظفون",
+    "التقارير",
+    "الأداء وKPI",
+    "الحوكمة",
+    "العملاء والمشروعات",
+    "العملاء والمشروعات"
+   ],
+   "bodyHead": "☰ نظام تقارير الأداء والتشغيل 🔔 2 R RC-P123 مدير اصطناعيّ مدير العملاء والمشروعات › المشروعات العملاء المشروع"
+  },
+  {
+   "role": "manager",
+   "route": "/app/projects",
+   "landed": "https://rc-report.emarketingacademy.net/app",
+   "viewport": 1440,
+   "file": "manager-app-projects-1440.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [
+    "الرئيسية",
+    "الموظفون",
+    "التقارير",
+    "الأداء وKPI",
+    "الحوكمة",
+    "العملاء والمشروعات",
+    "العملاء والمشروعات"
+   ],
+   "bodyHead": "☰ نظام تقارير الأداء والتشغيل 🔔 2 R RC-P123 مدير اصطناعيّ مدير الرئيسية الموظفون التقارير الأداء وKPI الحوكمة"
+  },
+  {
+   "role": "employee",
+   "route": "/app",
+   "landed": "https://rc-report.emarketingacademy.net/app",
+   "viewport": 390,
+   "file": "employee-app-390.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [
+    "الرئيسية",
+    "الموظفون",
+    "التقارير",
+    "الأداء وKPI",
+    "الحوكمة",
+    "الرئيسية"
+   ],
+   "bodyHead": "☰ 🔔 3 R الرئيسية › الرئيسية لوحة الموظف أهلاً، RC-P123 موظّف اصطناعيّ — تقاريرك ومؤشّراتك ومهامك الشخصية موظف"
+  },
+  {
+   "role": "employee",
+   "route": "/app",
+   "landed": "https://rc-report.emarketingacademy.net/app",
+   "viewport": 768,
+   "file": "employee-app-768.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [
+    "الرئيسية",
+    "الموظفون",
+    "التقارير",
+    "الأداء وKPI",
+    "الحوكمة",
+    "الرئيسية"
+   ],
+   "bodyHead": "☰ نظام تقارير الأداء والتشغيل 🔔 3 R RC-P123 موظّف اصطناعيّ موظف الرئيسية › الرئيسية لوحة الموظف أهلاً، RC-P12"
+  },
+  {
+   "role": "employee",
+   "route": "/app",
+   "landed": "https://rc-report.emarketingacademy.net/app",
+   "viewport": 1440,
+   "file": "employee-app-1440.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [
+    "الرئيسية",
+    "الموظفون",
+    "التقارير",
+    "الأداء وKPI",
+    "الحوكمة",
+    "الرئيسية"
+   ],
+   "bodyHead": "☰ نظام تقارير الأداء والتشغيل 🔔 3 R RC-P123 موظّف اصطناعيّ موظف الرئيسية الموظفون التقارير الأداء وKPI الحوكم"
+  },
+  {
+   "role": "employee",
+   "route": "/app/attendance",
+   "landed": "https://rc-report.emarketingacademy.net/app",
+   "viewport": 390,
+   "file": "employee-app-attendance-390.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [
+    "الرئيسية",
+    "الموظفون",
+    "التقارير",
+    "الأداء وKPI",
+    "الحوكمة",
+    "الموظفون"
+   ],
+   "bodyHead": "☰ 🔔 3 R الموظفون › الحضور والالتزام ملفي الحضور والالتزام الإجازات والاستئذانات الطلبات الأرصدة التطوير والمت"
+  },
+  {
+   "role": "employee",
+   "route": "/app/attendance",
+   "landed": "https://rc-report.emarketingacademy.net/app",
+   "viewport": 768,
+   "file": "employee-app-attendance-768.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [
+    "الرئيسية",
+    "الموظفون",
+    "التقارير",
+    "الأداء وKPI",
+    "الحوكمة",
+    "الموظفون"
+   ],
+   "bodyHead": "☰ نظام تقارير الأداء والتشغيل 🔔 3 R RC-P123 موظّف اصطناعيّ موظف الموظفون › الحضور والالتزام ملفي الحضور والال"
+  },
+  {
+   "role": "employee",
+   "route": "/app/attendance",
+   "landed": "https://rc-report.emarketingacademy.net/app",
+   "viewport": 1440,
+   "file": "employee-app-attendance-1440.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [
+    "الرئيسية",
+    "الموظفون",
+    "التقارير",
+    "الأداء وKPI",
+    "الحوكمة",
+    "الموظفون"
+   ],
+   "bodyHead": "☰ نظام تقارير الأداء والتشغيل 🔔 3 R RC-P123 موظّف اصطناعيّ موظف الرئيسية الموظفون التقارير الأداء وKPI الحوكم"
+  },
+  {
+   "role": "employee",
+   "route": "/app/projects",
+   "landed": "https://rc-report.emarketingacademy.net/app",
+   "viewport": 390,
+   "file": "employee-app-projects-390.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [
+    "الرئيسية",
+    "الموظفون",
+    "التقارير",
+    "الأداء وKPI",
+    "الحوكمة",
+    "الرئيسية"
+   ],
+   "bodyHead": "☰ 🔔 3 R الرئيسية › الرئيسية لوحة الموظف أهلاً، RC-P123 موظّف اصطناعيّ — تقاريرك ومؤشّراتك ومهامك الشخصية موظف"
+  },
+  {
+   "role": "employee",
+   "route": "/app/projects",
+   "landed": "https://rc-report.emarketingacademy.net/app",
+   "viewport": 768,
+   "file": "employee-app-projects-768.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [
+    "الرئيسية",
+    "الموظفون",
+    "التقارير",
+    "الأداء وKPI",
+    "الحوكمة",
+    "الرئيسية"
+   ],
+   "bodyHead": "☰ نظام تقارير الأداء والتشغيل 🔔 3 R RC-P123 موظّف اصطناعيّ موظف الرئيسية › الرئيسية لوحة الموظف أهلاً، RC-P12"
+  },
+  {
+   "role": "employee",
+   "route": "/app/projects",
+   "landed": "https://rc-report.emarketingacademy.net/app",
+   "viewport": 1440,
+   "file": "employee-app-projects-1440.png",
+   "dir": "rtl",
+   "horizontalOverflow": false,
+   "navItems": [
+    "الرئيسية",
+    "الموظفون",
+    "التقارير",
+    "الأداء وKPI",
+    "الحوكمة",
+    "الرئيسية"
+   ],
+   "bodyHead": "☰ نظام تقارير الأداء والتشغيل 🔔 3 R RC-P123 موظّف اصطناعيّ موظف الرئيسية الموظفون التقارير الأداء وKPI الحوكم"
+  }
+ ],
+ "consoleErrorsTotal": 0,
+ "consoleErrorsProxyNoise": 0,
+ "consoleErrorsReal": [],
+ "overflowViolations": [],
+ "nonRtl": []
+}

@@ -1,0 +1,287 @@
+[
+  {
+    "role": "anonymous",
+    "route": "/login",
+    "viewport": 390,
+    "file": "login-390.png",
+    "horizontalOverflow": false
+  },
+  {
+    "role": "anonymous",
+    "route": "/login",
+    "viewport": 768,
+    "file": "login-768.png",
+    "horizontalOverflow": false
+  },
+  {
+    "role": "anonymous",
+    "route": "/login",
+    "viewport": 1440,
+    "file": "login-1440.png",
+    "horizontalOverflow": false
+  },
+  {
+    "role": "admin",
+    "route": "/app",
+    "viewport": 390,
+    "file": "admin-390.png",
+    "dir": "rtl",
+    "horizontalOverflow": false,
+    "navItems": [
+      "الرئيسية",
+      "الموظفون",
+      "التقارير",
+      "الأداء وKPI",
+      "الحوكمة",
+      "العملاء والمشروعات",
+      "الإعدادات",
+      "الرئيسية"
+    ],
+    "consoleErrors": [
+      "[2026-08-26T13:51:12.979Z] Error: Server returned handshake error: Handshake was canceled.",
+      "[2026-08-26T13:51:12.979Z] Error: Connection disconnected with error 'Error: Server returned handshake error: Handshake was canceled.'.",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ]
+  },
+  {
+    "role": "admin",
+    "route": "/app",
+    "viewport": 768,
+    "file": "admin-768.png",
+    "dir": "rtl",
+    "horizontalOverflow": false,
+    "navItems": [
+      "الرئيسية",
+      "الموظفون",
+      "التقارير",
+      "الأداء وKPI",
+      "الحوكمة",
+      "العملاء والمشروعات",
+      "الإعدادات",
+      "الرئيسية"
+    ],
+    "consoleErrors": [
+      "[2026-08-26T13:51:32.957Z] Error: Server returned handshake error: Handshake was canceled.",
+      "[2026-08-26T13:51:32.958Z] Error: Connection disconnected with error 'Error: Server returned handshake error: Handshake was canceled.'.",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ]
+  },
+  {
+    "role": "admin",
+    "route": "/app",
+    "viewport": 1440,
+    "file": "admin-1440.png",
+    "dir": "rtl",
+    "horizontalOverflow": false,
+    "navItems": [
+      "الرئيسية",
+      "الموظفون",
+      "التقارير",
+      "الأداء وKPI",
+      "الحوكمة",
+      "العملاء والمشروعات",
+      "الإعدادات",
+      "الرئيسية"
+    ],
+    "consoleErrors": [
+      "[2026-08-26T13:51:53.060Z] Error: Server returned handshake error: Handshake was canceled.",
+      "[2026-08-26T13:51:53.061Z] Error: Connection disconnected with error 'Error: Server returned handshake error: Handshake was canceled.'.",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ]
+  },
+  {
+    "role": "hr",
+    "route": "/app",
+    "viewport": 390,
+    "file": "hr-390.png",
+    "dir": "rtl",
+    "horizontalOverflow": false,
+    "navItems": [
+      "الرئيسية",
+      "الموظفون",
+      "التقارير",
+      "الأداء وKPI",
+      "الحوكمة",
+      "الإعدادات",
+      "الرئيسية"
+    ],
+    "consoleErrors": [
+      "[2026-08-26T13:52:13.515Z] Error: Server returned handshake error: Handshake was canceled.",
+      "[2026-08-26T13:52:13.515Z] Error: Connection disconnected with error 'Error: Server returned handshake error: Handshake was canceled.'.",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ]
+  },
+  {
+    "role": "hr",
+    "route": "/app",
+    "viewport": 768,
+    "file": "hr-768.png",
+    "dir": "rtl",
+    "horizontalOverflow": false,
+    "navItems": [
+      "الرئيسية",
+      "الموظفون",
+      "التقارير",
+      "الأداء وKPI",
+      "الحوكمة",
+      "الإعدادات",
+      "الرئيسية"
+    ],
+    "consoleErrors": [
+      "[2026-08-26T13:52:33.704Z] Error: Server returned handshake error: Handshake was canceled.",
+      "[2026-08-26T13:52:33.705Z] Error: Connection disconnected with error 'Error: Server returned handshake error: Handshake was canceled.'.",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ]
+  },
+  {
+    "role": "hr",
+    "route": "/app",
+    "viewport": 1440,
+    "file": "hr-1440.png",
+    "dir": "rtl",
+    "horizontalOverflow": false,
+    "navItems": [
+      "الرئيسية",
+      "الموظفون",
+      "التقارير",
+      "الأداء وKPI",
+      "الحوكمة",
+      "الإعدادات",
+      "الرئيسية"
+    ],
+    "consoleErrors": [
+      "[2026-08-26T13:52:53.764Z] Error: Server returned handshake error: Handshake was canceled.",
+      "[2026-08-26T13:52:53.765Z] Error: Connection disconnected with error 'Error: Server returned handshake error: Handshake was canceled.'.",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ]
+  },
+  {
+    "role": "manager",
+    "route": "/app",
+    "viewport": 390,
+    "file": "manager-390.png",
+    "dir": "rtl",
+    "horizontalOverflow": false,
+    "navItems": [
+      "الرئيسية",
+      "الموظفون",
+      "التقارير",
+      "الأداء وKPI",
+      "الحوكمة",
+      "العملاء والمشروعات",
+      "الرئيسية"
+    ],
+    "consoleErrors": [
+      "[2026-08-26T13:53:14.702Z] Error: Server returned handshake error: Handshake was canceled.",
+      "[2026-08-26T13:53:14.702Z] Error: Connection disconnected with error 'Error: Server returned handshake error: Handshake was canceled.'.",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ]
+  },
+  {
+    "role": "manager",
+    "route": "/app",
+    "viewport": 768,
+    "file": "manager-768.png",
+    "dir": "rtl",
+    "horizontalOverflow": false,
+    "navItems": [
+      "الرئيسية",
+      "الموظفون",
+      "التقارير",
+      "الأداء وKPI",
+      "الحوكمة",
+      "العملاء والمشروعات",
+      "الرئيسية"
+    ],
+    "consoleErrors": [
+      "[2026-08-26T13:53:35.107Z] Error: Server returned handshake error: Handshake was canceled.",
+      "[2026-08-26T13:53:35.108Z] Error: Connection disconnected with error 'Error: Server returned handshake error: Handshake was canceled.'.",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ]
+  },
+  {
+    "role": "manager",
+    "route": "/app",
+    "viewport": 1440,
+    "file": "manager-1440.png",
+    "dir": "rtl",
+    "horizontalOverflow": false,
+    "navItems": [
+      "الرئيسية",
+      "الموظفون",
+      "التقارير",
+      "الأداء وKPI",
+      "الحوكمة",
+      "العملاء والمشروعات",
+      "الرئيسية"
+    ],
+    "consoleErrors": [
+      "[2026-08-26T13:53:55.568Z] Error: Server returned handshake error: Handshake was canceled.",
+      "[2026-08-26T13:53:55.568Z] Error: Connection disconnected with error 'Error: Server returned handshake error: Handshake was canceled.'.",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ]
+  },
+  {
+    "role": "employee",
+    "route": "/app",
+    "viewport": 390,
+    "file": "employee-390.png",
+    "dir": "rtl",
+    "horizontalOverflow": false,
+    "navItems": [
+      "الرئيسية",
+      "الموظفون",
+      "التقارير",
+      "الأداء وKPI",
+      "الحوكمة",
+      "الرئيسية"
+    ],
+    "consoleErrors": [
+      "[2026-08-26T13:54:16.511Z] Error: Server returned handshake error: Handshake was canceled.",
+      "[2026-08-26T13:54:16.512Z] Error: Connection disconnected with error 'Error: Server returned handshake error: Handshake was canceled.'.",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ]
+  },
+  {
+    "role": "employee",
+    "route": "/app",
+    "viewport": 768,
+    "file": "employee-768.png",
+    "dir": "rtl",
+    "horizontalOverflow": false,
+    "navItems": [
+      "الرئيسية",
+      "الموظفون",
+      "التقارير",
+      "الأداء وKPI",
+      "الحوكمة",
+      "الرئيسية"
+    ],
+    "consoleErrors": [
+      "[2026-08-26T13:54:36.698Z] Error: Server returned handshake error: Handshake was canceled.",
+      "[2026-08-26T13:54:36.698Z] Error: Connection disconnected with error 'Error: Server returned handshake error: Handshake was canceled.'.",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ]
+  },
+  {
+    "role": "employee",
+    "route": "/app",
+    "viewport": 1440,
+    "file": "employee-1440.png",
+    "dir": "rtl",
+    "horizontalOverflow": false,
+    "navItems": [
+      "الرئيسية",
+      "الموظفون",
+      "التقارير",
+      "الأداء وKPI",
+      "الحوكمة",
+      "الرئيسية"
+    ],
+    "consoleErrors": [
+      "[2026-08-26T13:54:56.899Z] Error: Server returned handshake error: Handshake was canceled.",
+      "[2026-08-26T13:54:56.899Z] Error: Connection disconnected with error 'Error: Server returned handshake error: Handshake was canceled.'.",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ]
+  }
+]

@@ -1,0 +1,55 @@
+{
+ "users": {
+  "admin": {
+   "id": "47f02378-1e2d-446b-a16e-7d2f043d307c",
+   "email": "p360nav.admin@navuat.test",
+   "fullName": "P360NAV-مدير النظام",
+   "role": "الإدارة"
+  },
+  "acctmgr": {
+   "id": "ad438a3a-b25a-4fd0-8485-359a67576727",
+   "email": "p360nav.acctmgr@navuat.test",
+   "fullName": "P360NAV-مدير الحساب",
+   "role": "مدير الحساب"
+  },
+  "owner": {
+   "id": "4e067a49-e172-45d2-8b82-4889575ce5c4",
+   "email": "p360nav.owner@navuat.test",
+   "fullName": "P360NAV-مالك المشروع",
+   "role": "مالك المشروع"
+  },
+  "lead": {
+   "id": "31c9814a-66a6-4342-b631-874b6190704c",
+   "email": "p360nav.lead@navuat.test",
+   "fullName": "P360NAV-قائد الفريق",
+   "role": "قائد الفريق"
+  },
+  "emp": {
+   "id": "ec96b860-b2dd-45d2-9943-b111c52348ed",
+   "email": "p360nav.emp@navuat.test",
+   "fullName": "P360NAV-موظّف داخل النطاق",
+   "role": "موظّف داخل النطاق"
+  },
+  "outsider": {
+   "id": "bd71b143-e679-40b1-88d6-b152d6eaffa9",
+   "email": "p360nav.outsider@navuat.test",
+   "fullName": "P360NAV-موظّف خارج النطاق",
+   "role": "موظّف خارج النطاق"
+  }
+ },
+ "clientId": "e28a39ef-dd70-4bed-b056-d5fe8f65646d",
+ "projectA": "b090c158-31b6-4688-ba39-ce5688606a17",
+ "projectB": "68dbd09a-3968-4b05-9b2b-a72abb9b527a",
+ "templateId": "454edc38-36ec-4592-8ed4-157078afedf2",
+ "markers": {
+  "A": "776001",
+  "B": "889002",
+  "general": "ملخّص-عامّ-لا-ينتمي-لمشروع-Z7Q"
+ },
+ "departmentId": "a5b77b91-2a68-4134-98b6-841a6e57c713",
+ "teamId": "eab9054f-a339-4fdd-b362-d583d22b199b",
+ "sectionFieldId": "b2b8229d-e2f6-4613-b9e8-b2e60a3b62fb",
+ "generalFieldId": "5bccc80a-d732-41a6-990b-7e04a51e956b",
+ "periodKey": "2026-W35",
+ "submissionId": "45f90d09-bbc9-4c1d-bd81-b44bb891564f"
+}

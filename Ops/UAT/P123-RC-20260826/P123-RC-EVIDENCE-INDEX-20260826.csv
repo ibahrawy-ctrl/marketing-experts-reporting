@@ -1,0 +1,63 @@
+﻿المسار,الوصف,المرحلة,الحجم (بايت),md5,CandidateSHA,البيئة
+P123-RC-PUSH-REPORT-20260826.md,تقرير الدفع,المرحلتان 1-2,3222,0aea9cc03495aa3f6beb7466d6910578,8479d374238b71731996ad73d20d1485701d2053,RC
+P123-RC-MERGE-REPORT-20260826.md,تقرير الدمج في develop,المرحلة 3,2832,7a0206047d78a2fca2282604d201f20a,8479d374238b71731996ad73d20d1485701d2053,RC
+P123-RC-MERGE-CANDIDATE-TEST-REPORT-20260826.md,تقرير اختبارات قيد الدمج,المرحلة 4,3950,c23704590dade88be2426963c61cb7e8,8479d374238b71731996ad73d20d1485701d2053,RC
+P123-RC-MIGRATION-PREFLIGHT-20260826.md,فحص ما قبل الهجرة على RC,المرحلة 7,2777,cd159a2693eb819b9f61ebfb54c28f0f,8479d374238b71731996ad73d20d1485701d2053,RC
+P123-RC-DEPLOYMENT-REPORT-20260826.md,تقرير نشر مرشّح RC,المرحلتان 6 و8,6260,e41f97331058fc94d39e75fd4da87600,8479d374238b71731996ad73d20d1485701d2053,RC
+P123-RC-SCENARIO-MATRIX-20260826.csv,مصفوفة سيناريوهات RC (91 سطرًا),المرحلتان 9 و10,23870,137bd173d48fae2f3623dba76bfbd359,8479d374238b71731996ad73d20d1485701d2053,RC
+P123-RC-DEFECT-REGISTER-20260826.csv,سجلّ العيوب,المرحلتان 9 و10,3410,98e57e44e6396c193eeda2447a3fde8f,8479d374238b71731996ad73d20d1485701d2053,RC
+P123-RC-PERMISSION-MATRIX-20260826.csv,مصفوفة الصلاحيّات,المرحلة 10,7846,d42e9dc0875ef365950e02e4c4761d23,8479d374238b71731996ad73d20d1485701d2053,RC
+P123-RC-EVIDENCE-INDEX-20260826.csv,فهرس الأدلّة (هذا الملفّ),المرحلة 12,(يُنتَج في هذه المرحلة),-,8479d374238b71731996ad73d20d1485701d2053,RC
+P123-RC-CLOSURE-NOTE-20260826.md,مذكّرة الإغلاق,المرحلة 12,(يُنتَج في هذه المرحلة),-,8479d374238b71731996ad73d20d1485701d2053,RC
+P123-RC-DEPLOYMENT-AND-VALIDATION-REPORT-AR.docx,تقرير Word عربيّ RTL مصوَّر,المرحلة 12,(يُنتَج في هذه المرحلة),-,8479d374238b71731996ad73d20d1485701d2053,RC
+P123-RC-DEPLOYMENT-AND-VALIDATION-REPORT-AR.pdf,نظير PDF مطابق,المرحلة 12,(يُنتَج في هذه المرحلة),-,8479d374238b71731996ad73d20d1485701d2053,RC
+evidence/phase910-results.json,نتائج 69 سيناريو خامّة من RC الحيّة,المرحلتان 9 و10,27048,6bd46326a1f20e6ce90072edd344e54c,8479d374238b71731996ad73d20d1485701d2053,RC
+evidence/phase910.py,مِشدّ تشغيل السيناريوهات,المرحلتان 9 و10,17865,4862707c8c57d6495b5416a30eb3e708,8479d374238b71731996ad73d20d1485701d2053,RC
+evidence/phase9-extra.py,إعادة قياس S-KPI-AGG2 و S-AUDIT-DENY,المرحلة 9,2133,3ab7443f2b3a1ffb89437ca6c42ca2c7,8479d374238b71731996ad73d20d1485701d2053,RC
+evidence/audit-probe.py,إعادة قياس أثر التدقيق S-AUDIT-PERM2,المرحلة 10,1342,d938314785afe59eb56c23c3d670986a,8479d374238b71731996ad73d20d1485701d2053,RC
+evidence/repro-draft-leak.py,إعادة إنتاج معزولة لـDEF-P123-RC-001,المرحلة 9,3121,5c20c2ebc2541f25fe41e38c029f1577,8479d374238b71731996ad73d20d1485701d2053,RC
+evidence/repro-draft-leak.json,الحمولة المسرَّبة الملتقطة,المرحلة 9,1232,6c2ed4ef10474c0c78e4d8c35f8dedb8,8479d374238b71731996ad73d20d1485701d2053,RC
+evidence/seed_synth.sql,طُعم المستخدمين الاصطناعيّين (5),المرحلة 10,4301,204896333163a13fd85d43d835f9ea8c,8479d374238b71731996ad73d20d1485701d2053,RC
+evidence/seed_synth.py,مولّد تجزئات كلمات المرور والطُعم,المرحلة 10,2427,f6a0645cad599d1ef49ae05eac639f3e,8479d374238b71731996ad73d20d1485701d2053,RC
+evidence/cleanup.sql,تنظيف اصطناعيّ حصريّ,المرحلة 11,1813,78d0ef6eba04ebefb6f19b7e7e9e0d48,8479d374238b71731996ad73d20d1485701d2053,RC
+evidence/rc-snapshot.sql,استعلام البصمة المرجعيّ,المرحلات 6 و11,2078,dedbf3ef69eecbc97336f68ae594b1f7,8479d374238b71731996ad73d20d1485701d2053,RC
+evidence/synth-ids.json,معرّفات المستخدمين الاصطناعيّين,المرحلة 10,329,ab6f4ec686da1ec77af8bf7c070f33e8,8479d374238b71731996ad73d20d1485701d2053,RC
+evidence/snapshot-rc-BEFORE.txt,بصمة RC قبل النشر,المرحلة 6,543,0eb0a0f54d319969aaa3dc13317dcb01,8479d374238b71731996ad73d20d1485701d2053,RC
+evidence/snapshot-rc-AFTER.txt,بصمة RC بعد التنظيف الأوّل,المرحلة 11,543,0ab0d8e4ffbc82b3e9b1dcd79419ff7b,8479d374238b71731996ad73d20d1485701d2053,RC
+evidence/snapshot-rc-AFTER2.txt,بصمة RC بعد جولة اللقطات وتنظيفها,المرحلة 11,583,8fae7d4406007240626d34918b12e319,8479d374238b71731996ad73d20d1485701d2053,RC
+evidence/prod-BEFORE.txt,بصمة الإنتاج قبل النشر,المرحلة 6,208,ba4264c25a7e24516d1b58cbed9dcb8e,8479d374238b71731996ad73d20d1485701d2053,RC
+evidence/prod-AFTER.txt,بصمة الإنتاج بعد كلّ العمل,المرحلة 8,304,b2ee66bc8d27aba662319a1ecdf64608,8479d374238b71731996ad73d20d1485701d2053,RC
+evidence/mig-preflight-rc.txt,نتائج فحوص التكرار الثلاثة,المرحلة 7,142,1e9fe69fba8c792d524b77858151d057,8479d374238b71731996ad73d20d1485701d2053,RC
+evidence/mig-rows-rc.txt,سجلّ هجرات RC قبل النشر (42 صفًّا),المرحلة 7,1709,618cb945d31a83a449faebe0fb8f0fd8,8479d374238b71731996ad73d20d1485701d2053,RC
+evidence/mig-files-develop.txt,ملفّات الهجرة في شجرة المرشّح,المرحلة 7,1629,e04ad4fe742b4ab4d60bd8ae393e8f91,8479d374238b71731996ad73d20d1485701d2053,RC
+evidence/mig-empty.log,هجرة على قاعدة فارغة (45),المرحلة 4,2888,2338aef9160286663d2a7b3d75de8024,8479d374238b71731996ad73d20d1485701d2053,RC
+evidence/mig-repr.log,هجرة على نسخة RC المأهولة (5),المرحلة 4,379,bf707a2e11254b6faaddda87213b31f7,8479d374238b71731996ad73d20d1485701d2053,RC
+evidence/mig-repr-restore.log,استعادة نسخة RC للبروفة,المرحلة 4,107,1be4d7595a078a222409dad1c0cc5506,8479d374238b71731996ad73d20d1485701d2053,RC
+evidence/build-merge.log,بناء Release على قيد الدمج,المرحلة 4,7351,12109150ea486e049d56aeb5919cb5a7,8479d374238b71731996ad73d20d1485701d2053,RC
+evidence/unit-merge.log,556/556 وحدويّ,المرحلة 4,474,c1eb88be755fd14af60157860e5f1789,8479d374238b71731996ad73d20d1485701d2053,RC
+evidence/integ-merge-r1.log,2174/2174 تكامل — الجولة 1,المرحلة 4,498,94c5edf24d1bc4d7399baabe904d1b4a,8479d374238b71731996ad73d20d1485701d2053,RC
+evidence/integ-merge-r2.log,2174/2174 تكامل — الجولة 2,المرحلة 4,499,eb1674e3894b7ced85bbec131be1fe10,8479d374238b71731996ad73d20d1485701d2053,RC
+evidence/integ-refset.log,163/163 المجموعة المرجعيّة P1/P2/P3,المرحلة 4,494,2549bb2b8876bf9b829a822a6fa93e91,8479d374238b71731996ad73d20d1485701d2053,RC
+evidence/tsc-merge.log,TypeScript — 0 بايت,المرحلة 4,0,d41d8cd98f00b204e9800998ecf8427e,8479d374238b71731996ad73d20d1485701d2053,RC
+evidence/vitest-merge.log,735/735 Vitest,المرحلة 4,361,ed9d0978df767c5548fcbfa148dff86a,8479d374238b71731996ad73d20d1485701d2053,RC
+evidence/playwright-merge.log,47/47 Playwright,المرحلة 4,14359,c0535a97c9f8a328bb615b20667831bc,8479d374238b71731996ad73d20d1485701d2053,RC
+evidence/publish.log,نشر حزمة الخلفيّة,المرحلة 5,943,d82e950aef4fb8f7c0a838082c8e4e62,8479d374238b71731996ad73d20d1485701d2053,RC
+evidence/fe-build.log,بناء حزمة الواجهة,المرحلة 5,3309,7e6a5ba979f397551dfa0c84f4cbffbc,8479d374238b71731996ad73d20d1485701d2053,RC
+evidence/merge-delta-stat.txt,إحصاء فارق 9595c01..8479d374 (64 ملفًّا),المرحلة 3,4277,2409d53a8a83d3411f03c42f378163e5,8479d374238b71731996ad73d20d1485701d2053,RC
+evidence/rc-nginx-hubs.txt,كتلة /hubs/ في nginx الخاصّ بـRC,المرحلة 9,926,f41f0a0ab0dbbd821e7669e0a8c37b21,8479d374238b71731996ad73d20d1485701d2053,RC
+screenshots/admin-1440.png,لقطة دور/مقاس,المرحلة 9,386389,990fc0abf734e12d439c1452a84b0e1b,8479d374238b71731996ad73d20d1485701d2053,RC
+screenshots/admin-390.png,لقطة دور/مقاس,المرحلة 9,353232,ff6de4d095f71eb67572674cc19435f0,8479d374238b71731996ad73d20d1485701d2053,RC
+screenshots/admin-768.png,لقطة دور/مقاس,المرحلة 9,366200,da6cc2d01a19bbdce48450356b586583,8479d374238b71731996ad73d20d1485701d2053,RC
+screenshots/employee-1440.png,لقطة دور/مقاس,المرحلة 9,201291,191536ee96fca9906d15e10a7fb9aeab,8479d374238b71731996ad73d20d1485701d2053,RC
+screenshots/employee-390.png,لقطة دور/مقاس,المرحلة 9,123180,299e85b4cb9f87f9fbfd71da385b96b9,8479d374238b71731996ad73d20d1485701d2053,RC
+screenshots/employee-768.png,لقطة دور/مقاس,المرحلة 9,166910,96c9a88c83dd2ad4d059d560f2c7c485,8479d374238b71731996ad73d20d1485701d2053,RC
+screenshots/hr-1440.png,لقطة دور/مقاس,المرحلة 9,190909,47646b47d6c8098748046f43f8d2a321,8479d374238b71731996ad73d20d1485701d2053,RC
+screenshots/hr-390.png,لقطة دور/مقاس,المرحلة 9,130715,17a5290f7c898cde9533632d4c69e212,8479d374238b71731996ad73d20d1485701d2053,RC
+screenshots/hr-768.png,لقطة دور/مقاس,المرحلة 9,160855,0485f0d7eaab3f9de502201affdebd99,8479d374238b71731996ad73d20d1485701d2053,RC
+screenshots/login-1440.png,لقطة دور/مقاس,المرحلة 9,22267,519ae32f0d064e351ddbea2a102f8561,8479d374238b71731996ad73d20d1485701d2053,RC
+screenshots/login-390.png,لقطة دور/مقاس,المرحلة 9,18174,164c8cda9638304be663c43a103a2427,8479d374238b71731996ad73d20d1485701d2053,RC
+screenshots/login-768.png,لقطة دور/مقاس,المرحلة 9,20786,e56c17299cbd554bda304538a8d9e7f8,8479d374238b71731996ad73d20d1485701d2053,RC
+screenshots/manager-1440.png,لقطة دور/مقاس,المرحلة 9,285756,acaf90c888ce2223f8b60a86d7f3072c,8479d374238b71731996ad73d20d1485701d2053,RC
+screenshots/manager-390.png,لقطة دور/مقاس,المرحلة 9,209821,485d967462f463f65a93380bd2776025,8479d374238b71731996ad73d20d1485701d2053,RC
+screenshots/manager-768.png,لقطة دور/مقاس,المرحلة 9,247203,22c9abb26dc5b8257dc55373b747283b,8479d374238b71731996ad73d20d1485701d2053,RC
+screenshots/shots-log.json,سجلّ اللقطات المقيس,المرحلة 9,9195,329151b57237c01c5a104441d6a5c51e,8479d374238b71731996ad73d20d1485701d2053,RC

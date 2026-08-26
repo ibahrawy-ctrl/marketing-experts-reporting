@@ -1,0 +1,65 @@
+ .../P123-FIX-EVIDENCE-C-D-20260826.md              |   91 +
+ .../P123-FIX-EVIDENCE-E-20260826.md                |   65 +
+ .../P123-FIX-EVIDENCE-F-20260826.md                |   78 +
+ .../P123-FIX-EVIDENCE-G-20260826.md                |   80 +
+ .../P123-FIX-EVIDENCE-H-20260826.md                |   85 +
+ .../P123-MIGRATION-DATA-PREFLIGHT-20260826.md      |   77 +
+ .../P123-PERMISSION-MATRIX-20260826.csv            |   12 +
+ .../P123-REMEDIATION-AND-REUAT-REPORT-AR.docx      |  Bin 0 -> 1948068 bytes
+ .../P123-REMEDIATION-AND-REUAT-REPORT-AR.pdf       |  Bin 0 -> 1720578 bytes
+ ...3-REMEDIATION-IMPLEMENTATION-REPORT-20260826.md |  119 +
+ .../P123-REUAT-CLOSURE-NOTE-20260826.md            |   37 +
+ .../P123-REUAT-DEFECT-REGISTER-20260826.csv        |   12 +
+ .../P123-REUAT-EVIDENCE-INDEX-20260826.csv         |   22 +
+ .../P123-REUAT-SCENARIO-MATRIX-20260826.csv        |  410 ++
+ .../P123-TEST-DEPLOY-EVIDENCE-I-20260826.md        |  118 +
+ .../P123-REMEDIATION-20260826/browser-results.json |    1 +
+ Ops/UAT/P123-REMEDIATION-20260826/integ-base.txt   |    3 +
+ Ops/UAT/P123-REMEDIATION-20260826/integ-final.txt  |    3 +
+ Ops/UAT/P123-REMEDIATION-20260826/integ-full3.txt  |   12 +
+ Ops/UAT/P123-REMEDIATION-20260826/results-api.json |  372 ++
+ .../screenshots/DEF-P123-005-after-admin-1440.png  |  Bin 0 -> 291505 bytes
+ .../DEF-P123-005-after-admin-390-drawer-closed.png |  Bin 0 -> 236534 bytes
+ .../DEF-P123-005-after-admin-390-drawer-open.png   |  Bin 0 -> 27304 bytes
+ .../screenshots/DEF-P123-005-after-admin-768.png   |  Bin 0 -> 280589 bytes
+ .../DEF-P123-005-after-teamleader-1440.png         |  Bin 0 -> 425842 bytes
+ ...P123-005-after-teamleader-390-drawer-closed.png |  Bin 0 -> 322627 bytes
+ ...F-P123-005-after-teamleader-390-drawer-open.png |  Bin 0 -> 23837 bytes
+ .../DEF-P123-005-after-teamleader-768.png          |  Bin 0 -> 422212 bytes
+ .../screenshots/DEF-P123-005-before-admin-1440.png |  Bin 0 -> 291475 bytes
+ ...DEF-P123-005-before-admin-390-drawer-closed.png |  Bin 0 -> 264982 bytes
+ .../DEF-P123-005-before-admin-390-drawer-open.png  |  Bin 0 -> 15045 bytes
+ .../screenshots/DEF-P123-005-before-admin-768.png  |  Bin 0 -> 280579 bytes
+ .../DEF-P123-005-before-teamleader-1440.png        |  Bin 0 -> 425856 bytes
+ ...123-005-before-teamleader-390-drawer-closed.png |  Bin 0 -> 358492 bytes
+ ...-P123-005-before-teamleader-390-drawer-open.png |  Bin 0 -> 14701 bytes
+ .../DEF-P123-005-before-teamleader-768.png         |  Bin 0 -> 422209 bytes
+ .../P123-REMEDIATION-20260826/snapshot-BEFORE.txt  |   17 +
+ .../P123-REMEDIATION-20260826/snapshot-CLEANED.txt |   17 +
+ Ops/UAT/P123-REMEDIATION-20260826/snapshot.sql     |   28 +
+ .../Controllers/DirectoryController.cs             |   14 +
+ .../Attendance/AttendanceAccess.cs                 |   27 +-
+ .../Directory/DirectoryModels.cs                   |    9 +
+ .../Directory/IDirectoryService.cs                 |   10 +
+ .../Configurations/OrgConfigurations.cs            |    7 +
+ ...6073223_P123DirectoryNameUniqueness.Designer.cs | 5353 ++++++++++++++++++++
+ .../20260826073223_P123DirectoryNameUniqueness.cs  |   60 +
+ .../Migrations/AppDbContextModelSnapshot.cs        |    8 +
+ .../Services/AttendanceService.cs                  |    4 +-
+ .../Services/DirectoryService.cs                   |  186 +-
+ .../DirectoryNameUniquenessTests.cs                |  211 +
+ .../Reporting.IntegrationTests/DirectoryTests.cs   |   15 +-
+ .../PermissionGrantPathTests.cs                    |  263 +
+ .../Reporting.IntegrationTests/PositionsTests.cs   |    5 +-
+ .../ProjectRepeatableGridTests.cs                  |    9 +-
+ .../ReportTemplateAssignmentTests.cs               |    7 +-
+ .../SecurityPenetrationTests.cs                    |   11 +-
+ .../AttendanceDraftPrivacyTests.cs                 |  130 +
+ reporting-frontend/e2e/dashboard-overflow.spec.ts  |  223 +
+ .../e2e/governance-summary-gate.spec.ts            |  118 +
+ reporting-frontend/src/components/dashboard.tsx    |    4 +-
+ reporting-frontend/src/components/ui.tsx           |    5 +-
+ .../src/pages/KpiPage.overflow.test.tsx            |   61 +
+ reporting-frontend/src/pages/KpiPage.tsx           |    6 +
+ reporting-frontend/src/pages/RoleDashboards.tsx    |   16 +-
+ 64 files changed, 8392 insertions(+), 29 deletions(-)

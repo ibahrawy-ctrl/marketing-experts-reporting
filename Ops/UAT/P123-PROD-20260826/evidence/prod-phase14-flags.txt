@@ -1,0 +1,52 @@
+=== PHASE 14 — FEATURE FLAGS & PERMISSIONS 2026-08-26T19:24:35Z ===
+--- 14.0 Phase2 flags (product feature gates) ---
+keys present in prod env: 0
+=> absent ⇒ all Phase2FeatureOptions default to false (Employee360/Attendance/HrOperations/EmployeeChecklist = OFF, surfaces hidden 404)
+
+--- 14.1 permission mechanism deployed? (deny-by-default) ---
+userclaims_perm_total|0
+roleclaims_perm_total|0
+attendance surface probe (unauthenticated, must be 401/404 not 200):
+  /api/attendance -> 401
+  /api/hr-operations/queues -> 404
+
+--- 14.2 STAGE A: restore schedulers, email in DryRun (observe, do not send) ---
+EmailNotifications__Mode=DryRun
+Scheduler__Enabled=true
+Reminders__Enabled=true
+ReportReminderScheduler__Enabled=true
+health OK after 3x2s
+observing 60s under DryRun...
+outbox after DryRun window:
+ERROR:  invalid input syntax for type integer: "NULL"
+LINE 1: SELECT coalesce("Status",'NULL'), count(*)::text FROM email_...
+                                 ^
+  (empty)
+  outbox_total=0
+errors during DryRun window: 0
+NRestarts=0
+ActiveState=active
+=== END PHASE 14 STAGE A ===
+--- 14.3 STAGE B: restore EmailNotifications__Mode=Enabled (production baseline value) ---
+health OK after 3x2s
+--- final flag state (BEFORE vs AFTER) ---
+BackgroundJobs__Enabled=false
+EmailNotifications__Mode=Enabled
+EmailNotifications__RecipientSafetyMode=Disabled
+Email__Enabled=false
+Reminders__Enabled=true
+ReportReminderScheduler__Enabled=true
+Scheduler__Enabled=true
+--- diff vs pre-deploy env (flags only; secrets never printed) ---
+IDENTICAL_TO_PRE_DEPLOY_FLAGS=1
+--- outbox + errors ---
+outbox_total=0
+unhandled_errors=0
+MainPID=1603719
+NRestarts=0
+ActiveState=active
+SubState=running
+{"status":"ok","service":"reporting-api"}
+--- perm claims still zero? ---
+userclaims_perm_total=0
+=== END PHASE 14 ===

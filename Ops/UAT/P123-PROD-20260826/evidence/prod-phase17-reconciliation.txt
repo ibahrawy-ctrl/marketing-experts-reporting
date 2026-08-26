@@ -1,0 +1,43 @@
+=== PHASE 17 — RECONCILIATION & CLEANUP 2026-08-26T19:36:35Z ===
+--- 17.1 drop the shadow rehearsal database ---
+shadow_exists_before=1
+shadow_exists_after=0
+--- 17.2 remove the staging copy (artifacts already live + backed up) ---
+staging_removed=1
+--- 17.3 what is deliberately RETAINED for rollback ---
+/etc/reporting-api.env.pre-p123
+/opt/reporting/publish-pre-p123-20260826
+/opt/reporting/reporting-frontend/dist-pre-p123-20260826
+47M	/var/backups/reporting/20260826-P123
+--- 17.4 databases on the host (no stray P123 artifact) ---
+reporting_prod
+reporting_rc
+reporting_test_dryrun_20260825
+reporting_test_rc
+reporting_test_uat
+--- 17.5 FINAL production state (AFTER) ---
+attendance_incident_events|0
+attendance_incident_types|6
+attendance_incidents|0
+audit_logs_total|1464
+departments_total|4
+email_outbox|0
+employee_checklist_items|0
+md5_departments|7d80557511c8efa0ca5616a4a59e8be7
+md5_submissions|08defb3b860a6d4ad97ec31f0ee1b5cc
+md5_teams|a874a3098deb7b4746d2cf6e630adb55
+md5_users|a6385875d3cfc436639864adfc3f4c0c
+migrations_total|47
+roleclaims_perm_total|0
+roles_total|12
+submissions_total|311
+teams_total|9
+userclaims_perm_total|0
+userroles_total|39
+users_active|33
+users_total|34
+--- 17.6 no synthetic/test rows leaked into production ---
+users_matching_test_domains|0
+departments_synthetic|0
+teams_synthetic|0
+=== END PHASE 17 ===

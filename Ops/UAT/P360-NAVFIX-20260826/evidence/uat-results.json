@@ -1,0 +1,322 @@
+[
+ {
+  "id": "LOGIN-admin",
+  "role": "الإدارة",
+  "desc": "تسجيل الدخول من الواجهة",
+  "result": "PASS",
+  "detail": "/app",
+  "shot": "/tmp/p360nav/shots/00-login-admin.png"
+ },
+ {
+  "id": "P360-admin",
+  "role": "الإدارة",
+  "desc": "زرّ 360 يفتح مساحة عمل نفس المشروع",
+  "result": "PASS",
+  "detail": "href=/app/projects/b090c158-31b6-4688-ba39-ce5688606a17/360 url=/app/projects/b090c158-31b6-4688-ba39-ce5688606a17/360 text=878",
+  "shot": "/tmp/p360nav/shots/01-360-admin.png"
+ },
+ {
+  "id": "SLICE-A-admin",
+  "role": "الإدارة",
+  "desc": "فتح ⟵ شريحة مشروع أ وحدها",
+  "result": "PASS",
+  "detail": "href=/app/projects/b090c158-31b6-4688-ba39-ce5688606a17/reports/45f90d09-bbc9-4c1d-bd81-b44bb891564f A=true B=false عامّ=false",
+  "shot": "/tmp/p360nav/shots/02-sliceA-admin.png"
+ },
+ {
+  "id": "BACK-admin",
+  "role": "الإدارة",
+  "desc": "الرجوع يعود إلى صفحة نفس المشروع",
+  "result": "PASS",
+  "detail": "/app/projects/b090c158-31b6-4688-ba39-ce5688606a17",
+  "shot": null
+ },
+ {
+  "id": "SLICE-B-admin",
+  "role": "الإدارة",
+  "desc": "نفس التقرير من مشروع ب ⟵ شريحة ب وحدها",
+  "result": "PASS",
+  "detail": "B=true A=false عامّ=false",
+  "shot": "/tmp/p360nav/shots/03-sliceB-admin.png"
+ },
+ {
+  "id": "SIGNALR-admin",
+  "role": "الإدارة",
+  "desc": "اتّصال SignalR: تفاوض 200 ومقبس مفتوح",
+  "result": "PASS",
+  "detail": "negotiate=200 sockets=4 err=none",
+  "shot": null
+ },
+ {
+  "id": "HYGIENE-admin",
+  "role": "الإدارة",
+  "desc": "صفر خطأ Console غير متوقَّع · صفر طلب فاشل · أصل TEST حصرًا",
+  "result": "PASS",
+  "detail": "console_unexpected=0 console_404_مقصود=0 failed=0 aborted_by_nav=1 origins=http://127.0.0.1:4420,https://fonts.googleapis.com,https://test.emarketingacademy.net |  | ",
+  "shot": null
+ },
+ {
+  "id": "LOGIN-acctmgr",
+  "role": "مدير الحساب",
+  "desc": "تسجيل الدخول من الواجهة",
+  "result": "PASS",
+  "detail": "/app",
+  "shot": "/tmp/p360nav/shots/00-login-acctmgr.png"
+ },
+ {
+  "id": "P360-acctmgr",
+  "role": "مدير الحساب",
+  "desc": "زرّ 360 يفتح مساحة عمل نفس المشروع",
+  "result": "PASS",
+  "detail": "href=/app/projects/b090c158-31b6-4688-ba39-ce5688606a17/360 url=/app/projects/b090c158-31b6-4688-ba39-ce5688606a17/360 text=830",
+  "shot": "/tmp/p360nav/shots/01-360-acctmgr.png"
+ },
+ {
+  "id": "SLICE-A-acctmgr",
+  "role": "مدير الحساب",
+  "desc": "فتح ⟵ شريحة مشروع أ وحدها",
+  "result": "PASS",
+  "detail": "href=/app/projects/b090c158-31b6-4688-ba39-ce5688606a17/reports/45f90d09-bbc9-4c1d-bd81-b44bb891564f A=true B=false عامّ=false",
+  "shot": "/tmp/p360nav/shots/02-sliceA-acctmgr.png"
+ },
+ {
+  "id": "BACK-acctmgr",
+  "role": "مدير الحساب",
+  "desc": "الرجوع يعود إلى صفحة نفس المشروع",
+  "result": "PASS",
+  "detail": "/app/projects/b090c158-31b6-4688-ba39-ce5688606a17",
+  "shot": null
+ },
+ {
+  "id": "SLICE-B-acctmgr",
+  "role": "مدير الحساب",
+  "desc": "نفس التقرير من مشروع ب ⟵ شريحة ب وحدها",
+  "result": "PASS",
+  "detail": "B=true A=false عامّ=false",
+  "shot": "/tmp/p360nav/shots/03-sliceB-acctmgr.png"
+ },
+ {
+  "id": "SIGNALR-acctmgr",
+  "role": "مدير الحساب",
+  "desc": "اتّصال SignalR: تفاوض 200 ومقبس مفتوح",
+  "result": "PASS",
+  "detail": "negotiate=200 sockets=4 err=none",
+  "shot": null
+ },
+ {
+  "id": "HYGIENE-acctmgr",
+  "role": "مدير الحساب",
+  "desc": "صفر خطأ Console غير متوقَّع · صفر طلب فاشل · أصل TEST حصرًا",
+  "result": "PASS",
+  "detail": "console_unexpected=0 console_404_مقصود=0 failed=0 aborted_by_nav=1 origins=http://127.0.0.1:4420,https://fonts.googleapis.com,https://test.emarketingacademy.net |  | ",
+  "shot": null
+ },
+ {
+  "id": "LOGIN-owner",
+  "role": "مالك المشروع",
+  "desc": "تسجيل الدخول من الواجهة",
+  "result": "PASS",
+  "detail": "/app",
+  "shot": "/tmp/p360nav/shots/00-login-owner.png"
+ },
+ {
+  "id": "P360-owner",
+  "role": "مالك المشروع",
+  "desc": "زرّ 360 يفتح مساحة عمل نفس المشروع",
+  "result": "PASS",
+  "detail": "href=/app/projects/b090c158-31b6-4688-ba39-ce5688606a17/360 url=/app/projects/b090c158-31b6-4688-ba39-ce5688606a17/360 text=862",
+  "shot": "/tmp/p360nav/shots/01-360-owner.png"
+ },
+ {
+  "id": "SLICE-A-owner",
+  "role": "مالك المشروع",
+  "desc": "فتح ⟵ شريحة مشروع أ وحدها",
+  "result": "PASS",
+  "detail": "href=/app/projects/b090c158-31b6-4688-ba39-ce5688606a17/reports/45f90d09-bbc9-4c1d-bd81-b44bb891564f A=true B=false عامّ=false",
+  "shot": "/tmp/p360nav/shots/02-sliceA-owner.png"
+ },
+ {
+  "id": "BACK-owner",
+  "role": "مالك المشروع",
+  "desc": "الرجوع يعود إلى صفحة نفس المشروع",
+  "result": "PASS",
+  "detail": "/app/projects/b090c158-31b6-4688-ba39-ce5688606a17",
+  "shot": null
+ },
+ {
+  "id": "SLICE-B-owner",
+  "role": "مالك المشروع",
+  "desc": "نفس التقرير من مشروع ب ⟵ شريحة ب وحدها",
+  "result": "PASS",
+  "detail": "B=true A=false عامّ=false",
+  "shot": "/tmp/p360nav/shots/03-sliceB-owner.png"
+ },
+ {
+  "id": "SIGNALR-owner",
+  "role": "مالك المشروع",
+  "desc": "اتّصال SignalR: تفاوض 200 ومقبس مفتوح",
+  "result": "PASS",
+  "detail": "negotiate=200 sockets=4 err=none",
+  "shot": null
+ },
+ {
+  "id": "HYGIENE-owner",
+  "role": "مالك المشروع",
+  "desc": "صفر خطأ Console غير متوقَّع · صفر طلب فاشل · أصل TEST حصرًا",
+  "result": "PASS",
+  "detail": "console_unexpected=0 console_404_مقصود=0 failed=0 aborted_by_nav=1 origins=http://127.0.0.1:4420,https://fonts.googleapis.com,https://test.emarketingacademy.net |  | ",
+  "shot": null
+ },
+ {
+  "id": "LOGIN-lead",
+  "role": "قائد الفريق",
+  "desc": "تسجيل الدخول من الواجهة",
+  "result": "PASS",
+  "detail": "/app",
+  "shot": "/tmp/p360nav/shots/00-login-lead.png"
+ },
+ {
+  "id": "P360-lead",
+  "role": "قائد الفريق",
+  "desc": "زرّ 360 يفتح مساحة عمل نفس المشروع",
+  "result": "PASS",
+  "detail": "href=/app/projects/b090c158-31b6-4688-ba39-ce5688606a17/360 url=/app/projects/b090c158-31b6-4688-ba39-ce5688606a17/360 text=838",
+  "shot": "/tmp/p360nav/shots/01-360-lead.png"
+ },
+ {
+  "id": "SLICE-A-lead",
+  "role": "قائد الفريق",
+  "desc": "فتح ⟵ شريحة مشروع أ وحدها",
+  "result": "PASS",
+  "detail": "href=/app/projects/b090c158-31b6-4688-ba39-ce5688606a17/reports/45f90d09-bbc9-4c1d-bd81-b44bb891564f A=true B=false عامّ=false",
+  "shot": "/tmp/p360nav/shots/02-sliceA-lead.png"
+ },
+ {
+  "id": "BACK-lead",
+  "role": "قائد الفريق",
+  "desc": "الرجوع يعود إلى صفحة نفس المشروع",
+  "result": "PASS",
+  "detail": "/app/projects/b090c158-31b6-4688-ba39-ce5688606a17",
+  "shot": null
+ },
+ {
+  "id": "SLICE-B-lead",
+  "role": "قائد الفريق",
+  "desc": "نفس التقرير من مشروع ب ⟵ شريحة ب وحدها",
+  "result": "PASS",
+  "detail": "B=true A=false عامّ=false",
+  "shot": "/tmp/p360nav/shots/03-sliceB-lead.png"
+ },
+ {
+  "id": "SIGNALR-lead",
+  "role": "قائد الفريق",
+  "desc": "اتّصال SignalR: تفاوض 200 ومقبس مفتوح",
+  "result": "PASS",
+  "detail": "negotiate=200 sockets=4 err=none",
+  "shot": null
+ },
+ {
+  "id": "HYGIENE-lead",
+  "role": "قائد الفريق",
+  "desc": "صفر خطأ Console غير متوقَّع · صفر طلب فاشل · أصل TEST حصرًا",
+  "result": "PASS",
+  "detail": "console_unexpected=0 console_404_مقصود=0 failed=0 aborted_by_nav=1 origins=http://127.0.0.1:4420,https://fonts.googleapis.com,https://test.emarketingacademy.net |  | ",
+  "shot": null
+ },
+ {
+  "id": "LOGIN-emp",
+  "role": "موظّف داخل النطاق",
+  "desc": "تسجيل الدخول من الواجهة",
+  "result": "PASS",
+  "detail": "/app",
+  "shot": "/tmp/p360nav/shots/00-login-emp.png"
+ },
+ {
+  "id": "P360-emp",
+  "role": "موظّف داخل النطاق",
+  "desc": "زرّ 360 يفتح مساحة عمل نفس المشروع",
+  "result": "PASS",
+  "detail": "href=/app/projects/b090c158-31b6-4688-ba39-ce5688606a17/360 url=/app/projects/b090c158-31b6-4688-ba39-ce5688606a17/360 text=788",
+  "shot": "/tmp/p360nav/shots/01-360-emp.png"
+ },
+ {
+  "id": "SLICE-A-emp",
+  "role": "موظّف داخل النطاق",
+  "desc": "فتح ⟵ شريحة مشروع أ وحدها",
+  "result": "PASS",
+  "detail": "href=/app/projects/b090c158-31b6-4688-ba39-ce5688606a17/reports/45f90d09-bbc9-4c1d-bd81-b44bb891564f A=true B=false عامّ=false",
+  "shot": "/tmp/p360nav/shots/02-sliceA-emp.png"
+ },
+ {
+  "id": "BACK-emp",
+  "role": "موظّف داخل النطاق",
+  "desc": "الرجوع يعود إلى صفحة نفس المشروع",
+  "result": "PASS",
+  "detail": "/app/projects/b090c158-31b6-4688-ba39-ce5688606a17",
+  "shot": null
+ },
+ {
+  "id": "SLICE-B-emp",
+  "role": "موظّف داخل النطاق",
+  "desc": "نفس التقرير من مشروع ب ⟵ شريحة ب وحدها",
+  "result": "PASS",
+  "detail": "B=true A=false عامّ=false",
+  "shot": "/tmp/p360nav/shots/03-sliceB-emp.png"
+ },
+ {
+  "id": "SIGNALR-emp",
+  "role": "موظّف داخل النطاق",
+  "desc": "اتّصال SignalR: تفاوض 200 ومقبس مفتوح",
+  "result": "PASS",
+  "detail": "negotiate=200 sockets=4 err=none",
+  "shot": null
+ },
+ {
+  "id": "HYGIENE-emp",
+  "role": "موظّف داخل النطاق",
+  "desc": "صفر خطأ Console غير متوقَّع · صفر طلب فاشل · أصل TEST حصرًا",
+  "result": "PASS",
+  "detail": "console_unexpected=0 console_404_مقصود=0 failed=0 aborted_by_nav=1 origins=http://127.0.0.1:4420,https://fonts.googleapis.com,https://test.emarketingacademy.net |  | ",
+  "shot": null
+ },
+ {
+  "id": "LOGIN-outsider",
+  "role": "موظّف خارج النطاق",
+  "desc": "تسجيل الدخول من الواجهة",
+  "result": "PASS",
+  "detail": "/app",
+  "shot": "/tmp/p360nav/shots/00-login-outsider.png"
+ },
+ {
+  "id": "DENY-outsider",
+  "role": "موظّف خارج النطاق",
+  "desc": "خارج النطاق: حالة رفض نهائيّة بلا بيانات",
+  "result": "PASS",
+  "detail": "deny=true A=false B=false",
+  "shot": "/tmp/p360nav/shots/04-deny-outsider.png"
+ },
+ {
+  "id": "TAMPER-outsider",
+  "role": "موظّف خارج النطاق",
+  "desc": "العبث بمعرّف المشروع: نفس الرفض بلا تعداد",
+  "result": "PASS",
+  "detail": "deny=true",
+  "shot": "/tmp/p360nav/shots/05-tamper-outsider.png"
+ },
+ {
+  "id": "SIGNALR-outsider",
+  "role": "موظّف خارج النطاق",
+  "desc": "اتّصال SignalR: تفاوض 200 ومقبس مفتوح",
+  "result": "PASS",
+  "detail": "negotiate=200 sockets=3 err=none",
+  "shot": null
+ },
+ {
+  "id": "HYGIENE-outsider",
+  "role": "موظّف خارج النطاق",
+  "desc": "صفر خطأ Console غير متوقَّع · صفر طلب فاشل · أصل TEST حصرًا",
+  "result": "PASS",
+  "detail": "console_unexpected=0 console_404_مقصود=2 failed=0 aborted_by_nav=0 origins=http://127.0.0.1:4420,https://fonts.googleapis.com,https://test.emarketingacademy.net |  | ",
+  "shot": null
+ }
+]

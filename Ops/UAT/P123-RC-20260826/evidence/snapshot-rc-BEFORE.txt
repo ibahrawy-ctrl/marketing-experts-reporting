@@ -1,0 +1,19 @@
+Output format is unaligned.
+Field separator is "|".
+users_total|49
+users_synth_p123rc|0
+users_nonsynth|49
+userclaims_perm_total|0
+userclaims_perm_nonsynth|0
+departments_total|6
+departments_nonsynth|6
+teams_total|11
+teams_nonsynth|11
+report_submissions_total|39
+report_templates_total|41
+migrations|42
+md5_users_nonsynth|c6528a9edd684bafe8293217b402b8cc
+md5_departments_nonsynth|f82185914961568b265b5ccf605a0737
+md5_teams_nonsynth|a938355950a83390e54d49ec0dff4182
+md5_submissions|b541614e11e063893ea34edc14b0f373
+md5_perm_claims_nonsynth|EMPTY

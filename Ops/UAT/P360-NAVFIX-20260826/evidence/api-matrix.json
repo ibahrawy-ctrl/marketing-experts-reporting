@@ -1,0 +1,98 @@
+[
+ {
+  "id": "SLICE-A-admin",
+  "desc": "admin: شريحة أ = 200 وتحوي 776001 فقط",
+  "result": "PASS",
+  "detail": "http=200 MA=True MB=False B_id=False general=False"
+ },
+ {
+  "id": "SLICE-B-admin",
+  "desc": "admin: شريحة ب = 200 وتحوي 889002 فقط",
+  "result": "PASS",
+  "detail": "http=200 MB=True MA=False A_id=False general=False"
+ },
+ {
+  "id": "SLICE-A-acctmgr",
+  "desc": "acctmgr: شريحة أ = 200 وتحوي 776001 فقط",
+  "result": "PASS",
+  "detail": "http=200 MA=True MB=False B_id=False general=False"
+ },
+ {
+  "id": "SLICE-B-acctmgr",
+  "desc": "acctmgr: شريحة ب = 200 وتحوي 889002 فقط",
+  "result": "PASS",
+  "detail": "http=200 MB=True MA=False A_id=False general=False"
+ },
+ {
+  "id": "SLICE-A-owner",
+  "desc": "owner: شريحة أ = 200 وتحوي 776001 فقط",
+  "result": "PASS",
+  "detail": "http=200 MA=True MB=False B_id=False general=False"
+ },
+ {
+  "id": "SLICE-B-owner",
+  "desc": "owner: شريحة ب = 200 وتحوي 889002 فقط",
+  "result": "PASS",
+  "detail": "http=200 MB=True MA=False A_id=False general=False"
+ },
+ {
+  "id": "SLICE-A-lead",
+  "desc": "lead: شريحة أ = 200 وتحوي 776001 فقط",
+  "result": "PASS",
+  "detail": "http=200 MA=True MB=False B_id=False general=False"
+ },
+ {
+  "id": "SLICE-B-lead",
+  "desc": "lead: شريحة ب = 200 وتحوي 889002 فقط",
+  "result": "PASS",
+  "detail": "http=200 MB=True MA=False A_id=False general=False"
+ },
+ {
+  "id": "SLICE-A-emp",
+  "desc": "emp: شريحة أ = 200 وتحوي 776001 فقط",
+  "result": "PASS",
+  "detail": "http=200 MA=True MB=False B_id=False general=False"
+ },
+ {
+  "id": "SLICE-B-emp",
+  "desc": "emp: شريحة ب = 200 وتحوي 889002 فقط",
+  "result": "PASS",
+  "detail": "http=200 MB=True MA=False A_id=False general=False"
+ },
+ {
+  "id": "SLICE-A-outsider",
+  "desc": "خارج النطاق: 404 بلا أيّ بصمة",
+  "result": "PASS",
+  "detail": "http=404"
+ },
+ {
+  "id": "SLICE-B-outsider",
+  "desc": "خارج النطاق على ب: 404",
+  "result": "PASS",
+  "detail": "http=404"
+ },
+ {
+  "id": "TAMPER-IDS",
+  "desc": "العبث بالمعرّفين: 404/404 وبصمة رفض واحدة",
+  "result": "PASS",
+  "detail": "404/404 fp=Not Found|المشروع غير موجود.|project.not_found"
+ },
+ {
+  "id": "GENERAL-POLICY",
+  "desc": "المسار العامّ للتسليم بقي رافضًا لخارج النطاق",
+  "result": "PASS",
+  "detail": "http=403"
+ },
+ {
+  "id": "GENERAL-OWNER",
+  "desc": "صاحب التقرير ما زال يرى تقريره الكامل (لا تضييق غير مقصود)",
+  "result": "PASS",
+  "detail": "http=200"
+ },
+ {
+  "id": "LIST-A",
+  "desc": "قائمة تقارير مشروع أ تُدرِج التسليم",
+  "result": "PASS",
+  "detail": "http=200"
+ }
+]

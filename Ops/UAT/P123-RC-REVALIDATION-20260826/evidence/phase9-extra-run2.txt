@@ -1,0 +1,20 @@
+مخرجات phase9-extra.py على RC الحيّ — المرشّح 897c9b18 — 26 أغسطس 2026 ≈18:47Z
+(السيناريوهان البديلان للفاشلَين في phase910.py، وهما عيبان في المِشدّ لا في المنتج:
+ معامل granularity المفقود، ومسار سجلّ التدقيق الخاطئ.)
+
+S-KPI-AGG2 | تجميع KPI بمعاملات صحيحة -> 200
+    {"granularity":"Monthly","periodLabel":"أغسطس 2026","rangeStart":"2026-08-01","rangeEnd":"2026-08-31","average":null,"weeksCount":0,"evaluationsCount":0,"scopeType":"department","canViewRows":true,"we
+
+S-AUDIT-PERM2 | سجلّ التدقيق -> 200
+    [{"id":"df55af12-c63c-4530-ada1-0032fc80fd49","actorId":"ad052d93-94f6-4d14-8dfd-56ea830788f1","actorName":"RC-P123 مدير نظام اصطناعيّ","action":"user.permissions.changed","entityType":"User","entityId":"06b6bb2b-463f-43e3-a318-f44d7bf9c2c9","dataJson":"{\"aft
+
+S-AUDIT-DENY | سجلّ التدقيق من موظّف -> 403
+
+ملاحظة على العدّاد: طبع المِشدّ `total=0 permHits=0` لأنّ ردّ `/api/audit-logs` مصفوفة عارية
+لا كائن فيه `items`، فرمى `list.get` استثناءً ابتلعه `except` وأرجع قائمة فارغة. العدّ الصحيح
+قُيس مباشرةً على القاعدة:
+
+  SELECT "Action", count(*) FROM audit_logs WHERE "Action" LIKE '%permission%' GROUP BY 1;
+  user.permissions.changed|13
+
+أي أنّ تغييرات الصلاحيات موثَّقة فعلًا في سجلّ التدقيق مع الفاعل والكيان والقيمة قبل/بعد.

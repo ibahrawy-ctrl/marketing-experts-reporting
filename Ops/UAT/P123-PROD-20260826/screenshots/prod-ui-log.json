@@ -1,0 +1,66 @@
+{
+ "origin": "https://reports.emarketingacademy.net",
+ "anonymousOnly": true,
+ "bundles": [
+  "index-CTofEn_d.js"
+ ],
+ "shots": [
+  {
+   "route": "/login",
+   "viewport": 390,
+   "file": "prod-login-390.png",
+   "overflow": false,
+   "dir": "rtl",
+   "head": "تسجيل الدخول نظام تقارير الأداء والتشغيل الداخلي البريد الإلكتروني كلمة المرور دخول رجوع للصفحة الرئيسية",
+   "url": "/login"
+  },
+  {
+   "route": "/login",
+   "viewport": 768,
+   "file": "prod-login-768.png",
+   "overflow": false,
+   "dir": "rtl",
+   "head": "تسجيل الدخول نظام تقارير الأداء والتشغيل الداخلي البريد الإلكتروني كلمة المرور دخول رجوع للصفحة الرئيسية",
+   "url": "/login"
+  },
+  {
+   "route": "/login",
+   "viewport": 1440,
+   "file": "prod-login-1440.png",
+   "overflow": false,
+   "dir": "rtl",
+   "head": "تسجيل الدخول نظام تقارير الأداء والتشغيل الداخلي البريد الإلكتروني كلمة المرور دخول رجوع للصفحة الرئيسية",
+   "url": "/login"
+  },
+  {
+   "route": "/app",
+   "viewport": 390,
+   "file": "prod-app-390.png",
+   "overflow": false,
+   "dir": "rtl",
+   "head": "تسجيل الدخول نظام تقارير الأداء والتشغيل الداخلي البريد الإلكتروني كلمة المرور دخول رجوع للصفحة الرئيسية",
+   "url": "/login"
+  },
+  {
+   "route": "/app",
+   "viewport": 768,
+   "file": "prod-app-768.png",
+   "overflow": false,
+   "dir": "rtl",
+   "head": "تسجيل الدخول نظام تقارير الأداء والتشغيل الداخلي البريد الإلكتروني كلمة المرور دخول رجوع للصفحة الرئيسية",
+   "url": "/login"
+  },
+  {
+   "route": "/app",
+   "viewport": 1440,
+   "file": "prod-app-1440.png",
+   "overflow": false,
+   "dir": "rtl",
+   "head": "تسجيل الدخول نظام تقارير الأداء والتشغيل الداخلي البريد الإلكتروني كلمة المرور دخول رجوع للصفحة الرئيسية",
+   "url": "/login"
+  }
+ ],
+ "consoleErrors": [],
+ "overflowViolations": [],
+ "nonRtl": []
+}

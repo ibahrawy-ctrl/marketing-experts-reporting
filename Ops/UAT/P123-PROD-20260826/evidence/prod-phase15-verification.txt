@@ -1,0 +1,41 @@
+=== PHASE 15 — NON-DESTRUCTIVE PRODUCTION VERIFICATION 2026-08-26T19:27:26Z ===
+--- 15.1 deployed identity ---
+1.0.0+897c9b187ab4216213b4f453ec65948cd06dff27
+46e0a3a169c9ef2285aef3b8e9d7fe13  /opt/reporting/publish/Reporting.Api.dll
+218346d38e3103a2cf92914fdacd2f3d  /opt/reporting/reporting-frontend/dist/assets/index-CTofEn_d.js
+--- 15.2 bundle content proof (new work is actually live) ---
+P360 slice route in bundle: 1
+prod API base baked:        1
+rc API base absent:         0
+--- 15.3 auth enforcement on protected surfaces (anonymous) ---
+  /api/attendance                  -> 401
+  /api/employees                   -> 404
+  /api/reports                     -> 404
+  /api/audit-logs                  -> 401
+  /api/hr-operations/queues        -> 404
+  /api/kpi/analytics               -> 404
+  (401/403/404 = correct; 200 or 5xx = defect)
+--- 15.4 public HTTPS surface via nginx ---
+  GET / -> 200
+  served bundle: assets/index-CTofEn_d.js
+  GET /api/health -> 404
+--- 15.5 database integrity (fingerprints must equal BEFORE) ---
+attendance_incident_types|6
+attendance_incidents|0
+departments_total|4
+email_outbox|0
+employee_checklist_items|0
+md5_departments|7d80557511c8efa0ca5616a4a59e8be7
+md5_submissions|08defb3b860a6d4ad97ec31f0ee1b5cc
+md5_teams|a874a3098deb7b4746d2cf6e630adb55
+md5_users|a6385875d3cfc436639864adfc3f4c0c
+migrations_total|47
+submissions_total|311
+teams_total|9
+userclaims_perm_total|0
+userroles_total|39
+users_active|33
+users_total|34
+--- 15.6 audit log delta (what the deployment itself wrote) ---
+audit_logs_total=1464
+=== END PHASE 15 ===
