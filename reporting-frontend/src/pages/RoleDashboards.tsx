@@ -91,6 +91,14 @@ const kpiTileTone = (p?: KpiPerformance): 'success' | 'gold' | 'alert' | 'navy' 
 };
 const useGovSummary = (enabled: boolean) =>
   useQuery({ queryKey: ['dash-gov-summary'], enabled, queryFn: async () => (await api.get<GovernanceSummaryReport>('/reports/governance-summary')).data });
+
+// DEF-P123-004: بوّابة النداء = بوّابة الخادم نفسها، مقروءة من الخادم لا مُكرَّرة في الواجهة.
+// `/reports/governance-summary` يمنع بـ`RoleAccess.CanViewGovernance` (ReportingService.cs:2068)،
+// وهي `Has(roles,"ViewGovernance")` ⟸ Admin/CeoSupport/Ceo/GeneralManager (RoleAccess.cs:57-58).
+// نفس `RoleAccess.PermissionsFor` هو ما يملأ `dash.permissions` (DashboardService.cs:137)، فالقراءة
+// منه تجعل الواجهة تابعة للخادم بلا انحراف؛ تكرار قائمة الأدوار هنا كان سيصير مصدر عيب لاحق.
+// لا توسيع صلاحيّة: هذا كبحٌ لنداء كان يُطلَق ثمّ يُرفَض، والخادم يبقى المُنفِّذ الوحيد.
+const canViewGovernance = (dash: DashboardDto) => dash.permissions.includes('ViewGovernance');
 const useEscalations = (enabled: boolean) =>
   useQuery({ queryKey: ['dash-escalations'], enabled, queryFn: async () => (await api.get<EscalationDto[]>('/escalations')).data });
 const useDecisions = (enabled: boolean) =>
@@ -1628,7 +1636,7 @@ export function ManagerDashboard({ dash }: { dash: DashboardDto }) {
   const { data: approvals } = usePendingApprovals(true);
   const { data: members } = useMembers(true);
   const { data: pending } = usePendingReports(true);
-  const { data: gov } = useGovSummary(true);
+  const { data: gov } = useGovSummary(canViewGovernance(dash));
   const { data: kpi } = useDashKpi(dash.period.periodKey, true);
 
   const actions: NeedsActionEntry[] = [];
@@ -1695,7 +1703,7 @@ export function ManagerDashboard({ dash }: { dash: DashboardDto }) {
 export function GMDashboard({ dash }: { dash: DashboardDto }) {
   const { data: comp } = useCompleteness(dash.period.periodKey, true);
   const { data: kpi } = useDashKpi(dash.period.periodKey, true);
-  const { data: gov } = useGovSummary(true);
+  const { data: gov } = useGovSummary(canViewGovernance(dash));
   const { data: approvals } = usePendingApprovals(true);
   const lateDeptList = comp?.byDepartment.filter((d) => d.completionRate < 100) ?? [];
   const lateDepts = lateDeptList.length;
@@ -1772,7 +1780,7 @@ export function GMDashboard({ dash }: { dash: DashboardDto }) {
 export function CeoDashboard({ dash, kpiDelta }: { dash: DashboardDto; kpiDelta: { value: number; up: boolean } | null }) {
   const { data: comp } = useCompleteness(dash.period.periodKey, true);
   const { data: kpi } = useDashKpi(dash.period.periodKey, true);
-  const { data: gov } = useGovSummary(true);
+  const { data: gov } = useGovSummary(canViewGovernance(dash));
   const { data: risks } = useRisks(true);
   const { data: decisions } = useDecisions(true);
   const highRisks = (risks ?? []).filter((r) => (r.severity === 'High' || r.severity === 'Critical') && r.status !== 'Closed');
@@ -1929,7 +1937,7 @@ export function CeoSupportDashboard({ dash }: { dash: DashboardDto }) {
 export function AdminDashboard({ dash }: { dash: DashboardDto }) {
   const { data: comp } = useCompleteness(dash.period.periodKey, true);
   const { data: pending } = usePendingReports(true);
-  const { data: gov } = useGovSummary(true);
+  const { data: gov } = useGovSummary(canViewGovernance(dash));
   const { data: users } = useQuery({ queryKey: ['dash-users'], queryFn: async () => (await api.get<{ id: string }[]>('/directory/users')).data });
   const { data: templates } = useQuery({ queryKey: ['dash-templates'], queryFn: async () => (await api.get<{ id: string }[]>('/report-templates')).data });
 
