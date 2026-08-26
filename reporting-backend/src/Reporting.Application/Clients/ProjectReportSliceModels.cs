@@ -26,7 +26,20 @@ public sealed record ProjectReportSliceFieldDto(
     string Label,
     string? ConfigJson,
     int Order,
-    IReadOnlyList<IReadOnlyDictionary<string, string?>> Entries);
+    IReadOnlyList<ProjectReportSliceEntryDto> Entries);
+
+/// <summary>
+/// عنصر مشروع واحد داخل الشريحة: إجابات مستوى المشروع + بنود العمل المنفَّذة داخله
+/// (PROJECT360-MULTI-WORK-ITEMS-AND-REPORT-DISCOVERY-CLOSURE-R2).
+/// <para><b>لماذا لم يبقَ العنصر قاموسًا مسطّحًا</b>: المشروع الواحد داخل التقرير الواحد قد يحمل
+/// عدّة بنود عمل (كاروسيل + بوست ثابت + ريل…)، والتسطيح كان يفرض تكرار المشروع نفسه — وهو ما
+/// يمنعه حارس التفرّد ⇒ كان الموظّف عاجزًا عن تسجيل عمله كاملًا.</para>
+/// <para><b>محوِّل القراءة</b>: عنصر قديم (v1) بلا <c>workItems</c> يُعرَض ببندٍ ضمنيّ واحد مشتقّ من
+/// <c>answers</c> نفسها — <b>عرضًا فقط، بلا أيّ كتابة على البيانات المخزَّنة</b>.</para>
+/// </summary>
+public sealed record ProjectReportSliceEntryDto(
+    IReadOnlyDictionary<string, string?> Answers,
+    IReadOnlyList<IReadOnlyDictionary<string, string?>> WorkItems);
 
 /// <summary>
 /// مساهمة تسليم واحد في مشروع واحد — البيانات الوصفيّة اللازمة فقط + الشريحة.

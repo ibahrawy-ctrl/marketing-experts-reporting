@@ -40,6 +40,13 @@ public class SubmissionFieldValueConfiguration : IEntityTypeConfiguration<Submis
         b.HasKey(x => x.Id);
         b.Property(x => x.ValueJson).HasColumnType("jsonb");
         b.HasIndex(x => new { x.ReportSubmissionId, x.TemplateFieldId }).IsUnique();
+        // فهرس GIN لاحتواء jsonb (PROJECT360-…-CLOSURE-R2 · ADR-R2-002): يخدم شرط اكتشاف تقارير
+        // المشروع `ValueJson @> '[{"projectId":"…"}]'`. jsonb_path_ops أصغر وأسرع من الافتراضيّ لأنّه
+        // يفهرس المسارات لا المفاتيح المنفردة، وهو كافٍ لأنّنا لا نستعمل إلّا الاحتواء. إضافيّ بحت.
+        b.HasIndex(x => x.ValueJson)
+            .HasDatabaseName("ix_submission_field_values_value_json_gin")
+            .HasMethod("gin")
+            .HasOperators("jsonb_path_ops");
     }
 }
 

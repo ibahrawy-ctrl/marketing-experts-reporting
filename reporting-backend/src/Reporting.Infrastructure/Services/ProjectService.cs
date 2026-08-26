@@ -253,9 +253,40 @@ public class ProjectService : IProjectService
         var exists = await _db.Projects.AnyAsync(p => p.Id == id, ct);
         if (!exists) return Result<IReadOnlyList<LinkedReportRow>>.Failure(ProjectNotFoundMessage, ProjectNotFoundCode);
 
-        var rows = await LinkedReportsAsync(s => s.ProjectId == id, ct);
+        var rows = await LinkedReportsAsync(LinkedToProject(id), ct);
         return Result<IReadOnlyList<LinkedReportRow>>.Success(rows);
     }
+
+    /// <summary>
+    /// شرط ارتباط التسليم بالمشروع (PROJECT360-MULTI-WORK-ITEMS-AND-REPORT-DISCOVERY-CLOSURE-R2 · ADR-R2-002).
+    /// <para><b>لماذا شرطان لا شرط واحد</b>: العمود العلويّ <c>ReportSubmissions.ProjectId</c> شبه مهجور —
+    /// مقيسًا على الإنتاج: مملوء في تسليمَين فقط من 311، بينما 261 إشارة مشروع تعيش داخل
+    /// <c>ValueJson</c> لأقسام <c>ProjectRepeatableSection</c>. الاقتصار على العمود العلويّ كان يُخفي
+    /// 74 تقريرًا من 76 عن قوائم تقارير مشاريعها.</para>
+    /// <para><b>لماذا الاحتواء <c>@&gt;</c> لا البحث النصّيّ</b>: <c>ValueJson</c> عمود <c>jsonb</c>،
+    /// فالاحتواء البنيويّ يطابق المفتاح والقيمة معًا ويستفيد من فهرس GIN، بينما <c>LIKE</c> على نصّ
+    /// قد يطابق معرّفًا داخل حقل آخر ⇒ تسريب تقرير خارج نطاق المشروع.</para>
+    /// <para><b>لماذا التصفية على نوع الحقل</b>: نفس علّة الشريحة — لا يجوز اعتبار ورود المعرّف في
+    /// أيّ حقل حرّ ارتباطًا بالمشروع.</para>
+    /// <para>الشرط مبنيّ بـ<c>Any</c> فرعيّ ⇒ صفّ واحد لكلّ تسليم مهما تعدّدت مواضع الارتباط (لا تكرار،
+    /// ولا حاجة إلى <c>Distinct</c>)، والتصفية كلّها في قاعدة البيانات لا في الذاكرة.</para>
+    /// </summary>
+    private System.Linq.Expressions.Expression<Func<Domain.Entities.Submissions.ReportSubmission, bool>> LinkedToProject(Guid id)
+    {
+        var containment = ProjectContainmentJson(id);
+        return s => s.ProjectId == id
+            || _db.SubmissionFieldValues.Any(v =>
+                    v.ReportSubmissionId == s.Id
+                    && v.ValueJson != null
+                    && _db.TemplateFields.Any(f => f.Id == v.TemplateFieldId
+                                                   && f.FieldType == FieldType.ProjectRepeatableSection)
+                    && EF.Functions.JsonContains(v.ValueJson!, containment));
+    }
+
+    // قالب الاحتواء: عنصر مصفوفة واحد يحمل projectId المطلوب. التنسيق مطابق حرفيًّا لما تكتبه الواجهة
+    // (مفتاح camelCase ومعرّف بأحرف صغيرة) — وهو ما تحقّقنا منه على بيانات الإنتاج قبل اعتماد الشرط.
+    private static string ProjectContainmentJson(Guid id) =>
+        "[{\"projectId\":\"" + id.ToString("D") + "\"}]";
 
     public async Task<Result<ProjectSummaryDto>> GetSummaryAsync(Guid id, CancellationToken ct = default)
     {
@@ -266,7 +297,9 @@ public class ProjectService : IProjectService
         var project = await _db.Projects.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id, ct);
         if (project is null) return Result<ProjectSummaryDto>.Failure(ProjectNotFoundMessage, ProjectNotFoundCode);
 
-        var subs = await _db.ReportSubmissions.AsNoTracking().Where(s => s.ProjectId == id).ToListAsync(ct);
+        // نفس شرط الارتباط المستعمَل في قائمة التقارير — وإلّا صار العدّاد يناقض القائمة التي تحته.
+        var subs = await _db.ReportSubmissions.AsNoTracking().Where(LinkedToProject(id))
+            .Select(s => new { s.Status, s.SubmittedAtUtc }).ToListAsync(ct);
         var total = subs.Count;
         var closed = subs.Count(s => s.Status == SubmissionStatus.Closed);
         var pending = subs.Count(s => s.Status is SubmissionStatus.Submitted or SubmissionStatus.ApprovedByDirectManager
@@ -333,7 +366,7 @@ public class ProjectService : IProjectService
         var fields = new List<ProjectReportSliceFieldDto>();
         foreach (var r in raw)
         {
-            var entries = ExtractProjectEntries(r.ValueJson!, id);
+            var entries = ExtractProjectEntries(r.ValueJson!, id, TemplateDeclaresWorkItems(r.ConfigJson));
             if (entries.Count == 0) continue; // حقل بلا عنصر لهذا المشروع لا يُذكَر أصلًا
             fields.Add(new ProjectReportSliceFieldDto(r.Id, r.Label, r.ConfigJson, r.Order, entries));
         }
@@ -356,9 +389,9 @@ public class ProjectService : IProjectService
     /// قاموس نصّيّ. <c>JsonException</c> تُبتلع عمدًا وتُعيد قائمة فارغة: JSON تالف يعني
     /// «لا أعرف لمن هذا العنصر» ⇒ الفشل المغلق (لا يخرج شيء) لا المفتوح.
     /// </summary>
-    private static List<IReadOnlyDictionary<string, string?>> ExtractProjectEntries(string valueJson, Guid projectId)
+    private static List<ProjectReportSliceEntryDto> ExtractProjectEntries(string valueJson, Guid projectId, bool templateHasWorkItems)
     {
-        var result = new List<IReadOnlyDictionary<string, string?>>();
+        var result = new List<ProjectReportSliceEntryDto>();
         JsonDocument doc;
         try { doc = JsonDocument.Parse(valueJson); }
         catch (JsonException) { return result; }
@@ -372,21 +405,55 @@ public class ProjectService : IProjectService
                 if (!el.TryGetProperty("projectId", out var pid) || pid.ValueKind != JsonValueKind.String) continue;
                 if (!Guid.TryParse(pid.GetString(), out var g) || g != projectId) continue;
 
-                var answers = new Dictionary<string, string?>(StringComparer.Ordinal);
-                if (el.TryGetProperty("answers", out var ans) && ans.ValueKind == JsonValueKind.Object)
+                var answers = FlattenAnswers(el);
+
+                var items = new List<IReadOnlyDictionary<string, string?>>();
+                if (el.TryGetProperty("workItems", out var wi) && wi.ValueKind == JsonValueKind.Array)
                 {
-                    foreach (var p in ans.EnumerateObject())
-                        answers[p.Name] = p.Value.ValueKind switch
-                        {
-                            JsonValueKind.Null => null,
-                            JsonValueKind.String => p.Value.GetString(),
-                            _ => p.Value.GetRawText()
-                        };
+                    foreach (var item in wi.EnumerateArray())
+                        if (item.ValueKind == JsonValueKind.Object)
+                            items.Add(FlattenAnswers(item));
                 }
-                result.Add(answers);
+                // محوِّل القراءة (§7): بيانات v1 داخل قالب أعلن مجموعة بنود عمل ⇒ بندٌ ضمنيّ واحد،
+                // عرضًا فقط. لا كتابة، ولا تحويل، ولا مساس بما هو مخزَّن.
+                else if (templateHasWorkItems && answers.Count > 0)
+                {
+                    items.Add(answers);
+                }
+
+                result.Add(new ProjectReportSliceEntryDto(answers, items));
             }
         }
         return result;
+    }
+
+    private static Dictionary<string, string?> FlattenAnswers(JsonElement container)
+    {
+        var answers = new Dictionary<string, string?>(StringComparer.Ordinal);
+        if (!container.TryGetProperty("answers", out var ans) || ans.ValueKind != JsonValueKind.Object) return answers;
+        foreach (var p in ans.EnumerateObject())
+            answers[p.Name] = p.Value.ValueKind switch
+            {
+                JsonValueKind.Null => null,
+                JsonValueKind.String => p.Value.GetString(),
+                _ => p.Value.GetRawText()
+            };
+        return answers;
+    }
+
+    // هل أعلن القالب مجموعة بنود عمل؟ فحص بنيويّ خفيف على ConfigJson بلا نموذج كامل —
+    // الشريحة لا تحتاج تفاصيل المجموعة، بل وجودها فقط لتقرير تفعيل محوِّل القراءة.
+    private static bool TemplateDeclaresWorkItems(string? configJson)
+    {
+        if (string.IsNullOrWhiteSpace(configJson)) return false;
+        try
+        {
+            using var doc = JsonDocument.Parse(configJson);
+            return doc.RootElement.ValueKind == JsonValueKind.Object
+                   && doc.RootElement.TryGetProperty("workItems", out var w)
+                   && w.ValueKind == JsonValueKind.Object;
+        }
+        catch (JsonException) { return false; }
     }
 
     /// <summary>

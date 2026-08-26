@@ -99,7 +99,7 @@ public class ProjectScopedReportSliceTests
         Assert.Equal(f.ProjectA, slice!.ProjectId);
         Assert.Equal(f.SubmissionId, slice.SubmissionId);
         var entries = Assert.Single(slice.Fields).Entries;
-        Assert.Equal(MarkerA, Assert.Single(entries)["spend"]);
+        Assert.Equal(MarkerA, Assert.Single(entries).Answers["spend"]);
     }
 
     // ===== 2: خارج النطاق → 404 (لا 403) منعًا للتعداد =====
@@ -135,8 +135,8 @@ public class ProjectScopedReportSliceTests
         var a = await (await f.Admin.GetAsync(Url(f.ProjectA, f.SubmissionId))).ReadAsync<ProjectReportSliceDto>();
         var b = await (await f.Admin.GetAsync(Url(f.ProjectB, f.SubmissionId))).ReadAsync<ProjectReportSliceDto>();
 
-        Assert.Equal(MarkerA, Assert.Single(Assert.Single(a!.Fields).Entries)["spend"]);
-        Assert.Equal(MarkerB, Assert.Single(Assert.Single(b!.Fields).Entries)["spend"]);
+        Assert.Equal(MarkerA, Assert.Single(Assert.Single(a!.Fields).Entries).Answers["spend"]);
+        Assert.Equal(MarkerB, Assert.Single(Assert.Single(b!.Fields).Entries).Answers["spend"]);
     }
 
     // ===== 5: العبث بالمعرّفات لا يكشف شيئًا =====

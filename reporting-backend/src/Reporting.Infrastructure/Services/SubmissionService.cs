@@ -1464,6 +1464,25 @@ public class SubmissionService : ISubmissionService
         public int MinProjects { get; set; }
         public int MaxProjects { get; set; }
         public List<RepeatableField> Fields { get; set; } = new();
+        // امتداد المخطّط v2 (PROJECT360-MULTI-WORK-ITEMS-R2): بنود عمل متعدّدة داخل بطاقة المشروع الواحدة.
+        // كلا المفتاحين اختياريّان ⇒ كلّ إصدارات القوالب القائمة (v1) تسلك سلوكها الحرفيّ بلا أيّ تغيير.
+        public int SchemaVersion { get; set; } = 1;
+        public RepeatableWorkItemsConfig? WorkItems { get; set; }
+    }
+
+    // تعريف مجموعة بنود العمل المتداخلة — مقاد بالقالب بالكامل (Template-Driven):
+    // اسم المجموعة وتسمياتها وحدودها وحقولها وقواعد تفرّدها كلّها من ConfigJson، بلا أيّ ترميز صلب لقالب بعينه.
+    private sealed class RepeatableWorkItemsConfig
+    {
+        public string Key { get; set; } = "workItems";
+        public string Label { get; set; } = "بنود العمل";
+        public string ItemLabel { get; set; } = "بند عمل";
+        public string AddLabel { get; set; } = "+ إضافة بند عمل";
+        public int MinItems { get; set; }
+        public int MaxItems { get; set; }
+        // مفاتيح الحقول التي يُمنع تكرار توليفتها داخل المشروع الواحد. فارغة ⇒ لا قيد تفرّد (المسلك الافتراضيّ).
+        public List<string> UniqueBy { get; set; } = new();
+        public List<RepeatableField> Fields { get; set; } = new();
     }
 
     private sealed class RepeatableField
@@ -1488,6 +1507,13 @@ public class SubmissionService : ISubmissionService
     private sealed class RepeatableEntry
     {
         public Guid? ProjectId { get; set; }
+        public Dictionary<string, JsonElement> Answers { get; set; } = new();
+        // v2: قائمة بنود العمل داخل بطاقة المشروع. غيابها ⇒ بيانات v1 تُقرأ كما هي بلا أيّ تحويل.
+        public List<RepeatableWorkItem>? WorkItems { get; set; }
+    }
+
+    private sealed class RepeatableWorkItem
+    {
         public Dictionary<string, JsonElement> Answers { get; set; } = new();
     }
 
@@ -1523,6 +1549,20 @@ public class SubmissionService : ISubmissionService
         return false;
     }
 
+    // مفتاح مقارنة نصّيّ مستقرّ لقيمة إجابة، لأغراض قواعد التفرّد داخل بنود العمل فقط.
+    private static string AnswerToKey(Dictionary<string, JsonElement> answers, string key)
+    {
+        if (answers is null || !answers.TryGetValue(key, out var el)) return string.Empty;
+        return el.ValueKind switch
+        {
+            JsonValueKind.String => (el.GetString() ?? string.Empty).Trim(),
+            JsonValueKind.Number => el.GetRawText(),
+            JsonValueKind.True => "true",
+            JsonValueKind.False => "false",
+            _ => string.Empty
+        };
+    }
+
     private async Task<List<string>> ValidateRepeatableSectionsAsync(ReportSubmission submission, CancellationToken ct)
     {
         var errors = new List<string>();
@@ -1556,7 +1596,8 @@ public class SubmissionService : ISubmissionService
             // فحص سلامة قيود الحقول الرقميّة مرّة واحدة لكل قسم قبل التحقّق من الصفوف.
             // تعريف غير صالح (Min>Max أو Step<=0) ⇒ report.repeatable_config_invalid ونتخطّى القسم.
             var configInvalid = false;
-            foreach (var nf in config.Fields.Where(HasNumericConstraint))
+            var declaredFields = config.Fields.Concat(config.WorkItems?.Fields ?? new List<RepeatableField>());
+            foreach (var nf in declaredFields.Where(HasNumericConstraint))
             {
                 if (!RepeatableNumericValidation.IsConstraintDefinitionValid(nf.Min, nf.Max, nf.Step))
                 {
@@ -1567,6 +1608,7 @@ public class SubmissionService : ISubmissionService
             if (configInvalid) continue;
 
             var numericFields = config.Fields.Where(HasNumericConstraint).ToList();
+            var itemNumericFields = (config.WorkItems?.Fields ?? new List<RepeatableField>()).Where(HasNumericConstraint).ToList();
 
             // منع تكرار المشروع داخل القسم الواحد: صفّ واحد لكل مشروع في التقرير (فترة واحدة) —
             // يمنع ازدواج بيانات نفس (العميل/المشروع) ضمن نفس التسليم. مقصور على القسم الحالي.
@@ -1628,6 +1670,71 @@ public class SubmissionService : ISubmissionService
                         _ => "قيمة رقميّة غير صالحة.",
                     };
                     errors.Add($"{code} | قسم «{sec.Label}» الحقل «{nf.Label}» الصف {rowNum}: {detail}");
+                }
+
+                // ===== v2: تحقّق بنود العمل داخل بطاقة المشروع =====
+                // لا يعمل إطلاقًا إلّا إذا صرّح القالب بمجموعة workItems ⇒ إصدارات v1 لا تمرّ من هنا.
+                if (config.WorkItems is null) continue;
+                var wi = config.WorkItems;
+                var items = entry.WorkItems ?? new List<RepeatableWorkItem>();
+
+                if (items.Count < wi.MinItems)
+                {
+                    errors.Add($"قسم «{sec.Label}» — المشروع {rowNum}: يجب إضافة {wi.MinItems} {wi.ItemLabel} على الأقل.");
+                    continue;
+                }
+                if (wi.MaxItems > 0 && items.Count > wi.MaxItems)
+                {
+                    errors.Add($"قسم «{sec.Label}» — المشروع {rowNum}: الحدّ الأقصى {wi.MaxItems} {wi.ItemLabel}.");
+                    continue;
+                }
+
+                var seenItemKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                for (var itemIndex = 0; itemIndex < items.Count; itemIndex++)
+                {
+                    var item = items[itemIndex];
+                    var itemNum = itemIndex + 1;
+                    var answers = item.Answers ?? new Dictionary<string, JsonElement>();
+
+                    foreach (var sf in wi.Fields.Where(x => x.Required))
+                    {
+                        if (!(answers.TryGetValue(sf.Key, out var av) && AnswerHasValue(av)))
+                            errors.Add($"قسم «{sec.Label}» — المشروع {rowNum} / {wi.ItemLabel} {itemNum}: الحقل «{sf.Label}» مطلوب.");
+                    }
+
+                    foreach (var nf in itemNumericFields)
+                    {
+                        if (!answers.TryGetValue(nf.Key, out var nav) || !AnswerHasValue(nav)) continue;
+
+                        if (!RepeatableNumericValidation.TryGetNumber(nav, out var num))
+                        {
+                            errors.Add($"{RepeatableNumericValidation.NumberInvalid} | قسم «{sec.Label}» — المشروع {rowNum} / {wi.ItemLabel} {itemNum} الحقل «{nf.Label}»: قيمة رقميّة غير صالحة.");
+                            continue;
+                        }
+
+                        var icode = RepeatableNumericValidation.ValidateParsed(num, nf.Min, nf.Max, nf.IntegerOnly, nf.Step);
+                        if (icode is null) continue;
+
+                        var idetail = icode switch
+                        {
+                            RepeatableNumericValidation.IntegerRequired => "يجب إدخال عدد صحيح.",
+                            RepeatableNumericValidation.BelowMin => $"القيمة أقل من الحدّ الأدنى ({nf.Min?.ToString(CultureInfo.InvariantCulture)}).",
+                            RepeatableNumericValidation.AboveMax => $"القيمة أكبر من الحدّ الأقصى ({nf.Max?.ToString(CultureInfo.InvariantCulture)}).",
+                            RepeatableNumericValidation.StepInvalid => $"القيمة لا تطابق خطوة الإدخال ({nf.Step?.ToString(CultureInfo.InvariantCulture)}).",
+                            _ => "قيمة رقميّة غير صالحة.",
+                        };
+                        errors.Add($"{icode} | قسم «{sec.Label}» — المشروع {rowNum} / {wi.ItemLabel} {itemNum} الحقل «{nf.Label}»: {idetail}");
+                    }
+
+                    // تفرّد اختياريّ بالكامل: بلا uniqueBy يُسمح بتكرار نوع العمل ما دامت التفاصيل مختلفة (§4.2).
+                    if (wi.UniqueBy.Count == 0) continue;
+                    var signature = string.Join("\u001f", wi.UniqueBy.Select(k => AnswerToKey(answers, k)));
+                    if (!seenItemKeys.Add(signature))
+                    {
+                        var labels = string.Join("، ", wi.UniqueBy.Select(k =>
+                            wi.Fields.FirstOrDefault(f => string.Equals(f.Key, k, StringComparison.OrdinalIgnoreCase))?.Label ?? k));
+                        errors.Add($"قسم «{sec.Label}» — المشروع {rowNum}: تكرّر {wi.ItemLabel} بنفس ({labels}) داخل المشروع نفسه.");
+                    }
                 }
             }
         }
