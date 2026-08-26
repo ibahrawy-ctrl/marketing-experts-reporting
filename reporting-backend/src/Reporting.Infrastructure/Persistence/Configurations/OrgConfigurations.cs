@@ -15,6 +15,9 @@ public class DepartmentConfiguration : IEntityTypeConfiguration<Department>
         b.Property(x => x.NameEn).HasMaxLength(200);
         b.Property(x => x.Code).HasMaxLength(50);
         b.HasIndex(x => x.Code).IsUnique().HasFilter("\"Code\" IS NOT NULL");
+        // DEF-P123-001 — اسم الإدارة فريد على مستوى الشركة. الضمانة النهائيّة ضدّ التسابق،
+        // والتحقّق التطبيقيّ في DirectoryService هو ما يعطي الرسالة المفهومة قبل بلوغها.
+        b.HasIndex(x => x.NameAr).IsUnique().HasDatabaseName("IX_departments_NameAr");
         b.HasMany(x => x.Teams).WithOne(x => x.Department!)
             .HasForeignKey(x => x.DepartmentId).OnDelete(DeleteBehavior.Restrict);
     }
@@ -29,6 +32,10 @@ public class TeamConfiguration : IEntityTypeConfiguration<Team>
         b.Property(x => x.NameAr).IsRequired().HasMaxLength(200);
         b.Property(x => x.NameEn).HasMaxLength(200);
         b.HasIndex(x => x.DepartmentId);
+        // DEF-P123-001 — اسم الفريق فريد **داخل إدارته** لا على مستوى الشركة: العقد يسمح
+        // بتكرار الاسم في إدارة أخرى (فريق «المبيعات» في إدارتين مختلفتين تسمية مشروعة).
+        b.HasIndex(x => new { x.DepartmentId, x.NameAr }).IsUnique()
+            .HasDatabaseName("IX_teams_DepartmentId_NameAr");
     }
 }
 
