@@ -1,0 +1,17 @@
+attendance_incidents_nonsynth|5
+departments_nonsynth|8
+digest_attendance_nonsynth|64ba80c78d55b4810e0eec78175ac184
+digest_kpi_eval_nonsynth|c2cab133e27e7868c3e6a277910aa847
+digest_reports_nonsynth|7f217da60993fb3cb2212682966522f8
+digest_users_nonsynth|8bc9fc39596f767a997f78450524c524
+employee_checklist_items_nonsynth|0
+employee_service_requests_nonsynth|0
+governance_items_total|0
+kpi_evaluations_nonsynth|16
+kpi_templates_total|9
+leave_requests_nonsynth|0
+migrations_total|45
+report_submissions_nonsynth|13
+report_templates_total|34
+teams_nonsynth|11
+users_nonsynth|22

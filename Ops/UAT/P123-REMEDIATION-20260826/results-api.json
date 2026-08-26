@@ -1,0 +1,372 @@
+[
+ {
+  "id": "UAT-P123R-SEC-NO-IMPLICIT-PERM",
+  "actor": "ALL-13",
+  "action": "تصفير شامل ثمّ قراءة perm للثلاثة عشر",
+  "expected": "قائمة فارغة للجميع بمن فيهم Admin",
+  "status": 200,
+  "detail": "",
+  "result": "PASS",
+  "note": "leaks={}"
+ },
+ {
+  "id": "UAT-P123R-PERM-GRANT-PATH",
+  "actor": "adm",
+  "action": "منح أربعة مفاتيح لـhr عبر مسار المنتَج",
+  "expected": "200 والمفاتيح مُعادة",
+  "status": 200,
+  "detail": "",
+  "result": "PASS",
+  "note": ""
+ },
+ {
+  "id": "UAT-P123R-PERM-READ-BACK",
+  "actor": "adm",
+  "action": "قراءة المفاتيح بعد المنح",
+  "expected": "200 ونفس المفاتيح",
+  "status": 200,
+  "detail": "",
+  "result": "PASS",
+  "note": ""
+ },
+ {
+  "id": "UAT-P123R-PERM-IN-JWT",
+  "actor": "hr",
+  "action": "المفاتيح في /auth/me بعد تجديد الرمز",
+  "expected": "الأربعة نفسها",
+  "status": 200,
+  "detail": "",
+  "result": "PASS",
+  "note": "perms=['Attendance.Escalate', 'Attendance.Review', 'HrOperations.Export', 'HrOperations.View']"
+ },
+ {
+  "id": "UAT-P123R-PERM-SELF-GRANT-DENIED",
+  "actor": "outsider",
+  "action": "محاولة منح النفس كلّ المفاتيح",
+  "expected": "403",
+  "status": 403,
+  "detail": "",
+  "result": "PASS",
+  "note": ""
+ },
+ {
+  "id": "UAT-P123R-PERM-NO-DELEGATION",
+  "actor": "hr",
+  "action": "حامل المفاتيح يفوّضها لغيره",
+  "expected": "403 — لا تفويض متعدٍّ",
+  "status": 403,
+  "detail": "",
+  "result": "PASS",
+  "note": ""
+ },
+ {
+  "id": "UAT-P123R-PERM-DENY-CONTROL",
+  "actor": "outsider",
+  "action": "شاهد سالب: outsider بلا أيّ مفتاح",
+  "expected": "قائمة فارغة",
+  "status": 200,
+  "detail": "",
+  "result": "PASS",
+  "note": ""
+ },
+ {
+  "id": "UAT-P2-PERM-ALLOW-API-HR-OPERATIONS-DASHBOARD",
+  "actor": "hr(+key)",
+  "action": "GET /hr-operations/dashboard",
+  "expected": "200 لحامل المفتاح",
+  "status": 200,
+  "detail": "",
+  "result": "PASS",
+  "note": ""
+ },
+ {
+  "id": "UAT-P2-PERM-ALLOW-API-HR-OPERATIONS-DASHBOARD-DENY",
+  "actor": "outsider",
+  "action": "GET /hr-operations/dashboard بلا مفتاح",
+  "expected": "403",
+  "status": 403,
+  "detail": "",
+  "result": "PASS",
+  "note": ""
+ },
+ {
+  "id": "UAT-P2-PERM-ALLOW-API-HR-OPERATIONS-QUEUES-ATTENDANCE",
+  "actor": "hr(+key)",
+  "action": "GET /hr-operations/queues/attendance-awaiting-hr",
+  "expected": "200 لحامل المفتاح",
+  "status": 200,
+  "detail": "",
+  "result": "PASS",
+  "note": ""
+ },
+ {
+  "id": "UAT-P2-PERM-ALLOW-API-HR-OPERATIONS-QUEUES-ATTENDANCE-DENY",
+  "actor": "outsider",
+  "action": "GET /hr-operations/queues/attendance-awaiting-hr بلا مفتاح",
+  "expected": "403",
+  "status": 403,
+  "detail": "",
+  "result": "PASS",
+  "note": ""
+ },
+ {
+  "id": "UAT-P2-PERM-ALLOW-API-HR-OPERATIONS-QUEUES-REPORTS",
+  "actor": "hr(+key)",
+  "action": "GET /hr-operations/queues/reports-missing/export",
+  "expected": "200 لحامل المفتاح",
+  "status": 200,
+  "detail": "",
+  "result": "PASS",
+  "note": ""
+ },
+ {
+  "id": "UAT-P2-PERM-ALLOW-API-HR-OPERATIONS-QUEUES-REPORTS-DENY",
+  "actor": "outsider",
+  "action": "GET /hr-operations/queues/reports-missing/export بلا مفتاح",
+  "expected": "403",
+  "status": 403,
+  "detail": "",
+  "result": "PASS",
+  "note": ""
+ },
+ {
+  "id": "UAT-P2-PERM-ALLOW-API-OBLIGATIONS",
+  "actor": "hr(+key)",
+  "action": "GET /obligations",
+  "expected": "200 لحامل المفتاح",
+  "status": 200,
+  "detail": "",
+  "result": "PASS",
+  "note": ""
+ },
+ {
+  "id": "UAT-P2-PERM-ALLOW-API-OBLIGATIONS-DENY",
+  "actor": "outsider",
+  "action": "GET /obligations بلا مفتاح",
+  "expected": "403",
+  "status": 403,
+  "detail": "",
+  "result": "PASS",
+  "note": ""
+ },
+ {
+  "id": "UAT-P123R-ATT-DRAFT-CREATED",
+  "actor": "leadA1",
+  "action": "إنشاء مسودّة بلاغ على عضو الفريق",
+  "expected": "200/201 والحالة Draft",
+  "status": 200,
+  "detail": "",
+  "result": "PASS",
+  "note": "يوم الواقعة=2026-08-25"
+ },
+ {
+  "id": "UAT-P123R-ATT-DUP-OPEN-GUARD",
+  "actor": "leadA1",
+  "action": "بلاغ ثانٍ بنفس النوع والموظّف واليوم",
+  "expected": "409 برسالة عربيّة — لا ازدواج بلاغات مفتوحة",
+  "status": 409,
+  "detail": "يوجد بلاغ مفتوح من النوع نفسه على الموظّف في 2026-08-25.",
+  "result": "PASS",
+  "note": ""
+ },
+ {
+  "id": "UAT-P2-ATT-L1-DRAFT-HIDDEN",
+  "actor": "empFull",
+  "action": "الموظّف موضوع البلاغ يقرأ المسودّة قبل إرسالها",
+  "expected": "404 — لا تُعرَض حالة سابقة للإرسال",
+  "status": 404,
+  "detail": "لا توجد واقعة مطابقة.",
+  "result": "PASS",
+  "note": "DEF-P123-003"
+ },
+ {
+  "id": "UAT-P123R-ATT-DRAFT-VISIBLE-TO-REPORTER",
+  "actor": "leadA1",
+  "action": "المُبلِّغ يقرأ مسودّته",
+  "expected": "200 — الحجب على الموضوع لا على صاحب البلاغ",
+  "status": 200,
+  "detail": "",
+  "result": "PASS",
+  "note": ""
+ },
+ {
+  "id": "UAT-P123R-ATT-DRAFT-DENIED-OUTSIDER",
+  "actor": "outsider",
+  "action": "غريب عن النطاق يقرأ المسودّة",
+  "expected": "404 — لا 403 (لا يُفشى الوجود)",
+  "status": 404,
+  "detail": "لا توجد واقعة مطابقة.",
+  "result": "PASS",
+  "note": ""
+ },
+ {
+  "id": "UAT-P123R-ATT-SUBMIT",
+  "actor": "leadA1",
+  "action": "إرسال المسودّة",
+  "expected": "200 والحالة تغادر Draft",
+  "status": 200,
+  "detail": "",
+  "result": "PASS",
+  "note": ""
+ },
+ {
+  "id": "UAT-P123R-ATT-VISIBLE-AFTER-SUBMIT",
+  "actor": "empFull",
+  "action": "الموظّف يقرأ الواقعة بعد الإرسال",
+  "expected": "200 — الحجب مرتبط بالحالة لا بالشخص",
+  "status": 200,
+  "detail": "",
+  "result": "PASS",
+  "note": "برهان أنّ الإصلاح لم يكسر الرؤية المشروعة"
+ },
+ {
+  "id": "UAT-P123R-ATT-ACK",
+  "actor": "empFull",
+  "action": "إقرار الموظّف بالواقعة",
+  "expected": "200",
+  "status": 200,
+  "detail": "",
+  "result": "PASS",
+  "note": ""
+ },
+ {
+  "id": "UAT-P123R-ATT-HR-CAN-SEE",
+  "actor": "hr(+key)",
+  "action": "حامل مفتاح المراجعة يرى الواقعة",
+  "expected": "200",
+  "status": 200,
+  "detail": "",
+  "result": "PASS",
+  "note": ""
+ },
+ {
+  "id": "UAT-P2-ATT-RECONCILE-SUGGEST",
+  "actor": "hr(+key)",
+  "action": "قراءة اقتراحات المصالحة مع الإجازات",
+  "expected": "200 وقائمة اقتراحات (اقتراح لا منع)",
+  "status": 200,
+  "detail": "",
+  "result": "PASS",
+  "note": ""
+ },
+ {
+  "id": "UAT-P2-ATT-RECONCILE-SUGGEST-DENY",
+  "actor": "outsider",
+  "action": "نفس النداء بلا مفتاح",
+  "expected": "404/403",
+  "status": 404,
+  "detail": "لا توجد واقعة مطابقة.",
+  "result": "PASS",
+  "note": ""
+ },
+ {
+  "id": "UAT-P2-ATT-HR-HR-REVIEW",
+  "actor": "hr(+key)",
+  "action": "قرار HR بالتأكيد (Confirm)",
+  "expected": "200 وانتقال حالة مسجَّل",
+  "status": 200,
+  "detail": "",
+  "result": "PASS",
+  "note": ""
+ },
+ {
+  "id": "UAT-P2-ATT-HR-HR-REVIEW-DENY",
+  "actor": "outsider",
+  "action": "نفس القرار بلا مفتاح",
+  "expected": "403/404",
+  "status": 404,
+  "detail": "لا توجد واقعة مطابقة.",
+  "result": "PASS",
+  "note": ""
+ },
+ {
+  "id": "UAT-P2-ATT-HR-ESCALATE",
+  "actor": "hr(+key)",
+  "action": "تصعيد الواقعة إلى الحوكمة",
+  "expected": "200",
+  "status": 200,
+  "detail": "",
+  "result": "PASS",
+  "note": ""
+ },
+ {
+  "id": "UAT-P2-ATT-HR-CLOSE",
+  "actor": "hr(+key)",
+  "action": "إغلاق الواقعة",
+  "expected": "200",
+  "status": 200,
+  "detail": "",
+  "result": "PASS",
+  "note": ""
+ },
+ {
+  "id": "UAT-P123R-ATT-AUDIT-TRAIL",
+  "actor": "hr(+key)",
+  "action": "أثر التدقيق للسلسلة كاملة",
+  "expected": "200 وسلسلة أحداث غير فارغة",
+  "status": 200,
+  "detail": "",
+  "result": "PASS",
+  "note": "events=8"
+ },
+ {
+  "id": "UAT-P123R-DIR-DEPT-CREATE",
+  "actor": "adm",
+  "action": "إنشاء إدارة جديدة باسم فريد",
+  "expected": "200/201",
+  "status": 200,
+  "detail": "",
+  "result": "PASS",
+  "note": ""
+ },
+ {
+  "id": "UAT-P1-DIR-DEPT-DUP-NAME",
+  "actor": "adm",
+  "action": "إنشاء إدارة بنفس الاسم العربيّ ورمز مختلف",
+  "expected": "409 برسالة تفرّد عربيّة",
+  "status": 409,
+  "detail": "توجد إدارة أخرى بهذا الاسم. اختر اسمًا مختلفًا.",
+  "result": "PASS",
+  "note": "DEF-P123-001"
+ },
+ {
+  "id": "UAT-P1-DIR-DEPT-DUP-CODE",
+  "actor": "adm",
+  "action": "إنشاء إدارة برمز مكرّر واسم مختلف",
+  "expected": "409 برسالة عربيّة — لا 500",
+  "status": 409,
+  "detail": "توجد إدارة أخرى بهذا الرمز. اختر رمزًا مختلفًا.",
+  "result": "PASS",
+  "note": "DEF-P123-002"
+ },
+ {
+  "id": "UAT-P123R-DIR-TEAM-CREATE",
+  "actor": "adm",
+  "action": "إنشاء فريق جديد داخل الإدارة",
+  "expected": "200/201",
+  "status": 200,
+  "detail": "",
+  "result": "PASS",
+  "note": ""
+ },
+ {
+  "id": "UAT-P1-DIR-TEAM-DUP-NAME",
+  "actor": "adm",
+  "action": "إنشاء فريق بنفس الاسم داخل الإدارة نفسها",
+  "expected": "409 برسالة عربيّة",
+  "status": 409,
+  "detail": "يوجد فريق آخر بهذا الاسم داخل الإدارة نفسها. اختر اسمًا مختلفًا.",
+  "result": "PASS",
+  "note": "DEF-P123-001"
+ },
+ {
+  "id": "UAT-P123R-DIR-TEAM-SAME-NAME-OTHER-DEPT",
+  "actor": "adm",
+  "action": "نفس اسم الفريق تحت إدارة أخرى",
+  "expected": "200/201 — التفرّد مقيَّد بالإدارة لا عالميّ",
+  "status": 200,
+  "detail": "",
+  "result": "PASS",
+  "note": "برهان أنّ القيد لم يُشدَّد فوق ما تقتضيه القاعدة"
+ }
+]
