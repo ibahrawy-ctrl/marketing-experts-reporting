@@ -19,9 +19,12 @@ export function Badge({ children, tone = 'muted' }: { children: ReactNode; tone?
   );
 }
 
+// `min-w-0` ليس تجميلًا: البطاقة تُستعمل عنصرًا في شبكة/فليكس، والقيمة الافتراضيّة `min-width:auto`
+// تمنع المسار من النزول تحت `min-content` لمحتواها، فيفيض عرض الصفحة عند 390px متى حوى المحتوى
+// رموزًا طويلة بلا مسافات (عناوين قوالب/بُرد). تصفيرها يسمح للمسار بالانكماش فيعمل `truncate` بالداخل.
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`rounded-xl border border-line bg-white p-5 ${className}`}>{children}</div>
+    <div className={`min-w-0 rounded-xl border border-line bg-white p-5 ${className}`}>{children}</div>
   );
 }
 

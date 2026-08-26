@@ -28,8 +28,8 @@ const accentBar: Record<Tone, string> = {
 // عنوان قسم موحّد مع إجراء اختياري على اليسار.
 export function SectionTitle({ title, hint, action }: { title: string; hint?: string; action?: ReactNode }) {
   return (
-    <div className="mb-3 flex items-center justify-between gap-3">
-      <div>
+    <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+      <div className="min-w-0">
         <h2 className="text-lg font-bold text-navy">{title}</h2>
         {hint && <p className="text-xs text-ink-2">{hint}</p>}
       </div>
