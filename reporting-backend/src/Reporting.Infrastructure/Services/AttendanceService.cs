@@ -803,7 +803,7 @@ public class AttendanceService : IAttendanceService
         if (incident is null) return Result<AttendanceIncident>.Failure("لا توجد واقعة مطابقة.", NotFound);
 
         var ctx = await _visibility.BuildContextAsync(incident.SubjectUserId, "attendance.read", ct);
-        if (!AttendanceAccess.CanViewIncident(ctx, incident.ReportedByUserId))
+        if (!AttendanceAccess.CanViewIncident(ctx, incident.ReportedByUserId, incident.Status))
             return Result<AttendanceIncident>.Failure("لا توجد واقعة مطابقة.", NotFound);
 
         return Result<AttendanceIncident>.Success(incident);
@@ -821,7 +821,7 @@ public class AttendanceService : IAttendanceService
             return Result<(AttendanceIncident, FieldVisibilityContext)>.Failure("لا توجد واقعة مطابقة.", NotFound);
 
         var ctx = await _visibility.BuildContextAsync(incident.SubjectUserId, "attendance.write", ct);
-        if (!AttendanceAccess.CanViewIncident(ctx, incident.ReportedByUserId))
+        if (!AttendanceAccess.CanViewIncident(ctx, incident.ReportedByUserId, incident.Status))
             return Result<(AttendanceIncident, FieldVisibilityContext)>.Failure("لا توجد واقعة مطابقة.", NotFound);
 
         return Result<(AttendanceIncident, FieldVisibilityContext)>.Success((incident, ctx));
