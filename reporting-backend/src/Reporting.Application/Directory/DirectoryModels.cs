@@ -268,6 +268,15 @@ public record TeamMoveImpactDto(
     bool WillSyncMembers,
     IReadOnlyList<string> Warnings);
 
+/// <summary>
+/// طلب ضبط مفاتيح الصلاحيّات الدقيقة لمستخدم: المجموعة المرسَلة هي الحالة النهائيّة المطلوبة
+/// بالكامل — ما لم يُذكَر يُلغى. قائمة فارغة = سحب كلّ المفاتيح.
+/// </summary>
+public record SetUserPermissionsRequest(List<string>? Permissions);
+
+/// <summary>مفاتيح <c>perm</c> الممنوحة لمستخدم صراحةً (لا شيء منها مشتقّ من الدور).</summary>
+public record UserPermissionsDto(Guid UserId, IReadOnlyList<string> Permissions);
+
 /// <summary>إنشاء إدارة جديدة — للأدمن فقط.</summary>
 public record CreateDepartmentRequest(
     string NameAr,

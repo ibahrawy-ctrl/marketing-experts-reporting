@@ -55,6 +55,16 @@ public interface IDirectoryService
     /// <summary>تحديث أدوار مستخدم (إضافة/إزالة) مع حواجز أمان ضد قفل النظام.</summary>
     Task<Result> UpdateUserRolesAsync(Guid userId, IReadOnlyList<string> roles, Guid actingUserId, CancellationToken ct = default);
 
+    /// <summary>مفاتيح الصلاحيّات الدقيقة (<c>perm</c>) الممنوحة لمستخدم بعينه صراحةً — قراءة فقط.</summary>
+    Task<Result<UserPermissionsDto>> GetUserPermissionsAsync(Guid userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// ضبط مفاتيح <c>perm</c> لمستخدم إلى المجموعة المطلوبة بالضبط (منح وإلغاء في نداء واحد).
+    /// العمليّة **Idempotent** ومُدقَّقة، والإلغاء يتمّ بإسقاط المفتاح من المجموعة المرسَلة.
+    /// </summary>
+    Task<Result<UserPermissionsDto>> SetUserPermissionsAsync(
+        Guid userId, IReadOnlyList<string> permissions, Guid actingUserId, CancellationToken ct = default);
+
     /// <summary>إنشاء مستخدم جديد مع أدواره وانتمائه التنظيمي — للأدمن فقط.</summary>
     Task<Result<DirectoryUserDto>> CreateUserAsync(CreateUserRequest req, CancellationToken ct = default);
 
