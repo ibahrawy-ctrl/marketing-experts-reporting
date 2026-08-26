@@ -61,7 +61,14 @@
      "CrossSurfaceConsistencyTests.CurrentWeekSubmitted_AllSurfaces_AgreeSubmittedNoAction (CrossSurfaceConsistencyTests.cs:117)",
      "ReportDueTests.MyStatus_CurrentWeek_Employee_NotOverdue (ReportDueTests.cs:170)"
     ],
-    "scopeAssessment": "كلّها في مجال «الحالة الموحّدة للتقارير / استحقاق الدورة الحاليّة» ولا تمسّ Project 360 ولا بنود العمل ولا اكتشاف تقارير المشروع ولا عقد الشريحة. أسماؤها كلّها حول الدورة الحاليّة (CurrentCycle/CurrentWeek) ⇒ مرشّح قويّ لحساسيّة تقويميّة عند حدّ الأسبوع السعوديّ (أحد→خميس؛ يوم القياس خميس). يستحقّ تذكرة مستقلّة ولا يُصلَح ضمن هذه.",
+    "scopeAssessment": "كلّها في مجال «الحالة الموحّدة للتقارير / استحقاق الدورة الحاليّة» ولا تمسّ Project 360 ولا بنود العمل ولا اكتشاف تقارير المشروع ولا عقد الشريحة. يستحقّ تذكرة مستقلّة ولا يُصلَح ضمن هذه.",
+    "calendarSensitivityEvidence": {
+     "claim": "الإخفاقات الثمانية حسّاسة لليوم لا للكود — حدّ الأسبوع السعوديّ (أحد→خميس).",
+     "passingRun": "26 أغسطس 23:06 (الأربعاء) — نفس المجموعة الكاملة: Failed 0, Passed 2210, Total 2210",
+     "failingRuns": "27 أغسطس (الخميس) 00:13 على reporting_test_r22c النظيفة، و00:29 على reporting_test_r22verify نظيفة جديدة، وعلى BASE_SHA في reporting_test_base النظيفة — 8 إخفاقات في الثلاث بالأسماء والأسطر ذاتها",
+     "codeHypothesisExcluded": "التزام الميزة d934fc9 لم يمسّ أيّ ملفّ في منطق الحالة الموحّدة أو الاستحقاق (صفر مطابقة على unified|reportdue|status|crosssurface)؛ لمسه محصور في ProjectService وSubmissionService وعقد الشريحة والفهرس.",
+     "conclusion": "التناقض بين الجولتين يفسّره عبور منتصف الليل إلى الخميس (آخر يوم عمل)، لا أيّ تغيير في الشجرة ⇒ التصنيف كخطّ أساس قائم يبقى صحيحًا، والتذكرة المستقلّة يجب أن تبدأ من هذه الحساسيّة التقويميّة."
+    },
     "contaminatedRunDiscarded": {
      "database": "reporting_test_r22b",
      "failed": 6,
