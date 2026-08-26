@@ -760,24 +760,34 @@ public class AttendanceService : IAttendanceService
     /// <summary>
     /// استعلام الوقائع محصورًا بنطاق المستخدم — يُطبَّق **قبل** أيّ مرشِّح من العميل،
     /// فلا يستطيع مرشِّح مُلفَّق توسيع النطاق.
+    ///
+    /// <para>
+    /// DEF-P123-RC-001: القاعدة نفسها التي يحتكم إليها سطح التفاصيل
+    /// (<see cref="AttendanceAccess.CanViewIncident"/>) تدخل هنا **داخل الاستعلام** عبر
+    /// <see cref="AttendanceAccess.VisibleIncidentPredicate"/>، فتسبق <c>Count</c> و<c>Skip/Take</c>
+    /// والإسقاط والتسلسل معًا. الثابت المحروس: <b>القائمة ⊆ التفاصيل</b>.
+    /// </para>
     /// </summary>
     private async Task<IQueryable<AttendanceIncident>> BuildScopedQueryAsync(CancellationToken ct)
     {
-        var query = _db.AttendanceIncidents.AsNoTracking();
+        var canReviewOrEscalate = _currentUser.HasPermission(AppPermissions.AttendanceReview)
+                                  || _currentUser.HasPermission(AppPermissions.AttendanceEscalate);
+        var isOperationalSupervisor = _currentUser.IsInRole(Roles.TeamLeader)
+                                      || _currentUser.IsInRole(Roles.Manager);
 
-        var canReview = _currentUser.HasPermission(AppPermissions.AttendanceReview);
-        var canEscalate = _currentUser.HasPermission(AppPermissions.AttendanceEscalate);
-        if (canReview || canEscalate) return query;
+        // حلّ النطاق مكلف؛ حامل مفتاح المراجعة/التصعيد لا يحتاجه (كما في السلوك السابق تمامًا).
+        IReadOnlyCollection<Guid> scopedSubjectUserIds = Array.Empty<Guid>();
+        var seesAllSubjects = false;
+        if (!canReviewOrEscalate)
+        {
+            var scope = await _scope.ResolveAsync(ct);
+            scopedSubjectUserIds = scope.UserIds.ToList();
+            seesAllSubjects = scope.SeesAll;
+        }
 
-        var scope = await _scope.ResolveAsync(ct);
-        if (scope.SeesAll) return query;
-
-        var visibleUsers = scope.UserIds.ToList();
-        var me = ActorId;
-
-        // صاحب الواقعة، أو مُبلِّغها، أو من هو داخل نطاق المُشاهِد — وما عدا ذلك غير موجود بالنسبة له.
-        return query.Where(i =>
-            i.SubjectUserId == me || i.ReportedByUserId == me || visibleUsers.Contains(i.SubjectUserId));
+        return _db.AttendanceIncidents.AsNoTracking().Where(
+            AttendanceAccess.VisibleIncidentPredicate(
+                ActorId, canReviewOrEscalate, isOperationalSupervisor, seesAllSubjects, scopedSubjectUserIds));
     }
 
     private IQueryable<AttendanceIncident> ApplyNeedsMyActionFilter(IQueryable<AttendanceIncident> query)
