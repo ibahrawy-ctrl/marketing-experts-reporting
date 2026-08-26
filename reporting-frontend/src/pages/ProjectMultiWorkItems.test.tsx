@@ -136,6 +136,27 @@ describe('R2 — تفكيك القالب والقيم', () => {
     expect(entries[0].workItems).toBeUndefined();
     expect(JSON.stringify(entries[0])).not.toContain('workItems');
   });
+
+  // ---- 5أ: انحدار — قيمة JSON غير نصّيّة يقبلها الخادم كانت تُسقِط المحرّر عند `trim()` ----
+  it('5أ القيم الرقميّة والمنطقيّة والغائبة تُقرأ نصًّا بلا انهيار', () => {
+    const json = JSON.stringify([
+      {
+        projectId: PROJECT_A,
+        answers: { count: 3, done: true, note: null },
+        workItems: [{ answers: { count: 5, ratio: 2.5 } }],
+      },
+    ]);
+    const entries = parseRepeatableEntries(json);
+    expect(entries[0].answers.count).toBe('3');
+    expect(entries[0].answers.done).toBe('true');
+    expect(entries[0].answers.note).toBe('');
+    expect(entries[0].workItems?.[0].answers.count).toBe('5');
+    expect(entries[0].workItems?.[0].answers.ratio).toBe('2.5');
+    // الشرط الحقيقيّ: كلّ قيمة قابلة لاستدعاء `trim()` كما يفترض المحرّر.
+    for (const v of Object.values(entries[0].workItems![0].answers)) {
+      expect(typeof v).toBe('string');
+    }
+  });
 });
 
 describe('R2 — محرّر بنود العمل', () => {
@@ -256,6 +277,27 @@ describe('R2 — محرّر بنود العمل', () => {
 
     expect(screen.queryByRole('button', { name: '+ إضافة بند عمل' })).toBeNull();
     expect(state()[0].workItems).toBeUndefined();
+  });
+
+  // ---- 13أ: انحدار — فتح مسودّة مخزَّنة بقيمة رقميّة على حقل رقميّ مقيَّد لا يُسقِط المحرّر ----
+  it('13أ المحرّر يفتح مسودّة بقيم رقميّة مخزَّنة بلا انهيار', () => {
+    const cfgJson = JSON.stringify({
+      schemaVersion: 2,
+      projectRequired: true, minProjects: 1, maxProjects: 0,
+      fields: [{ key: 'work_status', label: 'حالة العمل', type: 'Text', required: true }],
+      workItems: {
+        key: 'work_items', label: 'بنود العمل', itemLabel: 'بند عمل', addLabel: '+ إضافة بند عمل',
+        minItems: 1, maxItems: 0, uniqueBy: [],
+        fields: [{ key: 'count', label: 'العدد', type: 'Number', required: true, min: 1, max: 100, integerOnly: true }],
+      },
+    });
+    // القيم كما يخزّنها الخادم فعلًا: `count` رقم JSON لا نصّ.
+    const stored = JSON.stringify([{ projectId: PROJECT_A, answers: {}, workItems: [{ answers: { count: 3 } }] }]);
+
+    render(<Harness config={parseRepeatableConfig(cfgJson)} initial={parseRepeatableEntries(stored)} />);
+
+    expect(screen.getByDisplayValue('3')).toBeTruthy();
+    expect(screen.queryAllByRole('alert')).toHaveLength(0);
   });
 
   // ---- 14: قيم بند العمل تُكتب في البند الصحيح لا في مستوى المشروع ----

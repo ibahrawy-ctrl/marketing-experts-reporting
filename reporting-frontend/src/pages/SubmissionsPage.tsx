@@ -766,6 +766,18 @@ function normalizeSubField(f: RepeatableSubField): RepeatableSubField {
   return out;
 }
 
+// الخادم يقبل في `answers` أيّ قيمة JSON عدديّة أو منطقيّة (حقل Number يُخزَّن رقمًا لا نصًّا)،
+// بينما المحرّر يعامل كلّ إجابة كنصّ ويستدعي `trim()` عليها ⇒ رقم واحد كان يُسقِط الصفحة كلّها.
+// التوحيد يتمّ **عند القراءة فقط**: لا يتغيّر أيّ بايت مخزَّن، والقيم الغائبة تصير نصًّا فارغًا.
+export function coerceAnswers(a: unknown): Record<string, string> {
+  if (!a || typeof a !== 'object') return {};
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(a as Record<string, unknown>)) {
+    out[k] = v === null || v === undefined ? '' : typeof v === 'string' ? v : String(v);
+  }
+  return out;
+}
+
 export function parseRepeatableEntries(json: string | null | undefined): ProjectRepeatableEntry[] {
   if (!json) return [];
   try {
@@ -774,14 +786,14 @@ export function parseRepeatableEntries(json: string | null | undefined): Project
     return (v as ProjectRepeatableEntry[]).map((e) => {
       const entry: ProjectRepeatableEntry = {
         projectId: e?.projectId ?? null,
-        answers: e?.answers && typeof e.answers === 'object' ? e.answers : {},
+        answers: coerceAnswers(e?.answers),
       };
       // بنود العمل تُنقَل كما هي حين توجد فقط. إسقاطها هنا كان يعني فقدانها صامتًا عند إعادة فتح
       // المسودّة ثمّ محوَها من المخزَّن عند الحفظ التالي؛ وإضافة مفتاح فارغ لبيانات v1 كان يعني
       // كتابة مفتاح جديد في تقارير لم تعرفه — وكلاهما ممنوع.
       if (Array.isArray(e?.workItems)) {
         entry.workItems = e.workItems.map((it) => ({
-          answers: it?.answers && typeof it.answers === 'object' ? it.answers : {},
+          answers: coerceAnswers(it?.answers),
         }));
       }
       return entry;
