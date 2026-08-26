@@ -60,8 +60,15 @@ public class SecurityPenetrationTests
         var login = await (await client.PostAsJsonAsync("/api/auth/login",
             new LoginRequest("admin@marketingexperts.local", "Admin#12345")))
             .Content.ReadFromJsonAsync<AuthResponse>();
-        // العبث بآخر محرفين من التوقيع.
-        var tampered = login!.AccessToken[..^2] + (login.AccessToken[^1] == 'a' ? "bc" : "aa");
+        // العبث ببايت في **وسط** التوقيع. المحرف الأخير من base64url لتوقيع HS256 (32 بايتًا = 43 محرفًا)
+        // يحمل أربع بتّات معنويّة فقط وبتّي حشو مُهمَلَين، فالعبث به وحده قد لا يغيّر البايتات إطلاقًا
+        // ويعود الرمز صالحًا (200) — مصدر رفرفة نادرة وحقيقيّة رُصِدت في هذه الدورة. الوسط معنويّ كلّه.
+        var parts = login!.AccessToken.Split('.');
+        var sig = parts[2].ToCharArray();
+        var mid = sig.Length / 2;
+        sig[mid] = sig[mid] == 'A' ? 'B' : 'A';
+        var tampered = $"{parts[0]}.{parts[1]}.{new string(sig)}";
+        Assert.NotEqual(login.AccessToken, tampered);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tampered);
         var res = await client.GetAsync("/api/auth/me");
         Assert.Equal(HttpStatusCode.Unauthorized, res.StatusCode);

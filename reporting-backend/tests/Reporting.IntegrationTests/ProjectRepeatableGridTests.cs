@@ -467,11 +467,16 @@ public class ProjectRepeatableGridTests
         values.RemoveAll(v => v.TemplateFieldId == prsId);
         values.Add(new FieldValueInput(prsId, null, null, null, null, SectionValue((seoProject.Id, new()))));
 
-        var draftId = await CreateDraftAsync(admin, seo.Id, TestCalendar.Cycle(14));
+        // مفتاح فترة **حصريّ لهذا الاختبار**: تجميع seo-rollup عالميّ داخل الفترة، وقاعدة الاختبارات
+        // مشتركة، فأيّ صنف آخر يسلّم تقرير فريق SEO في نفس المفتاح يُفسد المساواة الدقيقة أدناه.
+        // كان المفتاح Cycle(14) وهو نفسه مفتاح ReportsTests.SeoRollup_GeneralManager_… (يسلّم 20)
+        // ⟹ تصادم كامن يظهر أو يختفي بحسب ترتيب التنفيذ (10 مقابل 30). Cycle(18) لا يستعمله أيّ اختبار.
+        var period = TestCalendar.Cycle(18);
+        var draftId = await CreateDraftAsync(admin, seo.Id, period);
         await SaveValuesAsync(admin, draftId, values.ToArray());
         await admin.PostAsync($"/api/submissions/{draftId}/submit", null);
 
-        var rollup = await (await admin.GetAsync($"/api/reports/seo-rollup?periodType=Weekly&periodKey={TestCalendar.Cycle(14)}"))
+        var rollup = await (await admin.GetAsync($"/api/reports/seo-rollup?periodType=Weekly&periodKey={period}"))
             .ReadAsync<SeoRollupReport>();
         Assert.Equal(10m, rollup!.TotalImprovedKeywords);
         Assert.Equal(4m, rollup.TotalDeclinedKeywords);
