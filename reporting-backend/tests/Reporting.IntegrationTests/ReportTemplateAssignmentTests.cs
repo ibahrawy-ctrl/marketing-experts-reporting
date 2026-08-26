@@ -297,7 +297,9 @@ public class ReportTemplateAssignmentTests
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var dept = new Department { NameAr = $"إدارة {tag}", Code = $"{tag}_{Guid.NewGuid():N}".Substring(0, 18) };
+        // لاحقة جولة على `NameAr` كما على `Code`: الاسم صار فريدًا (DEF-P123-001) والقاعدة دائمة
+        // تتراكم، فوسمٌ حرفيّ ثابت مثل «DI_DEPT» ينجح مرّة ثمّ يصطدم بنفسه. لا تأكيد على نصّ الاسم.
+        var dept = new Department { NameAr = $"إدارة {tag} {Guid.NewGuid():N}", Code = $"{tag}_{Guid.NewGuid():N}".Substring(0, 18) };
         db.Departments.Add(dept);
         await db.SaveChangesAsync();
         return dept.Id;
@@ -307,7 +309,8 @@ public class ReportTemplateAssignmentTests
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var dept = new Department { NameAr = $"إدارة فريق {tag}", Code = $"D{tag}_{Guid.NewGuid():N}".Substring(0, 18) };
+        // الفريق يبقى بوسمه: تفرّده مقيَّد بـ(DepartmentId, NameAr) وإدارته مُنشأة لتوّها، فلا تصادم.
+        var dept = new Department { NameAr = $"إدارة فريق {tag} {Guid.NewGuid():N}", Code = $"D{tag}_{Guid.NewGuid():N}".Substring(0, 18) };
         db.Departments.Add(dept);
         var team = new Team { NameAr = $"فريق {tag}", DepartmentId = dept.Id };
         db.Teams.Add(team);

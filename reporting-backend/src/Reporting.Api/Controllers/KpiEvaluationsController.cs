@@ -28,14 +28,17 @@ public class KpiEvaluationsController : ApiControllerBase
 
     // تجميع KPI الدوري (Phase 5 §8): الأسبوع وحدة الأساس، والمتوسط شهري/ربع سنوي/سنوي/مخصّص.
     // النطاق مفروض خادميًّا داخل الخدمة (لا تصفية من الواجهة فقط).
+    // P1-KPI-004/007: أُضيف `cadence` اختياريًّا (لا يكسر أيّ مستهلك قائم) لفصل نبض الأسبوع عن الربعيّ،
+    // والتوسيط صار ذا مرحلتين داخل الخدمة (B-2) — شكل الاستجابة لم يتغيّر، أُضيفت حقول فقط.
     [HttpGet("aggregate")]
     public async Task<IActionResult> Aggregate(
         [FromQuery] string granularity, [FromQuery] string? periodKey,
         [FromQuery] DateOnly? from, [FromQuery] DateOnly? to,
         [FromQuery] Guid? subjectUserId, [FromQuery] Guid? teamId, [FromQuery] Guid? departmentId,
+        [FromQuery] KpiCadence? cadence,
         CancellationToken ct)
         => FromResult(await _service.GetAggregateAsync(
-            new KpiAggregateRequest(granularity, periodKey, from, to, subjectUserId, teamId, departmentId), ct));
+            new KpiAggregateRequest(granularity, periodKey, from, to, subjectUserId, teamId, departmentId, cadence), ct));
 
     // الموظّفون الذين يحقّ للمستخدم الحالي إنشاء تقييم لهم (مرؤوسوه المباشرون، أو الكل للأدمن).
     [HttpGet("evaluatable-subjects")]

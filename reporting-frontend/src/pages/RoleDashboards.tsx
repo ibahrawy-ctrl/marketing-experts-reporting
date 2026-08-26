@@ -28,6 +28,7 @@ import {
   trainingNeedStatusLabel,
 } from '../lib/format';
 import { useReportingCalendar } from '../lib/useReportingCalendar';
+import { appliedThreshold, kpiTone, useKpiPerformance, type KpiPerformance } from '../lib/useKpi';
 import { selectBannerCycleUnified, unifiedEmployeeBanner, unifiedUrgency } from '../lib/unifiedBanner';
 import type {
   DashboardDto,
@@ -38,7 +39,6 @@ import type {
   ActivityItemDto,
   SubmissionListItem,
   SubmissionCompletenessReport,
-  KpiSummaryReport,
   GovernanceSummaryReport,
   EscalationDto,
   DecisionDto,
@@ -76,10 +76,29 @@ const useActivity = (enabled: boolean) =>
   useQuery({ queryKey: ['dash-activity'], enabled, queryFn: async () => (await api.get<ActivityItemDto[]>('/dashboard/recent-activity')).data });
 const useCompleteness = (key: string, enabled: boolean) =>
   useQuery({ queryKey: ['dash-completeness', key], enabled, queryFn: async () => (await api.get<SubmissionCompletenessReport>('/reports/submission-completeness', { params: { periodKey: key } })).data });
-const useKpiSummary = (key: string, enabled: boolean) =>
-  useQuery({ queryKey: ['dash-kpi-summary', key], enabled, queryFn: async () => (await api.get<KpiSummaryReport>('/reports/kpi-summary', { params: { periodKey: key } })).data });
+// P1-KPI-008: لوحات الأدوار تقرأ من المحرّك الموحّد (Approved فقط · أسبوع محدَّد · نبض أسبوعيّ)
+// بدل `/reports/kpi-summary` الذي كان يعيد صفًّا لكلّ تقييم فتُقرأ أرقامه هنا خطأً.
+const useDashKpi = (key: string, enabled: boolean) =>
+  useKpiPerformance({ periodType: 'Week', cadence: 'WeeklyPulse', periodKey: key }, enabled);
+
+/** عدد من حكم الخادم بأنّهم دون المستهدف — صفّ واحد لكلّ موظّف، بلا طيّ ولا إعادة حساب. */
+const belowTargetCount = (p?: KpiPerformance) => (p?.employees ?? []).filter((e) => e.isBelowTarget === true).length;
+
+/** نبرة بطاقة المتوسّط بعتبة الخادم (B-6) لا بثوابت 85/70 في الشاشة. */
+const kpiTileTone = (p?: KpiPerformance): 'success' | 'gold' | 'alert' | 'navy' => {
+  const t = kpiTone(p?.company.measure.value ?? null, appliedThreshold(p));
+  return t === 'muted' ? 'navy' : t;
+};
 const useGovSummary = (enabled: boolean) =>
   useQuery({ queryKey: ['dash-gov-summary'], enabled, queryFn: async () => (await api.get<GovernanceSummaryReport>('/reports/governance-summary')).data });
+
+// DEF-P123-004: بوّابة النداء = بوّابة الخادم نفسها، مقروءة من الخادم لا مُكرَّرة في الواجهة.
+// `/reports/governance-summary` يمنع بـ`RoleAccess.CanViewGovernance` (ReportingService.cs:2068)،
+// وهي `Has(roles,"ViewGovernance")` ⟸ Admin/CeoSupport/Ceo/GeneralManager (RoleAccess.cs:57-58).
+// نفس `RoleAccess.PermissionsFor` هو ما يملأ `dash.permissions` (DashboardService.cs:137)، فالقراءة
+// منه تجعل الواجهة تابعة للخادم بلا انحراف؛ تكرار قائمة الأدوار هنا كان سيصير مصدر عيب لاحق.
+// لا توسيع صلاحيّة: هذا كبحٌ لنداء كان يُطلَق ثمّ يُرفَض، والخادم يبقى المُنفِّذ الوحيد.
+const canViewGovernance = (dash: DashboardDto) => dash.permissions.includes('ViewGovernance');
 const useEscalations = (enabled: boolean) =>
   useQuery({ queryKey: ['dash-escalations'], enabled, queryFn: async () => (await api.get<EscalationDto[]>('/escalations')).data });
 const useDecisions = (enabled: boolean) =>
@@ -180,11 +199,16 @@ function pathFromStatus(status: SubmissionStatus | null): PathStep[] {
   }));
 }
 
-// «دون المستهدف» = حالة KPI رقمية أقل من العتبة 60 (نفس عتبة الباكند IsBelowTarget).
-const belowTarget = (m: MemberPerformanceDto) => m.kpiAverage != null && m.kpiAverage < 60;
-// «يحتاج دعمًا» = إجراء إداري/تدريبي (مؤشّر منخفض أو اتجاه هابط) — مصطلح إجراء لا حالة رقمية.
-const supportNeeded = (m: MemberPerformanceDto) =>
-  m.kpiAverage != null && (m.kpiAverage < 70 || m.kpiTrend === 'Down');
+// B-6 — «دون المستهدف» حكم الخادم بعتبته المعتمدة، لا مقارنة بثابت 60 هنا.
+const belowTarget = (m: MemberPerformanceDto) => m.isBelowTarget === true;
+// «يحتاج دعمًا» = إجراء إداري/تدريبي: لم يبلغ نطاق «المطابق» بعتبة الخادم، أو اتجاهه هابط.
+// مصطلح إجراء لا حالة رقمية — وغياب العتبة يعني «لا حكم» فلا يولّد إجراءً.
+const supportNeeded = (m: MemberPerformanceDto) => {
+  if (m.kpiAverage == null) return false;
+  if (m.kpiTrend === 'Down') return true;
+  const tone = kpiTone(m.kpiAverage, m.appliedBelowTargetThreshold ?? null);
+  return tone === 'gold' || tone === 'alert';
+};
 
 // جدول أداء الأعضاء — مُعاد استخدامه (تيم ليدر/مدير).
 function MembersCard({ members, title = 'أداء أعضاء الفريق' }: { members?: MemberPerformanceDto[]; title?: string }) {
@@ -1612,16 +1636,16 @@ export function ManagerDashboard({ dash }: { dash: DashboardDto }) {
   const { data: approvals } = usePendingApprovals(true);
   const { data: members } = useMembers(true);
   const { data: pending } = usePendingReports(true);
-  const { data: gov } = useGovSummary(true);
-  const { data: kpi } = useKpiSummary(dash.period.periodKey, true);
+  const { data: gov } = useGovSummary(canViewGovernance(dash));
+  const { data: kpi } = useDashKpi(dash.period.periodKey, true);
 
   const actions: NeedsActionEntry[] = [];
   (approvals ?? []).slice(0, 4).forEach((s) =>
     actions.push({ id: `appr-${s.id}`, title: `اعتمِد: ${s.templateTitle}`, context: `${s.submitterName} · ${s.periodKey}`, urgency: 'high', to: `/app/submissions?open=${s.id}`, cta: 'مراجعة' }));
   if ((gov?.openRisks ?? 0) > 0)
     actions.push({ id: 'risks', title: `${gov!.openRisks} مخاطر مفتوحة في القسم`, context: 'تحتاج خطة تخفيف أو متابعة', urgency: 'high', to: '/app/governance', cta: 'الحوكمة' });
-  if ((kpi?.belowTarget ?? 0) > 0)
-    actions.push({ id: 'below', title: `${kpi!.belowTarget} موظف دون المستهدف KPI`, context: 'راجع التقييمات وافتح خطط تحسين', urgency: 'medium', to: '/app/kpi', cta: 'المؤشرات' });
+  if (belowTargetCount(kpi) > 0)
+    actions.push({ id: 'below', title: `${belowTargetCount(kpi)} موظف دون المستهدف KPI`, context: 'راجع التقييمات وافتح خطط تحسين', urgency: 'medium', to: '/app/kpi', cta: 'المؤشرات' });
   (pending ?? []).slice(0, 4).forEach((p) =>
     actions.push({ id: `late-${p.submissionId ?? `${p.submitterId}-${p.periodKey}`}`, title: `تقرير متأخر/مُعاد: ${p.templateTitle}`, context: `${p.submitterName} · ${p.statusLabel}`, urgency: 'medium', to: '/app/submissions?tab=all', cta: 'متابعة' }));
   (members ?? []).filter(supportNeeded).slice(0, 2).forEach((m) =>
@@ -1649,7 +1673,7 @@ export function ManagerDashboard({ dash }: { dash: DashboardDto }) {
         <MetricTile label="متوسط KPI للقسم" value={card(dash.summaryCards, 'kpiAverage')?.value ?? '—'} tone={tone[card(dash.summaryCards, 'kpiAverage')?.status ?? 'neutral']} icon="kpi" />
         <MetricTile label="اعتمادات معلّقة" value={approvals?.length ?? 0} tone={(approvals?.length ?? 0) > 0 ? 'gold' : 'success'} icon="workflow" />
         <MetricTile label="تقارير متأخرة" value={pending?.length ?? 0} tone={(pending?.length ?? 0) > 0 ? 'alert' : 'success'} icon="reports" />
-        <MetricTile label="موظفون دون المستهدف" value={kpi?.belowTarget ?? 0} tone={(kpi?.belowTarget ?? 0) > 0 ? 'alert' : 'success'} hint="قد يحتاجون إلى دعم أو خطة تحسين" icon="teams" />
+        <MetricTile label="موظفون دون المستهدف" value={belowTargetCount(kpi)} tone={belowTargetCount(kpi) > 0 ? 'alert' : 'success'} hint="قد يحتاجون إلى دعم أو خطة تحسين" icon="teams" />
       </div>
 
       <GovernanceTiles g={gov} />
@@ -1678,8 +1702,8 @@ export function ManagerDashboard({ dash }: { dash: DashboardDto }) {
 // ============================================================
 export function GMDashboard({ dash }: { dash: DashboardDto }) {
   const { data: comp } = useCompleteness(dash.period.periodKey, true);
-  const { data: kpi } = useKpiSummary(dash.period.periodKey, true);
-  const { data: gov } = useGovSummary(true);
+  const { data: kpi } = useDashKpi(dash.period.periodKey, true);
+  const { data: gov } = useGovSummary(canViewGovernance(dash));
   const { data: approvals } = usePendingApprovals(true);
   const lateDeptList = comp?.byDepartment.filter((d) => d.completionRate < 100) ?? [];
   const lateDepts = lateDeptList.length;
@@ -1691,8 +1715,8 @@ export function GMDashboard({ dash }: { dash: DashboardDto }) {
     actions.push({ id: `appr-${s.id}`, title: `اعتمِد: ${s.templateTitle}`, context: `${s.submitterName} · ${s.periodKey}`, urgency: 'high', to: `/app/submissions?open=${s.id}`, cta: 'مراجعة' }));
   lateDeptList.slice(0, 5).forEach((d) =>
     actions.push({ id: `dept-${d.departmentId ?? d.departmentName}`, title: `قسم متأخر: ${d.departmentName}`, context: `اكتمال ${d.completionRate}٪ (${d.closed}/${d.total})`, urgency: 'medium', to: '/app/reports', cta: 'تفاصيل' }));
-  if ((kpi?.belowTarget ?? 0) > 0)
-    actions.push({ id: 'below', title: `${kpi!.belowTarget} موظف دون المستهدف KPI`, context: 'متابعة على مستوى الأقسام', urgency: 'medium', to: '/app/kpi', cta: 'المؤشرات' });
+  if (belowTargetCount(kpi) > 0)
+    actions.push({ id: 'below', title: `${belowTargetCount(kpi)} موظف دون المستهدف KPI`, context: 'متابعة على مستوى الأقسام', urgency: 'medium', to: '/app/kpi', cta: 'المؤشرات' });
 
   return (
     <div className="space-y-6">
@@ -1715,7 +1739,7 @@ export function GMDashboard({ dash }: { dash: DashboardDto }) {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricTile label="اكتمال تقارير الشركة" value={`${comp?.completionRate ?? 0}٪`} tone={(comp?.completionRate ?? 0) >= 90 ? 'success' : 'gold'} icon="reports" />
         <MetricTile label="أقسام متأخرة" value={lateDepts} tone={lateDepts > 0 ? 'alert' : 'success'} icon="departments" />
-        <MetricTile label="متوسط KPI" value={kpi?.averageScore ?? '—'} tone={(kpi?.averageScore ?? 0) >= 85 ? 'success' : (kpi?.averageScore ?? 0) >= 70 ? 'gold' : 'alert'} icon="kpi" />
+        <MetricTile label="متوسط KPI" value={kpi?.company.measure.value ?? '—'} tone={kpiTileTone(kpi)} icon="kpi" />
         <MetricTile label="اعتمادات معلّقة" value={approvals?.length ?? 0} tone={(approvals?.length ?? 0) > 0 ? 'gold' : 'success'} icon="workflow" />
       </div>
 
@@ -1755,8 +1779,8 @@ export function GMDashboard({ dash }: { dash: DashboardDto }) {
 // ============================================================
 export function CeoDashboard({ dash, kpiDelta }: { dash: DashboardDto; kpiDelta: { value: number; up: boolean } | null }) {
   const { data: comp } = useCompleteness(dash.period.periodKey, true);
-  const { data: kpi } = useKpiSummary(dash.period.periodKey, true);
-  const { data: gov } = useGovSummary(true);
+  const { data: kpi } = useDashKpi(dash.period.periodKey, true);
+  const { data: gov } = useGovSummary(canViewGovernance(dash));
   const { data: risks } = useRisks(true);
   const { data: decisions } = useDecisions(true);
   const highRisks = (risks ?? []).filter((r) => (r.severity === 'High' || r.severity === 'Critical') && r.status !== 'Closed');
@@ -1771,8 +1795,8 @@ export function CeoDashboard({ dash, kpiDelta }: { dash: DashboardDto; kpiDelta:
   );
   if ((comp?.completionRate ?? 100) < 90)
     actions.push({ id: 'comp-low', title: `اكتمال الأسبوع ${comp?.completionRate ?? 0}٪`, context: 'تقارير ناقصة على مستوى الشركة', urgency: 'medium', to: '/app/reports', cta: 'تفاصيل' });
-  if ((kpi?.belowTarget ?? 0) > 0)
-    actions.push({ id: 'kpi-below', title: `${kpi?.belowTarget} موظف دون المستهدف`, context: 'مؤشرات أداء أقل من الحد المطلوب', urgency: 'medium', to: '/app/kpi', cta: 'افتح KPI' });
+  if (belowTargetCount(kpi) > 0)
+    actions.push({ id: 'kpi-below', title: `${belowTargetCount(kpi)} موظف دون المستهدف`, context: 'مؤشرات أداء أقل من الحد المطلوب', urgency: 'medium', to: '/app/kpi', cta: 'افتح KPI' });
 
   return (
     <div className="space-y-6">
@@ -1792,7 +1816,7 @@ export function CeoDashboard({ dash, kpiDelta }: { dash: DashboardDto; kpiDelta:
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricTile label="متوسط KPI للشركة" value={kpi?.averageScore ?? '—'} tone={(kpi?.averageScore ?? 0) >= 85 ? 'success' : (kpi?.averageScore ?? 0) >= 70 ? 'gold' : 'alert'} delta={kpiDelta} icon="kpi" />
+        <MetricTile label="متوسط KPI للشركة" value={kpi?.company.measure.value ?? '—'} tone={kpiTileTone(kpi)} delta={kpiDelta} icon="kpi" />
         <MetricTile label="اكتمال الأسبوع" value={`${comp?.completionRate ?? 0}٪`} tone={(comp?.completionRate ?? 0) >= 90 ? 'success' : 'gold'} icon="reports" />
         <MetricTile label="مخاطر عالية/حرجة" value={highRisks.length} tone={highRisks.length > 0 ? 'alert' : 'success'} to="/app/governance" icon="governance" />
         <MetricTile label="قرارات تحتاج قراري" value={openDecisions.length} tone={openDecisions.length > 0 ? 'gold' : 'success'} to="/app/governance" icon="governance" />
@@ -1850,7 +1874,7 @@ export function CeoSupportDashboard({ dash }: { dash: DashboardDto }) {
   const { data: comp } = useCompleteness(dash.period.periodKey, true);
   const { data: pending } = usePendingReports(true);
   const { data: activity } = useActivity(true);
-  const { data: kpi } = useKpiSummary(dash.period.periodKey, true);
+  const { data: kpi } = useDashKpi(dash.period.periodKey, true);
   const rate = comp?.completionRate ?? 0;
   const awaiting = (activity ?? []).filter((a) => a.status === 'Submitted' || a.status === 'ApprovedByDirectManager' || a.status === 'ApprovedByNextLevel');
 
@@ -1891,7 +1915,7 @@ export function CeoSupportDashboard({ dash }: { dash: DashboardDto }) {
       <Card>
         <SectionTitle title="نسبة اكتمال الأسبوع" />
         <ProgressBar value={rate} tone={rate >= 95 ? 'success' : 'orange'} />
-        <p className="mt-2 text-xs text-ink-2">{comp?.closed ?? 0} مكتمل من {comp?.total ?? 0} · {comp?.pending ?? 0} قيد الانتظار · متوسط KPI {kpi?.averageScore ?? '—'}</p>
+        <p className="mt-2 text-xs text-ink-2">{comp?.closed ?? 0} مكتمل من {comp?.total ?? 0} · {comp?.pending ?? 0} قيد الانتظار · متوسط KPI {kpi?.company.measure.value ?? '—'}</p>
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -1913,7 +1937,7 @@ export function CeoSupportDashboard({ dash }: { dash: DashboardDto }) {
 export function AdminDashboard({ dash }: { dash: DashboardDto }) {
   const { data: comp } = useCompleteness(dash.period.periodKey, true);
   const { data: pending } = usePendingReports(true);
-  const { data: gov } = useGovSummary(true);
+  const { data: gov } = useGovSummary(canViewGovernance(dash));
   const { data: users } = useQuery({ queryKey: ['dash-users'], queryFn: async () => (await api.get<{ id: string }[]>('/directory/users')).data });
   const { data: templates } = useQuery({ queryKey: ['dash-templates'], queryFn: async () => (await api.get<{ id: string }[]>('/report-templates')).data });
 

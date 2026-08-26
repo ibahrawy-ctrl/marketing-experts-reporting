@@ -26,6 +26,8 @@ public class KpiTemplateVersionConfiguration : IEntityTypeConfiguration<KpiTempl
         b.ToTable("kpi_template_versions");
         b.HasKey(x => x.Id);
         b.HasIndex(x => new { x.KpiTemplateId, x.VersionNumber }).IsUnique();
+        // B-6: عمود إضافيّ nullable بلا قيمة افتراضيّة ⇒ الهجرة إضافيّة بحتة ولا تلمس صفًّا قائمًا.
+        b.Property(x => x.BelowTargetThreshold).HasPrecision(5, 2);
         b.HasMany(x => x.Metrics).WithOne(x => x.KpiTemplateVersion!)
             .HasForeignKey(x => x.KpiTemplateVersionId).OnDelete(DeleteBehavior.Cascade);
     }

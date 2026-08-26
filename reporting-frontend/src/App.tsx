@@ -2,6 +2,8 @@ import { Routes, Route, Link } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { DashboardShell } from './components/DashboardShell';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { AliasRedirect } from './components/AliasRedirect';
+import { ROUTE_ALIASES } from './lib/navConfig';
 import LoginPage from './pages/LoginPage';
 import HomePage from './pages/HomePage';
 import ExecutiveReportsPage from './pages/ExecutiveReportsPage';
@@ -32,6 +34,8 @@ import ReportViewGrantsPage from './pages/ReportViewGrantsPage';
 import EmailNotificationsPage from './pages/EmailNotificationsPage';
 import EmailControlCenterPage from './pages/EmailControlCenterPage';
 import EmployeeProfilePage from './pages/EmployeeProfilePage';
+import AttendancePage from './pages/AttendancePage';
+import HrOperationsPage from './pages/HrOperationsPage';
 import { MyKpiPage, EmployeeKpiPage } from './pages/IndividualKpiPage';
 import LeaveRequestsPage from './pages/LeaveRequestsPage';
 import MyBalancesPage from './pages/MyBalancesPage';
@@ -181,6 +185,11 @@ const APP_ROUTES: { path: string; element: ReactNode; roles?: Role[] }[] = [
   { path: '/app/account-portfolio/projects/:id', element: <AccountPortfolioProjectPage />, roles: ACCOUNT_PORTFOLIO_ROLES },
   { path: '/app/account-portfolio/clients/:id', element: <AccountPortfolioClientPage />, roles: ACCOUNT_PORTFOLIO_ROLES },
   // ملف أداء الموظف: متاح لكل مصادَق عليه — النطاق مفروض خادمًا (الموظف يرى نفسه فقط).
+  // P2-EMP-003: «ملفّي» مسار صريح **إضافيّ** يُحَلّ معرّفه خادميًّا، ولا يستبدل المسار على المعرّف.
+  // `selfRoute` ضروريّ لا زخرفيّ: المقطع الثابت `me` يفوز على `:userId` في المطابقة، فلا
+  // باراميتر أصلًا هنا ⇒ اشتقاق وضع الذات من `useParams` كان يُنتج معرّفًا فارغًا فيسقط
+  // المسار في العرض الإداريّ ويعرض شاشة المنع بدل ملفّ المستخدم نفسه.
+  { path: '/app/employee/me', element: <EmployeeProfilePage selfRoute /> },
   { path: '/app/employee/:userId', element: <EmployeeProfilePage /> },
   // مؤشرات أداء فردية (KPI-INDIVIDUAL-DASHBOARD-R1): «مؤشرات أدائي» للموظّف الحالي،
   // و«مؤشرات أداء الموظف» لموظّف بعينه — النطاق مفروض خادمًا (self-or-scope ⇒ 403/404 خارج النطاق).
@@ -193,6 +202,15 @@ const APP_ROUTES: { path: string; element: ReactNode; roles?: Role[] }[] = [
   { path: '/app/my-reports', element: <SubmissionsPage personalOnly /> },
   // الإجازات والاستئذانات (V1.0.1): متاح لكل مصادَق عليه — النطاق والدور مفروضان خادمًا.
   { path: '/app/leave-requests', element: <LeaveRequestsPage /> },
+  // الحضور والالتزام (P2-ATT-007): مسار **جديد** لا يستبدل شيئًا. بلا بوّابة أدوار عمدًا — الموظّف
+  // طرفٌ أصيل في آلة الحالات (يقرّ أو يعترض)، وقصر الصفحة على الإدارة يُفقده حقّ الردّ. الرؤية
+  // والإجراءات محسومة خادميًّا: خارج النطاق 404، والأزرار تُرسَم من `allowedActions` وحدها.
+  { path: '/app/attendance', element: <AttendancePage /> },
+  // لوحة عمليّات الموارد البشريّة (P2-HR-009): مسار **جديد** لا يستبدل شيئًا. بلا بوّابة أدوار في
+  // الواجهة عمدًا — المفتاح `HrOperations.View` تخويل صريح لا يمنحه أيّ دور ضمنًا، فبوّابة الأدوار
+  // هنا كانت ستكذب في الاتّجاهين: تمنع حاملَ المفتاح، وتُوهم غير الحامل بأنّ له سطحًا. الخادم
+  // يردّ 403 بلا مفتاح و404 خارج النطاق، والصفحة تعرض ذلك رسالةً مفهومة.
+  { path: '/app/hr-operations', element: <HrOperationsPage /> },
   // خدمات الموظف (V1.1): الأرصدة وطلبات الموارد البشرية — متاح لكل مصادَق عليه (النطاق مفروض خادمًا).
   { path: '/app/balances', element: <MyBalancesPage /> },
   { path: '/app/hr-requests', element: <HrRequestsPage /> },
@@ -203,6 +221,11 @@ const APP_ROUTES: { path: string; element: ReactNode; roles?: Role[] }[] = [
   { path: '/app/kpi-finance-export', element: <KpiFinanceExportPage />, roles: KPI_FINANCE_EXPORT_ROLES },
   { path: '/app/report-templates', element: <ReportTemplatesPage />, roles: TEMPLATE_GOVERNANCE_ROLES },
   { path: '/app/kpi', element: <KpiPage /> },
+  // لوحة الأداء الموحّدة (P3-NAV-002) — الهدف المرجعيّ لعنصر «لوحة الأداء» في القائمة.
+  // **نفس المكوّن ونفس البوّابة** الموجودَين في `/app/kpi`: لا سطح جديد ولا صلاحيّة جديدة، وإنّما
+  // اسم مرجعيّ واحد بدل رابطَين متنافسَين في القائمة. `/app/kpi` و`/app/my-kpi` يبقيان عاملَين
+  // بالوصول المباشر بلا تحويل، فلا تنكسر أيّ روابط عميقة قائمة. الرؤية محسومة خادميًّا كما هي.
+  { path: '/app/performance', element: <KpiPage /> },
   // تقويم التقارير والتجميع الدوري: متاح لكل مصادَق عليه — النطاق مفروض خادمًا.
   { path: '/app/report-calendar', element: <ReportCalendarPage /> },
   { path: '/app/kpi-templates', element: <KpiTemplatesPage />, roles: TEMPLATE_GOVERNANCE_ROLES },
@@ -261,6 +284,14 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       {APP_ROUTES.map((r) => (
         <Route key={r.path} path={r.path} element={<Protected roles={r.roles}>{r.element}</Protected>} />
+      ))}
+      {/*
+        مسارات الـalias (P3-NAV-003) — مشتقّة من سجلّ الملاحة وحده، فلا قائمة موازية تتباعد عنه.
+        كلّ alias يحوّل إلى مساره المرجعيّ **قبل** أيّ حراسة، والوجهة تُطبّق حارسها الأصليّ كاملًا:
+        لا تجاوز لحارس، ولا كشف لوجود مورد لمن لا يملكه، ولا حلقة تحويل (الوجهة ليست alias أبدًا).
+      */}
+      {ROUTE_ALIASES.map((a) => (
+        <Route key={`alias:${a.from}`} path={a.from} element={<AliasRedirect to={a.to} />} />
       ))}
     </Routes>
   );

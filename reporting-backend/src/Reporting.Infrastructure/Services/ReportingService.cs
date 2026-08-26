@@ -2,7 +2,10 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Reporting.Application.Common;
+using Reporting.Application.Kpi;
+using Reporting.Application.Periods;
 using Reporting.Application.Reports;
 using Reporting.Domain.Entities.Submissions;
 using Reporting.Domain.Enums;
@@ -15,6 +18,8 @@ public class ReportingService : IReportingService
     private readonly AppDbContext _db;
     private readonly ICurrentUser _currentUser;
     private readonly IScopeResolver _scope;
+    private readonly IKpiCalculationService _kpi;
+    private readonly KpiFeatureOptions _kpiOptions;
 
     /// <summary>الأدوار المسموح لها بعرض تقارير المراقبة (إداريون + دعم الرئيس + مُطّلِع).</summary>
     private static readonly string[] MonitoringRoles =
@@ -28,13 +33,24 @@ public class ReportingService : IReportingService
         SubmissionStatus.Visible
     };
 
+    /// <summary>
+    /// عتبة «دون المستهدف» في المسار القديم فقط. المسار الجديد يقرأ العتبة من إصدار القالب ثمّ
+    /// من <see cref="KpiFeatureOptions.DefaultBelowTargetThreshold"/> (B-6) — يُحذف هذا الثابت مع حذف المسار القديم.
+    /// </summary>
     private const decimal AlertThreshold = 60m;
 
-    public ReportingService(AppDbContext db, ICurrentUser currentUser, IScopeResolver scope)
+    public ReportingService(
+        AppDbContext db,
+        ICurrentUser currentUser,
+        IScopeResolver scope,
+        IKpiCalculationService kpi,
+        IOptions<KpiFeatureOptions> kpiOptions)
     {
         _db = db;
         _currentUser = currentUser;
         _scope = scope;
+        _kpi = kpi;
+        _kpiOptions = kpiOptions.Value;
     }
 
     public async Task<Result<SubmissionCompletenessReport>> SubmissionCompletenessAsync(ReportFilter filter, CancellationToken ct = default)
@@ -684,10 +700,81 @@ public class ReportingService : IReportingService
             submitted == expected && expected > 0, label, late, lastSubmittedAt, key, lateSubmitted > 0);
     }
 
+    /// <summary>
+    /// P1-KPI-005 — نقطة النهاية القديمة <c>GET /api/reports/kpi-summary</c>.
+    /// <b>شكل الاستجابة (<see cref="KpiSummaryReport"/>) لم يتغيّر حرفًا</b> حفاظًا على المستهلكين القائمين،
+    /// لكنّ الحساب خلفه يمرّ الآن عبر <see cref="IKpiCalculationService"/> نفسها ⇒ لا مسارَي حساب مستقلَّين.
+    ///
+    /// <b>Deprecated</b> — تُزال بعد انتقال مستهلكيها إلى <c>GET /api/kpi/performance</c>؛ قائمة المستهلكين
+    /// وخطّة الإزالة في <c>Ops/P1-KPI-TRUTH-IMPLEMENTATION-REPORT-20260824.md</c>.
+    ///
+    /// العلم <c>Kpi:NewCalculationEngine</c> (افتراضيًّا <c>false</c>) يسمح بالرجوع المؤقّت للمسار القديم
+    /// حتّى تكتمل المطابقة على TEST. المسار القديم معزول في <see cref="LegacyKpiSummaryAsync"/> ليُحذف دفعةً واحدة.
+    /// </summary>
+    [Obsolete("P1-KPI-005: استعمل GET /api/kpi/performance. تبقى للتوافق حتّى انتقال المستهلكين.")]
     public async Task<Result<KpiSummaryReport>> KpiSummaryAsync(ReportFilter filter, CancellationToken ct = default)
     {
         if (Guard() is { } err) return Result<KpiSummaryReport>.Failure(err.Error!, err.ErrorCode);
 
+        return _kpiOptions.NewCalculationEngine
+            ? await KpiSummaryViaUnifiedEngineAsync(filter, ct)
+            : await LegacyKpiSummaryAsync(filter, ct);
+    }
+
+    /// <summary>
+    /// المحوّل: يستدعي المحرّك الموحّد ثمّ يطوي نتيجته في شكل الـDTO القديم.
+    /// فروق القيم متوقَّعة ومقصودة (Approved-only + صفّ واحد لكلّ موظّف + توسيط ثنائي)، والفروق
+    /// تُفسَّر في تقرير المطابقة لا بتعديل التقارير التاريخيّة (B-4).
+    /// </summary>
+    private async Task<Result<KpiSummaryReport>> KpiSummaryViaUnifiedEngineAsync(
+        ReportFilter filter, CancellationToken ct)
+    {
+        // B-3 — الكادنس مشتقّ صراحةً من نوع فترة الطلب القديم، لا سقوط صامت:
+        // Quarterly ⇒ التقييم الربع سنويّ الرسميّ، وما عداه ⇒ النبض الأسبوعيّ.
+        var cadence = filter.PeriodType == PeriodType.Quarterly ? KpiCadence.Quarterly : KpiCadence.WeeklyPulse;
+
+        var periodType = filter.PeriodType switch
+        {
+            PeriodType.Monthly => PeriodKinds.Month,
+            PeriodType.Quarterly => PeriodKinds.Quarter,
+            PeriodType.Yearly => PeriodKinds.Year,
+            PeriodType.Weekly => PeriodKinds.Week,
+            // بلا نوع فترة: مفتاح مُرسَل ⇒ أسبوع محدَّد، وإلّا آخر أسبوع مكتمل (الافتراضيّ التنظيميّ §5.4).
+            _ => string.IsNullOrWhiteSpace(filter.PeriodKey) ? PeriodKinds.LastCompletedWeek : PeriodKinds.Week
+        };
+
+        var result = await _kpi.GetPerformanceAsync(new KpiAnalyticsQuery(
+            periodType, cadence, filter.PeriodKey,
+            DepartmentId: filter.DepartmentId, TeamId: filter.TeamId), ct);
+
+        if (!result.Succeeded) return Result<KpiSummaryReport>.Failure(result.Error!, result.ErrorCode);
+        var p = result.Value!;
+
+        // صفّ واحد لكلّ موظّف له درجة معتمَدة — وهذا بالضبط ما يمنع انهيار الواجهة إلى «أعلى درجة».
+        // الموظّف بلا تقييم معتمَد لا يظهر بصفر: يغيب عن الصفوف تمامًا (Missing ≠ Zero).
+        var rows = p.Employees
+            .Where(e => e.Measure.Value is not null)
+            .Select(e => new KpiSummaryRow(
+                e.UserId, e.FullName, e.Measure.Value, e.Measure.Trend,
+                e.IsBelowTarget ?? false, p.PeriodResolved.Key))
+            .OrderBy(r => r.TotalScore)
+            .ToList();
+
+        return Result<KpiSummaryReport>.Success(new KpiSummaryReport(
+            p.PeriodResolved.Key,
+            rows.Count,
+            p.Company.Measure.Value,
+            rows.Count(r => r.IsBelowTarget),
+            rows));
+    }
+
+    /// <summary>
+    /// المسار القديم معزولًا — يُحتفَظ به للرجوع المؤقّت فقط ويُحذف كتلةً واحدة بعد قرار الانتقال.
+    /// عيوبه المعروفة والمقيسة: لا شرط <c>Approved</c>، وصفّ لكلّ تقييم لا لكلّ موظّف،
+    /// ومتوسّط خامّ يطغى فيه كثير التقييمات، وخلط للكادنس، وعتبة ثابتة مبعثرة.
+    /// </summary>
+    private async Task<Result<KpiSummaryReport>> LegacyKpiSummaryAsync(ReportFilter filter, CancellationToken ct)
+    {
         var scope = await _scope.ResolveAsync(ct);
         var q = _db.KpiEvaluations.AsNoTracking().Where(e => e.TotalScore != null);
         if (!scope.SeesAll)
@@ -2058,7 +2145,11 @@ public class ReportingService : IReportingService
 
     public async Task<Result<byte[]>> ExportKpiSummaryPdfAsync(ReportFilter filter, CancellationToken ct = default)
     {
+        // مستهلك داخليّ مقصود للعقد القديم أثناء الانتقال: التصدير يجب أن يطابق ما تعرضه الشاشة
+        // بالضبط، فيبقى على المسار نفسه ويُنقَل معه دفعةً واحدة عند إزالة العقد القديم.
+#pragma warning disable CS0618
         var report = await KpiSummaryAsync(filter, ct);
+#pragma warning restore CS0618
         if (!report.Succeeded) return Result<byte[]>.Failure(report.Error!, report.ErrorCode);
         return Result<byte[]>.Success(PdfReportBuilder.KpiSummary(report.Value!));
     }
@@ -2068,7 +2159,10 @@ public class ReportingService : IReportingService
         var completeness = await SubmissionCompletenessAsync(filter, ct);
         if (!completeness.Succeeded) return Result<byte[]>.Failure(completeness.Error!, completeness.ErrorCode);
 
+        // مستهلك داخليّ مقصود للعقد القديم أثناء الانتقال (انظر ExportKpiSummaryPdfAsync).
+#pragma warning disable CS0618
         var kpi = await KpiSummaryAsync(filter, ct);
+#pragma warning restore CS0618
         if (!kpi.Succeeded) return Result<byte[]>.Failure(kpi.Error!, kpi.ErrorCode);
 
         // الحوكمة مقصورة على من يملك صلاحية عرضها — تُضمَّن فقط إن سُمح بها.

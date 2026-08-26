@@ -82,10 +82,22 @@ public class ReportsController : ApiControllerBase
         [FromQuery] string? groupBy, [FromQuery] Guid? departmentId, [FromQuery] Guid? teamId, CancellationToken ct)
         => FromResult(await _service.ComplianceBreakdownAsync(weekKey, groupBy, departmentId, teamId, ct));
 
+    /// <summary>
+    /// P1-KPI-005 — <b>Deprecated</b>. البديل: <c>GET /api/kpi/performance</c>.
+    /// شكل الاستجابة لم يتغيّر (توافق تامّ للمستهلكين القائمين)، لكنّ الحساب يتحوّل داخليًّا
+    /// إلى المحرّك الموحّد عند تفعيل <c>Kpi:NewCalculationEngine</c>. خطّة الإزالة في تقرير المرحلة.
+    /// </summary>
     [HttpGet("kpi-summary")]
+    [Obsolete("P1-KPI-005: استعمل GET /api/kpi/performance.")]
     public async Task<IActionResult> KpiSummary([FromQuery] PeriodType? periodType,
         [FromQuery] string? periodKey, [FromQuery] Guid? departmentId, [FromQuery] Guid? teamId, CancellationToken ct)
-        => FromResult(await _service.KpiSummaryAsync(new ReportFilter(periodType, periodKey, departmentId, teamId), ct));
+    {
+        Response.Headers["Deprecation"] = "true";
+        Response.Headers["Link"] = "</api/kpi/performance>; rel=\"successor-version\"";
+#pragma warning disable CS0618
+        return FromResult(await _service.KpiSummaryAsync(new ReportFilter(periodType, periodKey, departmentId, teamId), ct));
+#pragma warning restore CS0618
+    }
 
     [HttpGet("governance-summary")]
     public async Task<IActionResult> GovernanceSummary(CancellationToken ct)

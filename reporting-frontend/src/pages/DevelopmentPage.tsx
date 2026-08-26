@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '../lib/api';
 import { useAuth } from '../lib/auth';
-import { useKpiSummary } from '../lib/useOrg';
+import { DEFAULT_KPI_FILTER, appliedThreshold, kpiTone, useKpiPerformance } from '../lib/useKpi';
 import { Alert, Badge, Button, Card, Field, Input } from '../components/ui';
 import { LoadingState, QueryError } from '../components/states';
 import { UserPicker } from '../components/UserPicker';
@@ -267,7 +267,8 @@ type Suggestion = {
 
 function SuggestedTab({ isManagement }: { isManagement: boolean }) {
   const qc = useQueryClient();
-  const kpi = useKpiSummary();
+  // P1-KPI-008: المقترحات تُبنى على متوسّط الموظّف في الفترة كما حسبه الخادم، لا على آخر تقييم.
+  const kpi = useKpiPerformance(DEFAULT_KPI_FILTER);
   const needs = useQuery({
     queryKey: ['training-needs'],
     queryFn: async () => (await api.get<TrainingNeedDto[]>('/training-needs')).data,
@@ -299,32 +300,36 @@ function SuggestedTab({ isManagement }: { isManagement: boolean }) {
   const haveNeed = new Set((needs.data ?? []).filter((n) => !DONE_TRAINING.includes(n.status)).map((n) => n.subjectUserId));
   const havePlan = new Set((plans.data ?? []).filter((p) => !DONE_PLAN.includes(p.status)).map((p) => p.subjectUserId));
 
-  const rows = kpi.data?.rows ?? [];
+  const rows = kpi.data?.employees ?? [];
+  const threshold = appliedThreshold(kpi.data);
   const suggestions: Suggestion[] = [];
   rows.forEach((r) => {
-    if (r.totalScore == null) return;
-    const score = r.totalScore;
-    // منطق الاقتراح: دون المستهدف (<60) ← خطة تحسين؛ متوسط ضعيف (<70) أو اتجاه هابط ← احتياج تدريبي.
-    if (score < 60 && !havePlan.has(r.subjectUserId)) {
+    // «لا تقييم» لا يولّد اقتراحًا: الغياب ليس ضعف أداء.
+    if (r.measure.value == null) return;
+    const score = r.measure.value;
+    const trend = r.measure.trend;
+    // B-6: الحكم بعتبة الخادم لا بثوابت 60/70 في الواجهة.
+    // دون المستهدف ← خطة تحسين؛ أقلّ من المستهدف (نبرة غير «مطابِقة») أو اتجاه هابط ← احتياج تدريبي.
+    if (r.isBelowTarget === true && !havePlan.has(r.userId)) {
       suggestions.push({
-        subjectUserId: r.subjectUserId,
-        subjectName: r.subjectName,
+        subjectUserId: r.userId,
+        subjectName: r.fullName,
         score,
         kind: 'plan',
-        title: `خطة تحسين أداء — ${r.subjectName}`,
-        reason: `المؤشّر ${formatPercent(score)} دون المستهدف (أقل من 60٪).`,
+        title: `خطة تحسين أداء — ${r.fullName}`,
+        reason: `المؤشّر ${formatPercent(score)} دون المستهدف المعتمَد (${formatPercent(r.appliedBelowTargetThreshold)}).`,
       });
     }
-    if ((score < 70 || r.trend === 'Down') && !haveNeed.has(r.subjectUserId)) {
+    if ((kpiTone(score, threshold) !== 'success' || trend === 'Down') && !haveNeed.has(r.userId)) {
       suggestions.push({
-        subjectUserId: r.subjectUserId,
-        subjectName: r.subjectName,
+        subjectUserId: r.userId,
+        subjectName: r.fullName,
         score,
         kind: 'training',
-        title: `احتياج تدريبي — ${r.subjectName}`,
-        reason: r.trend === 'Down'
-          ? `المؤشّر ${formatPercent(score)} والاتجاه ${kpiTrendLabel[r.trend]} مقارنةً بالفترة السابقة.`
-          : `المؤشّر ${formatPercent(score)} أقل من 70٪.`,
+        title: `احتياج تدريبي — ${r.fullName}`,
+        reason: trend === 'Down'
+          ? `المؤشّر ${formatPercent(score)} والاتجاه ${kpiTrendLabel[trend]} مقارنةً بالفترة السابقة.`
+          : `المؤشّر ${formatPercent(score)} دون المستهدف المعتمَد (${formatPercent(r.appliedBelowTargetThreshold)}).`,
       });
     }
   });
@@ -337,8 +342,10 @@ function SuggestedTab({ isManagement }: { isManagement: boolean }) {
       <Card className="bg-offwhite">
         <p className="text-sm font-semibold text-navy">كيف تُحسب المقترحات؟</p>
         <p className="mt-1 text-xs text-ink-2">
-          تُشتقّ هذه البنود تلقائيًا من مؤشّرات الأداء: مؤشّر <b>دون المستهدف (أقل من 60٪)</b> يقترح <b>خطة تحسين</b>، ومؤشّر
-          <b> أقل من 70٪ أو باتجاه هابط</b> يقترح <b>احتياجًا تدريبيًا</b>. لا يُنشأ أي بند تلقائيًا — يُنشأ فقط عند تأكيدك بالضغط على «إنشاء».
+          تُشتقّ هذه البنود من <b>متوسّط الموظّف في الفترة</b> كما يحسبه الخادم من التقييمات المعتمَدة فقط: مؤشّر
+          <b> دون المستهدف المعتمَد</b> يقترح <b>خطة تحسين</b>، ومؤشّر <b>لم يبلغ المستهدف أو باتجاه هابط</b> يقترح
+          <b> احتياجًا تدريبيًا</b>. المستهدف يأتي من نسخة القالب لا من رقم ثابت في الشاشة، ومن <b>لا تقييم له</b> لا يُقترح له شيء.
+          لا يُنشأ أي بند تلقائيًا — يُنشأ فقط عند تأكيدك بالضغط على «إنشاء».
         </p>
       </Card>
 

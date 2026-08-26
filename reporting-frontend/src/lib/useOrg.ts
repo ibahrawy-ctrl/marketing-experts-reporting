@@ -1,10 +1,15 @@
-// طبقة تجميع بيانات الفرق والمؤشرات من نقاط النهاية القائمة (حساب على جهة العميل).
+// طبقة تجميع بيانات الفرق (التسليمات والتصعيدات والخطط) من نقاط النهاية القائمة.
+//
+// P1-KPI-008 — **أرقام KPI لا تُشتقّ هنا إطلاقًا**. كانت هذه الطبقة تستهلك `/reports/kpi-summary`
+// الذي يعيد صفًّا لكلّ تقييم، ثمّ تطويها بـ`new Map(subjectUserId → row)` فيبقى آخر تقييم فقط
+// (= «متوسّط الموظّف» يساوي فعليًّا تقييمًا واحدًا)، ثمّ تأخذ متوسّطًا خامًا للأعضاء في الواجهة.
+// صار المصدر الوحيد الآن `/api/kpi/performance`: صفّ واحد لكلّ موظّف بمتوسّطه، ومتوسّط كلّ فريق
+// محسوبًا على الخادم بالتوسيط ذي المرحلتين (B-2)، والعتبة قادمة من الخادم (B-6).
 import { useQuery } from '@tanstack/react-query';
 import { api } from './api';
+import { kpiTone, type KpiEmployeeScore, type KpiGroupScore } from './useKpi';
 import type {
   SubmissionListItem,
-  KpiSummaryReport,
-  KpiSummaryRow,
   EscalationDto,
   DecisionDto,
   RiskDto,
@@ -20,13 +25,6 @@ export function useAllSubmissions() {
   return useQuery({
     queryKey: ['all-submissions'],
     queryFn: async () => (await api.get<SubmissionListItem[]>('/submissions')).data,
-  });
-}
-
-export function useKpiSummary() {
-  return useQuery({
-    queryKey: ['kpi-summary-all'],
-    queryFn: async () => (await api.get<KpiSummaryReport>('/reports/kpi-summary')).data,
   });
 }
 
@@ -89,14 +87,11 @@ export interface TeamAggregate {
   compliance: number; // 0..100
   escalations: number;
   openPlans: number;
-  membersBelowTarget: number; // أعضاء مؤشّرهم دون المستهدف (<60)
+  membersBelowTarget: number; // أعضاء حكم الخادم بأنّهم دون المستهدف (بعتبة نسخة القالب)
   noEvaluation: number; // أعضاء بلا تقييم لهذه الفترة
   reasons: string[]; // أسباب الحالة (لماذا «خطر»/«يحتاج متابعة»)
   health: TeamHealth;
 }
-
-// عتبة «دون المستهدف» = نفس منطق الباكند (IsBelowTarget = TotalScore < 60).
-const KPI_BELOW_TARGET = 60;
 
 const HEALTH_RANK: Record<TeamHealth, number> = { risk: 0, watch: 1, good: 2 };
 
@@ -138,14 +133,20 @@ export function activeWeeklyKey(subs: SubmissionListItem[]): string | null {
   return meaningful.at(-1) ?? latestWeeklyKey(subs);
 }
 
-export function avg(nums: number[]): number | null {
-  if (nums.length === 0) return null;
-  return Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 10) / 10;
-}
-
-export function teamHealth(compliance: number, avgKpi: number | null, escalations: number): TeamHealth {
-  if (compliance < 50 || (avgKpi !== null && avgKpi < 50) || escalations >= 3) return 'risk';
-  if (compliance < 80 || (avgKpi !== null && avgKpi < 70) || escalations > 0) return 'watch';
+/**
+ * حالة الفريق. نسبة الالتزام حساب تسليمات لا حساب KPI، فتبقى هنا؛ أمّا حكم KPI فيُقاس على
+ * **العتبة القادمة من الخادم** (B-6) عبر `kpiTone` لا على ثوابت 50/70 كانت مكتوبة هنا.
+ * `avgKpi === null` تعني «لا تقييم» فلا تُغلَّظ بها الحالة (لا تقييم ≠ أداء ضعيف).
+ */
+export function teamHealth(
+  compliance: number,
+  avgKpi: number | null,
+  escalations: number,
+  kpiThreshold: number | null,
+): TeamHealth {
+  const tone = kpiTone(avgKpi, kpiThreshold);
+  if (compliance < 50 || tone === 'alert' || escalations >= 3) return 'risk';
+  if (compliance < 80 || tone === 'gold' || escalations > 0) return 'watch';
   return 'good';
 }
 
@@ -166,14 +167,21 @@ export function buildTeamAggregates(args: {
   users: DirectoryUserDto[];
   departments: DepartmentDto[];
   submissions: SubmissionListItem[];
-  kpiRows: KpiSummaryRow[];
+  /** صفّ واحد لكلّ **موظّف** بمتوسّطه كما حسبه الخادم — لا صفّ لكلّ تقييم. */
+  kpiEmployees: KpiEmployeeScore[];
+  /** متوسّط كلّ فريق كما حسبه الخادم (توسيط ذو مرحلتين) — لا يُعاد حسابه هنا. */
+  kpiTeams: KpiGroupScore[];
+  /** العتبة المطبَّقة القادمة من الخادم (B-6). */
+  kpiThreshold: number | null;
   escalations: EscalationDto[];
   plans: ImprovementPlanDto[];
 }): TeamAggregate[] {
-  const { teams, users, departments, submissions, kpiRows, escalations, plans } = args;
+  const { teams, users, departments, submissions, kpiEmployees, kpiTeams, kpiThreshold, escalations, plans } = args;
   // نعتمد «أحدث أسبوع فيه بيانات فعلية» بدل الأحدث مطلقًا حتى لا تُحتسب تأخيرات وهمية من أسبوع شبه فارغ.
   const weekKey = activeWeeklyKey(submissions);
-  const kpiByUser = new Map(kpiRows.map((r) => [r.subjectUserId, r]));
+  // فهرسة لا طيّ: الخادم يضمن صفًّا واحدًا لكلّ موظّف، فلا تُفقَد أيّ تقييمات هنا.
+  const kpiByUser = new Map(kpiEmployees.map((e) => [e.userId, e]));
+  const kpiByTeam = new Map(kpiTeams.map((g) => [g.groupId, g.measure]));
   const deptName = (id: string) => departments.find((d) => d.id === id)?.nameAr ?? '—';
   const userName = (id: string | null) => users.find((u) => u.id === id)?.fullName ?? '—';
 
@@ -200,10 +208,11 @@ export function buildTeamAggregates(args: {
         (s) => s.status === 'Submitted' || s.status === 'ApprovedByDirectManager' || s.status === 'ApprovedByNextLevel',
       ).length;
 
-      const kpiVals = memberIds
-        .map((id) => kpiByUser.get(id)?.totalScore)
-        .filter((v): v is number => v !== null && v !== undefined);
-      const avgKpi = avg(kpiVals);
+      // B-2: متوسّط الفريق يأتي جاهزًا من الخادم. `null` = لا تقييم مؤهَّل، لا صفر.
+      const avgKpi = kpiByTeam.get(team.id)?.value ?? null;
+      const scoredMembers = memberIds.filter(
+        (id) => (kpiByUser.get(id)?.measure.value ?? null) !== null,
+      ).length;
       const compliance = requiredThisWeek === 0 ? 100 : Math.round((submitted / requiredThisWeek) * 100);
 
       const teamEscalations = escalations.filter(
@@ -213,20 +222,19 @@ export function buildTeamAggregates(args: {
         (p) => (p.status === 'Open' || p.status === 'InProgress') && memberSet.has(p.subjectUserId),
       ).length;
 
-      const membersBelowTarget = memberIds.filter((id) => {
-        const s = kpiByUser.get(id)?.totalScore;
-        return s !== null && s !== undefined && s < KPI_BELOW_TARGET;
-      }).length;
-      const noEvaluation = requiredThisWeek === 0 ? 0 : requiredThisWeek - kpiVals.length;
+      // B-6: «دون المستهدف» قرار الخادم بعتبة نسخة القالب، لا مقارنة بثابت في الواجهة.
+      const membersBelowTarget = memberIds.filter((id) => kpiByUser.get(id)?.isBelowTarget === true).length;
+      const noEvaluation = requiredThisWeek === 0 ? 0 : requiredThisWeek - scoredMembers;
 
-      const health = teamHealth(compliance, avgKpi, teamEscalations);
+      const health = teamHealth(compliance, avgKpi, teamEscalations, kpiThreshold);
 
       // أسباب الحالة — تُبنى فقط للفرق غير «الجيدة» لتوضيح «لماذا».
       const reasons: string[] = [];
       if (health !== 'good') {
         if (late > 0) reasons.push(`${late} تقرير متأخر هذا الأسبوع`);
         if (returned > 0) reasons.push(`${returned} تقرير مُعاد للتعديل`);
-        if (avgKpi !== null && avgKpi < 70) reasons.push(`متوسط KPI ${avgKpi}٪ دون المستهدف`);
+        if (kpiThreshold !== null && avgKpi !== null && avgKpi < kpiThreshold)
+          reasons.push(`متوسط KPI ${avgKpi}٪ دون المستهدف`);
         if (membersBelowTarget > 0) reasons.push(`${membersBelowTarget} عضو دون المستهدف`);
         if (noEvaluation > 0) reasons.push(`${noEvaluation} عضو بلا تقييم`);
         if (teamEscalations > 0) reasons.push(`${teamEscalations} تصعيد مفتوح`);

@@ -16,9 +16,9 @@ import {
   useRemoveAdditionalTeamMember,
 } from '../lib/useDirectory';
 import { useAuth } from '../lib/auth';
+import { DEFAULT_KPI_FILTER, appliedThreshold, useKpiPerformance } from '../lib/useKpi';
 import {
   useAllSubmissions,
-  useKpiSummary,
   useEscalations,
   useDecisions,
   useTrainingNeeds,
@@ -26,7 +26,6 @@ import {
   healthLabel,
   healthTone,
   teamHealth,
-  avg,
   activeWeeklyKey,
 } from '../lib/useOrg';
 import { Card, Badge, Button, StatCard, Alert, Field, Input, Select } from '../components/ui';
@@ -71,7 +70,8 @@ export default function TeamDetailsPage() {
   const teams = useTeams();
   const departments = useDepartments();
   const submissions = useAllSubmissions();
-  const kpi = useKpiSummary();
+  // P1-KPI-008: درجات الأعضاء ومتوسّط الفريق من الخادم مباشرة (نطاق الفريق مفروض خادميًّا).
+  const kpi = useKpiPerformance({ ...DEFAULT_KPI_FILTER, teamId });
   const escalations = useEscalations();
   const decisions = useDecisions();
   const trainingNeeds = useTrainingNeeds();
@@ -125,7 +125,8 @@ export default function TeamDetailsPage() {
   const deptName = deptList.find((d) => d.id === team.departmentId)?.nameAr ?? '—';
   // أعضاء تختلف إدارتهم عن إدارة الفريق — إشارة لوجوب المزامنة (يُصحَّح بحفظ نقل الفريق مع المزامنة).
   const mismatchedMembers = members.filter((m) => m.departmentId !== team.departmentId);
-  const kpiByUser = new Map((kpi.data?.rows ?? []).map((r) => [r.subjectUserId, r]));
+  // فهرسة لا طيّ: صفّ واحد لكلّ موظّف بمتوسّطه كما حسبه الخادم.
+  const kpiByUser = new Map((kpi.data?.employees ?? []).map((e) => [e.userId, e]));
 
   const allSubs = submissions.data ?? [];
   const teamSubs = allSubs.filter((s) => memberIds.has(s.submitterId));
@@ -140,13 +141,11 @@ export default function TeamDetailsPage() {
   const returned = teamSubs.filter((s) => s.status === 'Returned').length;
   const compliance = required === 0 ? 100 : Math.round((submitted / required) * 100);
 
-  const kpiVals = members
-    .map((m) => kpiByUser.get(m.id)?.totalScore)
-    .filter((v): v is number => v !== null && v !== undefined);
-  const avgKpi = avg(kpiVals);
+  // B-2: متوسّط الفريق = متوسّط متوسّطات أعضائه، محسوبًا على الخادم لا هنا.
+  const avgKpi = (kpi.data?.teams ?? []).find((t) => t.groupId === team.id)?.measure.value ?? null;
   const teamEscalations = (escalations.data ?? []).filter((e) => memberIds.has(e.targetUserId));
   const openEscalations = teamEscalations.filter((e) => e.status === 'Open').length;
-  const health = teamHealth(compliance, avgKpi, openEscalations);
+  const health = teamHealth(compliance, avgKpi, openEscalations, appliedThreshold(kpi.data));
 
   const teamTraining = (trainingNeeds.data ?? []).filter((t) => memberIds.has(t.subjectUserId));
   const teamPlans = (plans.data ?? []).filter((p) => memberIds.has(p.subjectUserId));
@@ -247,15 +246,17 @@ export default function TeamDetailsPage() {
                         </Link>
                       </td>
                       <td className="px-2 py-2">
-                        {row?.totalScore == null ? (
+                        {row?.measure.value == null ? (
                           <span className="text-ink-2" title="لا يوجد تقييم KPI لهذه الفترة">لا يوجد تقييم</span>
                         ) : (
-                          <span className={row.isBelowTarget ? 'font-semibold text-alert' : 'text-navy'}>
-                            {formatPercent(row.totalScore)}
+                          <span className={row.isBelowTarget === true ? 'font-semibold text-alert' : 'text-navy'}>
+                            {formatPercent(row.measure.value)}
                           </span>
                         )}
                       </td>
-                      <td className="px-2 py-2 text-ink-2">{row ? kpiTrendDisplay(row.trend, row.totalScore != null) : 'لا يوجد تقييم'}</td>
+                      <td className="px-2 py-2 text-ink-2">
+                        {row ? kpiTrendDisplay(row.measure.trend, row.measure.value != null) : 'لا يوجد تقييم'}
+                      </td>
                       <td className="px-2 py-2">
                         {didSubmit ? <Badge tone="success">مُسلّم</Badge> : <Badge tone="gold">لم يُسلّم</Badge>}
                       </td>

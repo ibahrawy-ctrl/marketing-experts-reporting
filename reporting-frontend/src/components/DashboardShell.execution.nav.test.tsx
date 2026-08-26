@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { it, expect, vi, beforeEach } from 'vitest';
 import type { Role } from '../types/api';
@@ -23,6 +23,8 @@ vi.mock('../lib/auth', () => ({
     hasAnyRole: (...r: Role[]) => r.some((x) => authState.roles.includes(x)),
     isSalesRep: authState.isSalesRep,
     isSalesB2cTeamLeader: authState.roles.includes('TeamLeader') && authState.jobRoleCode === 'SALES_B2C_TL',
+    permissions: new Set<string>(),
+    scopeType: null,
   }),
 }));
 vi.mock('../lib/useNotifications', () => ({ useNotificationRealtime: () => undefined }));
@@ -33,14 +35,18 @@ import { DashboardShell } from './DashboardShell';
 const LINK = 'لوحة تنفيذ الفريق';
 const SALES_TEAM = 'لوحة مبيعات الفريق';
 
+// نفتح «المزيد ⋯» بعد التصيير كي يشمل الفحص أقسام الوحدة كاملة لا السبعة الأولى فقط.
 function renderShell() {
-  return render(
+  const result = render(
     <MemoryRouter initialEntries={['/app/submissions']}>
       <DashboardShell>
         <div>محتوى</div>
       </DashboardShell>
     </MemoryRouter>,
   );
+  const more = screen.queryByRole('button', { name: 'المزيد ⋯' });
+  if (more) fireEvent.click(more);
+  return result;
 }
 
 beforeEach(() => {

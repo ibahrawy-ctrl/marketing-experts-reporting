@@ -443,4 +443,46 @@ public class ReportingCalendarPolicyTests
         var dates = ReportingCalendarPolicy.DailyExpectedDates("2026-W31", today, code);
         Assert.Equal(expectedCount, dates.Count);
     }
+
+    // ===== B-1 — لا اشتقاق مستقلّ لمفتاح الأسبوع خارج السياسة المعياريّة =====
+
+    /// <summary>
+    /// كانت `DashboardService.CurrentWeekKey()` تشتقّ المفتاح بـ`ISOWeek.GetWeekOfYear(DateTime.UtcNow)`
+    /// (أسبوع يبدأ الاثنين، وبتوقيت UTC) بينما `PeriodKey` مخزَّن بدورة الرياض (السبت → الجمعة).
+    /// هذا الاختبار يثبّت الفارق: أسبوع ISO يتخلّف دورةً كاملة في كلّ سبت وأحد — وهما أوّل يومَي
+    /// أسبوع العمل السعوديّ — فيقرأ المُرشِّح بيانات الأسبوع الماضي.
+    /// </summary>
+    [Theory]
+    [InlineData(2026, 1, 3)]   // سبت
+    [InlineData(2026, 1, 4)]   // أحد
+    [InlineData(2026, 8, 22)]  // سبت
+    [InlineData(2026, 8, 23)]  // أحد
+    public void CycleKeyFor_OnSaturdayAndSunday_DiffersFromIsoWeek_AndFollowsRiyadhCycle(int y, int m, int d)
+    {
+        var date = new DateOnly(y, m, d);
+        var isoKey = $"{ISOWeek.GetYear(date.ToDateTime(TimeOnly.MinValue))}-W{ISOWeek.GetWeekOfYear(date.ToDateTime(TimeOnly.MinValue)):00}";
+
+        var cycleKey = ReportingCalendarPolicy.CycleKeyFor(date);
+
+        Assert.NotEqual(isoKey, cycleKey);
+        // الدورة التي ينتمي إليها التاريخ تبدأ السبت السابق له أو نفسه وتحتويه فعلًا.
+        var (start, end) = ReportingCalendarPolicy.CycleRange(cycleKey);
+        Assert.Equal(DayOfWeek.Saturday, start.DayOfWeek);
+        Assert.InRange(date, start, end);
+    }
+
+    /// <summary>
+    /// وفي بقيّة الأيّام يتطابق المفتاحان — فالفارق ليس عشوائيًّا بل محصور في حدّ بداية الدورة.
+    /// </summary>
+    [Theory]
+    [InlineData(2026, 8, 24)]  // اثنين
+    [InlineData(2026, 8, 26)]  // أربعاء
+    [InlineData(2026, 8, 28)]  // جمعة
+    public void CycleKeyFor_OnMondayToFriday_MatchesIsoWeek(int y, int m, int d)
+    {
+        var date = new DateOnly(y, m, d);
+        var isoKey = $"{ISOWeek.GetYear(date.ToDateTime(TimeOnly.MinValue))}-W{ISOWeek.GetWeekOfYear(date.ToDateTime(TimeOnly.MinValue)):00}";
+
+        Assert.Equal(isoKey, ReportingCalendarPolicy.CycleKeyFor(date));
+    }
 }

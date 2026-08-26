@@ -10,6 +10,14 @@ import {
 import { api } from './api';
 import { tokenStore } from './tokenStore';
 import type { AuthResponse, MeResponse, PeriodType, Role } from '../types/api';
+import type { ScopeType } from './navConfig';
+
+// أنواع النطاق التي يصدرها الخادم (IScopeResolver) — أيّ قيمة أخرى تُعامَل كمجهولة (null).
+const SCOPE_TYPES: readonly string[] = ['own', 'team', 'department', 'company', 'governance'];
+
+function normalizeScope(value: string | null | undefined): ScopeType | null {
+  return value && SCOPE_TYPES.includes(value) ? (value as ScopeType) : null;
+}
 
 interface AuthUser {
   userId: string;
@@ -20,6 +28,10 @@ interface AuthUser {
   expectedReportCadence: PeriodType;
   // رمز المسمّى الوظيفي (مثل SALES_B2C) — لتحديد لوحات المبيعات وعناصر التنقّل (null إن لم يُسنَد).
   jobRoleCode: string | null;
+  // P3-NAV-001 — مفاتيح الصلاحيّة الدقيقة المُسنَدة لهذا المستخدم خادميًّا (فارغة إن لم يُسنَد شيء).
+  permissions: string[];
+  // نوع نطاق رؤيته كما يحسبه الخادم (null إن لم يُصرَّح به) — `own` = وضع الذات.
+  scopeType: ScopeType | null;
 }
 
 interface AuthContextValue {
@@ -32,6 +44,10 @@ interface AuthContextValue {
   // تغيير بريد الدخول للحساب الحالي (يتطلب كلمة المرور الحالية للتأكيد).
   changeEmail: (newEmail: string, currentPassword: string) => Promise<void>;
   hasAnyRole: (...roles: Role[]) => boolean;
+  // P3-NAV-001 — قدرات الخادم لهذا المستخدم: المصدر المفضَّل لقرارات ظهور الملاحة.
+  // مجموعة فارغة عند غياب الجلسة أو غياب الحقل ⇒ إخفاء العناصر المشروطة (احتياطيّ آمن).
+  permissions: ReadonlySet<string>;
+  scopeType: ScopeType | null;
   // صلاحية اعتماد التقارير (تظهر تبويب «بانتظار اعتمادي» وأزرار الاعتماد).
   canApprove: boolean;
   // صلاحية رؤية الحوكمة (المخاطر/القرارات) — تطابق RoleAccess.ViewGovernance بالخادم.
@@ -110,6 +126,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             roles: data.roles,
             expectedReportCadence: data.expectedReportCadence,
             jobRoleCode: data.jobRoleCode ?? null,
+            permissions: data.permissions ?? [],
+            scopeType: normalizeScope(data.scopeType),
           });
         }
       } catch {
@@ -134,6 +152,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       roles: data.roles,
       expectedReportCadence: data.expectedReportCadence,
       jobRoleCode: data.jobRoleCode ?? null,
+      permissions: data.permissions ?? [],
+      scopeType: normalizeScope(data.scopeType),
     });
   }, []);
 
@@ -160,6 +180,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (...roles: Role[]) => !!user && user.roles.some((r) => roles.includes(r)),
     [user],
   );
+
+  // مجموعة القدرات — تُعاد حسابها فقط عند تغيّر الجلسة.
+  const permissions = useMemo<ReadonlySet<string>>(
+    () => new Set(user?.permissions ?? []),
+    [user],
+  );
+  const scopeType = useMemo<ScopeType | null>(() => user?.scopeType ?? null, [user]);
 
   const canApprove = useMemo(
     () => !!user && user.roles.some((r) => APPROVER_ROLES.includes(r)),
@@ -203,8 +230,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, loading, login, logout, changePassword, changeEmail, hasAnyRole, canApprove, canViewGovernance, canManageTeams, canManageTemplates, canManageClients, canEditClientCore, canManageProjectStructure, isSalesRep, salesRepType, isSalesB2cTeamLeader }),
-    [user, loading, login, logout, changePassword, changeEmail, hasAnyRole, canApprove, canViewGovernance, canManageTeams, canManageTemplates, canManageClients, canEditClientCore, canManageProjectStructure, isSalesRep, salesRepType, isSalesB2cTeamLeader],
+    () => ({ user, loading, login, logout, changePassword, changeEmail, hasAnyRole, permissions, scopeType, canApprove, canViewGovernance, canManageTeams, canManageTemplates, canManageClients, canEditClientCore, canManageProjectStructure, isSalesRep, salesRepType, isSalesB2cTeamLeader }),
+    [user, loading, login, logout, changePassword, changeEmail, hasAnyRole, permissions, scopeType, canApprove, canViewGovernance, canManageTeams, canManageTemplates, canManageClients, canEditClientCore, canManageProjectStructure, isSalesRep, salesRepType, isSalesB2cTeamLeader],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -301,6 +301,9 @@ function KpiList({ isManagement, onOpen, hideTitle, subjectFilter }: { isManagem
             </p>
           </div>
         ) : (
+          // جدول سبعة أعمدة عرضه الأدنى يتجاوز 390px متى حوى اسم قالب أو موظّف طويلًا،
+          // فيدفع الصفحة كلّها إلى تمرير أفقيّ. الحاوية القياسيّة في المستودع تحصر التمرير داخله.
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-right text-ink-2">
@@ -333,6 +336,7 @@ function KpiList({ isManagement, onOpen, hideTitle, subjectFilter }: { isManagem
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </Card>
     </div>
@@ -472,6 +476,7 @@ function KpiDetail({ id, onBack }: { id: string; onBack: () => void }) {
         </Alert>
       )}
       <Card>
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="text-right text-ink-2">
@@ -535,6 +540,7 @@ function KpiDetail({ id, onBack }: { id: string; onBack: () => void }) {
             })}
           </tbody>
         </table>
+        </div>
         {ev.canEdit && (
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <Button

@@ -8,6 +8,7 @@ using Microsoft.IdentityModel.Tokens;
 using Reporting.Api.Realtime;
 using Reporting.Application.Common;
 using Reporting.Application.Notifications;
+using Reporting.Application.Security;
 using Reporting.Infrastructure;
 using Reporting.Infrastructure.Identity;
 using Reporting.Infrastructure.Persistence;
@@ -110,6 +111,8 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy(Policies.PayrollImpactManage, p => p.RequireRole(Roles.PayrollImpactManagers));
     // تصدير تقييمات KPI المعتمدة للمالية (KPI-FIN1) — Admin/CEO/GM/HR/CeoSupport. قراءة فقط على مستوى الشركة، لا يحسب/يصرف مستحقات.
     options.AddPolicy(Policies.KpiFinanceExport, p => p.RequireRole(Roles.KpiFinanceExporters));
+    // P1-KPI-004 — قراءة تحليلات KPI الموحّدة v2 (أداء/ترتيب/تفصيل). بوّابة دور أولى؛ الرؤية الفعليّة يحدّدها ScopeResolver خادميًّا.
+    options.AddPolicy(Policies.KpiAnalyticsView, p => p.RequireRole(Roles.KpiAnalyticsViewers));
     // محفظة مدير الحساب (مشاريعي/عملائي — عرض فقط) — AccountPortfolioReader (+Admin تشغيليًّا). الرؤية مقصورة خادمًا على مشاريع المستخدم نفسه.
     options.AddPolicy(Policies.AccountPortfolioRead, p => p.RequireRole(Roles.AccountPortfolioReaders));
     // ورشة الحوكمة العامة (GOV-GOVERNANCE-UX1) — Admin/CEO/GM/CeoSupport/Manager/TeamLeader/HR. Employee/Viewer ممنوعون.
@@ -137,6 +140,27 @@ builder.Services.AddAuthorization(options =>
     // ===== RESTORE-ARCHIVE-GOVERNANCE-R1 — الأرشيف الإداريّ واسترجاع المحذوف =====
     // قراءة الأرشيف الإداريّ (تقارير + KPI محذوفة ناعمًا) واسترجاعها وفق Hybrid — Admin/CEO/GM فقط.
     options.AddPolicy(Policies.ArchiveGovernanceAccess, p => p.RequireRole(Roles.ArchiveGovernanceAccessors));
+    // ===== P2 — Employee 360 & HR Operations =====
+    // مبنيّة على مطالبة `perm` صريحة لا على الدور ⇒ لا يكتسبها أيّ مستخدم/دور مخزَّن تلقائيًّا (ولا Admin).
+    // Employee/TeamLeader/Manager/Governance/Admin بلا المطالبة ⇒ الوصول محجوب، والنقطة تُخفي وجود المورد.
+    options.AddPolicy(Policies.HrOperationsView,
+        p => p.RequireClaim(AppPermissions.ClaimType, AppPermissions.HrOperationsView));
+    // التصدير صلاحيّة منفصلة تمامًا — امتلاك الرؤية لا يكفي.
+    options.AddPolicy(Policies.HrOperationsExport,
+        p => p.RequireClaim(AppPermissions.ClaimType, AppPermissions.HrOperationsExport));
+    // تسجيل بلاغ الحضور: إشراف تشغيليّ (TeamLeader/Manager) أو مطالبة صريحة. النطاق يُفرَض في الخدمة.
+    options.AddPolicy(Policies.AttendanceReport, p => p.RequireAssertion(ctx =>
+        ctx.User.IsInRole(Roles.TeamLeader)
+        || ctx.User.IsInRole(Roles.Manager)
+        || ctx.User.HasClaim(AppPermissions.ClaimType, AppPermissions.AttendanceReport)));
+    options.AddPolicy(Policies.AttendanceReview,
+        p => p.RequireClaim(AppPermissions.ClaimType, AppPermissions.AttendanceReview));
+    options.AddPolicy(Policies.AttendanceExport,
+        p => p.RequireClaim(AppPermissions.ClaimType, AppPermissions.AttendanceExport));
+    // تحرير البنود اليدويّة في قائمة الالتزام. قراءة القائمة **ليست** تحت هذه السياسة عمدًا:
+    // القراءة يحكمها النطاق وحسّاسيّة كلّ بند، والتحرير مفتاح مستقلّ لا يمنحه دور.
+    options.AddPolicy(Policies.EmployeeChecklistManage,
+        p => p.RequireClaim(AppPermissions.ClaimType, AppPermissions.EmployeeChecklistManage));
 });
 
 // ===== Rate limiting لمنع التخمين على المصادقة =====
@@ -228,6 +252,8 @@ using (var scope = app.Services.CreateScope())
     await CourseSeeder.SeedAsync(scope.ServiceProvider);
     // كتالوج خدمات B2B (مصدر أسماء خدمات مبيعات B2B) — بذر أولي قابل للتعديل (idempotent، إضافيّ بحت).
     await ServiceSeeder.SeedAsync(scope.ServiceProvider);
+    // كتالوج أنواع حوادث الحضور (P2-ATT-005) — بذر مرجعيّ (idempotent، إضافيّ بحت). كتالوج لا بيانات موظّفين.
+    await AttendanceSeeder.SeedAsync(scope.ServiceProvider);
 
     // هيكل تنظيمي تمثيلي لاختبار نطاق الرؤية — بيئة التطوير فقط (لا يُزرع في الإنتاج).
     if (app.Environment.IsDevelopment())

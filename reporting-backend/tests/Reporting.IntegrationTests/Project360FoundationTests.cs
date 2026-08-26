@@ -683,6 +683,9 @@ public class Project360FoundationTests
         public Guid? UserId { get; }
         public bool IsAuthenticated => UserId is not null;
         public IReadOnlyCollection<string> Roles => _roles;
+        // P2-SEC-001 — الأذونات الدقيقة غير مُمنَحة في هذا المزدوج الاختباريّ (قائمة فارغة).
+        public IReadOnlyCollection<string> Permissions => Array.Empty<string>();
+        public bool HasPermission(string permissionKey) => false;
         public bool IsInRole(string role) => _roles.Contains(role);
         public bool IsInAnyRole(params string[] roles) => roles.Any(_roles.Contains);
     }

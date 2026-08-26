@@ -651,13 +651,18 @@ public class DirectoryTests
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var code = $"ND{Guid.NewGuid():N}".Substring(0, 10);
+        // الاسم يُولَّد كما يُولَّد `Code` أصلًا: `reporting_test` قاعدة دائمة والصفوف تتراكم، و`NameAr`
+        // صار فريدًا (DEF-P123-001) ⟹ اسم حرفيّ ثابت ينجح مرّة واحدة فقط ثمّ يصطدم بنفسه إلى الأبد.
+        // المقصود هنا «الأدمن يُنشئ إدارة» لا «التكرار مسموح»؛ رفضُ التكرار له اختباره في
+        // DirectoryNameUniquenessTests، فلا تخفيف لأيّ تأكيد.
+        var nameAr = $"إدارة جديدة {Guid.NewGuid():N}".Substring(0, 20);
 
         var created = await (await admin.PostAsJsonAsync("/api/directory/departments",
-            new CreateDepartmentRequest("إدارة جديدة", "New Dept", code, null)))
+            new CreateDepartmentRequest(nameAr, "New Dept", code, null)))
             .ReadAsync<DepartmentDto>();
 
         Assert.NotNull(created);
-        Assert.Equal("إدارة جديدة", created!.NameAr);
+        Assert.Equal(nameAr, created!.NameAr);
         Assert.Equal(code, created.Code);
         Assert.True(created.IsActive);
 
@@ -697,14 +702,16 @@ public class DirectoryTests
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var deptId = await CreateDepartmentAsync();
+        // كما في CreateDepartment_AsAdmin_CreatesDepartment: الاسم يُولَّد لأنّ `NameAr` صار فريدًا.
+        var nameAr = $"إدارة معدّلة {Guid.NewGuid():N}".Substring(0, 21);
 
         var res = await admin.PutAsJsonAsync($"/api/directory/departments/{deptId}",
-            new UpdateDepartmentRequest("إدارة معدّلة", "Renamed", $"RN{Guid.NewGuid():N}".Substring(0, 10), null, false));
+            new UpdateDepartmentRequest(nameAr, "Renamed", $"RN{Guid.NewGuid():N}".Substring(0, 10), null, false));
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
 
         var depts = await (await admin.GetAsync("/api/directory/departments")).ReadAsync<List<DepartmentDto>>();
         var updated = depts!.Single(d => d.Id == deptId);
-        Assert.Equal("إدارة معدّلة", updated.NameAr);
+        Assert.Equal(nameAr, updated.NameAr);
         Assert.False(updated.IsActive);
     }
 

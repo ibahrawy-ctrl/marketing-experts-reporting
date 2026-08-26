@@ -1,10 +1,14 @@
+using System.Runtime.ExceptionServices;
+using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Reporting.Application.Audit;
 using Reporting.Application.Common;
 using Reporting.Application.Directory;
 using Reporting.Domain.Entities.Org;
+using Reporting.Application.Security;
 using Reporting.Domain.Enums;
 using Reporting.Infrastructure.Identity;
 using Reporting.Infrastructure.Persistence;
@@ -25,6 +29,73 @@ public class DirectoryService : IDirectoryService
         _scope = scope;
         _audit = audit;
     }
+
+    // ===== DEF-P123-001/002 — تفرّد وحدات الدليل التنظيميّ =====
+    //
+    // نطاق التفرّد (مطابق للعقد): اسم الإدارة **على مستوى الشركة**، واسم الفريق **داخل إدارته**
+    // فقط — فيجوز وجود «فريق التسويق» في إدارتين مختلفتين. رمز الإدارة يبقى فريدًا كما كان.
+    //
+    // التطبيع = `Trim()` وحده، وهو ما يفعله النموذج القائم فعلًا. لا تُضاف مطابقة غير حسّاسة
+    // لحالة الأحرف: العقد الحاليّ لا ينصّ عليها، والمقارنة هنا يجب أن تُطابق قيد قاعدة البيانات
+    // حرفيًّا وإلّا انفصل التحقّق التطبيقيّ عن الضمانة النهائيّة.
+
+    private const string DepartmentNameConflictCode = "department.name.conflict";
+    private const string DepartmentNameConflictAr = "توجد إدارة أخرى بهذا الاسم. اختر اسمًا مختلفًا.";
+
+    private const string DepartmentCodeConflictCode = "department.code.conflict";
+    private const string DepartmentCodeConflictAr = "توجد إدارة أخرى بهذا الرمز. اختر رمزًا مختلفًا.";
+
+    private const string TeamNameConflictCode = "team.name.conflict";
+    private const string TeamNameConflictAr = "يوجد فريق آخر بهذا الاسم داخل الإدارة نفسها. اختر اسمًا مختلفًا.";
+
+    private Task<bool> DepartmentNameTakenAsync(string nameAr, Guid? excludeId, CancellationToken ct) =>
+        _db.Departments.AnyAsync(d => d.NameAr == nameAr && (excludeId == null || d.Id != excludeId), ct);
+
+    private Task<bool> DepartmentCodeTakenAsync(string code, Guid? excludeId, CancellationToken ct) =>
+        _db.Departments.AnyAsync(d => d.Code == code && (excludeId == null || d.Id != excludeId), ct);
+
+    private Task<bool> TeamNameTakenAsync(Guid departmentId, string nameAr, Guid? excludeId, CancellationToken ct) =>
+        _db.Teams.AnyAsync(t => t.DepartmentId == departmentId && t.NameAr == nameAr
+                                && (excludeId == null || t.Id != excludeId), ct);
+
+    /// <summary>
+    /// حفظ يترجم **قيود التفرّد المعروفة وحدها** إلى تعارض 409 بدل 500.
+    ///
+    /// <para>
+    /// هذه شبكة أمان ضدّ التسابق (طلبان متزامنان يجتازان الفحص المسبق معًا)، لا بديل عنه.
+    /// **لا يُبتلَع أيّ خطأ آخر:** ما لا يُطابق فهرسًا معروفًا يُعاد رميه كما هو ليسلك مسار
+    /// الخطأ الحقيقيّ (500) — فتحويل كلّ <c>DbUpdateException</c> إلى 409 يُخفي أعطالًا فعليّة.
+    /// </para>
+    /// <para>لا يُكشف اسم القيد الداخليّ ولا نصّ SQL للعميل؛ الرسالة عربيّة والرمز دلاليّ.</para>
+    /// </summary>
+    private async Task<Result?> SaveTranslatingDirectoryConflictsAsync(CancellationToken ct)
+    {
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+            return null;
+        }
+        catch (DbUpdateException ex) when (UniqueViolationIndex(ex) is { } index)
+        {
+            return index switch
+            {
+                IxDepartmentsName => Result.Failure(DepartmentNameConflictAr, DepartmentNameConflictCode),
+                IxDepartmentsCode => Result.Failure(DepartmentCodeConflictAr, DepartmentCodeConflictCode),
+                IxTeamsDepartmentName => Result.Failure(TeamNameConflictAr, TeamNameConflictCode),
+                _ => throw ExceptionDispatchInfo.Capture(ex).SourceException
+            };
+        }
+    }
+
+    internal const string IxDepartmentsName = "IX_departments_NameAr";
+    internal const string IxDepartmentsCode = "IX_departments_Code";
+    internal const string IxTeamsDepartmentName = "IX_teams_DepartmentId_NameAr";
+
+    /// <summary>اسم الفهرس المنتهَك عند 23505 فقط، وإلّا <c>null</c>.</summary>
+    private static string? UniqueViolationIndex(DbUpdateException ex) =>
+        ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } pg
+            ? pg.ConstraintName
+            : null;
 
     public async Task<IReadOnlyList<DirectoryUserDto>> ListUsersAsync(bool includeInactive, CancellationToken ct = default)
     {
@@ -373,6 +444,78 @@ public class DirectoryService : IDirectoryService
         }
 
         return Result.Success();
+    }
+
+    // ===== مفاتيح الصلاحيّات الدقيقة (perm) — المسار المنتج للمنح والإلغاء =====
+    // AppPermissions.cs:6-9 يفرض: لا يكتسب أيّ دور هذه المفاتيح ضمنًا (ولا Admin)، والتعيين قرار
+    // نشر صريح. لذلك تُخزَّن كمطالبات Identity على المستخدم بعينه، ولا يوجد ولن يوجد ربط دور↔مفتاح.
+    // سلطة المنح = نفس سلطة توزيع الأدوار (Policies.UserManagement) لأنّها التغيير الأمنيّ النظير.
+
+    private async Task<string[]> ReadPermissionClaimsAsync(ApplicationUser user) =>
+        (await _users.GetClaimsAsync(user))
+            .Where(c => c.Type == AppPermissions.ClaimType)
+            .Select(c => c.Value)
+            .Distinct()
+            .OrderBy(v => v, StringComparer.Ordinal)
+            .ToArray();
+
+    public async Task<Result<UserPermissionsDto>> GetUserPermissionsAsync(Guid userId, CancellationToken ct = default)
+    {
+        var user = await _users.FindByIdAsync(userId.ToString());
+        if (user is null)
+            return Result<UserPermissionsDto>.Failure("المستخدم غير موجود.", "user.not_found");
+
+        return Result<UserPermissionsDto>.Success(
+            new UserPermissionsDto(userId, await ReadPermissionClaimsAsync(user)));
+    }
+
+    public async Task<Result<UserPermissionsDto>> SetUserPermissionsAsync(
+        Guid userId, IReadOnlyList<string> permissions, Guid actingUserId, CancellationToken ct = default)
+    {
+        var desired = (permissions ?? Array.Empty<string>())
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .Select(p => p.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        // مفتاح غير معروف يُرفض بدل أن يُخزَّن صامتًا: مطالبة لا تطابق أيّ سياسة تعطي وهم صلاحيّة.
+        var unknown = desired.Where(p => !AppPermissions.All.Contains(p)).ToList();
+        if (unknown.Count > 0)
+            return Result<UserPermissionsDto>.Failure(
+                $"مفاتيح صلاحيّات غير معروفة: {string.Join("، ", unknown)}", "user.permissions.invalid");
+
+        var user = await _users.FindByIdAsync(userId.ToString());
+        if (user is null)
+            return Result<UserPermissionsDto>.Failure("المستخدم غير موجود.", "user.not_found");
+
+        var current = await ReadPermissionClaimsAsync(user);
+        var toAdd = desired.Except(current, StringComparer.Ordinal).ToList();
+        var toRemove = current.Except(desired, StringComparer.Ordinal).ToList();
+
+        // Idempotent: تكرار النداء بنفس المجموعة لا يكتب شيئًا ولا يولّد سجلّ تدقيق زائفًا.
+        if (toAdd.Count == 0 && toRemove.Count == 0)
+            return Result<UserPermissionsDto>.Success(new UserPermissionsDto(userId, current));
+
+        foreach (var p in toRemove)
+        {
+            var r = await _users.RemoveClaimAsync(user, new Claim(AppPermissions.ClaimType, p));
+            if (!r.Succeeded)
+                return Result<UserPermissionsDto>.Failure(
+                    string.Join("; ", r.Errors.Select(e => e.Description)), "user.permissions.update_failed.conflict");
+        }
+        foreach (var p in toAdd)
+        {
+            var r = await _users.AddClaimAsync(user, new Claim(AppPermissions.ClaimType, p));
+            if (!r.Succeeded)
+                return Result<UserPermissionsDto>.Failure(
+                    string.Join("; ", r.Errors.Select(e => e.Description)), "user.permissions.update_failed.conflict");
+        }
+
+        var after = await ReadPermissionClaimsAsync(user);
+        await _audit.LogAsync(actingUserId, "user.permissions.changed", "User", userId,
+            JsonSerializer.Serialize(new { before = current, after, granted = toAdd, revoked = toRemove }), null, ct);
+
+        return Result<UserPermissionsDto>.Success(new UserPermissionsDto(userId, after));
     }
 
     public async Task<Result<DirectoryUserDto>> CreateUserAsync(CreateUserRequest req, CancellationToken ct = default)
@@ -948,6 +1091,10 @@ public class DirectoryService : IDirectoryService
         if (!await _db.Departments.AnyAsync(d => d.Id == req.DepartmentId, ct))
             return Result<TeamDto>.Failure("الإدارة المحدّدة غير موجودة.", "department.not_found");
 
+        // DEF-P123-001 — تفرّد اسم الفريق **داخل إدارته** فقط: الاسم نفسه مسموح في إدارة أخرى.
+        if (await TeamNameTakenAsync(req.DepartmentId, nameAr, null, ct))
+            return Result<TeamDto>.Failure(TeamNameConflictAr, TeamNameConflictCode);
+
         if (req.TeamLeaderId is Guid lid && !await _db.Users.AnyAsync(u => u.Id == lid, ct))
             return Result<TeamDto>.Failure("قائد الفريق المحدّد غير موجود.", "team.leader.not_found");
 
@@ -960,7 +1107,9 @@ public class DirectoryService : IDirectoryService
             IsActive = true,
         };
         _db.Teams.Add(team);
-        await _db.SaveChangesAsync(ct);
+
+        var saved = await SaveTranslatingDirectoryConflictsAsync(ct);
+        if (saved is not null) return Result<TeamDto>.Failure(saved.Error!, saved.ErrorCode!);
 
         return Result<TeamDto>.Success(new TeamDto(team.Id, team.NameAr, team.NameEn, team.DepartmentId, team.TeamLeaderId, team.IsActive));
     }
@@ -981,6 +1130,10 @@ public class DirectoryService : IDirectoryService
 
         if (!await _db.Departments.AnyAsync(d => d.Id == req.DepartmentId, ct))
             return Result<TeamDto>.Failure("الإدارة المحدّدة غير موجودة.", "department.not_found");
+
+        // DEF-P123-001 — التفرّد يُقاس على الإدارة **الهدف** (تُغطّي النقل وإعادة التسمية معًا).
+        if (await TeamNameTakenAsync(req.DepartmentId, nameAr, teamId, ct))
+            return Result<TeamDto>.Failure(TeamNameConflictAr, TeamNameConflictCode);
 
         if (req.TeamLeaderId is Guid lid && !await _db.Users.AnyAsync(u => u.Id == lid, ct))
             return Result<TeamDto>.Failure("قائد الفريق المحدّد غير موجود.", "team.leader.not_found");
@@ -1223,6 +1376,16 @@ public class DirectoryService : IDirectoryService
         if (string.IsNullOrWhiteSpace(nameAr))
             return Result<DepartmentDto>.Failure("اسم الإدارة مطلوب.", "department.name.required");
 
+        var code = string.IsNullOrWhiteSpace(req.Code) ? null : req.Code!.Trim();
+
+        // DEF-P123-001/002 — تحقّق تطبيقيّ مسبق يعطي رسالة مفهومة. القيد في قاعدة البيانات
+        // هو الضمانة النهائيّة ضدّ التسابق، وانتهاكه يُترجَم إلى نفس الرمز الدلاليّ أدناه.
+        if (await DepartmentNameTakenAsync(nameAr, null, ct))
+            return Result<DepartmentDto>.Failure(DepartmentNameConflictAr, DepartmentNameConflictCode);
+
+        if (code is not null && await DepartmentCodeTakenAsync(code, null, ct))
+            return Result<DepartmentDto>.Failure(DepartmentCodeConflictAr, DepartmentCodeConflictCode);
+
         if (req.ManagerId is Guid mid && !await _db.Users.AnyAsync(u => u.Id == mid, ct))
             return Result<DepartmentDto>.Failure("المدير المحدّد غير موجود.", "user.manager.not_found");
 
@@ -1230,12 +1393,14 @@ public class DirectoryService : IDirectoryService
         {
             NameAr = nameAr,
             NameEn = string.IsNullOrWhiteSpace(req.NameEn) ? null : req.NameEn!.Trim(),
-            Code = string.IsNullOrWhiteSpace(req.Code) ? null : req.Code!.Trim(),
+            Code = code,
             ManagerId = req.ManagerId,
             IsActive = true,
         };
         _db.Departments.Add(dept);
-        await _db.SaveChangesAsync(ct);
+
+        var saved = await SaveTranslatingDirectoryConflictsAsync(ct);
+        if (saved is not null) return Result<DepartmentDto>.Failure(saved.Error!, saved.ErrorCode!);
 
         return Result<DepartmentDto>.Success(new DepartmentDto(dept.Id, dept.NameAr, dept.NameEn, dept.Code, dept.ManagerId, dept.IsActive));
     }
@@ -1250,15 +1415,26 @@ public class DirectoryService : IDirectoryService
         if (dept is null)
             return Result<DepartmentDto>.Failure("الإدارة غير موجودة.", "department.not_found");
 
+        var code = string.IsNullOrWhiteSpace(req.Code) ? null : req.Code!.Trim();
+
+        // DEF-P123-001/002 — التعديل يخضع لنفس التفرّد، مع استثناء الصفّ نفسه من الفحص.
+        if (await DepartmentNameTakenAsync(nameAr, departmentId, ct))
+            return Result<DepartmentDto>.Failure(DepartmentNameConflictAr, DepartmentNameConflictCode);
+
+        if (code is not null && await DepartmentCodeTakenAsync(code, departmentId, ct))
+            return Result<DepartmentDto>.Failure(DepartmentCodeConflictAr, DepartmentCodeConflictCode);
+
         if (req.ManagerId is Guid mid && !await _db.Users.AnyAsync(u => u.Id == mid, ct))
             return Result<DepartmentDto>.Failure("المدير المحدّد غير موجود.", "user.manager.not_found");
 
         dept.NameAr = nameAr;
         dept.NameEn = string.IsNullOrWhiteSpace(req.NameEn) ? null : req.NameEn!.Trim();
-        dept.Code = string.IsNullOrWhiteSpace(req.Code) ? null : req.Code!.Trim();
+        dept.Code = code;
         dept.ManagerId = req.ManagerId;
         dept.IsActive = req.IsActive;
-        await _db.SaveChangesAsync(ct);
+
+        var saved = await SaveTranslatingDirectoryConflictsAsync(ct);
+        if (saved is not null) return Result<DepartmentDto>.Failure(saved.Error!, saved.ErrorCode!);
 
         return Result<DepartmentDto>.Success(new DepartmentDto(dept.Id, dept.NameAr, dept.NameEn, dept.Code, dept.ManagerId, dept.IsActive));
     }

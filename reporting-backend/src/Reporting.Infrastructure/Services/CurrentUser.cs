@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Reporting.Application.Common;
+using Reporting.Application.Security;
 
 namespace Reporting.Infrastructure.Services;
 
@@ -27,7 +28,14 @@ public class CurrentUser : ICurrentUser
     public IReadOnlyCollection<string> Roles =>
         Principal?.FindAll(ClaimTypes.Role).Select(c => c.Value).ToArray() ?? Array.Empty<string>();
 
+    /// <summary>مطالبات <c>perm</c> فقط — بلا أيّ اشتقاق من الأدوار (P2-SEC-001).</summary>
+    public IReadOnlyCollection<string> Permissions =>
+        Principal?.FindAll(AppPermissions.ClaimType).Select(c => c.Value).ToArray() ?? Array.Empty<string>();
+
     public bool IsInRole(string role) => Principal?.IsInRole(role) == true;
 
     public bool IsInAnyRole(params string[] roles) => roles.Any(IsInRole);
+
+    public bool HasPermission(string permissionKey) =>
+        Principal?.HasClaim(AppPermissions.ClaimType, permissionKey) == true;
 }

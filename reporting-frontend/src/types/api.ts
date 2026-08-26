@@ -31,6 +31,8 @@ export interface AuthResponse {
   expectedReportCadence: PeriodType;
   // رمز المسمّى الوظيفي (مثل SALES_B2C) — لتحديد لوحات المبيعات وعناصر التنقّل (null إن لم يُسنَد).
   jobRoleCode?: string | null;
+  permissions?: string[] | null;
+  scopeType?: string | null;
 }
 
 export type PeriodType = 'Daily' | 'Weekly' | 'Monthly' | 'Quarterly' | 'Yearly' | 'AdHoc';
@@ -45,6 +47,11 @@ export interface MeResponse {
   expectedReportCadence: PeriodType;
   // رمز المسمّى الوظيفي (مثل SALES_B2C) — لتحديد لوحات المبيعات وعناصر التنقّل (null إن لم يُسنَد).
   jobRoleCode?: string | null;
+  // P3-NAV-001 — قدرات هذا المستخدم كما يحسبها الخادم: مفاتيح `perm` المُسنَدة إليه صراحةً،
+  // ونوع نطاق رؤيته (own/team/department/company/governance). للعرض والتوجيه السياقيّ فقط؛
+  // التخويل الفعليّ خادميّ بالكامل. غيابها ⇒ إخفاء العناصر المشروطة (احتياطيّ آمن).
+  permissions?: string[] | null;
+  scopeType?: string | null;
 }
 
 /// سياق المبيعات الموثوق (RC-3 Task 1.1) — يُحسَب خادميًّا لتحديد الأقسام المعروضة ونوع المندوب.
@@ -1481,6 +1488,10 @@ export interface MemberPerformanceDto {
   kpiTrend: KpiTrend;
   reportsTotal: number;
   reportsCompleted: number;
+  /** B-6: حكم الخادم بالعتبة المعتمدة. `null` = لا تقييم، لا «مطابق». */
+  isBelowTarget?: boolean | null;
+  /** B-6: العتبة المطبَّقة كما أعادها الخادم. */
+  appliedBelowTargetThreshold?: number | null;
 }
 export interface ActivityItemDto {
   submissionId: string;
@@ -1600,6 +1611,12 @@ export interface KpiAggregateDto {
   scopeType: string;
   canViewRows: boolean;
   weeks: KpiWeeklyPointDto[];
+  /** P1-KPI-007 (B-3): الكادنس المطبَّق فعليًّا كما حسمه الخادم — اختياريّ لتوافق المستهلكين القدامى. */
+  appliedCadence?: 'WeeklyPulse' | 'Quarterly';
+  /** B-2: عدد الموظّفين الذين دخلوا التوسيط ذا المرحلتين (لا عدد التقييمات). */
+  employeesCount?: number;
+  /** B-6: العتبة المطبَّقة من الخادم. `null`/غياب = لا حكم، لا «افترض 60». */
+  appliedBelowTargetThreshold?: number | null;
 }
 
 export interface ExpectedReporterRow {

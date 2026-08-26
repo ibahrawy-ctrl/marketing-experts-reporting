@@ -94,6 +94,20 @@ public class DirectoryController : ApiControllerBase
     public async Task<IActionResult> UpdateUserRoles(Guid id, [FromBody] UpdateUserRolesRequest req, CancellationToken ct)
         => FromResult(await _service.UpdateUserRolesAsync(id, req.Roles ?? new List<string>(), CurrentUserId, ct));
 
+    // قراءة مفاتيح الصلاحيّات الدقيقة (perm) الممنوحة لمستخدم — Admin + CEO (نفس سلطة توزيع الأدوار).
+    [HttpGet("users/{id:guid}/permissions")]
+    [Authorize(Policy = Policies.UserManagement)]
+    public async Task<IActionResult> UserPermissions(Guid id, CancellationToken ct)
+        => FromResult(await _service.GetUserPermissionsAsync(id, ct));
+
+    // ضبط مفاتيح perm لمستخدم (منح وإلغاء معًا) — Admin + CEO. مُدقَّق وIdempotent.
+    // الإلغاء يسري على الرمز الحاليّ عند تجديده أو إعادة تسجيل الدخول (المفاتيح محقونة في JWT).
+    [HttpPut("users/{id:guid}/permissions")]
+    [Authorize(Policy = Policies.UserManagement)]
+    public async Task<IActionResult> SetUserPermissions(Guid id, [FromBody] SetUserPermissionsRequest req, CancellationToken ct)
+        => FromResult(await _service.SetUserPermissionsAsync(
+            id, req.Permissions ?? new List<string>(), CurrentUserId, ct));
+
     // إنشاء مستخدم جديد — Admin + CEO (GOV-R1).
     [HttpPost("users")]
     [Authorize(Policy = Policies.UserManagement)]

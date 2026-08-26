@@ -325,6 +325,52 @@ public class KpiTemplateService : IKpiTemplateService
         return null;
     }
 
+    /// <inheritdoc />
+    public async Task<IReadOnlyDictionary<Guid, IReadOnlyCollection<Guid>>> ResolveAssignedTemplatesForUsersAsync(
+        IReadOnlyCollection<Guid> userIds, CancellationToken ct = default)
+    {
+        var result = new Dictionary<Guid, IReadOnlyCollection<Guid>>();
+        var ids = userIds.Distinct().ToList();
+        if (ids.Count == 0) return result;
+
+        // ثلاثة استعلامات ثابتة مهما بلغ عدد المستخدمين: النطاقات + بيانات القوالب + الإسنادات.
+        var users = await _db.Users.AsNoTracking()
+            .Where(x => ids.Contains(x.Id))
+            .Select(x => new { x.Id, x.JobRoleId, x.TeamId, x.DepartmentId })
+            .ToListAsync(ct);
+
+        var metas = await _db.KpiTemplates.AsNoTracking()
+            .Where(t => t.Status == TemplateStatus.Published && t.IsActive)
+            .Select(t => new KpiMeta(t.Id, t.JobRoleId, t.Cadence))
+            .ToListAsync(ct);
+
+        var assignments = await LoadActiveAssignmentsAsync(metas.Select(m => m.Id).ToList(), ct);
+
+        foreach (var u in users)
+        {
+            var scopes = new UserScopes(u.Id, u.JobRoleId, u.TeamId, u.DepartmentId);
+            var included = new List<(KpiMeta Meta, MatchTier Tier)>();
+            foreach (var m in metas)
+            {
+                // نفس دالّة الحلّ المستعملة للمستخدم الواحد — لا نسخة ثانية من المنطق.
+                var r = ResolveOne(m, scopes, assignments);
+                if (r is { Included: true }) included.Add((m, r.Tier));
+            }
+
+            if (included.Count == 0)
+            {
+                result[u.Id] = Array.Empty<Guid>();
+                continue;
+            }
+
+            // «الأخصّ يطغى» غير تراكميّ — مطابق حرفيًّا لـResolveAssignedTemplateIdsAsync.
+            var minTier = included.Min(x => x.Tier);
+            result[u.Id] = included.Where(x => x.Tier == minTier)
+                .Select(x => x.Meta.Id).Distinct().ToList();
+        }
+        return result;
+    }
+
     private async Task<HashSet<(Guid, TemplateAssignmentScope, Guid, TemplateAssignmentKind)>> LoadActiveAssignmentsAsync(
         IReadOnlyCollection<Guid> templateIds, CancellationToken ct)
     {

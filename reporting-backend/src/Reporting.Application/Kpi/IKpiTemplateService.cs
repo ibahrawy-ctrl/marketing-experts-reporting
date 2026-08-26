@@ -31,4 +31,12 @@ public interface IKpiTemplateService
 
     /// <summary>حذف إسناد صريح.</summary>
     Task<Result> RemoveAssignmentAsync(Guid templateId, Guid assignmentId, CancellationToken ct = default);
+
+    /// <summary>
+    /// P2-HR-008 — النسخة الدفعيّة من منتقي الإسناد: لكلّ مستخدم، معرّفات قوالب KPI المنشورة النشطة
+    /// المُسنَدة له فعليًّا. تستعمل <b>نفس</b> منطق الأخصّية/الاستثناء المستعمل للمستخدم الواحد
+    /// (لا نسخة ثانية منه)، بعدد استعلامات ثابت مهما بلغ عدد المستخدمين (لا N+1).
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, IReadOnlyCollection<Guid>>> ResolveAssignedTemplatesForUsersAsync(
+        IReadOnlyCollection<Guid> userIds, CancellationToken ct = default);
 }

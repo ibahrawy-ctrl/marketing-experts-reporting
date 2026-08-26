@@ -19,9 +19,11 @@ using Reporting.Application.Governance;
 using Reporting.Application.Kpi;
 using Reporting.Application.Leave;
 using Reporting.Application.Notifications;
+using Reporting.Application.Periods;
 using Reporting.Application.Positions;
 using Reporting.Application.Payroll;
 using Reporting.Application.Reports;
+using Reporting.Application.Security;
 using Reporting.Application.Submissions;
 using Reporting.Application.Templates;
 using Reporting.Infrastructure.Identity;
@@ -59,11 +61,32 @@ public static class DependencyInjection
         services.Configure<EmailNotificationOptions>(configuration.GetSection(EmailNotificationOptions.SectionName));
         services.Configure<AppOptions>(configuration.GetSection(AppOptions.SectionName));
         services.Configure<ReportReminderSchedulerOptions>(configuration.GetSection(ReportReminderSchedulerOptions.SectionName));
+        // P1 — أعلام محرّك KPI الجديد وعتباته المركزيّة الاحتياطيّة. كلّ الأعلام false افتراضيًّا (§8).
+        services.Configure<KpiFeatureOptions>(configuration.GetSection(KpiFeatureOptions.SectionName));
+        // P2 §9 — أعلام المرحلة الثانية، كلّها false افتراضيًّا. العلم ليس تفويضًا.
+        services.Configure<Phase2FeatureOptions>(configuration.GetSection(Phase2FeatureOptions.SectionName));
 
         services.AddHttpContextAccessor();
         services.AddSingleton<ISystemClock, SystemClock>();
+        // P1-KPI-002 — مصدر الحقيقة الوحيد لحدود الفترات (Asia/Riyadh).
+        services.AddScoped<IPeriodService, CanonicalPeriodService>();
+        // P1-KPI-003 — المصدر الوحيد لحساب KPI المؤسّسيّ (Approved-only + توسيط ثنائي المرحلة).
+        services.AddScoped<IKpiCalculationService, KpiCalculationService>();
         services.AddScoped<ICurrentUser, CurrentUser>();
         services.AddScoped<IScopeResolver, ScopeResolver>();
+        // P2-SEC-001 — الطبقة الخادميّة المركزيّة للرؤية على مستوى الحقل/القسم.
+        services.AddScoped<IFieldVisibilityPolicy, FieldVisibilityPolicy>();
+        // P2-EMP-002 — عرض قراءة بحت؛ لا يملك بيانات ولا يكتب شيئًا.
+        services.AddScoped<Application.Employee360.IEmployee360Service, Employee360Service>();
+        // P2-ATT-006 — وقائع الحضور: كلّ كتابة تمرّ ببوّابة الانتقال، ولا أثر ماليّ في أيّ مسار.
+        services.AddScoped<Application.Attendance.IAttendanceService, AttendanceService>();
+        services.AddHostedService<AttendanceSlaSweepService>();
+        // P2-HR-008 — المصدر الخادميّ الوحيد لاشتقاق الالتزامات؛ لا جدول موازٍ ولا إعادة حساب في سطح آخر.
+        services.AddScoped<Application.Obligations.IObligationsService, ObligationsService>();
+        // P2-HR-009 — لوحة العمليّات: البطاقة والتفصيل من مجموعة صفوف واحدة، والمطلوب/الناقص من محرّك الالتزامات وحده.
+        services.AddScoped<Application.HrOperations.IHrOperationsService, HrOperationsService>();
+        // P2-HR-010 — قائمة الالتزام: الجدول الجديد يحمل البنود اليدويّة وحدها، والمحسوبة تُشتقّ في كلّ نداء.
+        services.AddScoped<Application.Checklist.IEmployeeChecklistService, EmployeeChecklistService>();
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IReportTemplateService, ReportTemplateService>();

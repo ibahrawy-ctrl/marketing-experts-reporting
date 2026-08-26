@@ -18,6 +18,7 @@ import {
   quarterKey,
 } from '../lib/format';
 import { riyadhToday } from '../lib/dashboardPeriod';
+import { kpiTone } from '../lib/useKpi';
 import type {
   EmployeeProfileDto,
   KpiAggregateDto,
@@ -159,11 +160,12 @@ function aggParams(spec: AggSpec, userId: string): Record<string, string> {
   return p;
 }
 
-// نطاق درجة التقييم: ممتاز ≥85، متوسط 60–84، دون المستهدف <60 (عتبة الإنذار 60).
-function scoreBand(score: number): 'excellent' | 'mid' | 'below' {
-  if (score >= 85) return 'excellent';
-  if (score >= 60) return 'mid';
-  return 'below';
+// B-6 — لا نطاقات 85/60 مكتوبة هنا: التصنيف يُقاس على العتبة القادمة من الخادم عبر `kpiTone`،
+// وغيابها يعني «لا حكم» (`muted`) لا افتراض رقم.
+
+/** نبرة بطاقة رقميّة: إنذار فقط عند حكم صريح من الخادم بأنّ الرقم دون المستهدف. */
+function alertTone(value: number | null, threshold: number | null): 'alert' | 'navy' {
+  return kpiTone(value, threshold) === 'alert' ? 'alert' : 'navy';
 }
 
 // ===== المكوّن المشترك =====
@@ -253,9 +255,18 @@ function IndividualKpiDashboard({ userId, mode }: { userId: string; mode: 'self'
     diff == null ? 'لا توجد بيانات كافية' : diff > 0 ? 'تحسّن' : diff < 0 ? 'تراجع' : 'ثابت';
   const trendTone: 'success' | 'alert' | 'navy' = diff == null ? 'navy' : diff > 0 ? 'success' : diff < 0 ? 'alert' : 'navy';
 
-  // توزيع التقييمات حسب النطاق (لهذا الموظّف فقط).
-  const dist = { excellent: 0, mid: 0, below: 0 };
-  for (const s of scores) dist[scoreBand(s)]++;
+  // B-6: العتبة المطبَّقة كما أعادها الخادم مع التجميع — لا ثابت في هذه الشاشة.
+  const threshold = curAgg?.appliedBelowTargetThreshold ?? null;
+
+  // توزيع التقييمات حسب النطاق (لهذا الموظّف فقط)، مقيسًا على عتبة الخادم.
+  const dist = { excellent: 0, mid: 0, below: 0, unrated: 0 };
+  for (const s of scores) {
+    const tone = kpiTone(s, threshold);
+    if (tone === 'success') dist.excellent++;
+    else if (tone === 'gold') dist.mid++;
+    else if (tone === 'alert') dist.below++;
+    else dist.unrated++;
+  }
 
   // نقاط منحنى الاتجاه + جدول الأداء (الأسابيع داخل الفترة).
   const trendPoints = weeks.map((w) => ({ label: `أ${w.periodKey.slice(-2)}`, value: w.score }));
@@ -349,14 +360,14 @@ function IndividualKpiDashboard({ userId, mode }: { userId: string; mode: 'self'
               <StatCard
                 label="متوسط KPI في الفترة"
                 value={average == null ? '—' : formatPercent(average)}
-                tone={average != null && average < 60 ? 'alert' : 'navy'}
+                tone={alertTone(average, threshold)}
               />
               <StatCard label="عدد التقييمات" value={evalCount} />
-              <StatCard label="آخر تقييم" value={lastScore ?? '—'} tone={lastScore != null && lastScore < 60 ? 'alert' : 'navy'} />
+              <StatCard label="آخر تقييم" value={lastScore ?? '—'} tone={alertTone(lastScore, threshold)} />
               <StatCard label="أعلى تقييم" value={highest ?? '—'} />
             </div>
             <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              <StatCard label="أقل تقييم" value={lowest ?? '—'} tone={lowest != null && lowest < 60 ? 'alert' : 'navy'} />
+              <StatCard label="أقل تقييم" value={lowest ?? '—'} tone={alertTone(lowest, threshold)} />
               <StatCard
                 label="الفرق عن الفترة السابقة"
                 value={diff == null ? '—' : `${diff > 0 ? '+' : ''}${diff}`}
@@ -381,9 +392,16 @@ function IndividualKpiDashboard({ userId, mode }: { userId: string; mode: 'self'
               <h2 className="mb-3 font-semibold text-navy">توزيع التقييمات</h2>
               <Donut
                 slices={[
-                  { label: 'ممتاز (≥85)', value: dist.excellent },
-                  { label: 'متوسط (60–84)', value: dist.mid },
-                  { label: 'دون المستهدف (<60)', value: dist.below },
+                  { label: threshold === null ? 'بلغ المستهدف' : `بلغ المستهدف (≥${threshold})`, value: dist.excellent },
+                  {
+                    label: threshold === null ? 'قريب من المستهدف' : `قريب من المستهدف (≥${Math.round(threshold * 0.75)})`,
+                    value: dist.mid,
+                  },
+                  {
+                    label: threshold === null ? 'دون المستهدف' : `دون المستهدف (<${Math.round(threshold * 0.75)})`,
+                    value: dist.below,
+                  },
+                  { label: 'بلا عتبة معتمَدة', value: dist.unrated },
                 ]}
               />
             </Card>

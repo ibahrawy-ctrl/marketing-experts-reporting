@@ -1,9 +1,9 @@
 // لوحة المدير/الحوكمة — بوّابة موجزة تقود إلى الصفحات الداخلية (ليست بديلاً عنها).
 import { Link } from 'react-router-dom';
 import { useDirectoryUsers, useTeams, useDepartments } from '../lib/useDirectory';
+import { DEFAULT_KPI_FILTER, appliedThreshold, useKpiPerformance } from '../lib/useKpi';
 import {
   useAllSubmissions,
-  useKpiSummary,
   useEscalations,
   useDecisions,
   useRisks,
@@ -37,7 +37,8 @@ export function AdminHome() {
   const teams = useTeams();
   const departments = useDepartments();
   const submissions = useAllSubmissions();
-  const kpi = useKpiSummary();
+  // P1-KPI-008: كلّ أرقام KPI هنا من الخادم — لا طيّ صفوف ولا متوسّط في الواجهة.
+  const kpi = useKpiPerformance(DEFAULT_KPI_FILTER);
   const escalations = useEscalations('Open');
   const decisions = useDecisions('Proposed');
   const risks = useRisks('Open');
@@ -64,14 +65,16 @@ export function AdminHome() {
   const userList = users.data ?? [];
   const teamList = teams.data ?? [];
   const subs = submissions.data ?? [];
-  const kpiRows = kpi.data?.rows ?? [];
+  const kpiEmployees = kpi.data?.employees ?? [];
 
   const aggregates = buildTeamAggregates({
     teams: teamList,
     users: userList,
     departments: departments.data ?? [],
     submissions: subs,
-    kpiRows,
+    kpiEmployees,
+    kpiTeams: kpi.data?.teams ?? [],
+    kpiThreshold: appliedThreshold(kpi.data),
     escalations: escalations.data ?? [],
     plans: plans.data ?? [],
   });
@@ -84,12 +87,13 @@ export function AdminHome() {
   const requiredThisWeek = aggregates.reduce((a, t) => a + t.requiredThisWeek, 0);
   const submittedThisWeek = aggregates.reduce((a, t) => a + t.submitted, 0);
   const lateThisWeek = aggregates.reduce((a, t) => a + t.late, 0);
-  const avgKpi = kpi.data?.averageScore ?? null;
+  // B-2: متوسّط الشركة = متوسّط متوسّطات الموظّفين كما حسبه الخادم، لا متوسّط تقييمات خام.
+  const avgKpi = kpi.data?.company.measure.value ?? null;
   const pendingApprovals = subs.filter(
     (s) => s.status === 'Submitted' || s.status === 'ApprovedByDirectManager' || s.status === 'ApprovedByNextLevel',
   );
   const lateReports = subs.filter((s) => s.status === 'Draft' || s.status === 'Returned');
-  const belowTargetKpi = kpiRows.filter((r) => r.isBelowTarget);
+  const belowTargetKpi = kpiEmployees.filter((e) => e.isBelowTarget === true);
   const openDecisions = decisions.data ?? [];
 
   return (
@@ -244,11 +248,11 @@ export function AdminHome() {
             <p className="py-6 text-center text-sm text-ink-2">جميع المؤشرات ضمن المستهدف.</p>
           ) : (
             <ul>
-              {belowTargetKpi.slice(0, 6).map((r, i) => (
+              {belowTargetKpi.slice(0, 6).map((r) => (
                 <ActionItem
-                  key={`${r.subjectUserId}-${r.periodKey}-${i}`}
-                  title={r.subjectName}
-                  context={`النتيجة: ${formatPercent(r.totalScore)} · ${r.periodKey}`}
+                  key={r.userId}
+                  title={r.fullName}
+                  context={`النتيجة: ${formatPercent(r.measure.value)} · ${kpi.data?.periodResolved.label ?? ''}`}
                   badge={<Badge tone="alert">دون المستهدف</Badge>}
                 />
               ))}

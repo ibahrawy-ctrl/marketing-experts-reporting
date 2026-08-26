@@ -374,7 +374,10 @@ public class PositionsTests
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var dept = new Department { NameAr = $"إدارة {tag}", Code = $"{tag}_{Guid.NewGuid():N}".Substring(0, 18) };
+        // `NameAr` يأخذ لاحقة جولة كما يأخذها `Code` أصلًا: الاسم صار فريدًا على مستوى القاعدة
+        // (DEF-P123-001)، و`reporting_test` قاعدة دائمة تتراكم ⟹ وسمٌ حرفيّ ثابت مثل «P1X» ينجح في
+        // أوّل جولة ويصطدم بنفسه في كلّ جولة تالية. لا تأكيد في هذا الصنف يتعلّق بنصّ الاسم.
+        var dept = new Department { NameAr = $"إدارة {tag} {Guid.NewGuid():N}", Code = $"{tag}_{Guid.NewGuid():N}".Substring(0, 18) };
         db.Departments.Add(dept);
         await db.SaveChangesAsync();
         return dept.Id;
