@@ -24,7 +24,7 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Badge, Card } from '../components/ui';
-import { LoadingState } from '../components/states';
+import { LoadingState, QueryError } from '../components/states';
 import { Tabs, type TabItem } from '../components/Tabs';
 import { ProjectBriefTab } from '../components/project360/ProjectBriefTab';
 import { ProjectContractDeliverablesTab } from '../components/project360/ProjectContractDeliverablesTab';
@@ -53,11 +53,26 @@ export default function Project360Page() {
 
   const project = overview.data?.project;
 
-  if (!projectId) return null;
+  // كلّ خروج مبكر يجب أن يقول شيئًا: `return null` يعطي صفحة بيضاء صامتة لا تُميَّز عن
+  // «الزرّ لم يعمل»، فيُبلَّغ عنها كعطل تنقّل ولا يبقى منها أثر يُشخَّص.
+  if (!projectId)
+    return (
+      <QueryError
+        title="رابط غير مكتمل"
+        description="لا يحمل الرابط معرّف مشروع. ارجع إلى قائمة المشاريع واختر المشروع من هناك."
+      />
+    );
   if (overview.isLoading) return <LoadingState label="يتم تحميل مساحة عمل المشروع…" />;
   if (overview.isError)
     return <Project360QueryError error={overview.error} onRetry={() => overview.refetch()} />;
-  if (!overview.data || !project) return null;
+  if (!overview.data || !project)
+    return (
+      <QueryError
+        title="تعذّر عرض مساحة عمل المشروع"
+        description="لم تصل بيانات صالحة من الخادم. أعد المحاولة، وإن تكرّر الأمر أبلغ الدعم."
+        onRetry={() => overview.refetch()}
+      />
+    );
 
   const data = overview.data;
 

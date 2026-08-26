@@ -2333,6 +2333,40 @@ export interface LinkedReportRow {
   projectId: string | null;
 }
 
+/**
+ * ما يحتاجه عرض القسم المتكرّر من المشروع فعلًا: عنوان البطاقة وتجميع العملاء.
+ * `ProjectDto` كامل ينطبق عليه تلقائيًّا، ومَن لا يملك سوى الاسم (شريحة المشروع) يكفيه هذا.
+ */
+export type ProjectNameRef = Pick<ProjectDto, 'id' | 'name' | 'clientId' | 'clientName'>;
+
+// ======================================================================
+// شريحة المشروع من تسليم واحد (PROJECT360-PROJECT-SCOPED-REPORT-NAVIGATION-FIX-R1)
+// الخادم يُرسِل **عناصر هذا المشروع فقط**؛ لا تصل الحمولة الكاملة ثمّ تُخفى محلّيًّا.
+// ======================================================================
+export interface ProjectReportSliceField {
+  templateFieldId: string;
+  label: string;
+  configJson: string | null;
+  order: number;
+  entries: Record<string, string | null>[];
+}
+
+export interface ProjectReportSliceDto {
+  submissionId: string;
+  projectId: string;
+  projectName: string;
+  clientId: string;
+  clientName: string;
+  submitterId: string;
+  submitterName: string | null;
+  templateTitle: string | null;
+  periodType: PeriodType;
+  periodKey: string;
+  status: SubmissionStatus;
+  submittedAtUtc: string | null;
+  fields: ProjectReportSliceField[];
+}
+
 // ملخّص المشروع (drill-down).
 export interface ProjectSummaryDto {
   project: ProjectDto;

@@ -39,6 +39,7 @@ import type {
   ProjectDto,
   ProjectRepeatableConfig,
   ProjectRepeatableEntry,
+  ProjectNameRef,
   RepeatableSubField,
   ReportingDayDto,
 } from '../types/api';
@@ -1693,7 +1694,7 @@ export function ProjectRepeatableDisplay({
 }: {
   config: ProjectRepeatableConfig;
   entries: ProjectRepeatableEntry[];
-  projects: ProjectDto[];
+  projects: ProjectNameRef[];
   templateTitle?: string;
 }) {
   // AMR-OUTPUT-REDESIGN-R1: إن طابق القالب ميفولة عرض (Presentation Profile) نصيّره بالمصيّر

@@ -53,6 +53,7 @@ import ClientDetailPage from './pages/ClientDetailPage';
 import ProjectsPage from './pages/ProjectsPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
 import Project360Page from './pages/Project360Page';
+import ProjectReportSlicePage from './pages/ProjectReportSlicePage';
 import AccountPortfolioPage from './pages/AccountPortfolioPage';
 import AccountPortfolioProjectPage from './pages/AccountPortfolioProjectPage';
 import AccountPortfolioClientPage from './pages/AccountPortfolioClientPage';
@@ -180,6 +181,14 @@ const APP_ROUTES: { path: string; element: ReactNode; roles?: Role[] }[] = [
   // مساحة عمل Project 360 (CPW-R3 · R2-W12): بوّابة الواجهة أوسع من EXEC_ROLES عمدًا لأنّ
   // مدير الحساب المسؤول من مستخدميها؛ ومع ذلك الرؤية الفعليّة تُحسَم خادمًا لكلّ مشروع على حدة.
   { path: '/app/projects/:projectId/360', element: <Project360Page />, roles: PROJECT_360_ROLES },
+  // مساهمة تقرير في مشروع (PROJECT360-PROJECT-SCOPED-REPORT-NAVIGATION-FIX-R1): يبقى المسار
+  // **تحت نطاق المشروع** فلا يُفقَد `projectId` أبدًا، ولا يُوسَّع تصريح التقارير العامّة —
+  // نفس بوّابة صفحة المشروع، والشريحة نفسها تُحسَم خادمًا (`404 project.not_found`).
+  {
+    path: '/app/projects/:projectId/reports/:reportId',
+    element: <ProjectReportSlicePage />,
+    roles: PROJECT_360_ROLES,
+  },
   // محفظة مدير الحساب (مشاريعي) — عرض فقط، النطاق مفروض خادمًا (Project.AccountManagerId == المستخدم).
   { path: '/app/account-portfolio', element: <AccountPortfolioPage />, roles: ACCOUNT_PORTFOLIO_ROLES },
   { path: '/app/account-portfolio/projects/:id', element: <AccountPortfolioProjectPage />, roles: ACCOUNT_PORTFOLIO_ROLES },

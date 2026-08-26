@@ -30,6 +30,14 @@ public class ProjectsController : ApiControllerBase
     public async Task<IActionResult> Reports(Guid id, CancellationToken ct)
         => FromResult(await _service.GetReportsAsync(id, ct));
 
+    /// <summary>
+    /// شريحة هذا المشروع من تسليم واحد. الحمولة الكاملة للتقرير **لا تُرسَل** إطلاقًا،
+    /// فالتصفية خادميّة لا في الواجهة، ولا يُوسَّع أيّ تصريح على التقارير العامّة.
+    /// </summary>
+    [HttpGet("{id:guid}/reports/{submissionId:guid}")]
+    public async Task<IActionResult> ReportSlice(Guid id, Guid submissionId, CancellationToken ct)
+        => FromResult(await _service.GetReportSliceAsync(id, submissionId, ct));
+
     [HttpGet("{id:guid}/summary")]
     public async Task<IActionResult> Summary(Guid id, CancellationToken ct)
         => FromResult(await _service.GetSummaryAsync(id, ct));

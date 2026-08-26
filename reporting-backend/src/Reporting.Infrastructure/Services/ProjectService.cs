@@ -281,7 +281,113 @@ public class ProjectService : IProjectService
         return Result<ProjectSummaryDto>.Success(new ProjectSummaryDto(dto, total, closed, pending, last, openRisks, openNotes));
     }
 
+    /// <summary>
+    /// شريحة المشروع من تسليم واحد (PROJECT360-PROJECT-SCOPED-REPORT-NAVIGATION-FIX-R1).
+    /// <para><b>لماذا الرفض موحّد بـ<c>project.not_found</c> في ثلاث حالات مختلفة</b> (خارج النطاق /
+    /// التسليم غير موجود / التسليم غير مرتبط بالمشروع): أيّ تمييز بينها يحوّل الواجهة إلى عدّاد
+    /// وجود — يجرّب المهاجم معرّفات حتّى يفرّق «غير موجود» عن «موجود لكن ليس لك».</para>
+    /// <para><b>لماذا يُصفّى على <c>ProjectRepeatableSection</c> وحده</b>: هو نوع الحقل الوحيد
+    /// الذي يحمل <c>projectId</c> بنيويًّا في <c>ValueJson</c>. بقيّة الحقول (نصّ حرّ، ملخّص عامّ…)
+    /// لا رابط موثوقًا لها بمشروع، وإخراجها يعني تسريب عمل مشروعات أخرى — ولا يجوز تخمين
+    /// انتماء الفقرة من نصّها.</para>
+    /// </summary>
+    public async Task<Result<ProjectReportSliceDto>> GetReportSliceAsync(Guid id, Guid submissionId, CancellationToken ct = default)
+    {
+        if (_currentUser.UserId is null) return Result<ProjectReportSliceDto>.Failure("غير مصرّح.", "auth.unauthenticated");
+        var vis = await _access.ResolveAsync(ct);
+        if (!vis.CanViewProject(id)) return Result<ProjectReportSliceDto>.Failure(ProjectNotFoundMessage, ProjectNotFoundCode);
+
+        var project = await _db.Projects.AsNoTracking()
+            .Where(p => p.Id == id)
+            .Select(p => new { p.Id, p.Name, p.ClientId, ClientName = p.Client!.Name })
+            .FirstOrDefaultAsync(ct);
+        if (project is null) return Result<ProjectReportSliceDto>.Failure(ProjectNotFoundMessage, ProjectNotFoundCode);
+
+        var sub = await _db.ReportSubmissions.AsNoTracking()
+            .Where(s => s.Id == submissionId)
+            .Select(s => new
+            {
+                s.Id,
+                s.SubmitterId,
+                s.PeriodType,
+                s.PeriodKey,
+                s.Status,
+                s.SubmittedAtUtc,
+                s.ProjectId,
+                TemplateTitle = _db.ReportTemplateVersions
+                    .Where(v => v.Id == s.ReportTemplateVersionId)
+                    .Select(v => v.ReportTemplate!.Title).FirstOrDefault()
+            })
+            .FirstOrDefaultAsync(ct);
+        if (sub is null) return Result<ProjectReportSliceDto>.Failure(ProjectNotFoundMessage, ProjectNotFoundCode);
+
+        var raw = await (from v in _db.SubmissionFieldValues.AsNoTracking()
+                         join f in _db.TemplateFields.AsNoTracking() on v.TemplateFieldId equals f.Id
+                         where v.ReportSubmissionId == submissionId
+                            && f.FieldType == FieldType.ProjectRepeatableSection
+                            && v.ValueJson != null
+                         orderby f.Order
+                         select new { f.Id, f.Label, f.ConfigJson, f.Order, v.ValueJson })
+                        .ToListAsync(ct);
+
+        var fields = new List<ProjectReportSliceFieldDto>();
+        foreach (var r in raw)
+        {
+            var entries = ExtractProjectEntries(r.ValueJson!, id);
+            if (entries.Count == 0) continue; // حقل بلا عنصر لهذا المشروع لا يُذكَر أصلًا
+            fields.Add(new ProjectReportSliceFieldDto(r.Id, r.Label, r.ConfigJson, r.Order, entries));
+        }
+
+        // لا شريحة **ولا** ربط مباشر على مستوى التسليم ⇒ «غير مرتبط» = نفس رفض «غير موجود».
+        if (fields.Count == 0 && sub.ProjectId != id)
+            return Result<ProjectReportSliceDto>.Failure(ProjectNotFoundMessage, ProjectNotFoundCode);
+
+        var names = await UserNamesAsync(new[] { sub.SubmitterId }, ct);
+        return Result<ProjectReportSliceDto>.Success(new ProjectReportSliceDto(
+            sub.Id, project.Id, project.Name, project.ClientId, project.ClientName,
+            sub.SubmitterId, names.GetValueOrDefault(sub.SubmitterId), sub.TemplateTitle,
+            sub.PeriodType, sub.PeriodKey, sub.Status, sub.SubmittedAtUtc, fields));
+    }
+
     // ===== helpers =====
+
+    /// <summary>
+    /// يُبقي من مصفوفة القسم المتكرّر عناصر <b>هذا المشروع فقط</b>، ويسطّح <c>answers</c> إلى
+    /// قاموس نصّيّ. <c>JsonException</c> تُبتلع عمدًا وتُعيد قائمة فارغة: JSON تالف يعني
+    /// «لا أعرف لمن هذا العنصر» ⇒ الفشل المغلق (لا يخرج شيء) لا المفتوح.
+    /// </summary>
+    private static List<IReadOnlyDictionary<string, string?>> ExtractProjectEntries(string valueJson, Guid projectId)
+    {
+        var result = new List<IReadOnlyDictionary<string, string?>>();
+        JsonDocument doc;
+        try { doc = JsonDocument.Parse(valueJson); }
+        catch (JsonException) { return result; }
+
+        using (doc)
+        {
+            if (doc.RootElement.ValueKind != JsonValueKind.Array) return result;
+            foreach (var el in doc.RootElement.EnumerateArray())
+            {
+                if (el.ValueKind != JsonValueKind.Object) continue;
+                if (!el.TryGetProperty("projectId", out var pid) || pid.ValueKind != JsonValueKind.String) continue;
+                if (!Guid.TryParse(pid.GetString(), out var g) || g != projectId) continue;
+
+                var answers = new Dictionary<string, string?>(StringComparer.Ordinal);
+                if (el.TryGetProperty("answers", out var ans) && ans.ValueKind == JsonValueKind.Object)
+                {
+                    foreach (var p in ans.EnumerateObject())
+                        answers[p.Name] = p.Value.ValueKind switch
+                        {
+                            JsonValueKind.Null => null,
+                            JsonValueKind.String => p.Value.GetString(),
+                            _ => p.Value.GetRawText()
+                        };
+                }
+                result.Add(answers);
+            }
+        }
+        return result;
+    }
 
     /// <summary>
     /// المُسنَد إليه يجب أن يكون **مستخدمًا قائمًا ونشطًا**. مرجع ميت أو موظّف مغادر يعني

@@ -967,7 +967,23 @@ function ProjectsTab({ client: c, canManage }: { client: ClientDto; canManage: b
   );
 }
 
-export function LinkedReportsCard({ rows, title }: { rows: LinkedReportRow[]; title: string }) {
+/**
+ * جدول التقارير المرتبطة.
+ *
+ * **`projectId` يغيّر وجهة «فتح» جوهريًّا** (PROJECT360-PROJECT-SCOPED-REPORT-NAVIGATION-FIX-R1):
+ * داخل مشروع تفتح **مساهمة هذا المشروع** تحت نطاقه؛ وبدونه (سياق العميل) تبقى الوجهة
+ * صفحة التقارير العامّة كما كانت. الفتح العامّ من داخل مشروع كان يعرض عمل مشروعات أخرى
+ * يحملها التقرير الأسبوعيّ نفسه — وهو ما تغلقه هذه الوجهة.
+ */
+export function LinkedReportsCard({
+  rows,
+  title,
+  projectId,
+}: {
+  rows: LinkedReportRow[];
+  title: string;
+  projectId?: string;
+}) {
   return (
     <Card>
       <h2 className="text-lg font-bold text-navy">{title}</h2>
@@ -1000,7 +1016,11 @@ export function LinkedReportsCard({ rows, title }: { rows: LinkedReportRow[]; ti
                   <td className="px-3 py-2.5 text-ink-2">{formatDate(r.submittedAtUtc)}</td>
                   <td className="px-3 py-2.5">
                     <Link
-                      to={`/app/submissions?open=${r.submissionId}`}
+                      to={
+                        projectId
+                          ? `/app/projects/${projectId}/reports/${r.submissionId}`
+                          : `/app/submissions?open=${r.submissionId}`
+                      }
                       className="text-sm font-semibold text-orange-600 hover:underline"
                     >
                       فتح

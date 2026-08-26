@@ -14,4 +14,10 @@ public interface IProjectService
 
     Task<Result<IReadOnlyList<LinkedReportRow>>> GetReportsAsync(Guid id, CancellationToken ct = default);
     Task<Result<ProjectSummaryDto>> GetSummaryAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>
+    /// شريحة مشروع واحد من تسليم تقرير واحد. الرفض موحّد بـ<c>project.not_found</c> في
+    /// كلّ حالات «خارج النطاق» و«غير مرتبط» و«غير موجود» منعًا للتعداد.
+    /// </summary>
+    Task<Result<ProjectReportSliceDto>> GetReportSliceAsync(Guid id, Guid submissionId, CancellationToken ct = default);
 }

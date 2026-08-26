@@ -10,6 +10,7 @@ import type {
   UpdateProjectRequest,
   ProjectSummaryDto,
   LinkedReportRow,
+  ProjectReportSliceDto,
   ClientStatus,
   ProjectStatus,
   ServiceType,
@@ -139,6 +140,20 @@ export function useProjectReports(id: string | undefined) {
     queryKey: ['project-reports', id],
     queryFn: async () => (await api.get<LinkedReportRow[]>(`/projects/${id}/reports`)).data,
     enabled: !!id,
+  });
+}
+
+/**
+ * شريحة المشروع من تسليم واحد. `retry: false` مقصود: 404 هنا قرار أمنيّ نهائيّ
+ * (خارج النطاق أو غير مرتبط) لا خطأ عابر، وإعادة المحاولة تؤخّر الحالة النهائيّة بلا فائدة.
+ */
+export function useProjectReportSlice(projectId: string | undefined, submissionId: string | undefined) {
+  return useQuery({
+    queryKey: ['project-report-slice', projectId, submissionId],
+    queryFn: async () =>
+      (await api.get<ProjectReportSliceDto>(`/projects/${projectId}/reports/${submissionId}`)).data,
+    enabled: !!projectId && !!submissionId,
+    retry: false,
   });
 }
 

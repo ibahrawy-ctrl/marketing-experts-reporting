@@ -165,7 +165,7 @@ export default function ProjectDetailPage() {
 
       <WorkstreamsCard projectId={p.id} canManage={canManagePlan} canManagePlan={canManagePlan} />
 
-      <LinkedReportsCard rows={reportRows} title="تقارير المشروع المرتبطة" />
+      <LinkedReportsCard rows={reportRows} title="تقارير المشروع المرتبطة" projectId={p.id} />
     </div>
   );
 }

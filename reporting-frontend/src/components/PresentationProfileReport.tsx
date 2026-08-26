@@ -14,7 +14,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Badge, Card } from './ui';
 import type {
-  ProjectDto,
+  ProjectNameRef,
   ProjectRepeatableConfig,
   ProjectRepeatableEntry,
   RepeatableSubField,
@@ -99,7 +99,7 @@ export function PresentationProfileReport({
   profile: PresentationProfile;
   config: ProjectRepeatableConfig;
   entries: ProjectRepeatableEntry[];
-  projects: ProjectDto[];
+  projects: ProjectNameRef[];
 }) {
   // حالة مرفوعة: فتح/طيّ بطاقات المشاريع، فتح مجموعات التنقّل، الإبراز المؤقّت، وطلب التمرير.
   const [openCards, setOpenCards] = useState<Record<string, boolean>>({});
