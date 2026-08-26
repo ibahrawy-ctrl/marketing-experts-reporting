@@ -1,0 +1,121 @@
+{
+ "ticket": "PROJECT360-MULTI-WORK-ITEMS-AND-REPORT-DISCOVERY-CLOSURE-R2",
+ "decidedAt": "2026-08-27",
+ "decision": "CLOSED_ON_TEST_AWAITING_PRODUCT_OWNER_SIGN_OFF",
+ "scopeBoundary": "TEST فقط. RC والإنتاج و origin/main لم تُمسّ ولن تُمسّ بلا تصريح صريح جديد.",
+
+ "lineage": {
+  "PREVIOUS_TICKET": "PROJECT360-PROJECT-SCOPED-REPORT-NAVIGATION-FIX-R1",
+  "PREVIOUS_FIX_SHA": "63b7d42f2d0cc54899b22cc919045389c23b2ec7",
+  "BASE_SHA": "897c9b187ab4216213b4f453ec65948cd06dff27",
+  "FIX_SHA": "706c8fe",
+  "ORIGIN_DEVELOP": "706c8fe",
+  "ORIGIN_MAIN": "508509a (لم يُمسّ)",
+  "TEST_DEPLOYED_SHA_BACKEND": "f8c4ad2298a06e13e2f8c793110f17aef0822910",
+  "TEST_DEPLOYED_FRONTEND_AGGREGATE_MD5": "dcc84621939c1f2f1cfabf492c02f494",
+  "backendTreeIdenticalBetweenDeployedAndFixSha": "987286b7de5b35f5eedbcf9f99e98d1539985473",
+  "pushType": "fast-forward (f8c4ad2..706c8fe) بلا --force"
+ },
+
+ "acceptanceConditions": {
+  "PREVIOUS_NAVIGATION_FIX_PRESERVED": "YES",
+  "PROJECT_ENTRY_UNIQUE_PER_REPORT": "YES",
+  "MULTIPLE_WORK_ITEMS_PER_PROJECT": "YES",
+  "TEMPLATE_DRIVEN_WORK_ITEM_FIELDS": "YES",
+  "DUPLICATE_PROJECT_TOASTS": "0",
+  "PROJECT_REPORT_DISCOVERY_FROM_NESTED_DATA": "PASS",
+  "PROJECT_A_LISTS_REPORT": "PASS",
+  "PROJECT_B_LISTS_REPORT": "PASS",
+  "PROJECT_A_OPENS_ONLY_A": "PASS",
+  "PROJECT_B_OPENS_ONLY_B": "PASS",
+  "BACKEND_PROJECT_SCOPE_ENFORCED": "YES",
+  "FRONTEND_ONLY_FILTERING": "NO",
+  "CROSS_PROJECT_DATA_LEAK": "PROVEN_ABSENT",
+  "LEGACY_REPORTS_PRESERVED": "YES",
+  "SUBMITTED_REPORTS_MUTATED": "NO",
+  "DRAFT_CONVERSION_DATA_LOSS": "0",
+  "PROJECT360_EMPTY_STATE": "PASS",
+  "ROLE_MATRIX": "PASS",
+  "ID_TAMPERING_404": "PASS",
+  "OUT_OF_SCOPE_404": "PASS",
+  "BROWSER_CONSOLE_ERRORS": "0 UNEXPECTED",
+  "FAILED_NETWORK_REQUESTS": "0 UNEXPECTED",
+  "SIGNALR": "PASS",
+  "SECRET_SCAN": "PASS",
+  "TEST_DEPLOYED": "YES",
+  "OWNER_REVIEW_READY": "YES",
+  "RC_TOUCHED": "NO",
+  "PRODUCTION_TOUCHED": "NO",
+  "ORIGIN_MAIN_TOUCHED": "NO"
+ },
+ "acceptanceConditionsSatisfied": "29/29",
+
+ "evidencePerCondition": {
+  "PREVIOUS_NAVIGATION_FIX_PRESERVED": "63b7d42 داخل خطّ نسب 706c8fe (git merge-base --is-ancestor = 0) + حالات C09-360-* الستّ PASS.",
+  "MULTIPLE_WORK_ITEMS_PER_PROJECT": "سيناريو §13 الحقيقيّ: مشروع أ بثلاثة بنود (Carousel/Static/Reel) ومشروع ب ببندَين (Article/SEO) داخل تسليم واحد 268f70a4 — C11-EDITOR-ITEMS PASS.",
+  "PROJECT_ENTRY_UNIQUE_PER_REPORT": "C13-DUP-SINGLE-MSG: ثلاث محاولات إضافة لنفس المشروع ⇒ رسالة واحدة فقط ولا بطاقة مكرّرة.",
+  "TEMPLATE_DRIVEN_WORK_ITEM_FIELDS": "حقول البنود تُقرأ من TemplateField.ConfigJson (schemaVersion 2، مجموعة workItems الاختياريّة) — لا تخصيص لقالب بعينه؛ اختبار 13أ يبني قالبًا مغايرًا ويعمل.",
+  "PROJECT_REPORT_DISCOVERY_FROM_NESTED_DATA": "مشروع ب مربوط داخل Project Entry فقط بلا Submission.ProjectId علويّ، ومع ذلك C03-LIST-B PASS عبر الأدوار الستّة.",
+  "BACKEND_PROJECT_SCOPE_ENFORCED": "التصفية في الإسقاط الخادميّ؛ C05-NOLEAK-A يثبت غياب علامات مشروع ب وعلامة الحقل العامّ R2X9 من شريحة أ.",
+  "CROSS_PROJECT_DATA_LEAK": "0 تسريب في 12 قياسًا (C05/C06 × 6 أدوار) + مصفوفة API 40/40.",
+  "ID_TAMPERING_404": "C08-TAMPER × 6 أدوار: معرّف مُلاعَب ⇒ 404 موحّد (project.not_found) لا 403.",
+  "OUT_OF_SCOPE_404": "C18/C19 للموظّف خارج النطاق ⇒ 404 لا كشف وجود.",
+  "SIGNALR": "C20 + negotiate = 200 للأدوار الستّة، badSockets = 0، لا حمولة خارج النطاق.",
+  "LEGACY_REPORTS_PRESERVED": "مهايئ قراءة عرضيّ فقط: صفر عبارات DML، صفر تعديل على لقطة القالب؛ التفاصيل في DATA-COMPATIBILITY-AND-MIGRATION-REPORT.md.",
+  "DRAFT_CONVERSION_DATA_LOSS": "لا تحويل أصلًا (DRAFTS_CONVERTED = 0): بيانات v1 تُقرأ كما هي ولا يُكتب مفتاح workItems في تقرير لم يعرفه."
+ },
+
+ "qualityGatesSummary": {
+  "BACKEND_BUILD": "PASS (0 أخطاء / 4 تحذيرات / 12.19s)",
+  "UNIT_TESTS": "PASS (556/556)",
+  "TARGETED_PROJECT_REPORT_TESTS": "PASS (22/22)",
+  "INTEGRATION_TESTS": "PASS_WITH_PREEXISTING_BASELINE_FAILURES (2202/2210 — 8 إخفاقات مُثبَتة كخطّ أساس على BASE_SHA)",
+  "FRONTEND_TSC": "PASS (0 أخطاء)",
+  "FRONTEND_TESTS": "PASS (767/767)",
+  "FRONTEND_BUILD": "PASS (746ms، 7 ملفّات)",
+  "API_MATRIX": "PASS (40/40 على 7 هويّات)",
+  "BROWSER_UAT": "PASS (57/57، أخطاء وحدة تحكّم 0، 5xx = 0)",
+  "SECRET_SCAN": "PASS (0 مطابقة)",
+  "DOCX_VISUAL_QA": "PASS",
+  "PDF_VISUAL_QA": "PASS"
+ },
+
+ "knownGapsNoEmbellishment": [
+  {
+   "id": "BASELINE-UNIFIED-STATUS-CURRENT-CYCLE",
+   "severity": "غير حاجب لهذه التذكرة",
+   "statement": "ثمانية اختبارات تكامل تفشل على قاعدة نظيفة، وكلّها في مجال «الحالة الموحّدة / استحقاق الدورة الحاليّة» ولا تمسّ Project 360.",
+   "proof": "أُعيد تشغيل الأصناف نفسها على BASE_SHA=897c9b1 في worktree منفصل وقاعدة reporting_test_base نظيفة ⇒ Failed: 8, Passed: 32, Total: 40 — تطابق اسميّ وسطريّ قبل التذكرة وبعدها.",
+   "requiredAction": "تذكرة مستقلّة. مرشّح قويّ لحساسيّة تقويميّة عند حدّ الأسبوع السعوديّ (أحد→خميس)."
+  },
+  {
+   "id": "UAT-FIXTURE-RETAINED-ON-TEST",
+   "severity": "مقصود وموثَّق",
+   "statement": "بيانات السيناريو الأساسيّة (عميل واحد + مشروعان + تسليم واحد + قالب UAT مؤقّت) أُبقِيت على TEST عمدًا كي يتمكّن مالك المنتج من التحقّق الحيّ من الدورة الكاملة بنفسه.",
+   "requiredAction": "تُحذف بأمر واحد بعد PRODUCT_OWNER_SIGN_OFF (المعرّفات في Ops/R22/logs/UAT-FIXTURE.json)."
+  }
+ ],
+
+ "uatCleanup": {
+  "preCleanupBackup": "/root/db-backups/reporting_test_uat-precleanup-20260826T212030Z.dump (809162 B، md5 a19e48d5dcbc66b1d564ad864dc5961f)",
+  "orphanProjectsDeleted": 4,
+  "orphanClientsDeleted": 2,
+  "orphanDeletionSafetyProof": "قبل الحذف: 0 تسليم مرتبط، 0 قيمة JSON تشير إلى أيّ من المعرّفات الأربعة.",
+  "temporaryAccountsDisabled": 6,
+  "disableMethod": "LockoutEnabled=true + LockoutEnd=9999-12-31 + IsActive=false على p360r2.%@r2uat.test",
+  "secretFilesRemoved": ["/root/.p360r2-token", "/tmp/p360r2/.pw", "/tmp/p360r2/.adminpw", "/tmp/p360r2/.basic"],
+  "localTestDatabasesDropped": ["reporting_test_r22b", "reporting_test_r22c", "reporting_test_base"],
+  "baselineWorktreeRemoved": "/tmp/p360r2/base-897c9b1",
+  "retainedForOwnerReview": {
+   "clientId": "bff99e78-df4f-4c9b-bc17-c259250f4958",
+   "projectA": "d13a438c-bdda-4d09-a992-284fe21cabaa",
+   "projectB": "c7ea6b1d-9bcd-4cda-a103-4de88c77f9cb",
+   "submissionId": "268f70a4-5cc5-43d0-b74c-03f2dc67882e",
+   "templateId": "aed0016c-398d-4e27-a901-43a2c9097fe8",
+   "periodKey": "2026-W35"
+  },
+  "healthAfterCleanup": {"local": 200, "public": 200, "service": "active"}
+ },
+
+ "nextRequiredAction": "PRODUCT_OWNER_SIGN_OFF على TEST. لا RC ولا إنتاج ولا origin/main بلا تصريح صريح جديد لكلّ عمليّة على حدة."
+}

@@ -1,0 +1,155 @@
+{
+ "ticket": "PROJECT360-MULTI-WORK-ITEMS-AND-REPORT-DISCOVERY-CLOSURE-R2",
+ "measuredAt": "2026-08-27",
+ "fixSha": "706c8fe",
+ "baseSha": "897c9b187ab4216213b4f453ec65948cd06dff27",
+ "previousFixShaInLineage": true,
+ "stalenessPolicy": "كلّ بوّابة أدناه أُعيد تشغيلها بعد FIX_SHA=706c8fe. لا نتيجة منقولة من جولة أقدم.",
+ "gates": {
+  "BACKEND_BUILD": {
+   "command": "dotnet build Reporting.sln -c Release",
+   "workingDirectory": "reporting-backend",
+   "exitCode": 0,
+   "errors": 0,
+   "warnings": 4,
+   "durationSeconds": 12.19,
+   "result": "PASS"
+  },
+  "UNIT_TESTS": {
+   "command": "dotnet test tests/Reporting.UnitTests -c Release --no-build",
+   "total": 556,
+   "passed": 556,
+   "failed": 0,
+   "skipped": 0,
+   "exitCode": 0,
+   "result": "PASS"
+  },
+  "TARGETED_PROJECT_REPORT_TESTS": {
+   "command": "dotnet test tests/Reporting.IntegrationTests -c Release --no-build --filter \"FullyQualifiedName~MultiWorkItem|FullyQualifiedName~ProjectScopedReport|FullyQualifiedName~ProjectReportDiscovery\"",
+   "database": "reporting_test_r22b (معزولة)",
+   "total": 22,
+   "passed": 22,
+   "failed": 0,
+   "exitCode": 0,
+   "result": "PASS",
+   "note": "غطّت ProjectMultiWorkItemDiscoveryTests + ProjectScopedReportSliceTests + ProjectRepeatableGridTests"
+  },
+  "INTEGRATION_TESTS": {
+   "command": "dotnet test tests/Reporting.IntegrationTests -c Release --no-build",
+   "database": "reporting_test_r22c (جديدة نظيفة + عبارة Classification='Supplementary' المعروفة)",
+   "total": 2210,
+   "passed": 2202,
+   "failed": 8,
+   "skipped": 0,
+   "durationMinutes": 7.83,
+   "result": "PASS_WITH_PREEXISTING_BASELINE_FAILURES",
+   "failureClassification": {
+    "regressionFromThisTicket": 0,
+    "preExistingBaselineDefects": 8,
+    "proof": {
+     "method": "أُعيد تشغيل أصناف الاختبار الثمانية نفسها على BASE_SHA=897c9b1 في worktree منفصل وقاعدة جديدة نظيفة reporting_test_base",
+     "baseShaResult": "Failed: 8, Passed: 32, Total: 40",
+     "conclusion": "الإخفاقات الثمانية متطابقة اسمًا وسطرًا قبل هذه التذكرة وبعدها ⇒ خطّ أساس قائم لا انحدار"
+    },
+    "failedTests": [
+     "UnifiedReportStatusTests.CurrentCycle_NoSubmission_DueNow (UnifiedReportStatusTests.cs:171)",
+     "UnifiedReportStatusTests.CurrentCycle_Submitted_OnTime (UnifiedReportStatusTests.cs:199)",
+     "UnifiedReportStatusTests.Draft_CurrentIsDraft_PastIsOverdueDraft (UnifiedReportStatusTests.cs:229)",
+     "UnifiedReportStatusTests.Returned_CurrentVsPast (UnifiedReportStatusTests.cs:244)",
+     "UnifiedReportStatusTests.Batch_MultipleKeys_OneRowPerKey_NoNPlusOne (UnifiedReportStatusTests.cs:304)",
+     "UnifiedStatusApiTests.MyCycles_CurrentCycleNoSubmission_UnifiedIsDueNow (UnifiedStatusApiTests.cs:133)",
+     "CrossSurfaceConsistencyTests.CurrentWeekSubmitted_AllSurfaces_AgreeSubmittedNoAction (CrossSurfaceConsistencyTests.cs:117)",
+     "ReportDueTests.MyStatus_CurrentWeek_Employee_NotOverdue (ReportDueTests.cs:170)"
+    ],
+    "scopeAssessment": "كلّها في مجال «الحالة الموحّدة للتقارير / استحقاق الدورة الحاليّة» ولا تمسّ Project 360 ولا بنود العمل ولا اكتشاف تقارير المشروع ولا عقد الشريحة. أسماؤها كلّها حول الدورة الحاليّة (CurrentCycle/CurrentWeek) ⇒ مرشّح قويّ لحساسيّة تقويميّة عند حدّ الأسبوع السعوديّ (أحد→خميس؛ يوم القياس خميس). يستحقّ تذكرة مستقلّة ولا يُصلَح ضمن هذه.",
+    "contaminatedRunDiscarded": {
+     "database": "reporting_test_r22b",
+     "failed": 6,
+     "reason": "استُعمِلت قبلها في جولة مُصفّاة ⇒ مشتبَه بها بالتلوّث وفق قاعدة التشخيص المعتمدة. أُلغِيت وأُعيد القياس على قاعدة جديدة نظيفة."
+    }
+   }
+  },
+  "FRONTEND_TSC": {
+   "command": "npx tsc --noEmit",
+   "workingDirectory": "reporting-frontend",
+   "errors": 0,
+   "exitCode": 0,
+   "result": "PASS"
+  },
+  "FRONTEND_TESTS": {
+   "command": "npx vitest run",
+   "testFiles": 65,
+   "total": 767,
+   "passed": 767,
+   "failed": 0,
+   "durationSeconds": 11.72,
+   "exitCode": 0,
+   "result": "PASS",
+   "note": "767 = 765 قبل التذكرة + اختبارا انحدار مضافان لعيب القيمة غير النصّيّة"
+  },
+  "FRONTEND_BUILD": {
+   "command": "VITE_API_BASE_URL=https://test.emarketingacademy.net/api npx vite build",
+   "exitCode": 0,
+   "durationMs": 746,
+   "outputFiles": 7,
+   "aggregateMd5": "dcc84621939c1f2f1cfabf492c02f494",
+   "mainBundle": "assets/index-BSGCZnf1.js",
+   "mainBundleBytes": 1645198,
+   "mainBundleMd5": "bac588097d9debd11e2790fd2ff12bd4",
+   "result": "PASS"
+  },
+  "API_MATRIX": {
+   "command": "python3 scripts/api-matrix.py",
+   "environment": "TEST",
+   "total": 40,
+   "passed": 40,
+   "failed": 0,
+   "roles": ["admin", "acctmgr", "owner", "lead", "emp", "outsider", "anon"],
+   "result": "PASS"
+  },
+  "BROWSER_UAT": {
+   "command": "node scripts/uat.mjs",
+   "engine": "Playwright · Chromium · locale ar-SA · viewport 1440x900",
+   "environment": "TEST",
+   "bundleServedMd5": "dcc84621939c1f2f1cfabf492c02f494",
+   "bundleIdentityVerified": "بناء محلّيّ = منشور على TEST = مُقدَّم للمتصفّح",
+   "total": 57,
+   "passed": 57,
+   "failed": 0,
+   "consoleErrors": 0,
+   "http5xx": 0,
+   "screenshots": 40,
+   "screenshotsUniqueByMd5": 40,
+   "result": "PASS"
+  },
+  "SECRET_SCAN": {
+   "command": "فحص نمطيّ على Ops/R22/** — JWT · Bearer · كلمات مرور · سلاسل اتّصال · مفاتيح خاصّة",
+   "matches": 0,
+   "result": "PASS",
+   "note": "الأسرار تُقرأ في السكربتات من ملفّات خارج المستودع (/tmp/p360r2/.pw وأخواتها) ولا تُطبَع في أيّ مخرج ولا تُلتزَم."
+  },
+  "DOCX_VISUAL_QA": {
+   "artifact": "Ops/R22/MASTER-CLOSURE-REPORT.docx",
+   "result": "PASS",
+   "checks": ["RTL كامل", "الجداول غير مقطوعة", "العناوين متدرّجة", "لا نصّ زائد عن هامش الصفحة"]
+  },
+  "PDF_VISUAL_QA": {
+   "artifact": "Ops/R22/MASTER-CLOSURE-REPORT.pdf",
+   "result": "PASS",
+   "checks": ["RTL كامل", "الجداول غير مقطوعة", "الخطّ العربيّ مضمَّن ومقروء", "لا صفحة فارغة"]
+  }
+ },
+ "deployment": {
+  "environmentsTouched": ["TEST"],
+  "rcTouched": false,
+  "productionTouched": false,
+  "originMainTouched": false,
+  "pushType": "fast-forward (f8c4ad2..706c8fe) بلا --force",
+  "backupsTakenBeforeDeploy": true,
+  "artifactIdentityVerifiedAfterDeploy": true,
+  "environmentIsolationVerifiedBeforeDeploy": true,
+  "healthAfterDeploy": {"local": 200, "public": 200},
+  "migrationsApplied": 46,
+  "backendTreeIdenticalBetweenDeployedAndFixSha": "987286b7de5b35f5eedbcf9f99e98d1539985473"
+ }
+}

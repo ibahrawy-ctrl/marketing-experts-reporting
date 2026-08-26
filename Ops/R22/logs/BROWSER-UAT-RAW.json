@@ -1,0 +1,517 @@
+{
+ "total": 57,
+ "pass": 57,
+ "fail": 0,
+ "diagnostics": {
+  "consoleErrors": [],
+  "failedRequests": [],
+  "signalR": {
+   "admin": 200,
+   "acctmgr": 200,
+   "owner": 200,
+   "lead": 200,
+   "emp": 200,
+   "outsider": 200,
+   "editor": null
+  },
+  "editor": {
+   "dupTarget": {
+    "totalSelects": 18,
+    "optionValueFound": true
+   },
+   "dup": {
+    "alertsFound": 1,
+    "alertTexts": [
+     "هذا المشروع مضاف بالفعل داخل التقرير. أضف نوع العمل الجديد داخل بطاقة المشروع الحالية."
+    ],
+    "selectedLabels": [
+     "P360R2-مشروع أ — P360R2-عميل بنود العمل",
+     "Awareness",
+     "Carousel",
+     "Published",
+     "Static Post",
+     "Approved",
+     "Reel Script",
+     "Draft",
+     "P360R2-مشروع ب — P360R2-عميل بنود العمل",
+     "Educational",
+     "Article (قيمة قديمة)",
+     "Published",
+     "SEO Activity (قيمة قديمة)",
+     "Approved",
+     "اختر مشروعًا…",
+     "اختر…",
+     "اختر…",
+     "اختر…"
+    ]
+   },
+   "emptyButtons": {
+    "dead": 0,
+    "deadHtml": [],
+    "iconLabels": [
+     "بحث",
+     "إجراءات سريعة",
+     "مساعدة"
+    ]
+   }
+  }
+ },
+ "cases": [
+  {
+   "id": "C01-LOGIN-admin",
+   "role": "الإدارة",
+   "desc": "تسجيل الدخول من واجهة TEST الحقيقيّة",
+   "result": "PASS",
+   "detail": "/app",
+   "shot": "/tmp/p360r2/shots/c01-login-admin.png"
+  },
+  {
+   "id": "C02-LIST-A-admin",
+   "role": "الإدارة",
+   "desc": "صفحة مشروع أ تعرض التقرير المرتبط",
+   "result": "PASS",
+   "detail": "len=880",
+   "shot": "/tmp/p360r2/shots/c02-list-a-admin.png"
+  },
+  {
+   "id": "C03-LIST-B-admin",
+   "role": "الإدارة",
+   "desc": "مشروع ب يعرض التقرير رغم أنّ الربط متداخل فقط",
+   "result": "PASS",
+   "detail": "len=880",
+   "shot": "/tmp/p360r2/shots/c03-list-b-admin.png"
+  },
+  {
+   "id": "C04-SLICE-A-admin",
+   "role": "الإدارة",
+   "desc": "شريحة أ تعرض بنود العمل الثلاثة كلّها",
+   "result": "PASS",
+   "detail": "A=3/3",
+   "shot": "/tmp/p360r2/shots/c04-slice-a-admin.png"
+  },
+  {
+   "id": "C05-NOLEAK-A-admin",
+   "role": "الإدارة",
+   "desc": "شريحة أ لا تُسرّب بنود ب ولا الملخّص العامّ",
+   "result": "PASS",
+   "detail": "Bleak=0 generalLeak=false",
+   "shot": null
+  },
+  {
+   "id": "C06-SLICE-B-admin",
+   "role": "الإدارة",
+   "desc": "شريحة ب تعرض بنديها فقط بلا تسريب من أ",
+   "result": "PASS",
+   "detail": "B=2/2 Aleak=0",
+   "shot": "/tmp/p360r2/shots/c06-slice-b-admin.png"
+  },
+  {
+   "id": "C07-RTL-admin",
+   "role": "الإدارة",
+   "desc": "الصفحة تعمل باتّجاه RTL كاملًا",
+   "result": "PASS",
+   "detail": "dir=rtl",
+   "shot": null
+  },
+  {
+   "id": "C08-TAMPER-admin",
+   "role": "الإدارة",
+   "desc": "معرّف تقرير مُعبَث به يعطي حالة «غير موجود» بلا تفاصيل تقنيّة",
+   "result": "PASS",
+   "detail": "☰ نظام تقارير الأداء والتشغيل 🔔 P P360R2-مدير النظام مدير النظام الرئيسية الموظفون التقارير الأداء وKPI الحوك",
+   "shot": "/tmp/p360r2/shots/c08-tamper-admin.png"
+  },
+  {
+   "id": "C09-360-admin",
+   "role": "الإدارة",
+   "desc": "زرّ 360 يفتح مساحة عمل نفس المشروع",
+   "result": "PASS",
+   "detail": "href=/app/projects/d13a438c-bdda-4d09-a992-284fe21cabaa/360",
+   "shot": "/tmp/p360r2/shots/c09-360-admin.png"
+  },
+  {
+   "id": "C01-LOGIN-acctmgr",
+   "role": "مدير الحساب",
+   "desc": "تسجيل الدخول من واجهة TEST الحقيقيّة",
+   "result": "PASS",
+   "detail": "/app",
+   "shot": "/tmp/p360r2/shots/c01-login-acctmgr.png"
+  },
+  {
+   "id": "C02-LIST-A-acctmgr",
+   "role": "مدير الحساب",
+   "desc": "صفحة مشروع أ تعرض التقرير المرتبط",
+   "result": "PASS",
+   "detail": "len=832",
+   "shot": "/tmp/p360r2/shots/c02-list-a-acctmgr.png"
+  },
+  {
+   "id": "C03-LIST-B-acctmgr",
+   "role": "مدير الحساب",
+   "desc": "مشروع ب يعرض التقرير رغم أنّ الربط متداخل فقط",
+   "result": "PASS",
+   "detail": "len=832",
+   "shot": "/tmp/p360r2/shots/c03-list-b-acctmgr.png"
+  },
+  {
+   "id": "C04-SLICE-A-acctmgr",
+   "role": "مدير الحساب",
+   "desc": "شريحة أ تعرض بنود العمل الثلاثة كلّها",
+   "result": "PASS",
+   "detail": "A=3/3",
+   "shot": "/tmp/p360r2/shots/c04-slice-a-acctmgr.png"
+  },
+  {
+   "id": "C05-NOLEAK-A-acctmgr",
+   "role": "مدير الحساب",
+   "desc": "شريحة أ لا تُسرّب بنود ب ولا الملخّص العامّ",
+   "result": "PASS",
+   "detail": "Bleak=0 generalLeak=false",
+   "shot": null
+  },
+  {
+   "id": "C06-SLICE-B-acctmgr",
+   "role": "مدير الحساب",
+   "desc": "شريحة ب تعرض بنديها فقط بلا تسريب من أ",
+   "result": "PASS",
+   "detail": "B=2/2 Aleak=0",
+   "shot": "/tmp/p360r2/shots/c06-slice-b-acctmgr.png"
+  },
+  {
+   "id": "C07-RTL-acctmgr",
+   "role": "مدير الحساب",
+   "desc": "الصفحة تعمل باتّجاه RTL كاملًا",
+   "result": "PASS",
+   "detail": "dir=rtl",
+   "shot": null
+  },
+  {
+   "id": "C08-TAMPER-acctmgr",
+   "role": "مدير الحساب",
+   "desc": "معرّف تقرير مُعبَث به يعطي حالة «غير موجود» بلا تفاصيل تقنيّة",
+   "result": "PASS",
+   "detail": "☰ نظام تقارير الأداء والتشغيل 🔔 P P360R2-مدير الحساب موظف · محفظة عملائي الرئيسية الموظفون التقارير الأداء وK",
+   "shot": "/tmp/p360r2/shots/c08-tamper-acctmgr.png"
+  },
+  {
+   "id": "C09-360-acctmgr",
+   "role": "مدير الحساب",
+   "desc": "زرّ 360 يفتح مساحة عمل نفس المشروع",
+   "result": "PASS",
+   "detail": "href=/app/projects/d13a438c-bdda-4d09-a992-284fe21cabaa/360",
+   "shot": "/tmp/p360r2/shots/c09-360-acctmgr.png"
+  },
+  {
+   "id": "C01-LOGIN-owner",
+   "role": "مالك المشروع",
+   "desc": "تسجيل الدخول من واجهة TEST الحقيقيّة",
+   "result": "PASS",
+   "detail": "/app",
+   "shot": "/tmp/p360r2/shots/c01-login-owner.png"
+  },
+  {
+   "id": "C02-LIST-A-owner",
+   "role": "مالك المشروع",
+   "desc": "صفحة مشروع أ تعرض التقرير المرتبط",
+   "result": "PASS",
+   "detail": "len=864",
+   "shot": "/tmp/p360r2/shots/c02-list-a-owner.png"
+  },
+  {
+   "id": "C03-LIST-B-owner",
+   "role": "مالك المشروع",
+   "desc": "مشروع ب يعرض التقرير رغم أنّ الربط متداخل فقط",
+   "result": "PASS",
+   "detail": "len=864",
+   "shot": "/tmp/p360r2/shots/c03-list-b-owner.png"
+  },
+  {
+   "id": "C04-SLICE-A-owner",
+   "role": "مالك المشروع",
+   "desc": "شريحة أ تعرض بنود العمل الثلاثة كلّها",
+   "result": "PASS",
+   "detail": "A=3/3",
+   "shot": "/tmp/p360r2/shots/c04-slice-a-owner.png"
+  },
+  {
+   "id": "C05-NOLEAK-A-owner",
+   "role": "مالك المشروع",
+   "desc": "شريحة أ لا تُسرّب بنود ب ولا الملخّص العامّ",
+   "result": "PASS",
+   "detail": "Bleak=0 generalLeak=false",
+   "shot": null
+  },
+  {
+   "id": "C06-SLICE-B-owner",
+   "role": "مالك المشروع",
+   "desc": "شريحة ب تعرض بنديها فقط بلا تسريب من أ",
+   "result": "PASS",
+   "detail": "B=2/2 Aleak=0",
+   "shot": "/tmp/p360r2/shots/c06-slice-b-owner.png"
+  },
+  {
+   "id": "C07-RTL-owner",
+   "role": "مالك المشروع",
+   "desc": "الصفحة تعمل باتّجاه RTL كاملًا",
+   "result": "PASS",
+   "detail": "dir=rtl",
+   "shot": null
+  },
+  {
+   "id": "C08-TAMPER-owner",
+   "role": "مالك المشروع",
+   "desc": "معرّف تقرير مُعبَث به يعطي حالة «غير موجود» بلا تفاصيل تقنيّة",
+   "result": "PASS",
+   "detail": "☰ نظام تقارير الأداء والتشغيل 🔔 P P360R2-مالك المشروع مدير الرئيسية الموظفون التقارير الأداء وKPI الحوكمة الع",
+   "shot": "/tmp/p360r2/shots/c08-tamper-owner.png"
+  },
+  {
+   "id": "C09-360-owner",
+   "role": "مالك المشروع",
+   "desc": "زرّ 360 يفتح مساحة عمل نفس المشروع",
+   "result": "PASS",
+   "detail": "href=/app/projects/d13a438c-bdda-4d09-a992-284fe21cabaa/360",
+   "shot": "/tmp/p360r2/shots/c09-360-owner.png"
+  },
+  {
+   "id": "C01-LOGIN-lead",
+   "role": "قائد الفريق",
+   "desc": "تسجيل الدخول من واجهة TEST الحقيقيّة",
+   "result": "PASS",
+   "detail": "/app",
+   "shot": "/tmp/p360r2/shots/c01-login-lead.png"
+  },
+  {
+   "id": "C02-LIST-A-lead",
+   "role": "قائد الفريق",
+   "desc": "صفحة مشروع أ تعرض التقرير المرتبط",
+   "result": "PASS",
+   "detail": "len=840",
+   "shot": "/tmp/p360r2/shots/c02-list-a-lead.png"
+  },
+  {
+   "id": "C03-LIST-B-lead",
+   "role": "قائد الفريق",
+   "desc": "مشروع ب يعرض التقرير رغم أنّ الربط متداخل فقط",
+   "result": "PASS",
+   "detail": "len=840",
+   "shot": "/tmp/p360r2/shots/c03-list-b-lead.png"
+  },
+  {
+   "id": "C04-SLICE-A-lead",
+   "role": "قائد الفريق",
+   "desc": "شريحة أ تعرض بنود العمل الثلاثة كلّها",
+   "result": "PASS",
+   "detail": "A=3/3",
+   "shot": "/tmp/p360r2/shots/c04-slice-a-lead.png"
+  },
+  {
+   "id": "C05-NOLEAK-A-lead",
+   "role": "قائد الفريق",
+   "desc": "شريحة أ لا تُسرّب بنود ب ولا الملخّص العامّ",
+   "result": "PASS",
+   "detail": "Bleak=0 generalLeak=false",
+   "shot": null
+  },
+  {
+   "id": "C06-SLICE-B-lead",
+   "role": "قائد الفريق",
+   "desc": "شريحة ب تعرض بنديها فقط بلا تسريب من أ",
+   "result": "PASS",
+   "detail": "B=2/2 Aleak=0",
+   "shot": "/tmp/p360r2/shots/c06-slice-b-lead.png"
+  },
+  {
+   "id": "C07-RTL-lead",
+   "role": "قائد الفريق",
+   "desc": "الصفحة تعمل باتّجاه RTL كاملًا",
+   "result": "PASS",
+   "detail": "dir=rtl",
+   "shot": null
+  },
+  {
+   "id": "C08-TAMPER-lead",
+   "role": "قائد الفريق",
+   "desc": "معرّف تقرير مُعبَث به يعطي حالة «غير موجود» بلا تفاصيل تقنيّة",
+   "result": "PASS",
+   "detail": "☰ نظام تقارير الأداء والتشغيل 🔔 P P360R2-قائد الفريق قائد فريق الرئيسية الموظفون التقارير الأداء وKPI الحوكمة",
+   "shot": "/tmp/p360r2/shots/c08-tamper-lead.png"
+  },
+  {
+   "id": "C09-360-lead",
+   "role": "قائد الفريق",
+   "desc": "زرّ 360 يفتح مساحة عمل نفس المشروع",
+   "result": "PASS",
+   "detail": "href=/app/projects/d13a438c-bdda-4d09-a992-284fe21cabaa/360",
+   "shot": "/tmp/p360r2/shots/c09-360-lead.png"
+  },
+  {
+   "id": "C01-LOGIN-emp",
+   "role": "موظّف داخل النطاق",
+   "desc": "تسجيل الدخول من واجهة TEST الحقيقيّة",
+   "result": "PASS",
+   "detail": "/app",
+   "shot": "/tmp/p360r2/shots/c01-login-emp.png"
+  },
+  {
+   "id": "C02-LIST-A-emp",
+   "role": "موظّف داخل النطاق",
+   "desc": "صفحة مشروع أ تعرض التقرير المرتبط",
+   "result": "PASS",
+   "detail": "len=790",
+   "shot": "/tmp/p360r2/shots/c02-list-a-emp.png"
+  },
+  {
+   "id": "C03-LIST-B-emp",
+   "role": "موظّف داخل النطاق",
+   "desc": "مشروع ب يعرض التقرير رغم أنّ الربط متداخل فقط",
+   "result": "PASS",
+   "detail": "len=790",
+   "shot": "/tmp/p360r2/shots/c03-list-b-emp.png"
+  },
+  {
+   "id": "C04-SLICE-A-emp",
+   "role": "موظّف داخل النطاق",
+   "desc": "شريحة أ تعرض بنود العمل الثلاثة كلّها",
+   "result": "PASS",
+   "detail": "A=3/3",
+   "shot": "/tmp/p360r2/shots/c04-slice-a-emp.png"
+  },
+  {
+   "id": "C05-NOLEAK-A-emp",
+   "role": "موظّف داخل النطاق",
+   "desc": "شريحة أ لا تُسرّب بنود ب ولا الملخّص العامّ",
+   "result": "PASS",
+   "detail": "Bleak=0 generalLeak=false",
+   "shot": null
+  },
+  {
+   "id": "C06-SLICE-B-emp",
+   "role": "موظّف داخل النطاق",
+   "desc": "شريحة ب تعرض بنديها فقط بلا تسريب من أ",
+   "result": "PASS",
+   "detail": "B=2/2 Aleak=0",
+   "shot": "/tmp/p360r2/shots/c06-slice-b-emp.png"
+  },
+  {
+   "id": "C07-RTL-emp",
+   "role": "موظّف داخل النطاق",
+   "desc": "الصفحة تعمل باتّجاه RTL كاملًا",
+   "result": "PASS",
+   "detail": "dir=rtl",
+   "shot": null
+  },
+  {
+   "id": "C08-TAMPER-emp",
+   "role": "موظّف داخل النطاق",
+   "desc": "معرّف تقرير مُعبَث به يعطي حالة «غير موجود» بلا تفاصيل تقنيّة",
+   "result": "PASS",
+   "detail": "☰ نظام تقارير الأداء والتشغيل 🔔 P P360R2-موظّف داخل النطاق موظف الرئيسية الموظفون التقارير الأداء وKPI الحوكم",
+   "shot": "/tmp/p360r2/shots/c08-tamper-emp.png"
+  },
+  {
+   "id": "C09-360-emp",
+   "role": "موظّف داخل النطاق",
+   "desc": "زرّ 360 يفتح مساحة عمل نفس المشروع",
+   "result": "PASS",
+   "detail": "href=/app/projects/d13a438c-bdda-4d09-a992-284fe21cabaa/360",
+   "shot": "/tmp/p360r2/shots/c09-360-emp.png"
+  },
+  {
+   "id": "C01-LOGIN-outsider",
+   "role": "موظّف خارج النطاق",
+   "desc": "تسجيل الدخول من واجهة TEST الحقيقيّة",
+   "result": "PASS",
+   "detail": "/app",
+   "shot": "/tmp/p360r2/shots/c01-login-outsider.png"
+  },
+  {
+   "id": "C18-OUTSIDER-PROJECT",
+   "role": "موظّف خارج النطاق",
+   "desc": "خارج النطاق: رفض واضح بلا تفاصيل تقنيّة",
+   "result": "PASS",
+   "detail": "☰ نظام تقارير الأداء والتشغيل 🔔 P P360R2-موظّف خارج النطاق موظف الرئيسية الموظفون التقارير الأداء وKPI الحوكمة العملاء ",
+   "shot": "/tmp/p360r2/shots/c18-outsider-project.png"
+  },
+  {
+   "id": "C19-OUTSIDER-SLICE",
+   "role": "موظّف خارج النطاق",
+   "desc": "خارج النطاق: لا تسريب لأيّ بند عمل في الشريحة",
+   "result": "PASS",
+   "detail": "leak=false",
+   "shot": "/tmp/p360r2/shots/c19-outsider-slice.png"
+  },
+  {
+   "id": "C10-EDITOR-CARDS",
+   "role": "موظّف داخل النطاق",
+   "desc": "بطاقتا مشروع اثنتان فقط رغم وجود خمسة بنود عمل",
+   "result": "PASS",
+   "detail": "occurrences=6",
+   "shot": "/tmp/p360r2/shots/c10-editor-cards.png"
+  },
+  {
+   "id": "C11-EDITOR-ITEMS",
+   "role": "موظّف داخل النطاق",
+   "desc": "بنود العمل الخمسة كلّها معروضة داخل بطاقتَي المشروع",
+   "result": "PASS",
+   "detail": "items=5/5",
+   "shot": null
+  },
+  {
+   "id": "C12-ADD-ITEM-BTN",
+   "role": "موظّف داخل النطاق",
+   "desc": "زرّ «إضافة بند عمل» موجود داخل كلّ بطاقة مشروع",
+   "result": "PASS",
+   "detail": "buttons=2",
+   "shot": null
+  },
+  {
+   "id": "C13-DUP-SINGLE-MSG",
+   "role": "موظّف داخل النطاق",
+   "desc": "ثلاث محاولات تكرار للمشروع ⇒ رسالة واحدة فقط لا ثلاث",
+   "result": "PASS",
+   "detail": "alerts=1 text=هذا المشروع مضاف بالفعل داخل التقرير. أضف نوع العمل الجديد داخل بطاقة المشروع ال",
+   "shot": "/tmp/p360r2/shots/c13-duplicate-message.png"
+  },
+  {
+   "id": "C14-NO-DEAD-BUTTONS",
+   "role": "موظّف داخل النطاق",
+   "desc": "لا أزرار بلا نصّ ولا وظيفة على الشاشة",
+   "result": "PASS",
+   "detail": "blank=0",
+   "shot": null
+  },
+  {
+   "id": "C15-PRESERVE-INPUTS",
+   "role": "موظّف داخل النطاق",
+   "desc": "محاولة التكرار لم تمسح أيّ مُدخَل قائم",
+   "result": "PASS",
+   "detail": "items=5/5",
+   "shot": null
+  },
+  {
+   "id": "C16-EDITOR-CLEAN",
+   "role": "موظّف داخل النطاق",
+   "desc": "محرّر التقرير بلا أخطاء console ولا استجابات 5xx",
+   "result": "PASS",
+   "detail": "console=0 http5xx=0",
+   "shot": null
+  },
+  {
+   "id": "C17-DIAGNOSTICS",
+   "role": "كلّ الأدوار",
+   "desc": "صفر أخطاء console وصفر استجابات 5xx عبر كلّ الأدوار",
+   "result": "PASS",
+   "detail": "console=0 http5xx=0 negotiate=[admin=200,acctmgr=200,owner=200,lead=200,emp=200,outsider=200]",
+   "shot": null
+  },
+  {
+   "id": "C20-SIGNALR",
+   "role": "كلّ الأدوار",
+   "desc": "مقابس SignalR بلا أخطاء",
+   "result": "PASS",
+   "detail": "badSockets=0",
+   "shot": null
+  }
+ ]
+}

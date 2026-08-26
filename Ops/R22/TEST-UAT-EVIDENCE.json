@@ -1,0 +1,1040 @@
+{
+ "ticket": "PROJECT360-MULTI-WORK-ITEMS-AND-REPORT-DISCOVERY-CLOSURE-R2",
+ "environment": {
+  "name": "TEST",
+  "publicUrl": "https://test.emarketingacademy.net",
+  "service": "khubara-reporting-test",
+  "aspnetcoreEnvironment": "Staging",
+  "database": "reporting_test_uat",
+  "port": 5091,
+  "emailNotificationsMode": "DryRun",
+  "productionTouched": false,
+  "rcTouched": false
+ },
+ "backups": {
+  "database": "/root/db-backups/reporting_test_uat-<TS>.dump (pg_dump -Fc، أُثبِت استرجاعه إلى قاعدة مؤقّتة ثمّ أُسقِطت)",
+  "backendPublish": "/root/publish-backups/ (نسخة publish الحيّة قبل الاستبدال)",
+  "frontendDist": "/root/frontend-backups/reporting-test-frontend-20260826T204518Z.tgz",
+  "frontendBackupBytes": 412074,
+  "frontendBackupMd5": "0bab00bd195b3da55c32ce38926a9746"
+ },
+ "deployedArtifacts": {
+  "backendDll": "/opt/reporting-test/publish/Reporting.Api.dll",
+  "backendDllMd5": "bb4b659b86cb28db14bbe9ce82ace833",
+  "backendVersion": "1.0.0+f8c4ad2298a06e13e2f8c793110f17aef0822910a",
+  "migrationsApplied": 46,
+  "latestMigration": "20260826185232_AddSubmissionFieldValueJsonGinIndex",
+  "ginIndex": "CREATE INDEX ix_submission_field_values_value_json_gin ON public.submission_field_values USING gin (\"ValueJson\" jsonb_path_ops)",
+  "frontendAggregateMd5": "dcc84621939c1f2f1cfabf492c02f494",
+  "frontendFiles": 7,
+  "frontendBundle": "assets/index-BSGCZnf1.js (1645198 B, md5 bac588097d9debd11e2790fd2ff12bd4)",
+  "localBuildEqualsDeployedEqualsServedToBrowser": true,
+  "healthLocal": 200,
+  "healthPublic": 200
+ },
+ "scenario": {
+  "description": "سيناريو §13 الحقيقيّ داخل تقرير أسبوعيّ واحد",
+  "projectA": {
+   "workItems": [
+    "Carousel",
+    "Static Post",
+    "Reel Script"
+   ],
+   "markers": [
+    "R2-A-CAROUSEL",
+    "R2-A-STATIC",
+    "R2-A-REEL"
+   ],
+   "linkage": "Submission.ProjectId العلويّ"
+  },
+  "projectB": {
+   "workItems": [
+    "Article",
+    "SEO Activity"
+   ],
+   "markers": [
+    "R2-B-ARTICLE",
+    "R2-B-SEO"
+   ],
+   "linkage": "ربط متداخل داخل Project Entry فقط — لا ربط علويّ"
+  },
+  "generalFieldMarker": "ملخّص-عامّ-لا-ينتمي-لمشروع-R2X9 (يجب ألّا يظهر في أيّ شريحة مشروع)"
+ },
+ "apiMatrix": {
+  "total": 40,
+  "pass": 40,
+  "fail": 0,
+  "cases": [
+   {
+    "id": "DISCOVERY-A-admin",
+    "role": "admin",
+    "desc": "التقرير يظهر في قائمة تقارير مشروع A مرّة واحدة بلا تكرار",
+    "result": "PASS",
+    "detail": "http=200 rows=1 hits=1"
+   },
+   {
+    "id": "DISCOVERY-B-admin",
+    "role": "admin",
+    "desc": "التقرير يظهر في قائمة تقارير مشروع B مرّة واحدة بلا تكرار",
+    "result": "PASS",
+    "detail": "http=200 rows=1 hits=1"
+   },
+   {
+    "id": "SLICE-A-admin",
+    "role": "admin",
+    "desc": "شريحة مشروع A تُظهر بنوده الثلاثة فقط",
+    "result": "PASS",
+    "detail": "http=200 A=3/3 B=0/0 general_leak=False"
+   },
+   {
+    "id": "SLICE-B-admin",
+    "role": "admin",
+    "desc": "شريحة مشروع B تُظهر بنديه فقط",
+    "result": "PASS",
+    "detail": "http=200 B=2/2 A=0/0 general_leak=False"
+   },
+   {
+    "id": "TAMPER-PROJECT-admin",
+    "role": "admin",
+    "desc": "معرّف مشروع مُعبَث به يُرجِع 404",
+    "result": "PASS",
+    "detail": "http=404"
+   },
+   {
+    "id": "TAMPER-SUBMISSION-admin",
+    "role": "admin",
+    "desc": "معرّف تسليم مُعبَث به يُرجِع 404",
+    "result": "PASS",
+    "detail": "http=404"
+   },
+   {
+    "id": "SUMMARY-B-admin",
+    "role": "admin",
+    "desc": "ملخّص مشروع B يحتسب التقرير المرتبط بالتداخل",
+    "result": "PASS",
+    "detail": "http=200 total=1 keys=['project', 'totalReports', 'closedReports', 'pendingReports', 'lastReportAtUtc', 'openRiskCount', 'openNoteCount']"
+   },
+   {
+    "id": "DISCOVERY-A-acctmgr",
+    "role": "acctmgr",
+    "desc": "التقرير يظهر في قائمة تقارير مشروع A مرّة واحدة بلا تكرار",
+    "result": "PASS",
+    "detail": "http=200 rows=1 hits=1"
+   },
+   {
+    "id": "DISCOVERY-B-acctmgr",
+    "role": "acctmgr",
+    "desc": "التقرير يظهر في قائمة تقارير مشروع B مرّة واحدة بلا تكرار",
+    "result": "PASS",
+    "detail": "http=200 rows=1 hits=1"
+   },
+   {
+    "id": "SLICE-A-acctmgr",
+    "role": "acctmgr",
+    "desc": "شريحة مشروع A تُظهر بنوده الثلاثة فقط",
+    "result": "PASS",
+    "detail": "http=200 A=3/3 B=0/0 general_leak=False"
+   },
+   {
+    "id": "SLICE-B-acctmgr",
+    "role": "acctmgr",
+    "desc": "شريحة مشروع B تُظهر بنديه فقط",
+    "result": "PASS",
+    "detail": "http=200 B=2/2 A=0/0 general_leak=False"
+   },
+   {
+    "id": "TAMPER-PROJECT-acctmgr",
+    "role": "acctmgr",
+    "desc": "معرّف مشروع مُعبَث به يُرجِع 404",
+    "result": "PASS",
+    "detail": "http=404"
+   },
+   {
+    "id": "TAMPER-SUBMISSION-acctmgr",
+    "role": "acctmgr",
+    "desc": "معرّف تسليم مُعبَث به يُرجِع 404",
+    "result": "PASS",
+    "detail": "http=404"
+   },
+   {
+    "id": "SUMMARY-B-acctmgr",
+    "role": "acctmgr",
+    "desc": "ملخّص مشروع B يحتسب التقرير المرتبط بالتداخل",
+    "result": "PASS",
+    "detail": "http=200 total=1 keys=['project', 'totalReports', 'closedReports', 'pendingReports', 'lastReportAtUtc', 'openRiskCount', 'openNoteCount']"
+   },
+   {
+    "id": "DISCOVERY-A-owner",
+    "role": "owner",
+    "desc": "التقرير يظهر في قائمة تقارير مشروع A مرّة واحدة بلا تكرار",
+    "result": "PASS",
+    "detail": "http=200 rows=1 hits=1"
+   },
+   {
+    "id": "DISCOVERY-B-owner",
+    "role": "owner",
+    "desc": "التقرير يظهر في قائمة تقارير مشروع B مرّة واحدة بلا تكرار",
+    "result": "PASS",
+    "detail": "http=200 rows=1 hits=1"
+   },
+   {
+    "id": "SLICE-A-owner",
+    "role": "owner",
+    "desc": "شريحة مشروع A تُظهر بنوده الثلاثة فقط",
+    "result": "PASS",
+    "detail": "http=200 A=3/3 B=0/0 general_leak=False"
+   },
+   {
+    "id": "SLICE-B-owner",
+    "role": "owner",
+    "desc": "شريحة مشروع B تُظهر بنديه فقط",
+    "result": "PASS",
+    "detail": "http=200 B=2/2 A=0/0 general_leak=False"
+   },
+   {
+    "id": "TAMPER-PROJECT-owner",
+    "role": "owner",
+    "desc": "معرّف مشروع مُعبَث به يُرجِع 404",
+    "result": "PASS",
+    "detail": "http=404"
+   },
+   {
+    "id": "TAMPER-SUBMISSION-owner",
+    "role": "owner",
+    "desc": "معرّف تسليم مُعبَث به يُرجِع 404",
+    "result": "PASS",
+    "detail": "http=404"
+   },
+   {
+    "id": "SUMMARY-B-owner",
+    "role": "owner",
+    "desc": "ملخّص مشروع B يحتسب التقرير المرتبط بالتداخل",
+    "result": "PASS",
+    "detail": "http=200 total=1 keys=['project', 'totalReports', 'closedReports', 'pendingReports', 'lastReportAtUtc', 'openRiskCount', 'openNoteCount']"
+   },
+   {
+    "id": "DISCOVERY-A-lead",
+    "role": "lead",
+    "desc": "التقرير يظهر في قائمة تقارير مشروع A مرّة واحدة بلا تكرار",
+    "result": "PASS",
+    "detail": "http=200 rows=1 hits=1"
+   },
+   {
+    "id": "DISCOVERY-B-lead",
+    "role": "lead",
+    "desc": "التقرير يظهر في قائمة تقارير مشروع B مرّة واحدة بلا تكرار",
+    "result": "PASS",
+    "detail": "http=200 rows=1 hits=1"
+   },
+   {
+    "id": "SLICE-A-lead",
+    "role": "lead",
+    "desc": "شريحة مشروع A تُظهر بنوده الثلاثة فقط",
+    "result": "PASS",
+    "detail": "http=200 A=3/3 B=0/0 general_leak=False"
+   },
+   {
+    "id": "SLICE-B-lead",
+    "role": "lead",
+    "desc": "شريحة مشروع B تُظهر بنديه فقط",
+    "result": "PASS",
+    "detail": "http=200 B=2/2 A=0/0 general_leak=False"
+   },
+   {
+    "id": "TAMPER-PROJECT-lead",
+    "role": "lead",
+    "desc": "معرّف مشروع مُعبَث به يُرجِع 404",
+    "result": "PASS",
+    "detail": "http=404"
+   },
+   {
+    "id": "TAMPER-SUBMISSION-lead",
+    "role": "lead",
+    "desc": "معرّف تسليم مُعبَث به يُرجِع 404",
+    "result": "PASS",
+    "detail": "http=404"
+   },
+   {
+    "id": "SUMMARY-B-lead",
+    "role": "lead",
+    "desc": "ملخّص مشروع B يحتسب التقرير المرتبط بالتداخل",
+    "result": "PASS",
+    "detail": "http=200 total=1 keys=['project', 'totalReports', 'closedReports', 'pendingReports', 'lastReportAtUtc', 'openRiskCount', 'openNoteCount']"
+   },
+   {
+    "id": "DISCOVERY-A-emp",
+    "role": "emp",
+    "desc": "التقرير يظهر في قائمة تقارير مشروع A مرّة واحدة بلا تكرار",
+    "result": "PASS",
+    "detail": "http=200 rows=1 hits=1"
+   },
+   {
+    "id": "DISCOVERY-B-emp",
+    "role": "emp",
+    "desc": "التقرير يظهر في قائمة تقارير مشروع B مرّة واحدة بلا تكرار",
+    "result": "PASS",
+    "detail": "http=200 rows=1 hits=1"
+   },
+   {
+    "id": "SLICE-A-emp",
+    "role": "emp",
+    "desc": "شريحة مشروع A تُظهر بنوده الثلاثة فقط",
+    "result": "PASS",
+    "detail": "http=200 A=3/3 B=0/0 general_leak=False"
+   },
+   {
+    "id": "SLICE-B-emp",
+    "role": "emp",
+    "desc": "شريحة مشروع B تُظهر بنديه فقط",
+    "result": "PASS",
+    "detail": "http=200 B=2/2 A=0/0 general_leak=False"
+   },
+   {
+    "id": "TAMPER-PROJECT-emp",
+    "role": "emp",
+    "desc": "معرّف مشروع مُعبَث به يُرجِع 404",
+    "result": "PASS",
+    "detail": "http=404"
+   },
+   {
+    "id": "TAMPER-SUBMISSION-emp",
+    "role": "emp",
+    "desc": "معرّف تسليم مُعبَث به يُرجِع 404",
+    "result": "PASS",
+    "detail": "http=404"
+   },
+   {
+    "id": "SUMMARY-B-emp",
+    "role": "emp",
+    "desc": "ملخّص مشروع B يحتسب التقرير المرتبط بالتداخل",
+    "result": "PASS",
+    "detail": "http=200 total=1 keys=['project', 'totalReports', 'closedReports', 'pendingReports', 'lastReportAtUtc', 'openRiskCount', 'openNoteCount']"
+   },
+   {
+    "id": "OUTSIDER-LIST-A",
+    "role": "outsider",
+    "desc": "خارج النطاق لا يرى قائمة تقارير مشروع A",
+    "result": "PASS",
+    "detail": "http=404"
+   },
+   {
+    "id": "OUTSIDER-SLICE-A",
+    "role": "outsider",
+    "desc": "خارج النطاق لا يرى شريحة مشروع A",
+    "result": "PASS",
+    "detail": "http=404"
+   },
+   {
+    "id": "OUTSIDER-LIST-B",
+    "role": "outsider",
+    "desc": "خارج النطاق لا يرى قائمة تقارير مشروع B",
+    "result": "PASS",
+    "detail": "http=404"
+   },
+   {
+    "id": "OUTSIDER-SLICE-B",
+    "role": "outsider",
+    "desc": "خارج النطاق لا يرى شريحة مشروع B",
+    "result": "PASS",
+    "detail": "http=404"
+   },
+   {
+    "id": "ANON-SLICE",
+    "role": "anon",
+    "desc": "طلب بلا مصادقة يُرفَض",
+    "result": "PASS",
+    "detail": "http=401"
+   }
+  ]
+ },
+ "browserUat": {
+  "total": 57,
+  "pass": 57,
+  "fail": 0,
+  "consoleErrors": [],
+  "failedRequests": [],
+  "signalRNegotiate": {
+   "admin": 200,
+   "acctmgr": 200,
+   "owner": 200,
+   "lead": 200,
+   "emp": 200,
+   "outsider": 200,
+   "editor": null
+  },
+  "cases": [
+   {
+    "id": "C01-LOGIN-admin",
+    "role": "الإدارة",
+    "desc": "تسجيل الدخول من واجهة TEST الحقيقيّة",
+    "result": "PASS",
+    "detail": "/app",
+    "shot": "/tmp/p360r2/shots/c01-login-admin.png"
+   },
+   {
+    "id": "C02-LIST-A-admin",
+    "role": "الإدارة",
+    "desc": "صفحة مشروع أ تعرض التقرير المرتبط",
+    "result": "PASS",
+    "detail": "len=880",
+    "shot": "/tmp/p360r2/shots/c02-list-a-admin.png"
+   },
+   {
+    "id": "C03-LIST-B-admin",
+    "role": "الإدارة",
+    "desc": "مشروع ب يعرض التقرير رغم أنّ الربط متداخل فقط",
+    "result": "PASS",
+    "detail": "len=880",
+    "shot": "/tmp/p360r2/shots/c03-list-b-admin.png"
+   },
+   {
+    "id": "C04-SLICE-A-admin",
+    "role": "الإدارة",
+    "desc": "شريحة أ تعرض بنود العمل الثلاثة كلّها",
+    "result": "PASS",
+    "detail": "A=3/3",
+    "shot": "/tmp/p360r2/shots/c04-slice-a-admin.png"
+   },
+   {
+    "id": "C05-NOLEAK-A-admin",
+    "role": "الإدارة",
+    "desc": "شريحة أ لا تُسرّب بنود ب ولا الملخّص العامّ",
+    "result": "PASS",
+    "detail": "Bleak=0 generalLeak=false",
+    "shot": null
+   },
+   {
+    "id": "C06-SLICE-B-admin",
+    "role": "الإدارة",
+    "desc": "شريحة ب تعرض بنديها فقط بلا تسريب من أ",
+    "result": "PASS",
+    "detail": "B=2/2 Aleak=0",
+    "shot": "/tmp/p360r2/shots/c06-slice-b-admin.png"
+   },
+   {
+    "id": "C07-RTL-admin",
+    "role": "الإدارة",
+    "desc": "الصفحة تعمل باتّجاه RTL كاملًا",
+    "result": "PASS",
+    "detail": "dir=rtl",
+    "shot": null
+   },
+   {
+    "id": "C08-TAMPER-admin",
+    "role": "الإدارة",
+    "desc": "معرّف تقرير مُعبَث به يعطي حالة «غير موجود» بلا تفاصيل تقنيّة",
+    "result": "PASS",
+    "detail": "☰ نظام تقارير الأداء والتشغيل 🔔 P P360R2-مدير النظام مدير النظام الرئيسية الموظفون التقارير الأداء وKPI الحوك",
+    "shot": "/tmp/p360r2/shots/c08-tamper-admin.png"
+   },
+   {
+    "id": "C09-360-admin",
+    "role": "الإدارة",
+    "desc": "زرّ 360 يفتح مساحة عمل نفس المشروع",
+    "result": "PASS",
+    "detail": "href=/app/projects/d13a438c-bdda-4d09-a992-284fe21cabaa/360",
+    "shot": "/tmp/p360r2/shots/c09-360-admin.png"
+   },
+   {
+    "id": "C01-LOGIN-acctmgr",
+    "role": "مدير الحساب",
+    "desc": "تسجيل الدخول من واجهة TEST الحقيقيّة",
+    "result": "PASS",
+    "detail": "/app",
+    "shot": "/tmp/p360r2/shots/c01-login-acctmgr.png"
+   },
+   {
+    "id": "C02-LIST-A-acctmgr",
+    "role": "مدير الحساب",
+    "desc": "صفحة مشروع أ تعرض التقرير المرتبط",
+    "result": "PASS",
+    "detail": "len=832",
+    "shot": "/tmp/p360r2/shots/c02-list-a-acctmgr.png"
+   },
+   {
+    "id": "C03-LIST-B-acctmgr",
+    "role": "مدير الحساب",
+    "desc": "مشروع ب يعرض التقرير رغم أنّ الربط متداخل فقط",
+    "result": "PASS",
+    "detail": "len=832",
+    "shot": "/tmp/p360r2/shots/c03-list-b-acctmgr.png"
+   },
+   {
+    "id": "C04-SLICE-A-acctmgr",
+    "role": "مدير الحساب",
+    "desc": "شريحة أ تعرض بنود العمل الثلاثة كلّها",
+    "result": "PASS",
+    "detail": "A=3/3",
+    "shot": "/tmp/p360r2/shots/c04-slice-a-acctmgr.png"
+   },
+   {
+    "id": "C05-NOLEAK-A-acctmgr",
+    "role": "مدير الحساب",
+    "desc": "شريحة أ لا تُسرّب بنود ب ولا الملخّص العامّ",
+    "result": "PASS",
+    "detail": "Bleak=0 generalLeak=false",
+    "shot": null
+   },
+   {
+    "id": "C06-SLICE-B-acctmgr",
+    "role": "مدير الحساب",
+    "desc": "شريحة ب تعرض بنديها فقط بلا تسريب من أ",
+    "result": "PASS",
+    "detail": "B=2/2 Aleak=0",
+    "shot": "/tmp/p360r2/shots/c06-slice-b-acctmgr.png"
+   },
+   {
+    "id": "C07-RTL-acctmgr",
+    "role": "مدير الحساب",
+    "desc": "الصفحة تعمل باتّجاه RTL كاملًا",
+    "result": "PASS",
+    "detail": "dir=rtl",
+    "shot": null
+   },
+   {
+    "id": "C08-TAMPER-acctmgr",
+    "role": "مدير الحساب",
+    "desc": "معرّف تقرير مُعبَث به يعطي حالة «غير موجود» بلا تفاصيل تقنيّة",
+    "result": "PASS",
+    "detail": "☰ نظام تقارير الأداء والتشغيل 🔔 P P360R2-مدير الحساب موظف · محفظة عملائي الرئيسية الموظفون التقارير الأداء وK",
+    "shot": "/tmp/p360r2/shots/c08-tamper-acctmgr.png"
+   },
+   {
+    "id": "C09-360-acctmgr",
+    "role": "مدير الحساب",
+    "desc": "زرّ 360 يفتح مساحة عمل نفس المشروع",
+    "result": "PASS",
+    "detail": "href=/app/projects/d13a438c-bdda-4d09-a992-284fe21cabaa/360",
+    "shot": "/tmp/p360r2/shots/c09-360-acctmgr.png"
+   },
+   {
+    "id": "C01-LOGIN-owner",
+    "role": "مالك المشروع",
+    "desc": "تسجيل الدخول من واجهة TEST الحقيقيّة",
+    "result": "PASS",
+    "detail": "/app",
+    "shot": "/tmp/p360r2/shots/c01-login-owner.png"
+   },
+   {
+    "id": "C02-LIST-A-owner",
+    "role": "مالك المشروع",
+    "desc": "صفحة مشروع أ تعرض التقرير المرتبط",
+    "result": "PASS",
+    "detail": "len=864",
+    "shot": "/tmp/p360r2/shots/c02-list-a-owner.png"
+   },
+   {
+    "id": "C03-LIST-B-owner",
+    "role": "مالك المشروع",
+    "desc": "مشروع ب يعرض التقرير رغم أنّ الربط متداخل فقط",
+    "result": "PASS",
+    "detail": "len=864",
+    "shot": "/tmp/p360r2/shots/c03-list-b-owner.png"
+   },
+   {
+    "id": "C04-SLICE-A-owner",
+    "role": "مالك المشروع",
+    "desc": "شريحة أ تعرض بنود العمل الثلاثة كلّها",
+    "result": "PASS",
+    "detail": "A=3/3",
+    "shot": "/tmp/p360r2/shots/c04-slice-a-owner.png"
+   },
+   {
+    "id": "C05-NOLEAK-A-owner",
+    "role": "مالك المشروع",
+    "desc": "شريحة أ لا تُسرّب بنود ب ولا الملخّص العامّ",
+    "result": "PASS",
+    "detail": "Bleak=0 generalLeak=false",
+    "shot": null
+   },
+   {
+    "id": "C06-SLICE-B-owner",
+    "role": "مالك المشروع",
+    "desc": "شريحة ب تعرض بنديها فقط بلا تسريب من أ",
+    "result": "PASS",
+    "detail": "B=2/2 Aleak=0",
+    "shot": "/tmp/p360r2/shots/c06-slice-b-owner.png"
+   },
+   {
+    "id": "C07-RTL-owner",
+    "role": "مالك المشروع",
+    "desc": "الصفحة تعمل باتّجاه RTL كاملًا",
+    "result": "PASS",
+    "detail": "dir=rtl",
+    "shot": null
+   },
+   {
+    "id": "C08-TAMPER-owner",
+    "role": "مالك المشروع",
+    "desc": "معرّف تقرير مُعبَث به يعطي حالة «غير موجود» بلا تفاصيل تقنيّة",
+    "result": "PASS",
+    "detail": "☰ نظام تقارير الأداء والتشغيل 🔔 P P360R2-مالك المشروع مدير الرئيسية الموظفون التقارير الأداء وKPI الحوكمة الع",
+    "shot": "/tmp/p360r2/shots/c08-tamper-owner.png"
+   },
+   {
+    "id": "C09-360-owner",
+    "role": "مالك المشروع",
+    "desc": "زرّ 360 يفتح مساحة عمل نفس المشروع",
+    "result": "PASS",
+    "detail": "href=/app/projects/d13a438c-bdda-4d09-a992-284fe21cabaa/360",
+    "shot": "/tmp/p360r2/shots/c09-360-owner.png"
+   },
+   {
+    "id": "C01-LOGIN-lead",
+    "role": "قائد الفريق",
+    "desc": "تسجيل الدخول من واجهة TEST الحقيقيّة",
+    "result": "PASS",
+    "detail": "/app",
+    "shot": "/tmp/p360r2/shots/c01-login-lead.png"
+   },
+   {
+    "id": "C02-LIST-A-lead",
+    "role": "قائد الفريق",
+    "desc": "صفحة مشروع أ تعرض التقرير المرتبط",
+    "result": "PASS",
+    "detail": "len=840",
+    "shot": "/tmp/p360r2/shots/c02-list-a-lead.png"
+   },
+   {
+    "id": "C03-LIST-B-lead",
+    "role": "قائد الفريق",
+    "desc": "مشروع ب يعرض التقرير رغم أنّ الربط متداخل فقط",
+    "result": "PASS",
+    "detail": "len=840",
+    "shot": "/tmp/p360r2/shots/c03-list-b-lead.png"
+   },
+   {
+    "id": "C04-SLICE-A-lead",
+    "role": "قائد الفريق",
+    "desc": "شريحة أ تعرض بنود العمل الثلاثة كلّها",
+    "result": "PASS",
+    "detail": "A=3/3",
+    "shot": "/tmp/p360r2/shots/c04-slice-a-lead.png"
+   },
+   {
+    "id": "C05-NOLEAK-A-lead",
+    "role": "قائد الفريق",
+    "desc": "شريحة أ لا تُسرّب بنود ب ولا الملخّص العامّ",
+    "result": "PASS",
+    "detail": "Bleak=0 generalLeak=false",
+    "shot": null
+   },
+   {
+    "id": "C06-SLICE-B-lead",
+    "role": "قائد الفريق",
+    "desc": "شريحة ب تعرض بنديها فقط بلا تسريب من أ",
+    "result": "PASS",
+    "detail": "B=2/2 Aleak=0",
+    "shot": "/tmp/p360r2/shots/c06-slice-b-lead.png"
+   },
+   {
+    "id": "C07-RTL-lead",
+    "role": "قائد الفريق",
+    "desc": "الصفحة تعمل باتّجاه RTL كاملًا",
+    "result": "PASS",
+    "detail": "dir=rtl",
+    "shot": null
+   },
+   {
+    "id": "C08-TAMPER-lead",
+    "role": "قائد الفريق",
+    "desc": "معرّف تقرير مُعبَث به يعطي حالة «غير موجود» بلا تفاصيل تقنيّة",
+    "result": "PASS",
+    "detail": "☰ نظام تقارير الأداء والتشغيل 🔔 P P360R2-قائد الفريق قائد فريق الرئيسية الموظفون التقارير الأداء وKPI الحوكمة",
+    "shot": "/tmp/p360r2/shots/c08-tamper-lead.png"
+   },
+   {
+    "id": "C09-360-lead",
+    "role": "قائد الفريق",
+    "desc": "زرّ 360 يفتح مساحة عمل نفس المشروع",
+    "result": "PASS",
+    "detail": "href=/app/projects/d13a438c-bdda-4d09-a992-284fe21cabaa/360",
+    "shot": "/tmp/p360r2/shots/c09-360-lead.png"
+   },
+   {
+    "id": "C01-LOGIN-emp",
+    "role": "موظّف داخل النطاق",
+    "desc": "تسجيل الدخول من واجهة TEST الحقيقيّة",
+    "result": "PASS",
+    "detail": "/app",
+    "shot": "/tmp/p360r2/shots/c01-login-emp.png"
+   },
+   {
+    "id": "C02-LIST-A-emp",
+    "role": "موظّف داخل النطاق",
+    "desc": "صفحة مشروع أ تعرض التقرير المرتبط",
+    "result": "PASS",
+    "detail": "len=790",
+    "shot": "/tmp/p360r2/shots/c02-list-a-emp.png"
+   },
+   {
+    "id": "C03-LIST-B-emp",
+    "role": "موظّف داخل النطاق",
+    "desc": "مشروع ب يعرض التقرير رغم أنّ الربط متداخل فقط",
+    "result": "PASS",
+    "detail": "len=790",
+    "shot": "/tmp/p360r2/shots/c03-list-b-emp.png"
+   },
+   {
+    "id": "C04-SLICE-A-emp",
+    "role": "موظّف داخل النطاق",
+    "desc": "شريحة أ تعرض بنود العمل الثلاثة كلّها",
+    "result": "PASS",
+    "detail": "A=3/3",
+    "shot": "/tmp/p360r2/shots/c04-slice-a-emp.png"
+   },
+   {
+    "id": "C05-NOLEAK-A-emp",
+    "role": "موظّف داخل النطاق",
+    "desc": "شريحة أ لا تُسرّب بنود ب ولا الملخّص العامّ",
+    "result": "PASS",
+    "detail": "Bleak=0 generalLeak=false",
+    "shot": null
+   },
+   {
+    "id": "C06-SLICE-B-emp",
+    "role": "موظّف داخل النطاق",
+    "desc": "شريحة ب تعرض بنديها فقط بلا تسريب من أ",
+    "result": "PASS",
+    "detail": "B=2/2 Aleak=0",
+    "shot": "/tmp/p360r2/shots/c06-slice-b-emp.png"
+   },
+   {
+    "id": "C07-RTL-emp",
+    "role": "موظّف داخل النطاق",
+    "desc": "الصفحة تعمل باتّجاه RTL كاملًا",
+    "result": "PASS",
+    "detail": "dir=rtl",
+    "shot": null
+   },
+   {
+    "id": "C08-TAMPER-emp",
+    "role": "موظّف داخل النطاق",
+    "desc": "معرّف تقرير مُعبَث به يعطي حالة «غير موجود» بلا تفاصيل تقنيّة",
+    "result": "PASS",
+    "detail": "☰ نظام تقارير الأداء والتشغيل 🔔 P P360R2-موظّف داخل النطاق موظف الرئيسية الموظفون التقارير الأداء وKPI الحوكم",
+    "shot": "/tmp/p360r2/shots/c08-tamper-emp.png"
+   },
+   {
+    "id": "C09-360-emp",
+    "role": "موظّف داخل النطاق",
+    "desc": "زرّ 360 يفتح مساحة عمل نفس المشروع",
+    "result": "PASS",
+    "detail": "href=/app/projects/d13a438c-bdda-4d09-a992-284fe21cabaa/360",
+    "shot": "/tmp/p360r2/shots/c09-360-emp.png"
+   },
+   {
+    "id": "C01-LOGIN-outsider",
+    "role": "موظّف خارج النطاق",
+    "desc": "تسجيل الدخول من واجهة TEST الحقيقيّة",
+    "result": "PASS",
+    "detail": "/app",
+    "shot": "/tmp/p360r2/shots/c01-login-outsider.png"
+   },
+   {
+    "id": "C18-OUTSIDER-PROJECT",
+    "role": "موظّف خارج النطاق",
+    "desc": "خارج النطاق: رفض واضح بلا تفاصيل تقنيّة",
+    "result": "PASS",
+    "detail": "☰ نظام تقارير الأداء والتشغيل 🔔 P P360R2-موظّف خارج النطاق موظف الرئيسية الموظفون التقارير الأداء وKPI الحوكمة العملاء ",
+    "shot": "/tmp/p360r2/shots/c18-outsider-project.png"
+   },
+   {
+    "id": "C19-OUTSIDER-SLICE",
+    "role": "موظّف خارج النطاق",
+    "desc": "خارج النطاق: لا تسريب لأيّ بند عمل في الشريحة",
+    "result": "PASS",
+    "detail": "leak=false",
+    "shot": "/tmp/p360r2/shots/c19-outsider-slice.png"
+   },
+   {
+    "id": "C10-EDITOR-CARDS",
+    "role": "موظّف داخل النطاق",
+    "desc": "بطاقتا مشروع اثنتان فقط رغم وجود خمسة بنود عمل",
+    "result": "PASS",
+    "detail": "occurrences=6",
+    "shot": "/tmp/p360r2/shots/c10-editor-cards.png"
+   },
+   {
+    "id": "C11-EDITOR-ITEMS",
+    "role": "موظّف داخل النطاق",
+    "desc": "بنود العمل الخمسة كلّها معروضة داخل بطاقتَي المشروع",
+    "result": "PASS",
+    "detail": "items=5/5",
+    "shot": null
+   },
+   {
+    "id": "C12-ADD-ITEM-BTN",
+    "role": "موظّف داخل النطاق",
+    "desc": "زرّ «إضافة بند عمل» موجود داخل كلّ بطاقة مشروع",
+    "result": "PASS",
+    "detail": "buttons=2",
+    "shot": null
+   },
+   {
+    "id": "C13-DUP-SINGLE-MSG",
+    "role": "موظّف داخل النطاق",
+    "desc": "ثلاث محاولات تكرار للمشروع ⇒ رسالة واحدة فقط لا ثلاث",
+    "result": "PASS",
+    "detail": "alerts=1 text=هذا المشروع مضاف بالفعل داخل التقرير. أضف نوع العمل الجديد داخل بطاقة المشروع ال",
+    "shot": "/tmp/p360r2/shots/c13-duplicate-message.png"
+   },
+   {
+    "id": "C14-NO-DEAD-BUTTONS",
+    "role": "موظّف داخل النطاق",
+    "desc": "لا أزرار بلا نصّ ولا وظيفة على الشاشة",
+    "result": "PASS",
+    "detail": "blank=0",
+    "shot": null
+   },
+   {
+    "id": "C15-PRESERVE-INPUTS",
+    "role": "موظّف داخل النطاق",
+    "desc": "محاولة التكرار لم تمسح أيّ مُدخَل قائم",
+    "result": "PASS",
+    "detail": "items=5/5",
+    "shot": null
+   },
+   {
+    "id": "C16-EDITOR-CLEAN",
+    "role": "موظّف داخل النطاق",
+    "desc": "محرّر التقرير بلا أخطاء console ولا استجابات 5xx",
+    "result": "PASS",
+    "detail": "console=0 http5xx=0",
+    "shot": null
+   },
+   {
+    "id": "C17-DIAGNOSTICS",
+    "role": "كلّ الأدوار",
+    "desc": "صفر أخطاء console وصفر استجابات 5xx عبر كلّ الأدوار",
+    "result": "PASS",
+    "detail": "console=0 http5xx=0 negotiate=[admin=200,acctmgr=200,owner=200,lead=200,emp=200,outsider=200]",
+    "shot": null
+   },
+   {
+    "id": "C20-SIGNALR",
+    "role": "كلّ الأدوار",
+    "desc": "مقابس SignalR بلا أخطاء",
+    "result": "PASS",
+    "detail": "badSockets=0",
+    "shot": null
+   }
+  ]
+ },
+ "screenshots": {
+  "count": 40,
+  "uniqueByMd5": 40,
+  "allUnique": true,
+  "files": [
+   {
+    "file": "c01-login-acctmgr.png",
+    "bytes": 180785,
+    "md5": "55c3010c23362029b5f1d319855c7414"
+   },
+   {
+    "file": "c01-login-admin.png",
+    "bytes": 175900,
+    "md5": "29bc72aaaffff93cdada8062308d4b44"
+   },
+   {
+    "file": "c01-login-emp.png",
+    "bytes": 199064,
+    "md5": "d2a0491c6f4435b18636d22e98571a94"
+   },
+   {
+    "file": "c01-login-lead.png",
+    "bytes": 217824,
+    "md5": "04fa9c94471d5079a848a78ca9e6c7d8"
+   },
+   {
+    "file": "c01-login-outsider.png",
+    "bytes": 198074,
+    "md5": "9eef263bd08e25ca717e9e74b2d47ee6"
+   },
+   {
+    "file": "c01-login-owner.png",
+    "bytes": 224126,
+    "md5": "2b953f58a0723a14dc6eba5cf5e6ea7f"
+   },
+   {
+    "file": "c02-list-a-acctmgr.png",
+    "bytes": 107054,
+    "md5": "943b1767d8a3efe646396d40731024f4"
+   },
+   {
+    "file": "c02-list-a-admin.png",
+    "bytes": 115586,
+    "md5": "fe076fa0dc6088acd44483e439762864"
+   },
+   {
+    "file": "c02-list-a-emp.png",
+    "bytes": 102527,
+    "md5": "09e1edac40ad5cf2cb00c52b62c37dee"
+   },
+   {
+    "file": "c02-list-a-lead.png",
+    "bytes": 109705,
+    "md5": "7290b6faf3624f621b2bbb629abd1ade"
+   },
+   {
+    "file": "c02-list-a-owner.png",
+    "bytes": 114205,
+    "md5": "6f715635fbf3ec723930c59df310c251"
+   },
+   {
+    "file": "c03-list-b-acctmgr.png",
+    "bytes": 108984,
+    "md5": "18416649245ba077f6e694033b563c42"
+   },
+   {
+    "file": "c03-list-b-admin.png",
+    "bytes": 117331,
+    "md5": "cad8bce022f284e2b5ea04fc76057e9c"
+   },
+   {
+    "file": "c03-list-b-emp.png",
+    "bytes": 104300,
+    "md5": "415cd3627add9560788c46dbaf5d7db1"
+   },
+   {
+    "file": "c03-list-b-lead.png",
+    "bytes": 111755,
+    "md5": "8b06e64319a3ccdc14d942e7a30d7bfc"
+   },
+   {
+    "file": "c03-list-b-owner.png",
+    "bytes": 116047,
+    "md5": "a62c9e8a5b2c7bc66358cc4af82fa3ff"
+   },
+   {
+    "file": "c04-slice-a-acctmgr.png",
+    "bytes": 129227,
+    "md5": "7302e0320ff696432eeb571622979814"
+   },
+   {
+    "file": "c04-slice-a-admin.png",
+    "bytes": 132246,
+    "md5": "171681d7841cde5823f2228249bb95e2"
+   },
+   {
+    "file": "c04-slice-a-emp.png",
+    "bytes": 126186,
+    "md5": "933c13ed4fa25d2c1f6e858c729da832"
+   },
+   {
+    "file": "c04-slice-a-lead.png",
+    "bytes": 130092,
+    "md5": "900adab2236eadea8a221571d6094d30"
+   },
+   {
+    "file": "c04-slice-a-owner.png",
+    "bytes": 130971,
+    "md5": "c61662a4de940a9307dae12aff74c7d7"
+   },
+   {
+    "file": "c06-slice-b-acctmgr.png",
+    "bytes": 115834,
+    "md5": "06f34cb01b97e900a9fe4c57e50578c8"
+   },
+   {
+    "file": "c06-slice-b-admin.png",
+    "bytes": 121005,
+    "md5": "5729d476c1f24589d732ed41c5748a07"
+   },
+   {
+    "file": "c06-slice-b-emp.png",
+    "bytes": 112873,
+    "md5": "fd59085085ed3ef6a1e07d737f410321"
+   },
+   {
+    "file": "c06-slice-b-lead.png",
+    "bytes": 119289,
+    "md5": "affbbd7d06f4e582a2c79a79832d7ba2"
+   },
+   {
+    "file": "c06-slice-b-owner.png",
+    "bytes": 119834,
+    "md5": "53727d20d80aee18956d76049a8bf842"
+   },
+   {
+    "file": "c08-tamper-acctmgr.png",
+    "bytes": 53590,
+    "md5": "b4ebb6ed41dec13741200f54e4c035ae"
+   },
+   {
+    "file": "c08-tamper-admin.png",
+    "bytes": 58937,
+    "md5": "fa48094c5747e28feeb97d09fd33da59"
+   },
+   {
+    "file": "c08-tamper-emp.png",
+    "bytes": 50867,
+    "md5": "01d5e0685441d9c8e74cb70a7ae05f55"
+   },
+   {
+    "file": "c08-tamper-lead.png",
+    "bytes": 57395,
+    "md5": "1c8041912b43285aebb27930606e8449"
+   },
+   {
+    "file": "c08-tamper-owner.png",
+    "bytes": 57378,
+    "md5": "63653c6cbf06a74d409e8226e662b62b"
+   },
+   {
+    "file": "c09-360-acctmgr.png",
+    "bytes": 127593,
+    "md5": "49ab59883df98a4f2ab61ecb8d90f3b6"
+   },
+   {
+    "file": "c09-360-admin.png",
+    "bytes": 127613,
+    "md5": "e89d9d9669990586eed7771d9a20704f"
+   },
+   {
+    "file": "c09-360-emp.png",
+    "bytes": 122029,
+    "md5": "38dd1278bd1d0132ed6db015da85a001"
+   },
+   {
+    "file": "c09-360-lead.png",
+    "bytes": 125876,
+    "md5": "8b224eee98b7b6be4a8a00a619166459"
+   },
+   {
+    "file": "c09-360-owner.png",
+    "bytes": 127030,
+    "md5": "10fc15580e637628ed8e9a370c057967"
+   },
+   {
+    "file": "c10-editor-cards.png",
+    "bytes": 209150,
+    "md5": "c3ec61b5c88a4cc13330dfd666a661d0"
+   },
+   {
+    "file": "c13-duplicate-message.png",
+    "bytes": 241454,
+    "md5": "ad0f2794ef3a8db9e8b40c975e6f1106"
+   },
+   {
+    "file": "c18-outsider-project.png",
+    "bytes": 46465,
+    "md5": "1f48b9fe3065b216bd8e97f28e8e2dd3"
+   },
+   {
+    "file": "c19-outsider-slice.png",
+    "bytes": 53517,
+    "md5": "e90e271021ceae80926c7797c81f8b77"
+   }
+  ]
+ },
+ "measurementCorrections": [
+  "C10/C11/C15: قياس النصّ وحده لا يشمل قيم `<input>` ⇒ أُضيفت قراءة قيم الحقول المرئيّة (عيب قياس لا منتج)",
+  "C13: الحزام كان يختار آخر `select` في الصفحة وهي قائمة حقل لا قائمة مشروع ⇒ صار يختار آخر قائمة تحوي خيار المشروع",
+  "C14: الأزرار الأيقونيّة ذات `aria-label` (بحث/إجراءات سريعة/مساعدة) ليست ميّتة ⇒ استُثنيت من عدّ «بلا اسم متاح»",
+  "C17: 404 المتعمَّدة في اختبارات العبث/خارج النطاق ليست أخطاء ⇒ مستثناة من عدّ أخطاء الشبكة"
+ ],
+ "nonBlockingObservations": [
+  "TanStack Query يعيد محاولة 404 نحو ثلاث مرّات بتراجع تصاعديّ ⇒ شاشة «تعذّر عرض المشروع» تستغرق ~15 ثانية للظهور لخارج النطاق. سلوك صحيح لكنّه بطيء؛ يُقترَح استثناء 404 من إعادة المحاولة في تذكرة لاحقة."
+ ]
+}

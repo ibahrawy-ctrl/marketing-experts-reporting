@@ -1,0 +1,287 @@
+{
+ "total": 40,
+ "pass": 40,
+ "fail": 0,
+ "cases": [
+  {
+   "id": "DISCOVERY-A-admin",
+   "role": "admin",
+   "desc": "التقرير يظهر في قائمة تقارير مشروع A مرّة واحدة بلا تكرار",
+   "result": "PASS",
+   "detail": "http=200 rows=1 hits=1"
+  },
+  {
+   "id": "DISCOVERY-B-admin",
+   "role": "admin",
+   "desc": "التقرير يظهر في قائمة تقارير مشروع B مرّة واحدة بلا تكرار",
+   "result": "PASS",
+   "detail": "http=200 rows=1 hits=1"
+  },
+  {
+   "id": "SLICE-A-admin",
+   "role": "admin",
+   "desc": "شريحة مشروع A تُظهر بنوده الثلاثة فقط",
+   "result": "PASS",
+   "detail": "http=200 A=3/3 B=0/0 general_leak=False"
+  },
+  {
+   "id": "SLICE-B-admin",
+   "role": "admin",
+   "desc": "شريحة مشروع B تُظهر بنديه فقط",
+   "result": "PASS",
+   "detail": "http=200 B=2/2 A=0/0 general_leak=False"
+  },
+  {
+   "id": "TAMPER-PROJECT-admin",
+   "role": "admin",
+   "desc": "معرّف مشروع مُعبَث به يُرجِع 404",
+   "result": "PASS",
+   "detail": "http=404"
+  },
+  {
+   "id": "TAMPER-SUBMISSION-admin",
+   "role": "admin",
+   "desc": "معرّف تسليم مُعبَث به يُرجِع 404",
+   "result": "PASS",
+   "detail": "http=404"
+  },
+  {
+   "id": "SUMMARY-B-admin",
+   "role": "admin",
+   "desc": "ملخّص مشروع B يحتسب التقرير المرتبط بالتداخل",
+   "result": "PASS",
+   "detail": "http=200 total=1 keys=['project', 'totalReports', 'closedReports', 'pendingReports', 'lastReportAtUtc', 'openRiskCount', 'openNoteCount']"
+  },
+  {
+   "id": "DISCOVERY-A-acctmgr",
+   "role": "acctmgr",
+   "desc": "التقرير يظهر في قائمة تقارير مشروع A مرّة واحدة بلا تكرار",
+   "result": "PASS",
+   "detail": "http=200 rows=1 hits=1"
+  },
+  {
+   "id": "DISCOVERY-B-acctmgr",
+   "role": "acctmgr",
+   "desc": "التقرير يظهر في قائمة تقارير مشروع B مرّة واحدة بلا تكرار",
+   "result": "PASS",
+   "detail": "http=200 rows=1 hits=1"
+  },
+  {
+   "id": "SLICE-A-acctmgr",
+   "role": "acctmgr",
+   "desc": "شريحة مشروع A تُظهر بنوده الثلاثة فقط",
+   "result": "PASS",
+   "detail": "http=200 A=3/3 B=0/0 general_leak=False"
+  },
+  {
+   "id": "SLICE-B-acctmgr",
+   "role": "acctmgr",
+   "desc": "شريحة مشروع B تُظهر بنديه فقط",
+   "result": "PASS",
+   "detail": "http=200 B=2/2 A=0/0 general_leak=False"
+  },
+  {
+   "id": "TAMPER-PROJECT-acctmgr",
+   "role": "acctmgr",
+   "desc": "معرّف مشروع مُعبَث به يُرجِع 404",
+   "result": "PASS",
+   "detail": "http=404"
+  },
+  {
+   "id": "TAMPER-SUBMISSION-acctmgr",
+   "role": "acctmgr",
+   "desc": "معرّف تسليم مُعبَث به يُرجِع 404",
+   "result": "PASS",
+   "detail": "http=404"
+  },
+  {
+   "id": "SUMMARY-B-acctmgr",
+   "role": "acctmgr",
+   "desc": "ملخّص مشروع B يحتسب التقرير المرتبط بالتداخل",
+   "result": "PASS",
+   "detail": "http=200 total=1 keys=['project', 'totalReports', 'closedReports', 'pendingReports', 'lastReportAtUtc', 'openRiskCount', 'openNoteCount']"
+  },
+  {
+   "id": "DISCOVERY-A-owner",
+   "role": "owner",
+   "desc": "التقرير يظهر في قائمة تقارير مشروع A مرّة واحدة بلا تكرار",
+   "result": "PASS",
+   "detail": "http=200 rows=1 hits=1"
+  },
+  {
+   "id": "DISCOVERY-B-owner",
+   "role": "owner",
+   "desc": "التقرير يظهر في قائمة تقارير مشروع B مرّة واحدة بلا تكرار",
+   "result": "PASS",
+   "detail": "http=200 rows=1 hits=1"
+  },
+  {
+   "id": "SLICE-A-owner",
+   "role": "owner",
+   "desc": "شريحة مشروع A تُظهر بنوده الثلاثة فقط",
+   "result": "PASS",
+   "detail": "http=200 A=3/3 B=0/0 general_leak=False"
+  },
+  {
+   "id": "SLICE-B-owner",
+   "role": "owner",
+   "desc": "شريحة مشروع B تُظهر بنديه فقط",
+   "result": "PASS",
+   "detail": "http=200 B=2/2 A=0/0 general_leak=False"
+  },
+  {
+   "id": "TAMPER-PROJECT-owner",
+   "role": "owner",
+   "desc": "معرّف مشروع مُعبَث به يُرجِع 404",
+   "result": "PASS",
+   "detail": "http=404"
+  },
+  {
+   "id": "TAMPER-SUBMISSION-owner",
+   "role": "owner",
+   "desc": "معرّف تسليم مُعبَث به يُرجِع 404",
+   "result": "PASS",
+   "detail": "http=404"
+  },
+  {
+   "id": "SUMMARY-B-owner",
+   "role": "owner",
+   "desc": "ملخّص مشروع B يحتسب التقرير المرتبط بالتداخل",
+   "result": "PASS",
+   "detail": "http=200 total=1 keys=['project', 'totalReports', 'closedReports', 'pendingReports', 'lastReportAtUtc', 'openRiskCount', 'openNoteCount']"
+  },
+  {
+   "id": "DISCOVERY-A-lead",
+   "role": "lead",
+   "desc": "التقرير يظهر في قائمة تقارير مشروع A مرّة واحدة بلا تكرار",
+   "result": "PASS",
+   "detail": "http=200 rows=1 hits=1"
+  },
+  {
+   "id": "DISCOVERY-B-lead",
+   "role": "lead",
+   "desc": "التقرير يظهر في قائمة تقارير مشروع B مرّة واحدة بلا تكرار",
+   "result": "PASS",
+   "detail": "http=200 rows=1 hits=1"
+  },
+  {
+   "id": "SLICE-A-lead",
+   "role": "lead",
+   "desc": "شريحة مشروع A تُظهر بنوده الثلاثة فقط",
+   "result": "PASS",
+   "detail": "http=200 A=3/3 B=0/0 general_leak=False"
+  },
+  {
+   "id": "SLICE-B-lead",
+   "role": "lead",
+   "desc": "شريحة مشروع B تُظهر بنديه فقط",
+   "result": "PASS",
+   "detail": "http=200 B=2/2 A=0/0 general_leak=False"
+  },
+  {
+   "id": "TAMPER-PROJECT-lead",
+   "role": "lead",
+   "desc": "معرّف مشروع مُعبَث به يُرجِع 404",
+   "result": "PASS",
+   "detail": "http=404"
+  },
+  {
+   "id": "TAMPER-SUBMISSION-lead",
+   "role": "lead",
+   "desc": "معرّف تسليم مُعبَث به يُرجِع 404",
+   "result": "PASS",
+   "detail": "http=404"
+  },
+  {
+   "id": "SUMMARY-B-lead",
+   "role": "lead",
+   "desc": "ملخّص مشروع B يحتسب التقرير المرتبط بالتداخل",
+   "result": "PASS",
+   "detail": "http=200 total=1 keys=['project', 'totalReports', 'closedReports', 'pendingReports', 'lastReportAtUtc', 'openRiskCount', 'openNoteCount']"
+  },
+  {
+   "id": "DISCOVERY-A-emp",
+   "role": "emp",
+   "desc": "التقرير يظهر في قائمة تقارير مشروع A مرّة واحدة بلا تكرار",
+   "result": "PASS",
+   "detail": "http=200 rows=1 hits=1"
+  },
+  {
+   "id": "DISCOVERY-B-emp",
+   "role": "emp",
+   "desc": "التقرير يظهر في قائمة تقارير مشروع B مرّة واحدة بلا تكرار",
+   "result": "PASS",
+   "detail": "http=200 rows=1 hits=1"
+  },
+  {
+   "id": "SLICE-A-emp",
+   "role": "emp",
+   "desc": "شريحة مشروع A تُظهر بنوده الثلاثة فقط",
+   "result": "PASS",
+   "detail": "http=200 A=3/3 B=0/0 general_leak=False"
+  },
+  {
+   "id": "SLICE-B-emp",
+   "role": "emp",
+   "desc": "شريحة مشروع B تُظهر بنديه فقط",
+   "result": "PASS",
+   "detail": "http=200 B=2/2 A=0/0 general_leak=False"
+  },
+  {
+   "id": "TAMPER-PROJECT-emp",
+   "role": "emp",
+   "desc": "معرّف مشروع مُعبَث به يُرجِع 404",
+   "result": "PASS",
+   "detail": "http=404"
+  },
+  {
+   "id": "TAMPER-SUBMISSION-emp",
+   "role": "emp",
+   "desc": "معرّف تسليم مُعبَث به يُرجِع 404",
+   "result": "PASS",
+   "detail": "http=404"
+  },
+  {
+   "id": "SUMMARY-B-emp",
+   "role": "emp",
+   "desc": "ملخّص مشروع B يحتسب التقرير المرتبط بالتداخل",
+   "result": "PASS",
+   "detail": "http=200 total=1 keys=['project', 'totalReports', 'closedReports', 'pendingReports', 'lastReportAtUtc', 'openRiskCount', 'openNoteCount']"
+  },
+  {
+   "id": "OUTSIDER-LIST-A",
+   "role": "outsider",
+   "desc": "خارج النطاق لا يرى قائمة تقارير مشروع A",
+   "result": "PASS",
+   "detail": "http=404"
+  },
+  {
+   "id": "OUTSIDER-SLICE-A",
+   "role": "outsider",
+   "desc": "خارج النطاق لا يرى شريحة مشروع A",
+   "result": "PASS",
+   "detail": "http=404"
+  },
+  {
+   "id": "OUTSIDER-LIST-B",
+   "role": "outsider",
+   "desc": "خارج النطاق لا يرى قائمة تقارير مشروع B",
+   "result": "PASS",
+   "detail": "http=404"
+  },
+  {
+   "id": "OUTSIDER-SLICE-B",
+   "role": "outsider",
+   "desc": "خارج النطاق لا يرى شريحة مشروع B",
+   "result": "PASS",
+   "detail": "http=404"
+  },
+  {
+   "id": "ANON-SLICE",
+   "role": "anon",
+   "desc": "طلب بلا مصادقة يُرفَض",
+   "result": "PASS",
+   "detail": "http=401"
+  }
+ ]
+}

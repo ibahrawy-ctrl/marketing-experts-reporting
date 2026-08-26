@@ -1,0 +1,76 @@
+{
+ "users": {
+  "admin": {
+   "id": "83368e10-e2ae-49a9-9cc5-a8d108b12040",
+   "email": "p360r2.admin@r2uat.test",
+   "roles": [
+    "Admin"
+   ],
+   "fullName": "P360R2-مدير النظام"
+  },
+  "acctmgr": {
+   "id": "c8761217-bd37-4cf7-911b-204765e9b43d",
+   "email": "p360r2.acctmgr@r2uat.test",
+   "roles": [
+    "Employee",
+    "AccountPortfolioReader"
+   ],
+   "fullName": "P360R2-مدير الحساب"
+  },
+  "owner": {
+   "id": "41c81a4e-5d36-491e-becc-459d1ed113ca",
+   "email": "p360r2.owner@r2uat.test",
+   "roles": [
+    "Manager"
+   ],
+   "fullName": "P360R2-مالك المشروع"
+  },
+  "lead": {
+   "id": "c354a583-8d85-4cd3-84a2-8aa3ad3d51b6",
+   "email": "p360r2.lead@r2uat.test",
+   "roles": [
+    "TeamLeader"
+   ],
+   "fullName": "P360R2-قائد الفريق"
+  },
+  "emp": {
+   "id": "438ea9cd-5c69-431e-9515-995c99582e3c",
+   "email": "p360r2.emp@r2uat.test",
+   "roles": [
+    "Employee"
+   ],
+   "fullName": "P360R2-موظّف داخل النطاق"
+  },
+  "outsider": {
+   "id": "85295c05-1706-4ef7-a3cd-f8c5c7bba182",
+   "email": "p360r2.outsider@r2uat.test",
+   "roles": [
+    "Employee"
+   ],
+   "fullName": "P360R2-موظّف خارج النطاق"
+  }
+ },
+ "templateId": "aed0016c-398d-4e27-a901-43a2c9097fe8",
+ "sectionFieldId": "0de34722-b3bb-422c-9c09-23ed2be68763",
+ "generalFieldId": "2f83c326-fd59-4a80-a58d-d70e562cf133",
+ "generalNote": "ملخّص-عامّ-لا-ينتمي-لمشروع-R2X9",
+ "departmentId": "7a14cdf9-9112-4825-bb22-5679937a68b6",
+ "teamId": "6f2e0b46-a7a4-4356-8749-ffca714a4fe9",
+ "outsiderTeamId": "bb9c66ee-23c7-4f7c-99dd-c439856ab5bf",
+ "clientId": "bff99e78-df4f-4c9b-bc17-c259250f4958",
+ "projectA": "d13a438c-bdda-4d09-a992-284fe21cabaa",
+ "projectB": "c7ea6b1d-9bcd-4cda-a103-4de88c77f9cb",
+ "periodKey": "2026-W35",
+ "submissionId": "268f70a4-5cc5-43d0-b74c-03f2dc67882e",
+ "markers": {
+  "A": [
+   "R2-A-CAROUSEL",
+   "R2-A-STATIC",
+   "R2-A-REEL"
+  ],
+  "B": [
+   "R2-B-ARTICLE",
+   "R2-B-SEO"
+  ]
+ }
+}
