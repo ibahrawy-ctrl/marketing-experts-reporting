@@ -1,0 +1,76 @@
+{
+  "ticket": "R22A",
+  "purpose": "بيان الملفّات المكرّرة بلاحقة \" 2\" الناتجة عن استعادة الملفّات غير المتتبَّعة بعد التقديم السريع — للتوثيق فقط، بلا حذف وبلا إدراج في Commit التذكرة",
+  "capturedAtUtc": "2026-08-29T19:48:18Z",
+  "repoRoot": "/Users/ibrahimelbahrawi/Documents/Mrketing Experts syestem",
+  "headSha": "16983d2d4f5a3116aeea630af5b7c5fbcf21ce10",
+  "policy": {
+    "delete": "ممنوع في هذه التذكرة",
+    "commit": "ممنوع — تبقى غير متتبَّعة",
+    "disposition": "معزولة حتّى قرار تنظيف مستقلّ بعد إغلاق R22A"
+  },
+  "totals": {
+    "files": 2,
+    "DIFFERENT": 1,
+    "IDENTICAL": 1,
+    "directories": 4,
+    "emptyShellDirectories": 4
+  },
+  "files": [
+    {
+      "duplicatePath": "Ops/R21/PROJECT360-PROJECT-SCOPED-REPORT-NAVIGATION-FIX-REPORT 2.md",
+      "duplicateSha256": "c57e2948c6817623de903b5a718e7087c1813c23c93e12d8ad93e656cd8dd5da",
+      "duplicateBytes": 12504,
+      "counterpartPath": "Ops/R21/PROJECT360-PROJECT-SCOPED-REPORT-NAVIGATION-FIX-REPORT.md",
+      "counterpartExists": true,
+      "counterpartTrackedInGit": true,
+      "counterpartSha256": "d1b50e9e8e40d57fecf3c662f3ed46ea7bb806e5c89e659d4dea44b4c8f8fffb",
+      "matchStatus": "DIFFERENT"
+    },
+    {
+      "duplicatePath": "Ops/R21/RC-CANDIDATE-BUILD-AND-REHEARSAL-REPORT-20260823 2.md",
+      "duplicateSha256": "7aaa93666455bedc0fd0cafa4ea4bdf8daf971fb0ff17d2e14f9155356c1320a",
+      "duplicateBytes": 10395,
+      "counterpartPath": "Ops/R21/RC-CANDIDATE-BUILD-AND-REHEARSAL-REPORT-20260823.md",
+      "counterpartExists": true,
+      "counterpartTrackedInGit": true,
+      "counterpartSha256": "7aaa93666455bedc0fd0cafa4ea4bdf8daf971fb0ff17d2e14f9155356c1320a",
+      "matchStatus": "IDENTICAL"
+    }
+  ],
+  "directories": [
+    {
+      "duplicateDirPath": "Ops/UAT/P123-PROD-20260826 2",
+      "fileCount": 0,
+      "counterpartDirPath": "Ops/UAT/P123-PROD-20260826",
+      "counterpartExists": true,
+      "counterpartFileCount": 27,
+      "matchStatus": "EMPTY_SHELL_NO_DATA"
+    },
+    {
+      "duplicateDirPath": "Ops/UAT/P123-RC-20260826 2",
+      "fileCount": 0,
+      "counterpartDirPath": "Ops/UAT/P123-RC-20260826",
+      "counterpartExists": true,
+      "counterpartFileCount": 49,
+      "matchStatus": "EMPTY_SHELL_NO_DATA"
+    },
+    {
+      "duplicateDirPath": "Ops/UAT/P123-RC-REVALIDATION-20260826 2",
+      "fileCount": 0,
+      "counterpartDirPath": "Ops/UAT/P123-RC-REVALIDATION-20260826",
+      "counterpartExists": true,
+      "counterpartFileCount": 56,
+      "matchStatus": "EMPTY_SHELL_NO_DATA"
+    },
+    {
+      "duplicateDirPath": "Ops/UAT/P123-RC001-HOTFIX-20260826 2",
+      "fileCount": 0,
+      "counterpartDirPath": "Ops/UAT/P123-RC001-HOTFIX-20260826",
+      "counterpartExists": true,
+      "counterpartFileCount": 4,
+      "matchStatus": "EMPTY_SHELL_NO_DATA"
+    }
+  ],
+  "note": "المجلّدات المكرّرة فارغة تمامًا (لا تحوي أيّ ملفّ) ⇒ لا بيانات معرَّضة للفقد؛ ولذلك لا يدرجها git في الحالة أصلًا. الملفّان المكرّران وحدهما يحملان محتوى، وأحدهما مطابق بصمةً لنظيره المتتبَّع والآخر مختلف (النسخة المحلّيّة قبل التنقيح)."
+}
