@@ -16,6 +16,7 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { AxiosError, AxiosHeaders } from 'axios';
 import { api } from '../lib/api';
 import type { AttendanceIncidentDetail, AttendanceListItem } from '../types/attendance';
 import AttendancePage from './AttendancePage';
@@ -180,7 +181,8 @@ describe('AttendancePage — القائمة والنطاق', () => {
   it('يعرض حالة فارغة مستقلّة حين لا وقائع', async () => {
     items = [];
     renderPage();
-    expect(await screen.findByText('لا توجد وقائع')).toBeInTheDocument();
+    // التبويب الافتراضيّ مُصفّى، فالفراغ عن الطابور لا عن السجلّ.
+    expect(await screen.findByText('لا شيء ينتظر إجراءك الآن')).toBeInTheDocument();
     expect(screen.queryByTestId('attendance-list')).toBeNull();
   });
 
@@ -190,6 +192,99 @@ describe('AttendancePage — القائمة والنطاق', () => {
     expect(await screen.findByText('تعذّر تحميل البيانات')).toBeInTheDocument();
     // الترويسة تبقى قائمة: فشل القائمة ليس فشل السطح.
     expect(screen.getByRole('heading', { name: 'الحضور والالتزام' })).toBeInTheDocument();
+  });
+});
+
+// ======================================================================
+// P123-R3 — «افتح الحضور فتصل إلى بيانات أو إلى فراغ **مفهوم**».
+//
+// العيب المُعالَج ليس تجميليًّا: التبويب الافتراضيّ مُصفّى على ما ينتظر إجراء المستخدم، فكانت
+// رسالة «لا توجد وقائع» تُخبِر مديرًا له عشرات الوقائع أنّ السجلّ خالٍ. ويُقاس هنا كذلك أنّ
+// المنع الدائم (403/404) لا يلبس ثوب العطل المؤقّت بزرّ إعادة محاولة لن يغيّر شيئًا.
+// ======================================================================
+
+function httpError(status: number) {
+  const err = new AxiosError('denied');
+  err.response = {
+    status,
+    statusText: '',
+    data: {},
+    headers: {},
+    config: { headers: new AxiosHeaders() },
+  };
+  return err;
+}
+
+describe('P123-R3 — الفراغات الثلاثة لا تُخلط', () => {
+  it('فراغ التبويب الافتراضيّ يقول «لا شيء ينتظرك» ويعرض مخرجًا إلى كلّ الوقائع', async () => {
+    items = [];
+    renderPage();
+
+    expect(await screen.findByText('لا شيء ينتظر إجراءك الآن')).toBeInTheDocument();
+    expect(screen.queryByText('لا توجد وقائع ضمن نطاقك')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'عرض كلّ الوقائع ضمن نطاقي' }));
+
+    // المخرج ليس نصًّا: يُلغي التصفية الخادميّة فعلًا ثمّ يُبدِّل الرسالة إلى حقيقة السجلّ.
+    await waitFor(() => {
+      const calls = getCalls.filter((c) => c.url === '/attendance');
+      expect(calls[calls.length - 1].params).not.toHaveProperty('needsMyAction');
+    });
+    expect(await screen.findByText('لا توجد وقائع ضمن نطاقك')).toBeInTheDocument();
+  });
+
+  it('فراغ طابور المراجعة يقول ذلك لا «لا وقائع»', async () => {
+    items = [];
+    renderPage();
+    await screen.findByText('لا شيء ينتظر إجراءك الآن');
+
+    fireEvent.click(screen.getByRole('tab', { name: 'طابور المراجعة' }));
+
+    expect(await screen.findByText('طابور المراجعة فارغ')).toBeInTheDocument();
+  });
+
+  it('فراغ ناتج عن مرشِّح صريح يُنسَب إلى المرشِّح لا إلى النطاق', async () => {
+    items = [];
+    renderPage();
+    await screen.findByText('لا شيء ينتظر إجراءك الآن');
+
+    fireEvent.click(screen.getByRole('tab', { name: 'كلّ الوقائع' }));
+    expect(await screen.findByText('لا توجد وقائع ضمن نطاقك')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('من تاريخ'), { target: { value: '2026-01-01' } });
+
+    expect(await screen.findByText('لا واقعة مطابقة لمرشِّحاتك')).toBeInTheDocument();
+    expect(screen.queryByText('لا توجد وقائع ضمن نطاقك')).toBeNull();
+  });
+});
+
+describe('P123-R3 — المنع الدائم لا يلبس ثوب العطل المؤقّت', () => {
+  it('403 على القائمة: منع بلا زرّ إعادة محاولة', async () => {
+    vi.spyOn(api, 'get').mockRejectedValue(httpError(403));
+    renderPage();
+
+    expect(await screen.findByText('لا يمكن عرض وقائع الحضور')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'إعادة المحاولة' })).toBeNull();
+  });
+
+  it('500 على القائمة يبقى عطلًا قابلًا لإعادة المحاولة', async () => {
+    vi.spyOn(api, 'get').mockRejectedValue(httpError(500));
+    renderPage();
+
+    expect(await screen.findByText('تعذّر تحميل البيانات')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'إعادة المحاولة' })).toBeInTheDocument();
+  });
+
+  it('واقعة خارج النطاق (404) تُعلَن غير موجودة بلا وعد بإعادة المحاولة', async () => {
+    vi.spyOn(api, 'get').mockImplementation((url: string) => {
+      if (url === `/attendance/${INCIDENT_ID}`) return Promise.reject(httpError(404)) as never;
+      if (url === '/attendance/types') return Promise.resolve({ data: [] }) as never;
+      return Promise.resolve({ data: { items, totalCount: 1, page: 1, pageSize: 25 } }) as never;
+    });
+    renderPage(`/app/attendance?incident=${INCIDENT_ID}`);
+
+    expect(await screen.findByText('لا توجد واقعة مطابقة')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'إعادة المحاولة' })).toBeNull();
   });
 
   it('الصفحة كلّها بالاتّجاه من اليمين إلى اليسار', async () => {
