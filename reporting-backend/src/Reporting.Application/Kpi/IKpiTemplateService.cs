@@ -39,4 +39,14 @@ public interface IKpiTemplateService
     /// </summary>
     Task<IReadOnlyDictionary<Guid, IReadOnlyCollection<Guid>>> ResolveAssignedTemplatesForUsersAsync(
         IReadOnlyCollection<Guid> userIds, CancellationToken ct = default);
+
+    /// <summary>
+    /// DEC-01/5+6 — التواتر الفعّال لكلّ مستخدم كما كان ساريًا في <paramref name="asOf"/>.
+    /// يُشتقّ من القالب الذي يُقيَّم عليه الموظّف فعلًا عبر <b>نفس</b> محرّك الأولوية أعلاه — لا آليّة موازية.
+    /// ترتيب الحسم بين القوالب المطابِقة: إسناد موظّف ← إسناد فريق ← مسمّى وظيفيّ ← إسناد إدارة ← قالب عامّ.
+    /// عند انعدام أيّ مطابقة تُعاد <see cref="KpiEffectiveCadence.Cadence"/> = <c>null</c>
+    /// بمصدر <c>notConfigured</c> — لا اختيار ولا سقوط صامت.
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, KpiEffectiveCadence>> ResolveEffectiveCadencesAsync(
+        IReadOnlyCollection<Guid> userIds, DateOnly asOf, CancellationToken ct = default);
 }

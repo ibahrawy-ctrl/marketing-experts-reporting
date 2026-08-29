@@ -100,7 +100,10 @@ public record KpiTemplateAssignmentRowDto(
     TemplateAssignmentKind Kind,
     string? Notes,
     bool IsActive,
-    DateTime CreatedAtUtc);
+    DateTime CreatedAtUtc,
+    // DEC-01/6 — تاريخا سريان الإسناد؛ null = ساري بلا حدّ (سلوك ما قبل R5 حرفيًّا).
+    DateOnly? EffectiveFrom = null,
+    DateOnly? EffectiveTo = null);
 
 // تغطية قالب KPI: المعلومات + المرتبطون + المستثنون بأسبابهم + الإسنادات/الاستثناءات الصريحة.
 // تطبّق نفس أولوية الاختيار بالخادم (Employee→JobRole→Team→Department→General، Exclude يتفوّق)
@@ -122,11 +125,16 @@ public record KpiTemplateAssignmentsDto(
     IReadOnlyList<KpiTemplateAssignmentRowDto> Assignments);
 
 // إنشاء إسناد/استثناء صريح لقالب KPI على مستوى (موظّف/مسمّى/فريق/إدارة).
+// DEC-01/6 — لكلّ تغيير تواتر/قالب تاريخُ سريان: الفترات التاريخيّة لا يُعاد تفسيرها بإعداد لاحق.
+// DEC-01/8 — الاستثناء (Exclude) المؤقَّت بتاريخَي سريان هو «الإعفاء الإداريّ المسجَّل» الذي يخفض
+// المقام (AdjustedExpected) بدل أن يُعاقِب الموظّف. الحدّان الفارغان ⇒ سلوك ما قبل R5 حرفيًّا.
 public record CreateKpiAssignmentRequest(
     TemplateAssignmentScope ScopeType,
     Guid ScopeId,
     TemplateAssignmentKind Kind,
-    string? Notes = null);
+    string? Notes = null,
+    DateOnly? EffectiveFrom = null,
+    DateOnly? EffectiveTo = null);
 
 // تعطيل/تفعيل إسناد قائم + تعديل الملاحظة.
 public record UpdateKpiAssignmentRequest(bool IsActive, string? Notes = null);

@@ -74,7 +74,7 @@ public class KpiAnalyticsController : ApiControllerBase
         [FromQuery] DateOnly? from, [FromQuery] DateOnly? to)
     {
         var resolved = _periods.Resolve(new PeriodRequest(
-            string.IsNullOrWhiteSpace(type) ? PeriodKinds.LastCompletedWeek : type, periodKey, from, to));
+            string.IsNullOrWhiteSpace(type) ? PeriodKinds.CurrentQuarter : type, periodKey, from, to));
         if (!resolved.Succeeded) return ToProblem(resolved);
 
         var period = resolved.Value!;
@@ -89,11 +89,16 @@ public class KpiAnalyticsController : ApiControllerBase
 
 /// <summary>
 /// مُدخَل الاستعلام المشترك لنقاط نهاية تحليلات KPI.
-/// <see cref="Cadence"/> بلا قيمة افتراضيّة عمدًا: غيابه يُنتج خطأً صريحًا من الخدمة (B-3).
+/// <see cref="Cadence"/> بلا قيمة افتراضيّة عمدًا (DEC-01/2): غيابه ⇒ يحسم الخادم تواتر كلّ موظّف
+/// من قالبه الفعّال (DEC-01/5)، ووجوده ⇒ مسار صريح واحد (مثلًا «النبض الأسبوعيّ» — DEC-01/3).
+/// لا سقوط صامت في الحالتين.
 /// </summary>
 public sealed class KpiAnalyticsRequest
 {
-    /// <summary>Week | Month | Quarter | Year | Custom | LastCompletedWeek. الافتراضيّ آخر أسبوع مكتمل (5.4).</summary>
+    /// <summary>
+    /// Week | Month | Quarter | Year | Custom | LastCompletedWeek | CurrentQuarter.
+    /// الافتراضيّ <b>الربع الجاري</b> بتوقيت Asia/Riyadh (DEC-01/1) — لا يختار المستخدم الفترة الجارية.
+    /// </summary>
     public string? PeriodType { get; init; }
 
     public KpiCadence? Cadence { get; init; }
@@ -108,6 +113,6 @@ public sealed class KpiAnalyticsRequest
     public Guid? SubjectUserId { get; init; }
 
     public KpiAnalyticsQuery ToQuery() => new(
-        string.IsNullOrWhiteSpace(PeriodType) ? PeriodKinds.LastCompletedWeek : PeriodType,
+        string.IsNullOrWhiteSpace(PeriodType) ? PeriodKinds.CurrentQuarter : PeriodType,
         Cadence, PeriodKey, From, To, DepartmentId, TeamId, SubjectUserId);
 }

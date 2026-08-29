@@ -13,7 +13,8 @@ namespace Reporting.IntegrationTests;
 /// ما تثبته هذه الحزمة:
 /// <list type="number">
 /// <item>التوسيط ذو المرحلتين (B-2) عبر واجهة HTTP فعليّة لا عبر دالّة خالصة فقط.</item>
-/// <item>الكادنس إلزاميّ (B-3): غيابه خطأ صريح لا سقوط صامت.</item>
+/// <item>لا سقوط صامت في الكادنس (B-3 بصيغة DEC-01/2+5): غيابه من الطلب يعني حسمًا خادميًّا
+/// صريحًا لكلّ موظّف من قالبه الفعّال، ومصدرُ الحسم مُعلَن في كلّ صفّ — لا افتراض ولا تلفيق.</item>
 /// <item>الحالة: Approved فقط تدخل الرقم؛ Submitted/UnderReview لا تدخل.</item>
 /// <item>Drill-down يعيد إنتاج الرقم نفسه من صفوفه (قابليّة التحقّق اليدويّ).</item>
 /// <item>الأمن: المورد خارج النطاق يعود <b>404</b> لا 403 ⇒ لا تسريب وجود.</item>
@@ -82,10 +83,25 @@ public class KpiTruthContractAndSecurityTests
             .Select(e => e.GetString()!).ToList();
     }
 
-    // ===== 1) التوسيط ذو المرحلتين عبر HTTP (B-2) =====
-    // الحالة المرجعيّة: موظّف قُيّم عشر مرّات بـ50، وآخر مرّة واحدة بـ90.
-    // الخطأ القديم (متوسّط خام على التقييمات) = (10×50 + 90) / 11 = 53.64.
-    // الصواب (متوسّط متوسّطات الموظّفين) = (50 + 90) / 2 = 70.00 — كلّ موظّف يزن واحدًا.
+    /// <summary>بداية فترة ما كما يحلّها الخادم بتوقيت الرياض (B-1) — لا اشتقاق تواريخ في الاختبار.</summary>
+    private static async Task<DateOnly> ResolveStartAsync(HttpClient client, string type, string periodKey)
+    {
+        var res = await client.GetAsync($"/api/kpi/periods/resolve?type={type}&periodKey={periodKey}");
+        res.EnsureSuccessStatusCode();
+        using var doc = System.Text.Json.JsonDocument.Parse(await res.Content.ReadAsStringAsync());
+        return DateOnly.ParseExact(
+            doc.RootElement.GetProperty("current").GetProperty("start").GetString()!,
+            "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    // ===== 1) التوسيط ذو المرحلتين عبر HTTP (B-2 + DEC-01/16) =====
+    // الحالة المرجعيّة: موظّف «ثقيل» قُيّم في كلّ أسابيع الربع بـ50، و«خفيف» التحق في آخر أسبوع
+    // وقُيّم مرّة واحدة بـ90. الخطأ القديم (متوسّط خام على التقييمات) ≈ 52.86، والصواب (متوسّط
+    // متوسّطات الموظّفين) = (50 + 90) / 2 = 70.00 — كلّ موظّف يزن واحدًا مهما اختلف عدد تقييماته.
+    //
+    // تغيير R5 على تجهيز الحالة (لا على مقصدها): بعد DEC-01/14 لا يدخل المتوسّطَ الرسميّ إلّا مَن
+    // بلغت تغطيته 80% من المتوقَّع المعدَّل. لذلك تُبنى الحالة الآن بموظّفَين **مؤهّلَين** يختلف
+    // عدد تقييماتهما اختلافًا حادًّا — عبر نافذة الخدمة (DEC-01/8) لا عبر إضعاف التوكيد.
     [Fact]
     public async Task Performance_TwoStageAveraging_EachEmployeeWeighsOne()
     {
@@ -95,14 +111,18 @@ public class KpiTruthContractAndSecurityTests
         var (_, heavy) = await TestAuth.CreateUserAsync(_factory, "Employee", managerId);
         var (_, light) = await TestAuth.CreateUserAsync(_factory, "Employee", managerId);
 
-        // الأسابيع تُؤخَذ من الخادم نفسه (لا تخمين أرقام أسابيع في الاختبار): أوّل عشرة أسابيع
-        // داخل الربع كما يحلّها CanonicalPeriodService بتوقيت الرياض.
-        var weeks = (await ResolveWeekKeysAsync(manager, "Quarter", "2026-Q2")).Take(10).ToArray();
-        Assert.Equal(10, weeks.Length);
+        // الأسابيع تُؤخَذ من الخادم نفسه (لا تخمين أرقام أسابيع في الاختبار): كلّ أسابيع الربع
+        // كما يحلّها CanonicalPeriodService بتوقيت الرياض.
+        var weeks = (await ResolveWeekKeysAsync(manager, "Quarter", "2026-Q2")).ToArray();
+        Assert.True(weeks.Length >= 3, "الربع يجب أن يحوي عدّة أسابيع حتّى يظهر التحيّز الحسابيّ.");
+
+        // DEC-01/8 — «الخفيف» التحق مع بداية آخر أسبوع، فمقامه المعدَّل = 1 لا طول الربع.
+        var lastWeekStart = await ResolveStartAsync(manager, "Week", weeks[^1]);
+        await TestAuth.SetEmploymentWindowAsync(_factory, light, lastWeekStart);
 
         foreach (var w in weeks)
             await ScoreAsync(manager, templateId, heavy, manualId, autoId, w, 50m);
-        await ScoreAsync(manager, templateId, light, manualId, autoId, weeks[0], 90m);
+        await ScoreAsync(manager, templateId, light, manualId, autoId, weeks[^1], 90m);
 
         var dto = await (await manager.GetAsync(
             "/api/kpi/performance?periodType=Quarter&periodKey=2026-Q2&cadence=WeeklyPulse"))
@@ -110,14 +130,28 @@ public class KpiTruthContractAndSecurityTests
 
         Assert.NotNull(dto);
         Assert.Equal(70.00m, dto!.Company.Measure.Value);
-        Assert.NotEqual(53.64m, dto.Company.Measure.Value);
+        var biasedRawAverage = Math.Round(
+            (weeks.Length * 50m + 90m) / (weeks.Length + 1), 2, MidpointRounding.AwayFromZero);
+        Assert.NotEqual(biasedRawAverage, dto.Company.Measure.Value);
 
         var heavyRow = dto.Employees.Single(e => e.UserId == heavy);
         var lightRow = dto.Employees.Single(e => e.UserId == light);
         Assert.Equal(50.00m, heavyRow.Measure.Value);
         Assert.Equal(90.00m, lightRow.Measure.Value);
-        Assert.Equal(10, heavyRow.Measure.EligibleEvaluationCount);
+        Assert.Equal(weeks.Length, heavyRow.Measure.EligibleEvaluationCount);
         Assert.Equal(1, lightRow.Measure.EligibleEvaluationCount);
+
+        // الوزن واحد لكلّ موظّف: كلاهما دخل المتوسّط رغم أنّ عدد تقييماتهما ليس واحدًا.
+        Assert.True(heavyRow.EligibleForRanking);
+        Assert.True(lightRow.EligibleForRanking);
+        Assert.Equal(2, dto.Company.QualifiedMemberCount);
+
+        // DEC-01/8 — أثر الالتحاق المتأخّر يقع على **المقام** لا على الدرجة، والفرق مُبرهَن بالعرض.
+        Assert.Equal(weeks.Length, lightRow.Measure.ExpectedEvaluationCount);
+        Assert.Equal(1, lightRow.Measure.AdjustedExpectedCount);
+        Assert.Equal(0, lightRow.Measure.MissingCount);
+        Assert.Equal(100m, lightRow.Measure.CoveragePercent);
+        Assert.False(lightRow.Measure.IsProvisional);
     }
 
     // ===== 1ب) نقطة التجميع القائمة تعيد العتبة والكادنس المطبَّقَين (B-6/B-3) =====
@@ -146,14 +180,53 @@ public class KpiTruthContractAndSecurityTests
         Assert.NotNull(dto.AppliedBelowTargetThreshold);
     }
 
-    // ===== 2) الكادنس إلزاميّ (B-3) — لا سقوط صامت إلى النبض الأسبوعيّ =====
+    // ===== 2) غياب الكادنس: حسم خادميّ صريح لكلّ موظّف — لا سقوط صامت (DEC-01/2+5) =====
+    //
+    // تعديل عقد موثَّق: قبل R5 كان غياب الكادنس يُردّ بـ400 حمايةً من السقوط الصامت إلى النبض
+    // الأسبوعيّ (B-3). وDEC-01/2 يمنع سؤال المستخدم عن «نوع التقييم» عند فتح الشاشة، فلو بقي
+    // الحارس لتعذّر تنفيذ البند نصًّا. المقصد الأصليّ (لا افتراض ضمنيّ) محفوظ بصيغة أقوى:
+    // الخادم يحسم تواتر كلّ موظّف من قالبه الفعّال، ويُعلن مصدر الحسم في كلّ صفّ، ويسمّي
+    // «غير مُهيّأ» صراحةً بدل أن يخترع مقامًا. وهذا ما تتحقّق منه التوكيدات أدناه.
     [Fact]
-    public async Task Performance_WithoutCadence_FailsExplicitly()
+    public async Task Performance_WithoutCadence_ResolvesPerEmployee_WithNoSilentFallback()
     {
-        var (manager, _) = await TestAuth.CreateUserAsync(_factory, "Manager");
+        var (manager, managerId) = await TestAuth.CreateUserAsync(_factory, "Manager");
+        await TestAuth.CreateUserAsync(_factory, "Employee", managerId);
+
         var res = await manager.GetAsync("/api/kpi/performance?periodType=Quarter&periodKey=2026-Q2");
-        Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode);
-        Assert.Contains("cadence", (await res.Content.ReadAsStringAsync()).ToLowerInvariant());
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+
+        var dto = await res.ReadAsync<KpiPerformanceDto>();
+        Assert.NotNull(dto);
+        // لم يُطلَب كادنس ⇒ الردّ لا يدّعي كادنسًا مطلوبًا (لا «WeeklyPulse» مفترَضة).
+        Assert.Null(dto!.Cadence);
+        Assert.NotEmpty(dto.Employees);
+
+        foreach (var e in dto.Employees)
+        {
+            // المصدر مُعلَن دائمًا ومن القائمة المعرَّفة — لا فراغ ولا قيمة مجهولة.
+            Assert.Contains(e.CadenceSource, new[]
+            {
+                KpiCadenceSources.EmployeeAssignment, KpiCadenceSources.TeamAssignment,
+                KpiCadenceSources.JobRole, KpiCadenceSources.DepartmentAssignment,
+                KpiCadenceSources.GeneralTemplate, KpiCadenceSources.NotConfigured
+            });
+
+            if (e.EffectiveCadence is null)
+            {
+                // لا تواتر فعّال ⇒ حالة مسمّاة، ولا مقام مخترَع، ولا تغطية ملفَّقة.
+                Assert.Equal(KpiCadenceSources.NotConfigured, e.CadenceSource);
+                Assert.Equal(KpiJourneyState.CadenceNotConfigured, e.Measure.JourneyState);
+                Assert.Equal(0, e.Measure.AdjustedExpectedCount);
+                Assert.Null(e.Measure.CoveragePercent);
+                Assert.False(e.EligibleForRanking);
+            }
+            else
+            {
+                Assert.NotEqual(KpiCadenceSources.NotConfigured, e.CadenceSource);
+                Assert.NotEqual(KpiJourneyState.CadenceNotConfigured, e.Measure.JourneyState);
+            }
+        }
     }
 
     // ===== 3) فصل نبض الأسبوع عن الربعيّ الرسميّ (B-3) =====
@@ -174,9 +247,19 @@ public class KpiTruthContractAndSecurityTests
             $"/api/kpi/performance?periodType=Quarter&periodKey=2026-Q2&cadence=Quarterly&subjectUserId={subject}"))
             .ReadAsync<KpiPerformanceDto>();
 
-        Assert.Equal(80.00m, weekly!.Company.Measure.Value);
+        // الرقم يُقرأ من صفّ الموظّف: DEC-01/11 يفصل الدرجة عن التغطية، فالدرجة تُعرَض ولو كانت
+        // التغطية دون العتبة (تقييم واحد داخل ربع كامل). المتوسّط المؤسّسيّ هو ما يُقصيه ضعفُ
+        // التغطية (DEC-01/14)، لا الدرجة الفرديّة — وهذا بالضبط ما يفصله التوكيدان التاليان.
+        var weeklyRow = weekly!.Employees.Single(e => e.UserId == subject);
+        Assert.Equal(80.00m, weeklyRow.Measure.Value);
+        Assert.True(weeklyRow.Measure.IsProvisional);
+        Assert.Equal(KpiCadence.WeeklyPulse, weeklyRow.EffectiveCadence);
+
         // لا خلط: التقييم أسبوعيّ الكادنس فلا يظهر في المسار الربعيّ الرسميّ، ولا يُعرَض صفرًا.
-        Assert.Null(quarterly!.Company.Measure.Value);
+        var quarterlyRow = quarterly!.Employees.Single(e => e.UserId == subject);
+        Assert.Null(quarterlyRow.Measure.Value);
+        Assert.Equal(0, quarterlyRow.Measure.EligibleEvaluationCount);
+        Assert.Null(quarterly.Company.Measure.Value);
         Assert.Equal(KpiDataQuality.NoData, quarterly.Company.Measure.DataQuality);
     }
 
@@ -218,11 +301,22 @@ public class KpiTruthContractAndSecurityTests
         var perf = await (await manager.GetAsync($"/api/kpi/performance?{url}")).ReadAsync<KpiPerformanceDto>();
         var drill = await (await manager.GetAsync($"/api/kpi/drilldown?{url}")).ReadAsync<KpiDrilldownDto>();
 
-        Assert.Equal(60.00m, perf!.Company.Measure.Value);             // (40+90+50)/3
+        // المقارنة على صفّ الموظّف: هو الرقم المعروض له فعلًا، والـdrill-down يخصّه بالتحديد.
+        // (المتوسّط المؤسّسيّ يخضع لشرط التغطية في DEC-01/14 وليس موضوع هذا الاختبار.)
+        var row = perf!.Employees.Single(e => e.UserId == subject);
+        Assert.Equal(60.00m, row.Measure.Value);                        // (40+90+50)/3
         Assert.Equal(3, drill!.Rows.Count);
-        Assert.Equal(perf.Company.Measure.Value, drill.RecomputedValue);
+        Assert.Equal(row.Measure.Value, drill.RecomputedValue);
         Assert.Equal(3, drill.RowCount);
         Assert.All(drill.Rows, r => Assert.Equal(KpiEvaluationStatus.Approved, r.Status));
+
+        // DEC-01/18 — الرقم لا يُشرَح بصفوفه فقط بل بمقاسه كاملًا وبفتراته المصدريّة المسمّاة.
+        Assert.NotNull(drill.Measure);
+        Assert.Equal(3, drill.Measure!.EligibleEvaluationCount);
+        Assert.NotNull(drill.SourcePeriods);
+        Assert.Equal(3, drill.SourcePeriods!.Count(p => p.IsCompleted));
+        Assert.Equal(drill.Measure.MissingCount,
+            drill.SourcePeriods.Count(p => !p.IsCompleted && !p.IsExempt));
     }
 
     // ===== 6) الأمن: خارج النطاق ⇒ 404 لا 403 (لا تسريب وجود المورد) =====
@@ -306,8 +400,16 @@ public class KpiTruthContractAndSecurityTests
             .ReadAsync<KpiPerformanceDto>();
 
         Assert.DoesNotContain(dto!.Employees, e => e.UserId == peerId);
-        // ولا يتسرّب الزميل عبر الرقم المؤسّسيّ أيضًا.
-        Assert.Equal(70.00m, dto.Company.Measure.Value);
+
+        // ولا يتسرّب الزميل عبر الأرقام المجمَّعة أيضًا: النطاق المرئيّ هو الذات وحدها،
+        // فالصفّ الوحيد درجته 70 والعدّادات كلّها مبنيّة عليه لا على الزميل (30) ولا على متوسّطهما (50).
+        var mine = Assert.Single(dto.Employees);
+        Assert.Equal(selfId, mine.UserId);
+        Assert.Equal(70.00m, mine.Measure.Value);
+        Assert.Equal(1, dto.Company.TotalMemberCount);
+        Assert.Equal(1, dto.Company.ScoredMemberCount);
+        Assert.NotEqual(50.00m, dto.Company.Measure.Value ?? -1m);
+        Assert.NotEqual(30.00m, dto.Company.Measure.Value ?? -1m);
     }
 
     // ===== 11) حدود الفترة تُحلّ خادميًّا بتوقيت الرياض (B-1) =====

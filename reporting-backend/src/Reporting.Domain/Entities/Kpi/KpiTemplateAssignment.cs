@@ -32,6 +32,15 @@ public class KpiTemplateAssignment : BaseEntity
     /// <summary>تعطيل دون حذف — صفوف غير النشطة تُتجاهَل في الحلّ.</summary>
     public bool IsActive { get; set; } = true;
 
+    /// <summary>
+    /// DEC-01/6 — تاريخ سريان الإسناد (شامل). <c>NULL</c> = ساري منذ الأزل ⇒ السلوك الحاليّ حرفيًّا.
+    /// وجوده يمنع إعادة تفسير الأرباع التاريخيّة بإعداد أُنشئ لاحقًا.
+    /// </summary>
+    public DateOnly? EffectiveFrom { get; set; }
+
+    /// <summary>DEC-01/6 — آخر تاريخ سريان (شامل). <c>NULL</c> = ساري إلى الأبد ⇒ السلوك الحاليّ حرفيًّا.</summary>
+    public DateOnly? EffectiveTo { get; set; }
+
     /// <summary>منشئ الإسناد (تدقيق).</summary>
     public Guid? CreatedById { get; set; }
 

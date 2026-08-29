@@ -24,8 +24,12 @@ public sealed class KpiFeatureOptions
     /// <summary>عتبة «يحتاج دعمًا» المركزيّة الاحتياطيّة (كانت ثابتًا 70 موزّعًا في الواجهة).</summary>
     public decimal DefaultSupportThreshold { get; set; } = 70m;
 
-    /// <summary>أدنى تغطية للدخول في الترتيب والمقارنة الرسميّة (B-5 = 0.75).</summary>
-    public decimal MinimumCoverageForRanking { get; set; } = 0.75m;
+    /// <summary>
+    /// DEC-01/13 — الحدّ الأدنى لاعتماد النتيجة الربعيّة = **80%** من <c>AdjustedExpected</c>
+    /// (كان 0.75 قبل اعتماد العقد). دونه: الدرجة «مؤقّتة» والحالة <c>InsufficientCoverage</c>،
+    /// ولا تدخل المتوسّط الرسميّ ولا التصدير المالي النهائي (DEC-01/14).
+    /// </summary>
+    public decimal MinimumCoverageForRanking { get; set; } = 0.80m;
 
     /// <summary>حدّ <c>delta</c> المطلق لاعتبار الاتجاه صاعدًا/هابطًا بدل مستقرّ (5.6 = 2.00).</summary>
     public decimal TrendDeltaThreshold { get; set; } = 2.00m;

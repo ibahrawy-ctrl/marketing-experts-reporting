@@ -12,6 +12,12 @@ public class ApplicationUser : IdentityUser<Guid>
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 
+    // DEC-01/8 — نافذة الاستحقاق داخل النطاق. NULL (الافتراضي لكلّ الصفوف القائمة) ⇒ القيد **لا يُطبَّق
+    // إطلاقًا**، فلا يُستعمل CreatedAtUtc بديلًا ولا يُخصم أيّ التزام بلا مصدر بيانات صريح.
+    // HireDate: الفترات السابقة له تُستبعَد من المتوقَّع. ExitDate: الفترات التالية له تُستبعَد.
+    public DateOnly? HireDate { get; set; }
+    public DateOnly? ExitDate { get; set; }
+
     // روابط تنظيمية (تُملأ في المراحل اللاحقة)
     public Guid? DepartmentId { get; set; }
     public Guid? TeamId { get; set; }

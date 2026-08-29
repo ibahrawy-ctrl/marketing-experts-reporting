@@ -37,6 +37,21 @@ public static class KpiScorePolicy
         return n > 0 ? sum / n : null;
     }
 
+    /// <summary>
+    /// DEC-01/9 — الحالات التي تُحتسَب «مكتملة» وتدخل الدرجة والتغطية: <c>Approved</c> (اعتماد المراجِع)
+    /// و<c>Closed</c> (إقفال نهائيّ بعد الاعتماد). المسودة وما دون الاعتماد **لا تُحتسَب مكتملة**.
+    /// مصدر واحد يُستعمل في الاستعلام وفي الاختبارات معًا — لا قائمة ثانية.
+    /// </summary>
+    public static readonly KpiEvaluationStatus[] CompletedStatuses =
+    {
+        KpiEvaluationStatus.Approved,
+        KpiEvaluationStatus.Closed
+    };
+
+    /// <inheritdoc cref="CompletedStatuses"/>
+    public static bool IsCompleted(KpiEvaluationStatus status) =>
+        status is KpiEvaluationStatus.Approved or KpiEvaluationStatus.Closed;
+
     /// <summary>التغطية = المؤهَّل / المتوقَّع المعدَّل؛ <c>null</c> إذا المقام صفر (لا تُلفَّق قيمة).</summary>
     public static decimal? Coverage(int eligibleCount, int adjustedExpectedCount) =>
         adjustedExpectedCount > 0 ? (decimal)eligibleCount / adjustedExpectedCount : null;
@@ -67,6 +82,46 @@ public static class KpiScorePolicy
         if (eligibleCount <= 0) return false;
         var coverage = Coverage(eligibleCount, adjustedExpectedCount);
         return coverage is null || coverage.Value >= minimumCoverage;
+    }
+
+    /// <summary>
+    /// DEC-01/12 — التغطية **كنسبة مئويّة معروضة**: <c>Completed ÷ AdjustedExpected × 100</c>
+    /// مقرَّبة إلى منزلتين. مثال العقد الحاكم: 1 من 9 ⇒ <c>11.11</c>.
+    /// </summary>
+    public static decimal? CoveragePercent(int completedCount, int adjustedExpectedCount)
+    {
+        var coverage = Coverage(completedCount, adjustedExpectedCount);
+        return coverage is null ? null : Round(coverage.Value * 100m);
+    }
+
+    /// <summary>
+    /// DEC-01/14 — الدرجة «مؤقّتة» متى وُجدت درجة وكانت التغطية دون الحدّ الأدنى المعتمَد.
+    /// المؤقّتة تُعرَض للمستخدم لكنّها لا تدخل المتوسّط الرسميّ ولا التصدير المالي النهائي.
+    /// </summary>
+    public static bool IsProvisional(decimal? score, int completedCount, int adjustedExpectedCount, decimal minimumCoverage)
+        => score is not null && !EligibleForRanking(completedCount, adjustedExpectedCount, minimumCoverage);
+
+    /// <summary>
+    /// DEC-01/18 — حالة رحلة KPI الصريحة. الترتيب مقصود ولا يجوز قلبه:
+    /// «لا تواتر» يسبق «مُعفى»، و«مُعفى» يسبق «لم يبدأ»، وإلّا اختفى سبب انعدام المقام خلف حالة عامّة.
+    /// «قيد الاستكمال» مشروط بأن تكون الفترة ما زالت **مفتوحة** — فلا يُوصَم ربع جارٍ بأنّه ناقص التغطية.
+    /// </summary>
+    public static KpiJourneyState JourneyState(
+        bool cadenceConfigured,
+        int expectedCount,
+        int adjustedExpectedCount,
+        int completedCount,
+        bool periodIsOpen,
+        decimal minimumCoverage)
+    {
+        if (!cadenceConfigured) return KpiJourneyState.CadenceNotConfigured;
+        if (adjustedExpectedCount <= 0 && expectedCount > 0 && completedCount <= 0) return KpiJourneyState.Exempt;
+        if (completedCount <= 0) return KpiJourneyState.NotStarted;
+
+        var coverage = Coverage(completedCount, adjustedExpectedCount);
+        if (coverage is null || coverage.Value >= 1m) return KpiJourneyState.CompleteEligible;
+        if (coverage.Value >= minimumCoverage) return KpiJourneyState.CompleteEligible;
+        return periodIsOpen ? KpiJourneyState.InProgress : KpiJourneyState.InsufficientCoverage;
     }
 
     /// <summary>

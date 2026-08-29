@@ -59,6 +59,37 @@ public static class TestAuth
     }
 
     /// <summary>
+    /// DEC-01/8 — يضبط نافذة الخدمة (تاريخ الالتحاق/انتهاء الخدمة) لمستخدم قائم.
+    /// لا توجد واجهة HTTP لهذين الحقلين بعد (قيد موثَّق)، فالضبط يتمّ على الكيان مباشرةً
+    /// في قاعدة الاختبار المعزولة — لا تُمسّ قاعدة مشتركة ولا بيانات حيّة.
+    /// </summary>
+    public static async Task SetEmploymentWindowAsync(
+        CustomWebApplicationFactory factory, Guid userId, DateOnly? hireDate, DateOnly? exitDate = null)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var user = await db.Users.FirstAsync(u => u.Id == userId);
+        user.HireDate = hireDate;
+        user.ExitDate = exitDate;
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>يجلب مسمًّى وظيفيًّا بالرمز أو ينشئه، ويعيد معرّفه (لنشر قوالب مربوطة بمسمّى).</summary>
+    public static async Task<Guid> GetOrCreateJobRoleAsync(CustomWebApplicationFactory factory, string code)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var jobRole = await db.Set<JobRole>().FirstOrDefaultAsync(r => r.Code == code);
+        if (jobRole is null)
+        {
+            jobRole = new JobRole { NameAr = code, Code = code, IsActive = true };
+            db.Set<JobRole>().Add(jobRole);
+            await db.SaveChangesAsync();
+        }
+        return jobRole.Id;
+    }
+
+    /// <summary>
     /// ينشئ مستخدمًا بدور Identity ومسمًّى وظيفيًّا بالرمز المحدّد (get-or-create للمسمّى حسب Code)،
     /// ثم يعيد عميلًا مسجّل الدخول مع معرّف المستخدم. تستخدمه اختبارات تجميع المبيعات:
     /// تقارير SALES_B2C/SALES_B2B تُفرَض «يومية» خادميًّا (ReportCadencePolicy)، فلا تُقبَل التسليمات

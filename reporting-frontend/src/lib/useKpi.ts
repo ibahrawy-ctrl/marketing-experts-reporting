@@ -10,6 +10,25 @@ export type KpiCadence = 'WeeklyPulse' | 'Quarterly';
 export type KpiDataQuality = 'NoData' | 'Complete' | 'Partial' | 'InsufficientCoverage';
 export type KpiTrendValue = 'Unknown' | 'Up' | 'Flat' | 'Down';
 
+/** DEC-01/18 — الحالات الستّ الصريحة لرحلة KPI. لا حالة سابعة ضمنيّة ولا فراغ بلا اسم. */
+export type KpiJourneyState =
+  | 'CadenceNotConfigured'
+  | 'Exempt'
+  | 'NotStarted'
+  | 'InProgress'
+  | 'CompleteEligible'
+  | 'InsufficientCoverage';
+
+/** DEC-01/5 — مصدر التواتر الفعليّ للموظّف، مُعلَن دائمًا (لا اختيار صامت). */
+export type KpiCadenceSource =
+  | 'employeeAssignment'
+  | 'teamAssignment'
+  | 'jobRole'
+  | 'departmentAssignment'
+  | 'generalTemplate'
+  | 'notConfigured'
+  | 'explicitRequest';
+
 export type KpiPeriodResolved = {
   type: string;
   key: string;
@@ -33,6 +52,12 @@ export type KpiMeasure = {
   previousValue: number | null;
   delta: number | null;
   trend: KpiTrendValue;
+  /** DEC-01/12 — `Completed ÷ AdjustedExpected × 100` كما حسبها الخادم. لا تُشتقّ هنا. */
+  coveragePercent: number | null;
+  /** DEC-01/14 — درجة موجودة لكنّ تغطيتها دون العتبة المعتمَدة ⇒ لا تُعتمد نتيجة نهائيّة. */
+  isProvisional: boolean;
+  /** DEC-01/18 — الحالة الصريحة المعروضة للمستخدم. */
+  journeyState: KpiJourneyState;
 };
 
 export type KpiEmployeeScore = {
@@ -47,6 +72,9 @@ export type KpiEmployeeScore = {
   isBelowTarget: boolean | null;
   appliedBelowTargetThreshold: number;
   thresholdSource: string;
+  /** DEC-01/5 — تواتر الموظّف الفعليّ؛ `null` يعني «التواتر غير مُهيّأ» لا «أسبوعيّ افتراضًا». */
+  effectiveCadence: KpiCadence | null;
+  cadenceSource: KpiCadenceSource;
 };
 
 export type KpiGroupScore = {
@@ -56,12 +84,17 @@ export type KpiGroupScore = {
   measure: KpiMeasure;
   scoredMemberCount: number;
   totalMemberCount: number;
+  /** DEC-01/16 — عدد من دخلوا المتوسّط الرسميّ فعلًا (تغطية ≥ العتبة). */
+  qualifiedMemberCount: number;
+  /** DEC-01/17 — غير المؤهّلين لا يختفون: أسماؤهم وحالتهم تُعرَض منفصلة عن المتوسّط. */
+  excludedForInsufficientCoverage: KpiEmployeeScore[] | null;
 };
 
 export type KpiPerformance = {
   periodResolved: KpiPeriodResolved;
   previousPeriodResolved: KpiPeriodResolved;
-  cadence: KpiCadence;
+  /** DEC-01/2 — `null` يعني «تواتر كلّ موظّف من قالبه» لا «افتراضيّ أسبوعيّ». */
+  cadence: KpiCadence | null;
   scopeType: string;
   company: KpiGroupScore;
   departments: KpiGroupScore[];
@@ -72,13 +105,17 @@ export type KpiPerformance = {
 
 export type KpiRankings = {
   periodResolved: KpiPeriodResolved;
-  cadence: KpiCadence;
+  cadence: KpiCadence | null;
   scopeType: string;
   topPerformers: KpiEmployeeScore[];
   needsSupport: KpiEmployeeScore[];
   excludedForInsufficientCoverage: number;
   minimumCoverage: number;
   calculatedAtUtc: string;
+  /** DEC-01/17 — المستبعَدون بأسمائهم لا بعددهم فقط. */
+  excludedEmployees: KpiEmployeeScore[] | null;
+  /** DEC-01/5 — من لا تواتر فعّالًا لهم: حالة مسمّاة تُعالَج إداريًّا لا تُخفى. */
+  cadenceNotConfiguredEmployees: KpiEmployeeScore[] | null;
 };
 
 export type KpiDrilldownRow = {
@@ -96,23 +133,43 @@ export type KpiDrilldownRow = {
   submittedAtUtc: string | null;
 };
 
+/** DEC-01/18 — فترة مصدر واحدة داخل النافذة الربعيّة: مكتملة أو مفقودة أو مُعفاة بسبب مسمّى. */
+export type KpiSourcePeriod = {
+  periodKey: string;
+  start: string;
+  end: string;
+  label: string;
+  isCompleted: boolean;
+  isExempt: boolean;
+  exemptReason: string | null;
+  score: number | null;
+};
+
 export type KpiDrilldown = {
   periodResolved: KpiPeriodResolved;
-  cadence: KpiCadence;
+  cadence: KpiCadence | null;
   subjectUserId: string | null;
   recomputedValue: number | null;
   rowCount: number;
   rows: KpiDrilldownRow[];
   calculatedAtUtc: string;
+  /** DEC-01/18 — أرقام التفصيل: Expected/AdjustedExpected/Completed/Missing/Coverage. */
+  measure: KpiMeasure | null;
+  sourcePeriods: KpiSourcePeriod[] | null;
+  effectiveCadence: KpiCadence | null;
+  cadenceSource: KpiCadenceSource;
 };
 
 /**
  * مُرشِّح واحد يقود كلّ شيء: البطاقات والرسوم والقوائم والجداول والترتيب والتفصيل.
- * `cadence` **إلزاميّ** (B-3) — لا قيمة ضمنيّة ولا خلط بين النبض الأسبوعيّ والربعيّ الرسميّ.
+ *
+ * DEC-01/2 — `cadence` **اختياريّ**: `null` (الافتراضيّ) يعني «يحسم الخادم تواتر كلّ موظّف من
+ * قالبه الفعّال»، فلا يُسأل المستخدم عن نوع التقييم عند فتح الشاشة. تحديده صراحةً = مسار واحد
+ * صريح (DEC-01/3، مثلًا النبض الأسبوعيّ وحده). في الحالتين لا سقوط صامت إلى تواتر مُفترَض.
  */
 export type KpiFilter = {
   periodType: string;
-  cadence: KpiCadence;
+  cadence: KpiCadence | null;
   periodKey?: string | null;
   from?: string | null;
   to?: string | null;
@@ -122,13 +179,16 @@ export type KpiFilter = {
 };
 
 export const DEFAULT_KPI_FILTER: KpiFilter = {
-  // الافتراضيّ = آخر فترة مكتملة (§5.4): لا اتّجاه رسميّ من فترة مفتوحة.
-  periodType: 'LastCompletedWeek',
-  cadence: 'WeeklyPulse',
+  // DEC-01/1 — الربع الميلاديّ الجاري بتوقيت Asia/Riyadh، يحسمه الخادم لا المتصفّح.
+  // DEC-01/4 — نافذة العرض ربعيّة حتّى لو كانت التقييمات المكوِّنة أسبوعيّة.
+  periodType: 'CurrentQuarter',
+  // DEC-01/2 — لا اختيار «نوع تقييم» عند الفتح.
+  cadence: null,
 };
 
 function params(f: KpiFilter): Record<string, string> {
-  const out: Record<string, string> = { periodType: f.periodType, cadence: f.cadence };
+  const out: Record<string, string> = { periodType: f.periodType };
+  if (f.cadence) out.cadence = f.cadence;
   if (f.periodKey) out.periodKey = f.periodKey;
   if (f.from) out.from = f.from;
   if (f.to) out.to = f.to;
@@ -141,7 +201,7 @@ function params(f: KpiFilter): Record<string, string> {
 // مفتاح الذاكرة المؤقّتة يضمّ الفترة والكادنس وكلّ مُضيِّقات النطاق. تجاهل أيّها يعني تسريب
 // نتائج نطاق إلى نطاق آخر داخل نفس الجلسة — وهو خلل أمنيّ لا خلل عرض.
 function key(kind: string, f: KpiFilter) {
-  return ['kpi', kind, f.periodType, f.cadence, f.periodKey ?? '', f.from ?? '', f.to ?? '',
+  return ['kpi', kind, f.periodType, f.cadence ?? 'auto', f.periodKey ?? '', f.from ?? '', f.to ?? '',
     f.departmentId ?? '', f.teamId ?? '', f.subjectUserId ?? ''] as const;
 }
 
@@ -232,6 +292,52 @@ export function kpiTone(
 export function appliedThreshold(perf?: { employees: KpiEmployeeScore[] }): number | null {
   return perf?.employees?.[0]?.appliedBelowTargetThreshold ?? null;
 }
+
+/**
+ * DEC-01/18 — الحالات الستّ بأسمائها الظاهرة للمستخدم. لا حالة تُطوى في «—» ولا في فراغ:
+ * انعدام التواتر والإعفاء سببان مختلفان تمامًا لانعدام الرقم، ويجب أن يفترقا في الشاشة.
+ */
+export const journeyStateLabel: Record<KpiJourneyState, string> = {
+  CadenceNotConfigured: 'التواتر غير مُهيّأ',
+  Exempt: 'مُعفى',
+  NotStarted: 'لم يبدأ',
+  InProgress: 'قيد الاستكمال',
+  CompleteEligible: 'مكتمل ومؤهّل',
+  InsufficientCoverage: 'تغطية غير كافية',
+};
+
+export const journeyStateTone: Record<KpiJourneyState, 'success' | 'gold' | 'alert' | 'muted'> = {
+  CadenceNotConfigured: 'alert',
+  Exempt: 'muted',
+  NotStarted: 'muted',
+  InProgress: 'gold',
+  CompleteEligible: 'success',
+  InsufficientCoverage: 'alert',
+};
+
+/** DEC-01/5 — مصدر التواتر يُعرَض نصًّا مفهومًا: المستخدم يعرف **لماذا** هذا تواتره. */
+export const cadenceSourceLabel: Record<KpiCadenceSource, string> = {
+  employeeAssignment: 'إسناد خاصّ بالموظّف',
+  teamAssignment: 'إسناد الفريق',
+  jobRole: 'المسمّى الوظيفيّ',
+  departmentAssignment: 'إسناد الإدارة',
+  generalTemplate: 'قالب عامّ',
+  notConfigured: 'غير مُهيّأ',
+  explicitRequest: 'اختيار صريح في المُرشِّح',
+};
+
+export const cadenceLabel: Record<KpiCadence, string> = {
+  WeeklyPulse: 'نبض أسبوعيّ',
+  Quarterly: 'تقييم ربعيّ رسميّ',
+};
+
+/** DEC-01/8 — أسباب إسقاط الالتزام من المقام، مسمّاة لا مطويّة. */
+export const exemptReasonLabel: Record<string, string> = {
+  approvedLeave: 'إجازة معتمَدة',
+  administrativeExemption: 'إعفاء إداريّ مسجَّل',
+  beforeHireDate: 'قبل تاريخ الالتحاق',
+  afterExitDate: 'بعد انتهاء الخدمة',
+};
 
 export const trendLabel: Record<KpiTrendValue, string> = {
   Unknown: '—',

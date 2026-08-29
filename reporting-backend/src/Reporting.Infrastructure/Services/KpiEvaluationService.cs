@@ -26,6 +26,9 @@ public class KpiEvaluationService : IKpiEvaluationService
     // صيغة مفتاح الفترة الأسبوعية المعتمدة: YYYY-Www (مثال 2026-W25) — تمنع إدخال قيَم حرّة غير مفهومة.
     private static readonly Regex WeeklyPeriodKeyPattern = new(@"^\d{4}-W\d{2}$", RegexOptions.Compiled);
 
+    // R5/DEC-01/3 — صيغة مفتاح الربع الرسميّ: YYYY-Qn حيث n ∈ 1..4 (مثال 2026-Q3).
+    private static readonly Regex QuarterlyPeriodKeyPattern = new(@"^\d{4}-Q[1-4]$", RegexOptions.Compiled);
+
     public KpiEvaluationService(AppDbContext db, ICurrentUser currentUser,
         INotificationService notifications, IAuditService audit, IScopeResolver scope,
         IOptions<KpiFeatureOptions> kpiOptions)
@@ -47,25 +50,56 @@ public class KpiEvaluationService : IKpiEvaluationService
         if (request.SubjectUserId == Guid.Empty)
             return Result<KpiEvaluationDto>.Failure("الموظف المُقيَّم مطلوب.", "kpi_eval.subject_required");
 
-        // حارس الدورية (المرحلة الحالية): تقييم KPI أسبوعي فقط. التجميع الشهري/الربع سنوي/السنوي يُدعم لاحقًا.
-        if (request.PeriodType != PeriodType.Weekly)
+        // R5/DEC-01/3 — «نبض الأسبوع» و«التقييم الربعيّ الرسميّ» مساران منفصلان، والتواتر خاصّية القالب
+        // لا خيار للمُقيِّم. لذلك حلّ الحارس القديم («أسبوعيّ فقط») حارسُ تطابق: نوع فترة التقييم يجب أن
+        // يطابق تواتر قالبه. Monthly/Yearly/AdHoc تبقى مرفوضة بالرمز نفسه لأنّ لا تواتر يقابلها.
+        var templateCadence = await _db.KpiTemplates.AsNoTracking()
+            .Where(t => t.Id == request.KpiTemplateId)
+            .Select(t => (KpiCadence?)t.Cadence)
+            .FirstOrDefaultAsync(ct);
+        if (templateCadence is null)
+            return Result<KpiEvaluationDto>.Failure("القالب غير موجود.", "kpi_template.not_found");
+
+        var expectedPeriodType = templateCadence == KpiCadence.Quarterly
+            ? PeriodType.Quarterly
+            : PeriodType.Weekly;
+        if (request.PeriodType != expectedPeriodType)
             return Result<KpiEvaluationDto>.Failure(
-                "تقييم KPI الحالي أسبوعي فقط. الدوريات الأخرى (شهري/ربع سنوي/سنوي) ستُدعم لاحقًا.",
+                expectedPeriodType == PeriodType.Weekly
+                    ? "هذا القالب أسبوعيّ (نبض الأسبوع)؛ نوع الفترة يجب أن يكون Weekly."
+                    : "هذا القالب ربعيّ (التقييم الرسميّ)؛ نوع الفترة يجب أن يكون Quarterly.",
                 "kpi_eval.period_type_not_supported");
 
-        // صيغة الفترة الأسبوعية يجب أن تكون YYYY-Www (مثال 2026-W25) — يمنع القيَم الحرّة غير المفهومة.
-        if (!WeeklyPeriodKeyPattern.IsMatch(request.PeriodKey.Trim()))
-            return Result<KpiEvaluationDto>.Failure(
-                "صيغة الفترة غير صحيحة؛ استخدم صيغة الأسبوع YYYY-Www مثل 2026-W25.",
-                "kpi_eval.period_format_invalid");
+        if (expectedPeriodType == PeriodType.Weekly)
+        {
+            // صيغة الفترة الأسبوعية يجب أن تكون YYYY-Www (مثال 2026-W25) — يمنع القيَم الحرّة غير المفهومة.
+            if (!WeeklyPeriodKeyPattern.IsMatch(request.PeriodKey.Trim()))
+                return Result<KpiEvaluationDto>.Failure(
+                    "صيغة الفترة غير صحيحة؛ استخدم صيغة الأسبوع YYYY-Www مثل 2026-W25.",
+                    "kpi_eval.period_format_invalid");
 
-        // ROLE-AWARE-REPORTING-CALENDAR — التحقّق الخادميّ من مفتاح الدورة (Phase 2.4):
-        // فوق فحص الصيغة، يجب أن يكون المفتاح دورةً صالحة بنيويًّا وقابلة للعكس (Sat→Fri عبر
-        // ReportingCalendarPolicy) وألّا يكون دورةً مستقبلية لم تبدأ بعد. لا تصحيح بيانات ولا تغيير مفتاح مخزَّن.
-        if (!ReportingCalendarPolicy.IsValidCycleKey(request.PeriodKey.Trim()))
-            return Result<KpiEvaluationDto>.Failure("مفتاح الدورة غير صالح.", "kpi.cycle_key_invalid");
-        if (ReportingCalendarPolicy.CycleRange(request.PeriodKey.Trim()).Start > ReportingCalendarPolicy.RiyadhToday())
-            return Result<KpiEvaluationDto>.Failure("لا يمكن إنشاء تقييم لدورة لم تبدأ بعد.", "calendar.cycle_not_open");
+            // ROLE-AWARE-REPORTING-CALENDAR — التحقّق الخادميّ من مفتاح الدورة (Phase 2.4):
+            // فوق فحص الصيغة، يجب أن يكون المفتاح دورةً صالحة بنيويًّا وقابلة للعكس (Sat→Fri عبر
+            // ReportingCalendarPolicy) وألّا يكون دورةً مستقبلية لم تبدأ بعد. لا تصحيح بيانات ولا تغيير مفتاح مخزَّن.
+            if (!ReportingCalendarPolicy.IsValidCycleKey(request.PeriodKey.Trim()))
+                return Result<KpiEvaluationDto>.Failure("مفتاح الدورة غير صالح.", "kpi.cycle_key_invalid");
+            if (ReportingCalendarPolicy.CycleRange(request.PeriodKey.Trim()).Start > ReportingCalendarPolicy.RiyadhToday())
+                return Result<KpiEvaluationDto>.Failure("لا يمكن إنشاء تقييم لدورة لم تبدأ بعد.", "calendar.cycle_not_open");
+        }
+        else
+        {
+            // مفتاح الربع YYYY-Qn بالنمط نفسه الذي يبنيه محرّك الحساب لنوافذ الالتزام الربعيّة،
+            // وبالقيد الزمنيّ نفسه: لا تقييم لربع لم يبدأ بعد بتوقيت الرياض.
+            if (!QuarterlyPeriodKeyPattern.IsMatch(request.PeriodKey.Trim()))
+                return Result<KpiEvaluationDto>.Failure(
+                    "صيغة الفترة غير صحيحة؛ استخدم صيغة الربع YYYY-Qn مثل 2026-Q3.",
+                    "kpi_eval.period_format_invalid");
+            var qk = request.PeriodKey.Trim();
+            var qYear = int.Parse(qk[..4], CultureInfo.InvariantCulture);
+            var qNo = int.Parse(qk[6..], CultureInfo.InvariantCulture);
+            if (ReportingCalendarPolicy.QuarterRange(qYear, qNo).Start > ReportingCalendarPolicy.RiyadhToday())
+                return Result<KpiEvaluationDto>.Failure("لا يمكن إنشاء تقييم لربع لم يبدأ بعد.", "calendar.cycle_not_open");
+        }
 
         // نطاق إنشاء التقييم أضيق من نطاق العرض: المرؤوسون المباشرون فقط (أو كل الموظّفين للأدمن).
         // لا يكفي أن يكون الموظّف ضمن نطاق رؤية المدير الواسع (القسم) — يجب أن يكون مرؤوسًا مباشرًا.
