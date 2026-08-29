@@ -36,6 +36,7 @@ import ReportViewGrantsPage from './pages/ReportViewGrantsPage';
 import EmailNotificationsPage from './pages/EmailNotificationsPage';
 import EmailControlCenterPage from './pages/EmailControlCenterPage';
 import EmployeeProfilePage from './pages/EmployeeProfilePage';
+import EmployeeDirectoryPage from './pages/EmployeeDirectoryPage';
 import AttendancePage from './pages/AttendancePage';
 import HrOperationsPage from './pages/HrOperationsPage';
 import { MyKpiPage, EmployeeKpiPage } from './pages/IndividualKpiPage';
@@ -225,6 +226,9 @@ const APP_ROUTES: { path: string; element: ReactNode; roles?: Role[]; featureKey
   // المسار في العرض الإداريّ ويعرض شاشة المنع بدل ملفّ المستخدم نفسه.
   { path: '/app/employee/me', element: <EmployeeProfilePage selfRoute />, featureKey: FEATURES.employee360 },
   { path: '/app/employee/:userId', element: <EmployeeProfilePage /> },
+  // P123-R2 — دليل الموظّفين: بلا بوّابة أدوار عمدًا. النطاق مفروض خادمًا في `/directory/users`
+  // بالمُحلِّل نفسه الذي يحرس ملفّ الموظّف، فأدنى نطاق (`own`) يعطي الموظّفَ نفسَه لا شاشة منع.
+  { path: '/app/employees', element: <EmployeeDirectoryPage /> },
   // مؤشرات أداء فردية (KPI-INDIVIDUAL-DASHBOARD-R1): «مؤشرات أدائي» للموظّف الحالي،
   // و«مؤشرات أداء الموظف» لموظّف بعينه — النطاق مفروض خادمًا (self-or-scope ⇒ 403/404 خارج النطاق).
   { path: '/app/my-kpi', element: <MyKpiPage /> },

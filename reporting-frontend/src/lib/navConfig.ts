@@ -176,10 +176,13 @@ export const MODULES: NavModule[] = [
     groups: [{ id: 'employee-services', label: 'خدمات الموظفين' }],
     items: [
       { id: 'people.me', label: 'ملفي', target: '/app/employee/me', order: 1, featureKey: FEATURES.employee360, matchPaths: ['/app/employee'], keywords: 'ملفّي الشخصي موظف 360' },
-      // «دليل الموظفين» = سطح بيانات الموظفين القائم (`/app/hr-employees`) بأدواره كما هي.
-      // لا يوجد دليل مستقلّ محكوم بالنطاق في النظام حتّى الآن — مسجَّل كقصور معروف، وممنوع
-      // اختراع سطح جديد يوهم بقدرة لا يفرضها الخادم.
-      { id: 'people.directory', label: 'دليل الموظفين', target: '/app/hr-employees', order: 2, roles: HR_EMPLOYEE, aliases: ['/app/directory'], keywords: 'دليل بيانات الموظفين hr' },
+      // P123-R2 — «دليل الموظفين» صار سطحًا مستقلًّا محكومًا بالنطاق، بلا بوّابة أدوار عمدًا:
+      // مصدره `/directory/users` يُصفّي خادميًّا بالمُحلِّل نفسه الذي يحرس ملفّ الموظّف، فما يظهر
+      // فيه قابل للفتح حتمًا وما لا يظهر مردود حتمًا (مُثبَت في DirectoryOpenableContractTests).
+      // بوّابة أدوار هنا كانت ستحجب عن المدير وقائد الفريق نطاقًا يمنحه لهما الخادم أصلًا.
+      { id: 'people.directory', label: 'دليل الموظفين', target: '/app/employees', order: 2, exact: true, aliases: ['/app/directory'], keywords: 'دليل الموظفين بحث فتح ملف' },
+      // سطح **تحرير** بيانات الموارد البشريّة — ليس دليلًا؛ فُصِل عن الدليل كي لا يَعِد اسمٌ واحد بقدرتين.
+      { id: 'people.hr-employees', label: 'إدارة بيانات الموظفين', target: '/app/hr-employees', order: 2.5, roles: HR_EMPLOYEE, keywords: 'تعديل بيانات الموظفين hr تنظيم' },
       { id: 'people.teams', label: 'فرق العمل', target: '/app/teams', order: 3, roles: EXEC_VIEW, matchPaths: ['/app/teams'] },
       // بلا بوّابة أدوار عمدًا (الموظّف طرف أصيل في آلة الحالات)، لكن بعَلَم الميزة:
       // بإطفائه يردّ الخادم 404 على كلّ نقاط الحضور، فالرابط كان يقود إلى «خطأ» ثابت.
@@ -395,11 +398,32 @@ function pathMatches(base: string, pathname: string, exact?: boolean): boolean {
   return pathname === base || pathname.startsWith(base + '/');
 }
 
+/// كلّ أنماط العنصر مع صفة التمام: الوجهة (قد تكون تامّة) ثمّ المسارات الديناميّة وaliasات.
+function itemPatterns(item: NavItem): [pattern: string, exact: boolean][] {
+  return [
+    [item.target, !!item.exact],
+    ...(item.matchPaths ?? []).map((p) => [p, false] as [string, boolean]),
+    ...(item.aliases ?? []).map((a) => [a, false] as [string, boolean]),
+  ];
+}
+
 /// هل يمثّل العنصر المسار المعطى (بما فيه مساراته الديناميّة وaliasاته)؟
 export function itemMatches(item: NavItem, pathname: string): boolean {
-  if (pathMatches(item.target, pathname, item.exact)) return true;
-  if (item.matchPaths?.some((p) => pathMatches(p, pathname))) return true;
-  return (item.aliases ?? []).some((a) => pathMatches(a, pathname));
+  return itemPatterns(item).some(([p, ex]) => pathMatches(p, pathname, ex));
+}
+
+/**
+ * أخصّيّة مطابقة العنصر للمسار — `null` حين لا يطابق.
+ *
+ * القياس على النمط **الذي طابَق فعلًا**، لا على الوجهة مهما كانت. الفرق ليس نظريًّا: عنصرٌ
+ * التقط المسار بمسار ديناميّ قصير كان يتفوّق بطول وجهةٍ لم تُطابِق أصلًا، فيسرق الإبراز من
+ * صاحب المسار الحقيقيّ. والمطابقة التامّة أخصّ من مطابقة البادئة بالطول نفسه: مسار جذر يملكه
+ * عنصر، وسطحٌ آخر يعلن البادئة نفسها لالتقاط ما تحتها — فصاحب الجذر أولى بجذره.
+ */
+function matchSpecificity(item: NavItem, pathname: string): [exact: boolean, length: number] | null {
+  const hits = itemPatterns(item).filter(([p, ex]) => pathMatches(p, pathname, ex));
+  if (hits.length === 0) return null;
+  return [hits.some(([, ex]) => ex), Math.max(...hits.map(([p]) => p.length))];
 }
 
 export interface ActiveNav {
@@ -408,21 +432,21 @@ export interface ActiveNav {
   group: NavGroup | null;
 }
 
-/// الوحدة/العنصر الحاوي للمسار الحالي — أطول مطابقة، بلا فلترة أدوار كي يُبرَز التنقّل
+/// الوحدة/العنصر الحاوي للمسار الحالي — أخصّ مطابقة، بلا فلترة أدوار كي يُبرَز التنقّل
 /// حتّى عند الوصول المباشر بالرابط. الـalias يُبرِز عنصره المرجعيّ لا نفسه.
 export function resolveActive(pathname: string): ActiveNav | null {
   const path = canonicalPath(pathname);
   let best: ActiveNav | null = null;
-  let bestLen = -1;
+  let bestScore: [boolean, number] | null = null;
   for (const m of MODULES) {
     for (const item of m.items) {
-      if (!itemMatches(item, path)) continue;
-      const len = Math.max(
-        item.target.length,
-        ...(item.matchPaths ?? []).filter((p) => pathMatches(p, path)).map((p) => p.length),
-      );
-      if (len > bestLen) {
-        bestLen = len;
+      const score = matchSpecificity(item, path);
+      if (score === null) continue;
+      const wins =
+        bestScore === null ||
+        (score[0] !== bestScore[0] ? score[0] : score[1] > bestScore[1]);
+      if (wins) {
+        bestScore = score;
         best = { module: m, item, group: m.groups?.find((g) => g.id === item.group) ?? null };
       }
     }
