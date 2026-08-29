@@ -1,0 +1,276 @@
+{
+  "ticket": "R22A — REAL OPERATIONAL MULTI-WORK-ITEM ACTIVATION",
+  "capturedAtUtc": "2026-08-29T18:17:00Z",
+  "environment": "TEST",
+  "database": "reporting_test_uat",
+  "host": "test.emarketingacademy.net",
+  "purpose": "حصر مسودات إصدارات القوالب قبل أيّ تغيير — بصمات md5 مرجعيّة لإثبات عدم المساس لاحقًا",
+  "guarantee": "قراءة فقط. لم تُحذف ولم تُنشَر ولم تُعدَّل أيّ مسودة.",
+  "anomaly": {
+    "description": "مسودات بذر أرقامها أدنى من الإصدار المنشور الحاليّ (v1..v3 مسودات و v4 منشور)",
+    "effect": "CreateDraftVersionAsync كان يُرجِع 409 version.draft_exists.conflict إلى الأبد ⇒ تجميد القالب",
+    "affectedTemplates": 4,
+    "inScopeThisTicket": [
+      "تقرير كاتب المحتوى الأسبوعي"
+    ],
+    "deferredToSeparateTickets": [
+      "تقرير المديرشن الأسبوعي",
+      "تقرير فريق التصميم",
+      "تقرير فريق الفيديو"
+    ]
+  },
+  "templates": [
+    {
+      "status": "Published",
+      "isActive": true,
+      "versions": [
+        {
+          "versionId": "88cd74a6-c9ce-498d-bf61-1530d9ed7986",
+          "fieldCount": 18,
+          "isPublished": false,
+          "allFieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+          "createdAtUtc": "2026-07-12T08:30:20.809357+00:00",
+          "versionNumber": 1,
+          "publishedAtUtc": "2026-07-12T08:30:20.809357+00:00",
+          "submissionCount": 0,
+          "projectSectionConfigMd5": "6de41b9a1f3e8e341fabf06991d87a75",
+          "projectSectionHasWorkItems": false,
+          "projectSectionSchemaVersion": "absent"
+        },
+        {
+          "versionId": "790e04da-b064-4dd5-bfe1-42c5a15f16b4",
+          "fieldCount": 5,
+          "isPublished": false,
+          "allFieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+          "createdAtUtc": "2026-07-12T08:30:21.176369+00:00",
+          "versionNumber": 2,
+          "publishedAtUtc": "2026-07-12T08:30:21.17637+00:00",
+          "submissionCount": 0,
+          "projectSectionConfigMd5": "922fc165e2da5cb6ba6c3c0e369a6491",
+          "projectSectionHasWorkItems": false,
+          "projectSectionSchemaVersion": "absent"
+        },
+        {
+          "versionId": "b593a022-b641-4fc6-a002-57a54127d4a5",
+          "fieldCount": 5,
+          "isPublished": false,
+          "allFieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+          "createdAtUtc": "2026-07-12T08:30:21.234572+00:00",
+          "versionNumber": 3,
+          "publishedAtUtc": "2026-07-12T08:30:21.234572+00:00",
+          "submissionCount": 0,
+          "projectSectionConfigMd5": "fba8ea401b52e01a4c276c742d5e5b7a",
+          "projectSectionHasWorkItems": false,
+          "projectSectionSchemaVersion": "absent"
+        },
+        {
+          "versionId": "6eaf6956-472c-4291-baf7-8ef9f09ea86e",
+          "fieldCount": 5,
+          "isPublished": true,
+          "allFieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+          "createdAtUtc": "2026-07-12T08:30:21.258836+00:00",
+          "versionNumber": 4,
+          "publishedAtUtc": "2026-07-12T08:30:21.258837+00:00",
+          "submissionCount": 1,
+          "projectSectionConfigMd5": "315c06d23a4f27a0259d44e941bb99db",
+          "projectSectionHasWorkItems": false,
+          "projectSectionSchemaVersion": "absent"
+        }
+      ],
+      "templateId": "3a4775c2-5a78-4171-b70f-d2b029f4ff92",
+      "assignments": 0,
+      "templateTitle": "تقرير المديرشن الأسبوعي",
+      "classification": "Primary",
+      "defaultPeriodType": "Weekly"
+    },
+    {
+      "status": "Published",
+      "isActive": true,
+      "versions": [
+        {
+          "versionId": "52a3cc3c-31bf-4294-8205-c8ce1f5a2e95",
+          "fieldCount": 18,
+          "isPublished": false,
+          "allFieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+          "createdAtUtc": "2026-07-12T08:30:20.831744+00:00",
+          "versionNumber": 1,
+          "publishedAtUtc": "2026-07-12T08:30:20.831744+00:00",
+          "submissionCount": 0,
+          "projectSectionConfigMd5": "4dce2ee99ffcb4d7e51d6b84948f5dc7",
+          "projectSectionHasWorkItems": false,
+          "projectSectionSchemaVersion": "absent"
+        },
+        {
+          "versionId": "27ef16ee-9fc1-4a5e-9309-fa63a01c26c1",
+          "fieldCount": 5,
+          "isPublished": false,
+          "allFieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+          "createdAtUtc": "2026-07-12T08:30:21.161002+00:00",
+          "versionNumber": 2,
+          "publishedAtUtc": "2026-07-12T08:30:21.161002+00:00",
+          "submissionCount": 0,
+          "projectSectionConfigMd5": "2abf4b5ab352649668349093eb4b8408",
+          "projectSectionHasWorkItems": false,
+          "projectSectionSchemaVersion": "absent"
+        },
+        {
+          "versionId": "89e49901-a61d-45ae-83dc-e87addf46554",
+          "fieldCount": 5,
+          "isPublished": false,
+          "allFieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+          "createdAtUtc": "2026-07-12T08:30:21.231375+00:00",
+          "versionNumber": 3,
+          "publishedAtUtc": "2026-07-12T08:30:21.231375+00:00",
+          "submissionCount": 0,
+          "projectSectionConfigMd5": "a394e654f9d1f3a185798eaa28559101",
+          "projectSectionHasWorkItems": false,
+          "projectSectionSchemaVersion": "absent"
+        },
+        {
+          "versionId": "597d49f9-754d-42d8-b452-3112df1c912a",
+          "fieldCount": 5,
+          "isPublished": true,
+          "allFieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+          "createdAtUtc": "2026-07-12T08:30:21.255636+00:00",
+          "versionNumber": 4,
+          "publishedAtUtc": "2026-07-12T08:30:21.255636+00:00",
+          "submissionCount": 0,
+          "projectSectionConfigMd5": "cab376e701fe20d45372b7dfe2feb83e",
+          "projectSectionHasWorkItems": false,
+          "projectSectionSchemaVersion": "absent"
+        }
+      ],
+      "templateId": "4b50b69d-5b3b-4160-89d4-1c524bb96458",
+      "assignments": 0,
+      "templateTitle": "تقرير فريق التصميم",
+      "classification": "Primary",
+      "defaultPeriodType": "Weekly"
+    },
+    {
+      "status": "Published",
+      "isActive": true,
+      "versions": [
+        {
+          "versionId": "2007347d-a6cd-4c71-89c4-ba012740c151",
+          "fieldCount": 18,
+          "isPublished": false,
+          "allFieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+          "createdAtUtc": "2026-07-12T08:30:20.834055+00:00",
+          "versionNumber": 1,
+          "publishedAtUtc": "2026-07-12T08:30:20.834055+00:00",
+          "submissionCount": 0,
+          "projectSectionConfigMd5": "8990fead7c4bfbe8f457424c1c526545",
+          "projectSectionHasWorkItems": false,
+          "projectSectionSchemaVersion": "absent"
+        },
+        {
+          "versionId": "e08a852c-a33b-47e3-9654-126636fb87cf",
+          "fieldCount": 5,
+          "isPublished": false,
+          "allFieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+          "createdAtUtc": "2026-07-12T08:30:21.163184+00:00",
+          "versionNumber": 2,
+          "publishedAtUtc": "2026-07-12T08:30:21.163184+00:00",
+          "submissionCount": 0,
+          "projectSectionConfigMd5": "60e48dfc1f8e01ddf5544102b0e2a53c",
+          "projectSectionHasWorkItems": false,
+          "projectSectionSchemaVersion": "absent"
+        },
+        {
+          "versionId": "1486b223-5a2d-4969-a1ee-42968a179e90",
+          "fieldCount": 5,
+          "isPublished": false,
+          "allFieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+          "createdAtUtc": "2026-07-12T08:30:21.233036+00:00",
+          "versionNumber": 3,
+          "publishedAtUtc": "2026-07-12T08:30:21.233036+00:00",
+          "submissionCount": 0,
+          "projectSectionConfigMd5": "2623f419d2a8720c78b4a0655b5830a2",
+          "projectSectionHasWorkItems": false,
+          "projectSectionSchemaVersion": "absent"
+        },
+        {
+          "versionId": "d26b6a10-616e-49bb-ba8f-5942fa04bac7",
+          "fieldCount": 5,
+          "isPublished": true,
+          "allFieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+          "createdAtUtc": "2026-07-12T08:30:21.257403+00:00",
+          "versionNumber": 4,
+          "publishedAtUtc": "2026-07-12T08:30:21.257403+00:00",
+          "submissionCount": 0,
+          "projectSectionConfigMd5": "13f1904d899365e1ee21330c08860ade",
+          "projectSectionHasWorkItems": false,
+          "projectSectionSchemaVersion": "absent"
+        }
+      ],
+      "templateId": "6f492ed5-b0fb-4b95-894c-f52ef9e8abee",
+      "assignments": 0,
+      "templateTitle": "تقرير فريق الفيديو",
+      "classification": "Primary",
+      "defaultPeriodType": "Weekly"
+    },
+    {
+      "status": "Published",
+      "isActive": true,
+      "versions": [
+        {
+          "versionId": "cf29dadf-7b34-4d96-aff8-73bfbc9811f5",
+          "fieldCount": 16,
+          "isPublished": false,
+          "allFieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+          "createdAtUtc": "2026-07-12T08:30:20.837268+00:00",
+          "versionNumber": 1,
+          "publishedAtUtc": "2026-07-12T08:30:20.837268+00:00",
+          "submissionCount": 0,
+          "projectSectionConfigMd5": "8d1170e33abe204c7e629ace0f7fa376",
+          "projectSectionHasWorkItems": false,
+          "projectSectionSchemaVersion": "absent"
+        },
+        {
+          "versionId": "63706888-e178-45e9-bc72-107c83d85fb1",
+          "fieldCount": 5,
+          "isPublished": false,
+          "allFieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+          "createdAtUtc": "2026-07-12T08:30:21.158052+00:00",
+          "versionNumber": 2,
+          "publishedAtUtc": "2026-07-12T08:30:21.158052+00:00",
+          "submissionCount": 0,
+          "projectSectionConfigMd5": "d7735b597c2c76a90810b1c2a2be999d",
+          "projectSectionHasWorkItems": false,
+          "projectSectionSchemaVersion": "absent"
+        },
+        {
+          "versionId": "3595e9d5-ffb9-4004-ab62-55477368f79a",
+          "fieldCount": 5,
+          "isPublished": false,
+          "allFieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+          "createdAtUtc": "2026-07-12T08:30:21.229413+00:00",
+          "versionNumber": 3,
+          "publishedAtUtc": "2026-07-12T08:30:21.229413+00:00",
+          "submissionCount": 0,
+          "projectSectionConfigMd5": "3f4f9e60593b4c6cfb3e43a92982b47d",
+          "projectSectionHasWorkItems": false,
+          "projectSectionSchemaVersion": "absent"
+        },
+        {
+          "versionId": "0ac84366-5a10-4e2c-8de0-bfa8010cd034",
+          "fieldCount": 5,
+          "isPublished": true,
+          "allFieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+          "createdAtUtc": "2026-07-12T08:30:21.253733+00:00",
+          "versionNumber": 4,
+          "publishedAtUtc": "2026-07-12T08:30:21.253733+00:00",
+          "submissionCount": 0,
+          "projectSectionConfigMd5": "554bd2e116c7eff6c2e44a60aa261bb2",
+          "projectSectionHasWorkItems": false,
+          "projectSectionSchemaVersion": "absent"
+        }
+      ],
+      "templateId": "9e375ad7-8a65-46f4-849f-886d5b795bfe",
+      "assignments": 0,
+      "templateTitle": "تقرير كاتب المحتوى الأسبوعي",
+      "classification": "Primary",
+      "defaultPeriodType": "Weekly"
+    }
+  ]
+}
