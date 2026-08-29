@@ -1,0 +1,114 @@
+{
+  "ticket": "R22A",
+  "status": "PREPARED_NOT_EXECUTED",
+  "blocker": "تعذّرت المصادقة — لا ملفّ /tmp/r22a/.adminpw ولا جلسة متصفّح مصادَقة بحساب Admin على TEST",
+  "target": {
+    "templateTitle": "تقرير كاتب المحتوى الأسبوعي",
+    "templateId": "9e375ad7-8a65-46f4-849f-886d5b795bfe",
+    "sourcePublishedVersion": { "versionNumber": 4, "versionId": "0ac84366-5a10-4e2c-8de0-bfa8010cd034" },
+    "newVersionNumber": 5,
+    "environment": "TEST",
+    "database": "reporting_test_uat"
+  },
+
+  "designRationale": {
+    "whatChanges": "الحقول الخمسة تنتقل من مستوى إدخال المشروع إلى مستوى بند العمل، ويُضاف schemaVersion 2 ومجموعة workItems.",
+    "whyProjectFieldsBecomeEmpty": "الحقول الخمسة كلّها وصفٌ لعملٍ منفَّذ (نوعه وهدفه وحالته وعدده وملاحظاته) لا وصفٌ للمشروع؛ إبقاؤها على مستوى المشروع هو عين العيب الذي فرض تكرار المشروع.",
+    "emptyProjectFieldsIsSafe": "SubmissionsPage.tsx:1774-1778 يمرّر config.fields إلى RepeatableAnswersGrid — مصفوفة فارغة تُصيّر شبكة فارغة بلا خطأ، ثمّ يظهر بلوك بنود العمل (:1780-1811) داخل بطاقة المشروع نفسها.",
+    "fieldDefinitionsUnchanged": "الحقول الخمسة منقولة بحرفيّتها من ConfigJson الخاصّ بـv4: نفس key وtype وlabel وoptions وrequired وcatalogDomain. لا حقل جديد ولا محذوف ولا معاد تسميته.",
+    "uniqueByEmpty": "تُرِك uniqueBy فارغًا عمدًا: تقييده بـcontent_type كان سيمنع بندَي Carousel لمشروع واحد، وهي حالة عمل مشروعة.",
+    "maxItemsZero": "0 = بلا حدّ أعلى، مطابق لاصطلاح maxProjects القائم في v4.",
+    "minItemsOne": "بند عمل واحد على الأقلّ لكلّ مشروع — يمنع تسجيل مشروع بلا عمل."
+  },
+
+  "newConfigJson": {
+    "schemaVersion": 2,
+    "fields": [],
+    "minProjects": 1,
+    "maxProjects": 0,
+    "projectRequired": true,
+    "workItems": {
+      "key": "work_items",
+      "label": "بنود العمل",
+      "itemLabel": "بند عمل",
+      "addLabel": "+ إضافة بند عمل",
+      "minItems": 1,
+      "maxItems": 0,
+      "uniqueBy": [],
+      "fields": [
+        {
+          "key": "content_type",
+          "type": "Select",
+          "label": "نوع المحتوى",
+          "columns": null,
+          "options": ["Carousel", "Static Post", "Reel Script", "Story", "Blog", "Landing Page Copy", "Email", "WhatsApp Copy", "Product Description", "Case Study", "Company Profile", "أخرى"],
+          "required": true,
+          "catalogDomain": "content_type"
+        },
+        {
+          "key": "content_goal",
+          "type": "Select",
+          "label": "هدف المحتوى",
+          "columns": null,
+          "options": ["Sales", "Educational", "Awareness", "Engagement", "Branding", "Offer", "Recruitment", "Event", "Announcement"],
+          "required": true,
+          "catalogDomain": "content_goal"
+        },
+        {
+          "key": "work_status",
+          "type": "Select",
+          "label": "حالة العمل",
+          "columns": null,
+          "options": ["Draft", "Revision", "Approved", "Published"],
+          "required": true,
+          "catalogDomain": "work_status"
+        },
+        {
+          "key": "count",
+          "type": "Number",
+          "label": "العدد",
+          "columns": null,
+          "options": null,
+          "required": true,
+          "catalogDomain": null
+        },
+        {
+          "key": "notes",
+          "type": "LongText",
+          "label": "ملاحظات",
+          "columns": null,
+          "options": null,
+          "required": false,
+          "catalogDomain": null
+        }
+      ]
+    }
+  },
+
+  "executionRunbook": {
+    "principle": "عبر واجهة المنتج البرمجيّة الرسميّة حصرًا — ممنوع SQL مباشر، وممنوع أيّ مسّ بكلمة مرور الحساب.",
+    "auth": "POST /api/auth/login بحساب admin@marketingexperts.local باستعمال كلمة المرور الحاليّة كما هي بالبايتات بلا trim. النفاذ عبر نفق SSH إلى 127.0.0.1:5091 لتفادي auth_basic الخاصّ بـnginx (ليس تجاوزًا للمصادقة — طبقة الحماية التطبيقيّة تعمل كاملة).",
+    "steps": [
+      { "n": 1, "action": "POST /api/report-templates/9e375ad7-8a65-46f4-849f-886d5b795bfe/versions", "expect": "200 — مسودة v5 تنسخ حقول v4 كاملة. كانت تُعيد 409 قبل إصلاح الحارس." },
+      { "n": 2, "action": "GET /api/report-templates/9e375ad7-8a65-46f4-849f-886d5b795bfe", "expect": "التقاط fieldId الخاصّ بحقل ProjectRepeatableSection داخل v5 وحدها" },
+      { "n": 3, "action": "PUT /api/report-templates/fields/{fieldId}", "body": "UpsertFieldRequest(Label, Key, FieldType, IsRequired, HelpText, ConfigJson) — تُعاد القيم الأربع الأولى كما هي من v4، ويُستبدل ConfigJson وحده بـnewConfigJson أعلاه", "expect": "200" },
+      { "n": 4, "action": "GET التحقّق قبل النشر", "expect": "ConfigJson المخزَّن يحوي schemaVersion=2 وworkItems.fields بخمسة عناصر، وv4 لم تتغيّر بصمتها" },
+      { "n": 5, "action": "POST /api/report-templates/versions/{v5Id}/publish", "expect": "200 — الفعّال يصير v5 (أعلى رقم منشور)" },
+      { "n": 6, "action": "POST /api/report-templates/9e375ad7-.../assignments", "expect": "إسناد القالب لموظّف اختبار — القالب حاليًّا بلا أيّ إسناد (0)" }
+    ],
+    "allRoutesRequire": "Policy = TemplateGovernance"
+  },
+
+  "invariantsToProveAfterExecution": [
+    "v1/v2/v3 لم تُحذف ولم تُنشَر ولم تتغيّر حالتها — بصماتها كما هي في TEMPLATE-VERSION-IMPACT.json",
+    "v4 بقيت منشورة وغير قابلة للتغيير — بصمة ConfigJson الخاصّة بها كما هي",
+    "عدد المسودات المفتوحة لم يتجاوز واحدة في أيّ لحظة",
+    "التقارير التاريخيّة لم تتغيّر — القالب الحقيقيّ عليه 0 تسليم و0 إسناد قبل التذكرة"
+  ],
+
+  "rollback": {
+    "method": "لا يلزم حذف: إعادة نشر v4 عبر POST /api/report-templates/versions/0ac84366-5a10-4e2c-8de0-bfa8010cd034/publish تعيد الفعّال إلى المخطّط 1.",
+    "note": "حذف v5 ممكن عبر DELETE إن لم تُستعمل في أيّ تسليم، لكنّه غير مطلوب ويحتاج تصريحًا صريحًا.",
+    "backendRollback": "مستقلّ ومقيس في TEST-BACKEND-DEPLOYMENT-20260829.md §7"
+  }
+}

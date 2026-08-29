@@ -1,0 +1,50 @@
+[
+  {
+    "status": 200,
+    "url": "/api/projects/9e731196-f87f-4bbf-82cd-260d06d90b56/reports"
+  },
+  {
+    "status": 200,
+    "url": "/api/projects/9e731196-f87f-4bbf-82cd-260d06d90b56/reports/591c4b63-790b-4801-9e06-6213768f32de"
+  },
+  {
+    "status": 404,
+    "url": "/api/projects/c7ea6b1d-9bcd-4cda-a103-4de88c77f9cb/reports/591c4b63-790b-4801-9e06-6213768f32de"
+  },
+  {
+    "status": 200,
+    "url": "/api/projects/c7ea6b1d-9bcd-4cda-a103-4de88c77f9cb/reports"
+  },
+  {
+    "status": 200,
+    "url": "/api/auth/me"
+  },
+  {
+    "status": 200,
+    "url": "/api/notifications/unread-count"
+  },
+  {
+    "status": 200,
+    "url": "/api/notifications"
+  },
+  {
+    "status": 200,
+    "url": "/api/projects/9e731196-f87f-4bbf-82cd-260d06d90b56/reports/591c4b63-790b-4801-9e06-6213768f32de"
+  },
+  {
+    "status": 200,
+    "url": "/api/auth/me"
+  },
+  {
+    "status": 200,
+    "url": "/api/notifications/unread-count"
+  },
+  {
+    "status": 200,
+    "url": "/api/notifications"
+  },
+  {
+    "status": 404,
+    "url": "/api/projects/c7ea6b1d-9bcd-4cda-a103-4de88c77f9cb/reports/591c4b63-790b-4801-9e06-6213768f32de"
+  }
+]
