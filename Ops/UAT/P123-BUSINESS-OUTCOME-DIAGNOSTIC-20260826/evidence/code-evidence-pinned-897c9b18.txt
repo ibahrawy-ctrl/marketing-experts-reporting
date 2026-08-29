@@ -1,0 +1,79 @@
+=== أدلّة الكود — مثبَّتة على الـSHA المنشورة على الإنتاج ===
+المسار: .claude/worktrees/p123-rc001-merge-20260826
+HEAD = 897c9b187ab4216213b4f453ec65948cd06dff27
+الـSHA المعلَنة للإنتاج = 897c9b187ab4216213b4f453ec65948cd06dff27
+التطابق: MATCH
+
+--- [1] الأعلام: لا مُهيّئ لأيّ bool ⇒ الافتراضيّ false ---
+12:    public const string SectionName = "Phase2";
+15:    public bool Employee360Enabled { get; set; }
+18:    public bool AttendanceEnabled { get; set; }
+21:    public bool HrOperationsEnabled { get; set; }
+24:    public bool EmployeeChecklistEnabled { get; set; }
+29:    public int AttendanceEmployeeResponseHours { get; set; } = 48;
+32:    public int AttendanceHrReviewWorkingDays { get; set; } = 5;
+38:    public bool AttendanceAutoReconcile { get; set; }
+
+--- [2] حرّاس الأعلام في وحدات التحكّم (العلم ⇒ 404) ---
+35:    private bool Disabled => !_flags.AttendanceEnabled;
+43:        if (Disabled) return NotFound();
+51:        if (Disabled) return NotFound();
+59:        if (Disabled) return NotFound();
+67:        if (Disabled) return NotFound();
+75:        if (Disabled) return NotFound();
+88:        if (Disabled) return NotFound();
+96:        if (Disabled) return NotFound();
+103:        if (Disabled) return NotFound();
+111:        if (Disabled) return NotFound();
+119:        if (Disabled) return NotFound();
+128:        if (Disabled) return NotFound();
+135:        if (Disabled) return NotFound();
+145:        if (Disabled) return NotFound();
+152:        if (Disabled) return NotFound();
+159:        if (Disabled) return NotFound();
+170:        if (Disabled) return NotFound();
+184:        if (Disabled) return NotFound();
+...
+38:    [HttpGet("{userId:guid}/profile-360")]
+45:        if (!_flags.Employee360Enabled) return NotFound();
+53:    [HttpGet("me/profile-360")]
+59:        if (!_flags.Employee360Enabled) return NotFound();
+71:    [HttpGet("{userId:guid}/checklist")]
+74:        if (!_flags.EmployeeChecklistEnabled) return NotFound();
+79:    [HttpGet("me/checklist")]
+82:        if (!_flags.EmployeeChecklistEnabled) return NotFound();
+91:    [HttpPut("{userId:guid}/checklist/{itemKey}")]
+99:        if (!_flags.EmployeeChecklistEnabled) return NotFound();
+
+--- [3] لا نقطة نهاية دليل موظّفين في EmployeesController ---
+4
+(كلّها مقيَّدة بـ{userId:guid} أو me — لا مسار قائمة)
+
+--- [4] الواجهة لا تعرف الأعلام إطلاقًا ---
+عدد إشارات الأعلام في كامل reporting-frontend/src =        0
+
+--- [5] الأقسام المنفَّذة فعليًّا في Employee 360 = 11 (خادم وواجهة متطابقتان) ---
+الخادم: Employee360Service.cs:88-98 (switch على enum Employee360Section) والعناوين في :141-151
+  Identity | OperationalSummary | Reports | Kpi | LeaveAndPermissions | RequestsAndBalances
+  | AttendanceAndCompliance | Notes | Governance | DevelopmentAndTraining | Timeline
+الواجهة: types/employee360.ts:69-81 (EMPLOYEE_360_SECTION_ORDER) — نفس الأحد عشر بالترتيب نفسه.
+اعتماد متشعّب: Employee360Service.cs:483-489 — قسم «الحضور والالتزام» يرجع NoData/Unavailable
+  بسبب `if (!_flags.AttendanceEnabled)` حتّى لو كان Employee360Enabled مشتعلًا.
+
+--- [6] تفسير اللقطة: قسمان مختلفان على الصفحة نفسها ---
+EmployeeProfilePage.tsx (المسار الإداريّ /app/employee/{userId}):
+  :148 «ملخّص الأداء» · :184 «أحدث التقارير» · :230 «أحدث تقييمات الأداء (KPI)»
+  :280 «بنود الحوكمة المرتبطة» · :300 «الإجازات والاستئذانات» · :351 «الخط الزمني»
+  ← كلّها من /api/dashboard/employee-profile/{userId} = DashboardController.cs:40-42
+    وهي نقطة نهاية **بلا أيّ حارس علم** ⇒ تعمل على الإنتاج وتعرض بيانات حقيقيّة.
+  :372 <Employee360Panel subject={userId} /> ← يستدعي /api/employees/{id}/profile-360
+    المحكوم بـEmployeesController.cs:45 ⇒ 404 على الإنتاج ⇒ بطاقة خطأ في **ذيل** الصفحة.
+  ⇒ هذا بالضبط ما تصفه لقطة مالك المنتج: أقسام تعمل ثمّ خطأ في النهاية.
+EmployeeProfilePage.tsx:53,59,75 (المسار الذاتيّ /app/employee/me):
+  isSelfRoute ⇒ enabled:false للاستعلام القديم ⇒ لا تُطلَب نقطة النهاية القديمة أصلًا،
+  ولا يُعرَض إلّا <Employee360Panel subject="me" /> ⇒ الصفحة = عنوان «ملفّي» + بطاقة خطأ وحيدة.
+
+--- [7] رسالتا خطأ مختلفتان يجب عدم الخلط بينهما ---
+EmployeeProfilePage.tsx:88   → «تعذّر تحميل الملف» (مستوى الصفحة، للمسار الإداريّ)
+Employee360Panel.tsx:444-450 → «تعذّر تحميل الملفّ الشامل» + «حدث خطأ مؤقّت. أعد المحاولة.»
+  مع retry:false (Employee360Panel.tsx:432) ⇒ الرسالة تَعِد بنجاح مستحيل: 404 العلم دائم لا مؤقّت.

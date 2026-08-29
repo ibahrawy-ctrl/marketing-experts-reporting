@@ -1,0 +1,20 @@
+=== مجسّات HTTP مجهولة على الإنتاج — GET فقط، صفر كتابة، صفر تسجيل دخول ===
+التاريخ (UTC): 2026-08-26T22:10:08Z
+الغرض: إثبات وجود/غياب نقاط النهاية وسلوك «خارج النطاق ⇒ 404» قبل أيّ مصادقة.
+
+/health                                        HTTP=200
+/api/attendance                                HTTP=401
+/api/attendance/types                          HTTP=401
+/api/employees                                 HTTP=404
+/api/employees/me/profile-360                  HTTP=401
+/api/employees/me/checklist                    HTTP=401
+/api/directory/users                           HTTP=401
+/api/directory/departments                     HTTP=401
+/api/kpi-evaluations/aggregate                 HTTP=401
+/api/kpi-evaluations/finance-export            HTTP=401
+/api/feature-flags                             HTTP=404
+/api/features                                  HTTP=404
+
+قراءة النتائج:
+401 = نقطة النهاية موجودة ومحميّة بالمصادقة (السطح قائم).
+404 = لا وجود لنقطة النهاية أصلًا، أو العلم مطفأ فأُخفِيت قبل فحص المصادقة.

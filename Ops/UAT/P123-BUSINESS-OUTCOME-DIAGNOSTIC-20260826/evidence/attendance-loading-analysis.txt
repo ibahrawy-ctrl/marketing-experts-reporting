@@ -1,0 +1,80 @@
+=== تحليل «التحميل اللانهائيّ» في /app/attendance — مثبَّت على 897c9b18 ===
+
+--- [أ] إعدادات react-query الافتراضيّة (لا تخصيص) ---
+10:const queryClient = new QueryClient();
+16:    "@tanstack/react-query": "^5.101.0",
+
+--- [ب] استعلام قائمة الوقائع: لا enabled، لا retry مخصّص، لا timeout ---
+37:export function useAttendanceIncidents(filter: AttendanceListFilter) {
+38-  return useQuery({
+39-    queryKey: [LIST_KEY, filter],
+40-    queryFn: async () =>
+41-      (await api.get<AttendancePaged>('/attendance', { params: toParams(filter) })).data,
+42-  });
+43-}
+44-
+45-export function useAttendanceIncident(id: string | null) {
+
+--- [ج] الحالات مطبَّقة فعلًا في الصفحة ---
+9:import { Alert, Badge, Button, Card, EmptyState, Field, Input, Select } from '../components/ui';
+10:import { QueryError, TableSkeleton } from '../components/states';
+224:  if (detail.isLoading) return <TableSkeleton rows={5} cols={2} />;
+225:  if (detail.isError) return <QueryError onRetry={() => detail.refetch()} />;
+228:  if (!d) return <EmptyState title="لا توجد واقعة مطابقة." />;
+546:      {list.isLoading && <TableSkeleton rows={6} cols={6} />}
+547:      {list.isError && <QueryError onRetry={() => list.refetch()} />}
+550:        <EmptyState
+551:          title="لا توجد وقائع"
+552:          description="لا توجد وقائع مطابقة لهذه المرشِّحات ضمن نطاق رؤيتك."
+
+--- [د] حقل الموظّف في نموذج البلاغ = نصّ حرّ لمعرّف تقنيّ ---
+      <form onSubmit={submit} className="grid gap-3 md:grid-cols-2" data-testid="attendance-report-form">
+        <Field label="معرّف الموظّف">
+          <Input
+            required
+            value={form.subjectUserId}
+            aria-label="معرّف الموظّف"
+            onChange={(e) => setForm({ ...form, subjectUserId: e.target.value })}
+          />
+        </Field>
+
+        <Field label="نوع الواقعة">
+          <Select
+            required
+            value={form.incidentTypeId}
+            aria-label="نوع الواقعة"
+            onChange={(e) => setForm({ ...form, incidentTypeId: e.target.value })}
+          >
+
+--- [هـ] عنصر التنقّل «الحضور والالتزام» بلا أيّ بوّابة ---
+    groups: [{ id: 'employee-services', label: 'خدمات الموظفين' }],
+    items: [
+      { id: 'people.me', label: 'ملفي', target: '/app/employee/me', order: 1, matchPaths: ['/app/employee'], keywords: 'ملفّي الشخصي موظف 360' },
+      // «دليل الموظفين» = سطح بيانات الموظفين القائم (`/app/hr-employees`) بأدواره كما هي.
+      // لا يوجد دليل مستقلّ محكوم بالنطاق في النظام حتّى الآن — مسجَّل كقصور معروف، وممنوع
+      // اختراع سطح جديد يوهم بقدرة لا يفرضها الخادم.
+      { id: 'people.directory', label: 'دليل الموظفين', target: '/app/hr-employees', order: 2, roles: HR_EMPLOYEE, aliases: ['/app/directory'], keywords: 'دليل بيانات الموظفين hr' },
+      { id: 'people.teams', label: 'فرق العمل', target: '/app/teams', order: 3, roles: EXEC_VIEW, matchPaths: ['/app/teams'] },
+      { id: 'people.attendance', label: 'الحضور والالتزام', target: '/app/attendance', order: 4, keywords: 'غياب تأخير انصراف واقعة بلاغ' },
+
+      { id: 'people.leaves', label: 'الإجازات والاستئذانات', target: '/app/leave-requests', order: 10, group: 'employee-services', aliases: ['/app/leaves', '/app/permissions'], keywords: 'إجازة استئذان' },
+      { id: 'people.requests', label: 'الطلبات', target: '/app/hr-requests', order: 11, group: 'employee-services', aliases: ['/app/employee-requests'], keywords: 'hr خطاب طلب' },
+      { id: 'people.balances', label: 'الأرصدة', target: '/app/balances', order: 12, group: 'employee-services', keywords: 'رصيد أرصدتي' },
+      { id: 'people.balance-management', label: 'إدارة الأرصدة', target: '/app/balance-management', order: 13, group: 'employee-services', roles: BALANCE_MANAGEMENT },
+      // سطح قائم بالفعل؛ لا تُنشَأ وحدة ماليّة جديدة (§5.2).
+      { id: 'people.payroll-impacts', label: 'الطلبات المؤثّرة على الراتب', target: '/app/payroll/leave-impacts', order: 14, group: 'employee-services', roles: PAYROLL, keywords: 'رواتب مالية' },
+
+      { id: 'people.development', label: 'التطوير والمتابعة', target: '/app/development', order: 20, keywords: 'تطوير خطة متابعة' },
+      // HR Operations: **بالمفتاح لا بالدور**. الخادم يشترط `HrOperations.View` صراحةً ولا يمنحه أيّ
+      // دور ضمنًا (ولا Admin). بوّابة أدوار هنا كانت ستكذب في الاتّجاهين معًا.
+      { id: 'people.hr-operations', label: 'عمليّات الموارد البشريّة', target: '/app/hr-operations', order: 21, permissionsAny: [PERMISSIONS.hrOperationsView], badgeKey: 'hrOpsQueue', keywords: 'طوابير إجراءات متأخّر مهلة sla' },
+
+--- [و] المعترض لا يتعامل إلّا مع 401 ---
+21:// تجديد رمز الوصول مرة واحدة عند 401، مع منع تكرار طلبات التجديد المتزامنة.
+22:let refreshing: Promise<string | null> | null = null;
+47:    if (error.response?.status === 401 && original && !original._retried && !isAuthCall) {
+49:      refreshing = refreshing ?? refreshAccessToken();
+50:      const token = await refreshing;
+51:      refreshing = null;
+118:    status === 409 ||
+126:  if (status === 403) {

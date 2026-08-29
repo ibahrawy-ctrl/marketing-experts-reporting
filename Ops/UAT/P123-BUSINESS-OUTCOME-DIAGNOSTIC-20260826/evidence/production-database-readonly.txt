@@ -1,0 +1,43 @@
+=== أدلّة قاعدة بيانات الإنتاج (reporting_prod) — SELECT فقط، صفر كتابة ===
+التاريخ (UTC): 2026-08-26T22:08:49Z
+
+--- عدّادات ---
+users_total=34
+users_active=33
+departments=4
+teams=9
+attendance_incidents=0
+attendance_incident_types=6
+kpi_evaluations=83
+perm_claims_user=0
+perm_claims_role=0
+migrations=47
+
+--- توزيع الأدوار ---
+AccountPortfolioReader=2
+Accountant=1
+Admin=3
+CEO=1
+CeoSupport=1
+Employee=20
+FinanceManager=1
+GeneralManager=1
+HR=1
+Manager=3
+TeamLeader=5
+Viewer=0
+
+--- توزيع تقييمات KPI ---
+ERROR:  column "Year" does not exist
+LINE 1: SELECT "Year"||'-Q'||"Quarter"||' | ptype='||"PeriodType"||'...
+               ^
+
+--- توزيع تقييمات KPI (PeriodType/PeriodKey/Status) ---
+ملاحظة بنيويّة: جدول kpi_evaluations لا يحوي عمودَي Year/Quarter — الربع مشتقّ من PeriodKey في طبقة التطبيق.
+ERROR:  ORDER BY position 2 is not in select list
+LINE 1: ...uations WHERE NOT "IsDeleted" GROUP BY 1,2,3 ORDER BY 1,2,3;
+                                                                   ^
+
+--- عدد الموظّفين المُقيَّمين وعدد الأسابيع المميّزة ---
+distinct_subjects=21
+distinct_periodkeys=9
