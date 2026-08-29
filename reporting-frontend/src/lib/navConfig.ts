@@ -50,6 +50,17 @@ export const PERMISSIONS = {
   employeeChecklistManage: 'EmployeeChecklist.Manage',
 } as const;
 
+// ===== مفاتيح توفّر الميزة (تطابق Reporting.Application.Security.AppFeatures حرفيًّا) =====
+// P123-R1 — بُعد مستقلّ عن الصلاحيّة تمامًا: هذه تجيب «هل السطح مفتوح في هذه البيئة؟»
+// وتلك تجيب «هل يملكه هذا المستخدم؟». عنصر مشروط بميزة مغلقة يردّ عليه الخادم 404 حتمًا،
+// فعرضه كان يُنتج «خطأ» في وعي المستخدم بينما هو إغلاق متعمَّد (§3/DEC-05).
+export const FEATURES = {
+  employee360: 'Employee360',
+  attendance: 'Attendance',
+  hrOperations: 'HrOperations',
+  employeeChecklist: 'EmployeeChecklist',
+} as const;
+
 // ===== الأنواع =====
 
 /// نوع نطاق الرؤية كما يحسبه الخادم (IScopeResolver) — `own` هو «وضع الذات».
@@ -86,6 +97,9 @@ export interface NavItem {
   resolveTarget?: (ctx: NavCtx) => string;
   order: number;
   group?: GroupId;
+  /// الميزة التي يقوم عليها هذا السطح كلّه — إن كانت مغلقة في هذه البيئة فالمسار يردّ 404 حتمًا
+  /// ⇒ لا يُعرَض العنصر إطلاقًا. شرط **سابق** على كلّ ما دونه: لا معنى لفحص صلاحيّة سطح مُغلَق.
+  featureKey?: string;
   /// أدوار مسموح بها — تُستعمل فقط حين لا يوجد مفتاح صلاحيّة صريح يعبّر عن القدرة.
   roles?: Role[];
   /// يكفي مفتاح واحد من هذه المفاتيح.
@@ -129,6 +143,8 @@ export interface NavCtx {
   hasAnyRole: (...roles: Role[]) => boolean;
   /// مفاتيح `perm` القادمة من الخادم لهذا المستخدم — المصدر المفضَّل للقرار.
   permissions: ReadonlySet<string>;
+  /// مفاتيح الميزات المفتوحة في هذه البيئة كما يعلنها الخادم (فارغة ⇒ لا ميزة مشروطة تظهر).
+  features: ReadonlySet<string>;
   /// نوع النطاق القادم من الخادم (null إن لم يُعرَف ⇒ عناصر النطاق تُخفى).
   scopeType: ScopeType | null;
   isSalesRep: boolean;
@@ -149,7 +165,9 @@ export const MODULES: NavModule[] = [
   },
 
   {
-    // «الموظفون» تظهر دائمًا: «ملفي» متاح لكلّ مستخدم نشط، فلا حالة تجعلها فارغة.
+    // «الموظفون» تظهر دائمًا: خدمات الموظّف (الإجازات/الطلبات/الأرصدة/التطوير) متاحة لكلّ
+    // مستخدم نشط بلا بوّابة، فلا حالة تجعلها فارغة. أمّا «ملفي» فمشروط بعَلَم Employee360:
+    // بإطفائه يردّ الخادم 404 على سطح 360 كلّه، فيُخفى العنصر ولا تُخفى الوحدة.
     id: 'people',
     label: 'الموظفون',
     icon: 'teams',
@@ -157,13 +175,15 @@ export const MODULES: NavModule[] = [
     alwaysVisible: true,
     groups: [{ id: 'employee-services', label: 'خدمات الموظفين' }],
     items: [
-      { id: 'people.me', label: 'ملفي', target: '/app/employee/me', order: 1, matchPaths: ['/app/employee'], keywords: 'ملفّي الشخصي موظف 360' },
+      { id: 'people.me', label: 'ملفي', target: '/app/employee/me', order: 1, featureKey: FEATURES.employee360, matchPaths: ['/app/employee'], keywords: 'ملفّي الشخصي موظف 360' },
       // «دليل الموظفين» = سطح بيانات الموظفين القائم (`/app/hr-employees`) بأدواره كما هي.
       // لا يوجد دليل مستقلّ محكوم بالنطاق في النظام حتّى الآن — مسجَّل كقصور معروف، وممنوع
       // اختراع سطح جديد يوهم بقدرة لا يفرضها الخادم.
       { id: 'people.directory', label: 'دليل الموظفين', target: '/app/hr-employees', order: 2, roles: HR_EMPLOYEE, aliases: ['/app/directory'], keywords: 'دليل بيانات الموظفين hr' },
       { id: 'people.teams', label: 'فرق العمل', target: '/app/teams', order: 3, roles: EXEC_VIEW, matchPaths: ['/app/teams'] },
-      { id: 'people.attendance', label: 'الحضور والالتزام', target: '/app/attendance', order: 4, keywords: 'غياب تأخير انصراف واقعة بلاغ' },
+      // بلا بوّابة أدوار عمدًا (الموظّف طرف أصيل في آلة الحالات)، لكن بعَلَم الميزة:
+      // بإطفائه يردّ الخادم 404 على كلّ نقاط الحضور، فالرابط كان يقود إلى «خطأ» ثابت.
+      { id: 'people.attendance', label: 'الحضور والالتزام', target: '/app/attendance', order: 4, featureKey: FEATURES.attendance, keywords: 'غياب تأخير انصراف واقعة بلاغ' },
 
       { id: 'people.leaves', label: 'الإجازات والاستئذانات', target: '/app/leave-requests', order: 10, group: 'employee-services', aliases: ['/app/leaves', '/app/permissions'], keywords: 'إجازة استئذان' },
       { id: 'people.requests', label: 'الطلبات', target: '/app/hr-requests', order: 11, group: 'employee-services', aliases: ['/app/employee-requests'], keywords: 'hr خطاب طلب' },
@@ -175,7 +195,7 @@ export const MODULES: NavModule[] = [
       { id: 'people.development', label: 'التطوير والمتابعة', target: '/app/development', order: 20, keywords: 'تطوير خطة متابعة' },
       // HR Operations: **بالمفتاح لا بالدور**. الخادم يشترط `HrOperations.View` صراحةً ولا يمنحه أيّ
       // دور ضمنًا (ولا Admin). بوّابة أدوار هنا كانت ستكذب في الاتّجاهين معًا.
-      { id: 'people.hr-operations', label: 'عمليّات الموارد البشريّة', target: '/app/hr-operations', order: 21, permissionsAny: [PERMISSIONS.hrOperationsView], badgeKey: 'hrOpsQueue', keywords: 'طوابير إجراءات متأخّر مهلة sla' },
+      { id: 'people.hr-operations', label: 'عمليّات الموارد البشريّة', target: '/app/hr-operations', order: 21, featureKey: FEATURES.hrOperations, permissionsAny: [PERMISSIONS.hrOperationsView], badgeKey: 'hrOpsQueue', keywords: 'طوابير إجراءات متأخّر مهلة sla' },
     ],
   },
 
@@ -293,10 +313,14 @@ export const MODULES: NavModule[] = [
 // ===== محلّل الرؤية المركزيّ (نقيّ وقابل للاختبار) =====
 
 /// هل يظهر العنصر للمستخدم الحالي؟
-/// الترتيب: مصادقة ⇒ مسمّى وظيفيّ ⇒ مفاتيح الصلاحيّة ⇒ النطاق ⇒ الأدوار.
+/// الترتيب: مصادقة ⇒ **توفّر الميزة** ⇒ مسمّى وظيفيّ ⇒ مفاتيح الصلاحيّة ⇒ النطاق ⇒ الأدوار.
 /// أيّ شرط مُعلَن ولا تتوفّر معلوماته ⇒ **إخفاء** (احتياطيّ آمن).
 export function isItemVisible(item: NavItem, ctx: NavCtx): boolean {
   if (!ctx.authenticated) return false;
+
+  // P123-R1 — توفّر الميزة أوّلًا: سطح مُغلَق بعَلَم يردّ عليه الخادم 404 مهما كان دور المستخدم
+  // أو صلاحيّته، فإظهار رابطه يَعِد بما لا يتحقّق ويُقرأ «خطأ» بينما هو إغلاق متعمَّد.
+  if (item.featureKey && !ctx.features.has(item.featureKey)) return false;
 
   // شرطٌ **إضافيّ** لا بديل: لو قصر المسمّى الوظيفيّ وحده لظهر الرابط لدور يمنعه حارس المسار
   // (موظّف بمسمّى مدير حساب مثلًا) فيصطدم بالمنع عند الفتح. القائمة لا تُعلن بابًا مُقفَلًا.

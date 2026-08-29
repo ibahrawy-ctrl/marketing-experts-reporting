@@ -22,7 +22,9 @@ public record AuthResponse(
     string? JobRoleCode = null,
     // P3-NAV-001 — قدرات المستخدم نفسه (انظر MeResponse).
     IReadOnlyCollection<string>? Permissions = null,
-    string? ScopeType = null);
+    string? ScopeType = null,
+    // P123-R1 — الميزات المفتوحة في هذه البيئة (انظر MeResponse).
+    IReadOnlyCollection<string>? Features = null);
 
 public record MeResponse(
     Guid UserId,
@@ -41,4 +43,9 @@ public record MeResponse(
     IReadOnlyCollection<string>? Permissions = null,
     // نوع نطاق رؤية المستخدم كما يحسبه الخادم (own/team/department/company/governance).
     // للعرض والتوجيه السياقيّ فقط (وضع الذات)؛ الفرز الفعليّ خادميّ عبر IScopeResolver.
-    string? ScopeType = null);
+    string? ScopeType = null,
+    // P123-R1 — **الميزات المفتوحة في هذه البيئة** كما يقرّرها إعداد الخادم (AppFeatures).
+    // مكمّلة لـPermissions لا بديلة عنها: الأولى تقول «هل السطح مفتوح أصلًا؟» والثانية «هل يملكه
+    // هذا المستخدم؟». بغياب الأولى كانت الواجهة تعرض رابطًا يردّ عليه الخادم 404 حتمًا، فيقرأه
+    // المستخدم «خطأ» بينما هو إغلاق متعمَّد. لا تمنح شيئًا: الخادم يبقى المُنفِّذ الوحيد للتخويل.
+    IReadOnlyCollection<string>? Features = null);

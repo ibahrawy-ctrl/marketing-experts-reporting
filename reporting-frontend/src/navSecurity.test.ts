@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { Role } from './types/api';
-import { MODULES, PERMISSIONS, ROUTE_ALIASES, isItemVisible, type NavCtx } from './lib/navConfig';
+import { FEATURES, MODULES, PERMISSIONS, ROUTE_ALIASES, isItemVisible, type NavCtx } from './lib/navConfig';
 
 // ===== P3-SEC-005 — بوّابة أمنيّة: القائمة لا تُعلن بابًا مُقفَلًا =====
 //
@@ -58,6 +58,7 @@ function widestCtx(role: Role, scopeType: NavCtx['scopeType']): NavCtx {
     authenticated: true,
     hasAnyRole: (...r: Role[]) => r.includes(role),
     permissions: new Set(Object.values(PERMISSIONS)),
+    features: new Set<string>(Object.values(FEATURES)),
     scopeType,
     isSalesRep: true,
     isSalesB2cTeamLeader: true,
@@ -113,6 +114,25 @@ describe('P3-SEC-005 — القائمة لا تتجاوز حارس المسار'
     for (const a of ROUTE_ALIASES) {
       expect(routeGuards.has(a.to)).toBe(true);
       expect(routeGuards.has(a.from)).toBe(false);
+    }
+  });
+
+  it('كل عنصر ملاحة مشروط بميزة يقود إلى مسار محروس بنفس الميزة', () => {
+    // الإخفاء من القائمة وحده لا يكفي: الرابط المباشر يبقى قابلًا للكتابة في شريط العنوان.
+    // بلا حارس مطابق على المسار كانت الصفحة تُصيَّر ثمّ تسقط في 404 يُعرَض «خطأً عامًّا» —
+    // وهو بالضبط ما تمنعه DEC-05. المطابقة **حرفيّة**: بوّابتان مختلفتان على السطح نفسه
+    // كانتا ستنتجان سلوكين متناقضين حسب طريقة الوصول.
+    const routeFeatures = new Map<string, string>();
+    for (const m of appSource.matchAll(/\{\s*path:\s*'([^']+)'[^}]*?\}/g)) {
+      const ref = /featureKey:\s*FEATURES\.(\w+)/.exec(m[0]);
+      if (ref) routeFeatures.set(m[1], FEATURES[ref[1] as keyof typeof FEATURES]);
+    }
+    expect(routeFeatures.size).toBeGreaterThan(0);
+
+    const gated = MODULES.flatMap((m) => m.items).filter((i) => i.featureKey);
+    expect(gated.length).toBeGreaterThan(0);
+    for (const item of gated) {
+      expect(routeFeatures.get(item.target)).toBe(item.featureKey);
     }
   });
 

@@ -33,6 +33,7 @@ export interface AuthResponse {
   jobRoleCode?: string | null;
   permissions?: string[] | null;
   scopeType?: string | null;
+  features?: string[] | null;
 }
 
 export type PeriodType = 'Daily' | 'Weekly' | 'Monthly' | 'Quarterly' | 'Yearly' | 'AdHoc';
@@ -52,6 +53,10 @@ export interface MeResponse {
   // التخويل الفعليّ خادميّ بالكامل. غيابها ⇒ إخفاء العناصر المشروطة (احتياطيّ آمن).
   permissions?: string[] | null;
   scopeType?: string | null;
+  // P123-R1 — الميزات المفتوحة في هذه البيئة كما يقرّرها إعداد الخادم (AppFeatures).
+  // مكمّلة لـ`permissions` لا بديلة عنها: هذه تقول «هل السطح مفتوح أصلًا؟» وتلك «هل يملكه المستخدم؟».
+  // غيابها ⇒ لا ميزة مفتوحة ⇒ إخفاء العناصر المشروطة بها (احتياطيّ آمن، ويطابق الافتراضيّ الخادميّ).
+  features?: string[] | null;
 }
 
 /// سياق المبيعات الموثوق (RC-3 Task 1.1) — يُحسَب خادميًّا لتحديد الأقسام المعروضة ونوع المندوب.

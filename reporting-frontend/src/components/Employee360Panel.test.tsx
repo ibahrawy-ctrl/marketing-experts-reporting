@@ -14,7 +14,15 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { api } from '../lib/api';
 import type { Employee360Dto, Employee360Section } from '../types/employee360';
+import { FEATURES } from '../lib/navConfig';
 import { Employee360Panel } from './Employee360Panel';
+
+// P123-R1 — الميزة مفتوحة في هذه الكتلة عمدًا: هذه الاختبارات تقيس **العقد مع الخادم**،
+// وبوّابة الميزة بُعد مستقلّ تُقاس في `surfaceState.test.ts` و`navSecurity.test.ts`.
+vi.mock('../lib/auth', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/auth')>()),
+  useAuth: () => ({ features: new Set<string>(Object.values(FEATURES)) }),
+}));
 
 const SUBJECT = '22222222-2222-2222-2222-222222222222';
 

@@ -75,3 +75,41 @@ export function QueryError({
     </div>
   );
 }
+
+// ═══════════ P123-R1 — الحالتان الدائمتان ═══════════
+//
+// تختلفان عن `QueryError` في جوهر لا في شكل: **لا زرّ إعادة محاولة فيهما إطلاقًا**، ولا نبرة
+// عُطل. كانت الشاشات تعرض «حدث خطأ مؤقّت، أعد المحاولة» على ميزة مغلقة بالإعداد وعلى سطح
+// خارج نطاق المستخدم — فيقرأ المستخدم قرارًا متعمَّدًا خللًا، ويعيد المحاولة على ما لن يتغيّر.
+
+// الميزة مغلقة في هذه البيئة — لا علاقة للأمر بهذا المستخدم ولا بصلاحيّاته.
+export function FeatureDisabledState({
+  title = 'هذه الخدمة غير مفعّلة حاليًّا',
+  description = 'لم تُفعَّل هذه الخدمة في النظام بعد. ليس هذا خطأً، ولا يلزمك فعل شيء — راجع إدارة النظام إن كنت تحتاجها.',
+}: {
+  title?: string;
+  description?: string;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-3 rounded-xl border border-line-2 bg-offwhite px-6 py-12 text-center">
+      <h3 className="text-base font-semibold text-navy">{title}</h3>
+      <p className="max-w-md text-sm text-ink-2">{description}</p>
+    </div>
+  );
+}
+
+// السطح مفتوح لكنّه ليس لهذا المستخدم — أو خارج نطاقه (الخادم يوحّد الحالتين عمدًا: عدم إفشاء).
+export function ForbiddenState({
+  title = 'لا تملك صلاحية الاطّلاع على هذه البيانات',
+  description = 'هذه البيانات خارج نطاق صلاحيّتك، أو غير موجودة. راجع مديرك المباشر إن كنت تحتاج الوصول إليها.',
+}: {
+  title?: string;
+  description?: string;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-3 rounded-xl border border-line-2 bg-offwhite px-6 py-12 text-center">
+      <h3 className="text-base font-semibold text-navy">{title}</h3>
+      <p className="max-w-md text-sm text-ink-2">{description}</p>
+    </div>
+  );
+}

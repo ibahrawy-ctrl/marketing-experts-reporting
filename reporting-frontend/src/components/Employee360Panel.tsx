@@ -7,7 +7,15 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { formatDate, formatDateTime } from '../lib/format';
 import { Badge, Card, EmptyState, StatCard } from '../components/ui';
-import { CardsSkeleton, QueryError, TableSkeleton } from '../components/states';
+import {
+  CardsSkeleton,
+  FeatureDisabledState,
+  ForbiddenState,
+  QueryError,
+  TableSkeleton,
+} from '../components/states';
+import { classifySurfaceState, useFeatureEnabled } from '../lib/surfaceState';
+import { FEATURES } from '../lib/navConfig';
 import { EmployeeChecklistPanel } from './EmployeeChecklistPanel';
 import {
   EMPLOYEE_360_SECTION_ORDER,
@@ -421,7 +429,13 @@ export function Employee360Panel({ subject }: { subject: string }) {
   const [periodKey, setPeriodKey] = useState('');
   const [draftPeriod, setDraftPeriod] = useState('');
 
-  const { data, isLoading, isError, refetch } = useQuery({
+  // P123-R1 — توفّر الميزة يُقرأ من عقد المستخدم **قبل** إرسال الطلب. لا مفرّ من ذلك:
+  // بعد الإرسال يعود 404 واحد لحالتين مختلفتين جذريًّا (الميزة مغلقة / الموظّف خارج نطاقك)،
+  // فلا يمكن تمييزهما من رمز الحالة، وكانت النتيجة رسالة «خطأ مؤقّت، أعد المحاولة» تُعرَض
+  // على إغلاق **دائم** — وهو ما تمنعه DEC-05 نصًّا.
+  const featureEnabled = useFeatureEnabled(FEATURES.employee360);
+
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['employee-360', subject, periodKey],
     queryFn: async () =>
       (
@@ -430,9 +444,16 @@ export function Employee360Panel({ subject }: { subject: string }) {
         })
       ).data,
     retry: false,
+    enabled: featureEnabled,
   });
 
-  if (isLoading) {
+  const state = classifySurfaceState({ featureEnabled, isLoading, error, isEmpty: !data });
+
+  if (state === 'FeatureDisabled') {
+    return <FeatureDisabledState description="الملفّ الشامل للموظّف غير مفعّل في النظام حاليًّا. ليس هذا خطأً، ولا يلزمك فعل شيء." />;
+  }
+
+  if (state === 'Loading') {
     return (
       <div className="space-y-4" role="status" aria-label="جارٍ تحميل ملفّ الموظّف الشامل">
         <CardsSkeleton count={4} />
@@ -441,12 +462,21 @@ export function Employee360Panel({ subject }: { subject: string }) {
     );
   }
 
-  if (isError || !data) {
+  if (state === 'Forbidden') {
+    return (
+      <ForbiddenState
+        title="لا يمكن عرض الملفّ الشامل لهذا الموظّف"
+        description="هذا الموظّف خارج نطاق صلاحيّتك، أو الملفّ غير موجود. راجع مديرك المباشر إن كنت تحتاج الاطّلاع عليه."
+      />
+    );
+  }
+
+  if (state === 'Failed' || !data) {
     return (
       <QueryError
         onRetry={() => refetch()}
         title="تعذّر تحميل الملفّ الشامل"
-        description="قد يكون هذا الموظّف خارج نطاق صلاحيتك، أو حدث خطأ مؤقّت. أعد المحاولة."
+        description="حدث خطأ مؤقّت أثناء جلب الملفّ. أعد المحاولة."
       />
     );
   }

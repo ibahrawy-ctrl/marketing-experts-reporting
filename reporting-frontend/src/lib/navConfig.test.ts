@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { Role } from '../types/api';
 import {
+  FEATURES,
   MODULES,
   PERMISSIONS,
   accessibleModules,
@@ -29,6 +30,9 @@ function ctx(over: Partial<NavCtx> & { roles?: Role[] } = {}): NavCtx {
     authenticated: true,
     hasAnyRole: (...r: Role[]) => r.some((x) => roles.includes(x)),
     permissions: new Set<string>(),
+    // الميزات مفتوحة افتراضيًّا في هذا المساعد عمدًا: بوّابة الميزة بُعد **مستقلّ** يُختبَر
+    // في كتلته الخاصّة أدناه، فلا تُلوِّث نتائجُها فحوصَ الأدوار والصلاحيّات والنطاق.
+    features: new Set<string>(Object.values(FEATURES)),
     scopeType: null,
     isSalesRep: false,
     isSalesB2cTeamLeader: false,
@@ -112,6 +116,99 @@ describe('شروط الظهور', () => {
     expect(isItemVisible(item, ctx({ roles: ['Employee'], jobRoleCode: 'ACCOUNT_MGR' }))).toBe(false);
     // …ويلزم اجتماعهما.
     expect(isItemVisible(item, ctx({ roles: ['AccountPortfolioReader'], jobRoleCode: 'ACCOUNT_MGR' }))).toBe(true);
+  });
+});
+
+// ===== P123-R1 — بوّابة توفّر الميزة =====
+// السؤال الذي تجيب عنه هذه الكتلة وحدها: هل تعرض القائمةُ رابطًا يردّ عليه الخادم 404 حتمًا
+// لأنّ الميزة مطفأة في هذه البيئة؟ الفارق عن كتلة «شروط الظهور» جوهريّ: تلك تسأل «هل يملك
+// المستخدم السطح؟» وهذه تسأل «هل السطح مفتوح أصلًا؟» — وخلطهما هو أصل قراءة «إغلاق» كـ«خطأ».
+describe('P123-R1 — توفّر الميزة شرط سابق على كلّ شرط آخر', () => {
+  const NO_FEATURES = new Set<string>();
+  const GATED: ReadonlyArray<[string, string]> = [
+    ['people.me', FEATURES.employee360],
+    ['people.attendance', FEATURES.attendance],
+    ['people.hr-operations', FEATURES.hrOperations],
+  ];
+
+  it('كلّ عنصر مشروط بميزة يختفي حين تكون مطفأة — مهما اتّسع الدور والصلاحيّة', () => {
+    for (const [id] of GATED) {
+      const item = findItem(id);
+      const widest = ctx({
+        roles: ['Admin'],
+        permissions: new Set(Object.values(PERMISSIONS)),
+        scopeType: 'company',
+        features: NO_FEATURES,
+      });
+      expect(isItemVisible(item, widest)).toBe(false);
+    }
+  });
+
+  it('إشعال الميزة لا يمنح شيئًا: الصلاحيّة تبقى شرطًا مستقلًّا', () => {
+    const item = findItem('people.hr-operations');
+    // الميزة مفتوحة والصلاحيّة غائبة ⇒ إخفاء (الخادم يردّ 403 لو فُتِح المسار).
+    expect(isItemVisible(item, ctx({ roles: ['Admin'], features: new Set([FEATURES.hrOperations]) }))).toBe(false);
+    // الصلاحيّة حاضرة والميزة مطفأة ⇒ إخفاء أيضًا (الخادم يردّ 404).
+    expect(
+      isItemVisible(item, ctx({
+        roles: ['Employee'],
+        permissions: new Set([PERMISSIONS.hrOperationsView]),
+        features: NO_FEATURES,
+      })),
+    ).toBe(false);
+    // اجتماعهما وحده يُظهِر الرابط.
+    expect(
+      isItemVisible(item, ctx({
+        roles: ['Employee'],
+        permissions: new Set([PERMISSIONS.hrOperationsView]),
+        features: new Set([FEATURES.hrOperations]),
+      })),
+    ).toBe(true);
+  });
+
+  it('كلّ ميزة تحكم عنصرها وحده — لا إطفاء جانبيّ', () => {
+    for (const [id, key] of GATED) {
+      const only = ctx({
+        roles: ['Admin'],
+        permissions: new Set(Object.values(PERMISSIONS)),
+        features: new Set([key]),
+      });
+      expect(isItemVisible(findItem(id), only)).toBe(true);
+      for (const [otherId] of GATED.filter(([g]) => g !== id))
+        expect(isItemVisible(findItem(otherId), only)).toBe(false);
+    }
+  });
+
+  it('«الموظفون» تبقى ظاهرة بكلّ الأعلام مطفأة (خدمات الموظّف بلا بوّابة ميزة)', () => {
+    const modules = accessibleModules(ctx({ roles: ['Employee'], features: NO_FEATURES })).map((m) => m.id);
+    expect(modules).toContain('people');
+    const ids = visibleItems(MODULES.find((m) => m.id === 'people')!, ctx({ roles: ['Employee'], features: NO_FEATURES })).map((i) => i.id);
+    expect(ids).not.toContain('people.me');
+    expect(ids).not.toContain('people.attendance');
+    expect(ids).toContain('people.leaves');
+  });
+
+  it('مسار الميزة المطفأة ليس مسارًا ظاهرًا (لا يُقترَح في البحث ولا يُعَدّ مملوكًا)', () => {
+    const off = ctx({ roles: ['Admin'], permissions: new Set(Object.values(PERMISSIONS)), features: NO_FEATURES });
+    expect(isPathVisible('/app/attendance', off)).toBe(false);
+    expect(isPathVisible('/app/employee/me', off)).toBe(false);
+    expect(searchableItems(off).map((i) => i.to)).not.toContain('/app/attendance');
+  });
+
+  it('عدّاد عنصر مشروط بميزة مطفأة لا يُعرَض إطلاقًا', () => {
+    const item = findItem('people.hr-operations');
+    const off = ctx({
+      roles: ['Admin'],
+      permissions: new Set([PERMISSIONS.hrOperationsView]),
+      features: NO_FEATURES,
+    });
+    expect(resolveBadge(item, off, { hrOpsQueue: 7 })).toBeNull();
+  });
+
+  it('مفاتيح FEATURES تطابق ما يُسنَد فعلًا في السجلّ (لا مفتاح مخترَع)', () => {
+    const known = new Set<string>(Object.values(FEATURES));
+    for (const item of MODULES.flatMap((m) => m.items))
+      if (item.featureKey) expect(known.has(item.featureKey)).toBe(true);
   });
 });
 

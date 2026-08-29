@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { FEATURES } from '../lib/navConfig';
 import type { Role } from '../types/api';
 
 // ===== P3-NAV-002/004 — الهيكل العام: حالة النشاط الأب/الابن، فتات الخبز، درج الهاتف =====
@@ -26,6 +27,9 @@ vi.mock('../lib/auth', () => ({
     isSalesB2cTeamLeader: false,
     permissions: new Set(authState.permissions),
     scopeType: authState.scopeType,
+    // P123-R1: كلّ الميزات مفتوحة عمدًا — الادّعاءات هنا عن الأدوار والمسمّيات والقدرات،
+    // وبوّابة الميزة بُعد مستقلّ يُقاس في `navConfig.test.ts` فلا تُلوَّث به هذه القياسات.
+    features: new Set<string>(Object.values(FEATURES)),
   }),
 }));
 vi.mock('../lib/useNotifications', () => ({ useNotificationRealtime: () => undefined }));

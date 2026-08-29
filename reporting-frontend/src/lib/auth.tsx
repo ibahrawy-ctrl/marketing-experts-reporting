@@ -32,6 +32,8 @@ interface AuthUser {
   permissions: string[];
   // نوع نطاق رؤيته كما يحسبه الخادم (null إن لم يُصرَّح به) — `own` = وضع الذات.
   scopeType: ScopeType | null;
+  // P123-R1 — الميزات المفتوحة في هذه البيئة (فارغة إن لم يُصرَّح بها ⇒ إخفاء آمن).
+  features: string[];
 }
 
 interface AuthContextValue {
@@ -48,6 +50,9 @@ interface AuthContextValue {
   // مجموعة فارغة عند غياب الجلسة أو غياب الحقل ⇒ إخفاء العناصر المشروطة (احتياطيّ آمن).
   permissions: ReadonlySet<string>;
   scopeType: ScopeType | null;
+  // P123-R1 — الميزات المفتوحة في هذه البيئة كما يقرّرها إعداد الخادم. تُقرأ مع `permissions`
+  // لا بدلًا عنها: ميزة مغلقة ⇒ الخادم يردّ 404 حتمًا ⇒ لا يُعرَض السطح ولا يُصنَّف «خطأ».
+  features: ReadonlySet<string>;
   // صلاحية اعتماد التقارير (تظهر تبويب «بانتظار اعتمادي» وأزرار الاعتماد).
   canApprove: boolean;
   // صلاحية رؤية الحوكمة (المخاطر/القرارات) — تطابق RoleAccess.ViewGovernance بالخادم.
@@ -128,6 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             jobRoleCode: data.jobRoleCode ?? null,
             permissions: data.permissions ?? [],
             scopeType: normalizeScope(data.scopeType),
+            features: data.features ?? [],
           });
         }
       } catch {
@@ -154,6 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       jobRoleCode: data.jobRoleCode ?? null,
       permissions: data.permissions ?? [],
       scopeType: normalizeScope(data.scopeType),
+      features: data.features ?? [],
     });
   }, []);
 
@@ -187,6 +194,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user],
   );
   const scopeType = useMemo<ScopeType | null>(() => user?.scopeType ?? null, [user]);
+  // مجموعة الميزات المفتوحة — نفس دورة الحياة ونفس الاحتياطيّ الآمن (فارغة = لا شيء مفتوح).
+  const features = useMemo<ReadonlySet<string>>(() => new Set(user?.features ?? []), [user]);
 
   const canApprove = useMemo(
     () => !!user && user.roles.some((r) => APPROVER_ROLES.includes(r)),
@@ -230,8 +239,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, loading, login, logout, changePassword, changeEmail, hasAnyRole, permissions, scopeType, canApprove, canViewGovernance, canManageTeams, canManageTemplates, canManageClients, canEditClientCore, canManageProjectStructure, isSalesRep, salesRepType, isSalesB2cTeamLeader }),
-    [user, loading, login, logout, changePassword, changeEmail, hasAnyRole, permissions, scopeType, canApprove, canViewGovernance, canManageTeams, canManageTemplates, canManageClients, canEditClientCore, canManageProjectStructure, isSalesRep, salesRepType, isSalesB2cTeamLeader],
+    () => ({ user, loading, login, logout, changePassword, changeEmail, hasAnyRole, permissions, scopeType, features, canApprove, canViewGovernance, canManageTeams, canManageTemplates, canManageClients, canEditClientCore, canManageProjectStructure, isSalesRep, salesRepType, isSalesB2cTeamLeader }),
+    [user, loading, login, logout, changePassword, changeEmail, hasAnyRole, permissions, scopeType, features, canApprove, canViewGovernance, canManageTeams, canManageTemplates, canManageClients, canEditClientCore, canManageProjectStructure, isSalesRep, salesRepType, isSalesB2cTeamLeader],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
