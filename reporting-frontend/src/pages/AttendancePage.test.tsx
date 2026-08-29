@@ -28,6 +28,7 @@ let getCalls: { url: string; params: unknown }[] = [];
 let postCalls: { url: string; body: unknown; config: unknown }[] = [];
 let detail: AttendanceIncidentDetail;
 let items: AttendanceListItem[];
+let directoryUsers: { id: string; fullName: string; email: string }[];
 
 function listItem(): AttendanceListItem {
   return {
@@ -106,6 +107,10 @@ beforeEach(() => {
   postCalls = [];
   detail = detailFixture();
   items = [listItem()];
+  directoryUsers = [
+    { id: 'u-1', fullName: 'سارة العتيبي', email: 'sara@x.local' },
+    { id: 'u-3', fullName: 'خالد الشمري', email: 'khalid@x.local' },
+  ];
 
   vi.spyOn(api, 'get').mockImplementation((url: string, config?: { params?: unknown }) => {
     getCalls.push({ url, params: config?.params });
@@ -126,6 +131,9 @@ beforeEach(() => {
     }
     if (url === `/attendance/${INCIDENT_ID}`) {
       return Promise.resolve({ data: detail } as never);
+    }
+    if (url === '/directory/users') {
+      return Promise.resolve({ data: directoryUsers } as never);
     }
     return Promise.resolve({
       data: { items, totalCount: items.length, page: 1, pageSize: 25 },
@@ -450,7 +458,7 @@ describe('AttendancePage — تسجيل بلاغ', () => {
     await screen.findByTestId('attendance-list');
     fireEvent.click(screen.getByRole('button', { name: 'تسجيل بلاغ' }));
 
-    fireEvent.change(await screen.findByLabelText('معرّف الموظّف'), { target: { value: 'u-1' } });
+    fireEvent.change(await screen.findByLabelText('الموظّف'), { target: { value: 'u-1' } });
     fireEvent.change(screen.getByLabelText('نوع الواقعة'), { target: { value: TYPE_ID } });
     fireEvent.change(screen.getByLabelText('تاريخ الواقعة'), { target: { value: '2026-08-18' } });
     fireEvent.change(await screen.findByLabelText('وقت البداية'), { target: { value: '08:45' } });
@@ -468,10 +476,69 @@ describe('AttendancePage — تسجيل بلاغ', () => {
     renderPage();
     await screen.findByTestId('attendance-list');
     fireEvent.click(screen.getByRole('button', { name: 'تسجيل بلاغ' }));
-    await screen.findByLabelText('معرّف الموظّف');
+    await screen.findByLabelText('الموظّف');
     // قبل اختيار النوع لا وقت مطلوب.
     expect(screen.queryByLabelText('وقت البداية')).toBeNull();
     fireEvent.change(screen.getByLabelText('نوع الواقعة'), { target: { value: TYPE_ID } });
     expect(await screen.findByLabelText('وقت البداية')).toBeInTheDocument();
+  });
+});
+
+// ======================================================================
+// P123-R4 — «سجِّل بلاغًا باختيار اسم، لا بكتابة معرّف».
+//
+// الحقل السابق كان نصًّا حرًّا اسمه «معرّف الموظّف»، ولا مصدر لقيمته في أيّ سطح من سطوح النظام:
+// القدرة كانت قائمة في الشيفرة وغائبة عن المستخدم. ويُقاس هنا الادّعاء كاملًا — لا وجود لحقل
+// معرّف، والاسم المختار يتحوّل إلى المعرّف الصحيح في الحمولة، والقائمة مصدرها نطاق الخادم.
+// ======================================================================
+
+describe('P123-R4 — من الاسم إلى البلاغ بلا معرّف مكتوب', () => {
+  async function openForm() {
+    renderPage();
+    await screen.findByTestId('attendance-list');
+    fireEvent.click(screen.getByRole('button', { name: 'تسجيل بلاغ' }));
+    await screen.findByTestId('attendance-report-form');
+  }
+
+  it('لا حقل معرّف إطلاقًا، والاختيار من أسماء نطاق الخادم', async () => {
+    await openForm();
+    const picker = await screen.findByLabelText('الموظّف');
+
+    expect(screen.queryByLabelText('معرّف الموظّف')).toBeNull();
+    expect(getCalls.some((c) => c.url === '/directory/users')).toBe(true);
+    expect(
+      within(picker as HTMLElement)
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual([
+      '— اختر موظّفًا —',
+      'سارة العتيبي — sara@x.local',
+      'خالد الشمري — khalid@x.local',
+    ]);
+  });
+
+  it('الاسم المختار يصل الخادمَ معرّفًا صحيحًا في حمولة الإنشاء', async () => {
+    await openForm();
+
+    fireEvent.change(await screen.findByLabelText('الموظّف'), { target: { value: 'u-3' } });
+    fireEvent.change(screen.getByLabelText('نوع الواقعة'), { target: { value: TYPE_ID } });
+    fireEvent.change(screen.getByLabelText('تاريخ الواقعة'), { target: { value: '2026-08-18' } });
+    fireEvent.change(await screen.findByLabelText('وقت البداية'), { target: { value: '08:45' } });
+    fireEvent.change(screen.getByLabelText('وقت العودة'), { target: { value: '09:30' } });
+    fireEvent.change(screen.getByLabelText('الوصف'), { target: { value: 'تأخّر بلا إشعار.' } });
+    fireEvent.submit(screen.getByTestId('attendance-report-form'));
+
+    await waitFor(() => expect(postCalls).toHaveLength(1));
+    expect(postCalls[0].body).toMatchObject({ subjectUserId: 'u-3' });
+  });
+
+  it('نطاق بلا أحد: يُعلَن العجز صراحةً ولا يُعرَض صندوق اختيار فارغ', async () => {
+    directoryUsers = [];
+    await openForm();
+
+    expect(
+      await screen.findByText('لا يوجد ضمن نطاقك موظّف يمكن تسجيل بلاغ عليه.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText('الموظّف')).toBeNull();
   });
 });

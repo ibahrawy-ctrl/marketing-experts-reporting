@@ -19,6 +19,7 @@ import {
   useUploadAttendanceAttachment,
   type HrDecision,
 } from '../lib/useAttendance';
+import { UserPicker } from '../components/UserPicker';
 import {
   ATTENDANCE_ACTIONS_REQUIRING_REASON,
   ATTENDANCE_ACTION_LABEL,
@@ -55,6 +56,7 @@ function errorMessage(err: unknown): string {
 }
 
 // ═══════════════════════════════ نموذج تسجيل بلاغ ═══════════════════════════════
+
 
 function ReportForm({ onDone }: { onDone: (id: string) => void }) {
   const types = useAttendanceTypes();
@@ -99,12 +101,16 @@ function ReportForm({ onDone }: { onDone: (id: string) => void }) {
       </p>
 
       <form onSubmit={submit} className="grid gap-3 md:grid-cols-2" data-testid="attendance-report-form">
-        <Field label="معرّف الموظّف">
-          <Input
+        {/* P123-R4 — البلاغ يُكتَب على **اسم** لا على GUID يُنسَخ من شريط العنوان: الحقل السابق
+            كان نصًّا حرًّا اسمه «معرّف الموظّف» ولا مصدر لقيمته في أيّ سطح، فكانت القدرة قائمة
+            في الشيفرة وغائبة عن المستخدم. والخادم يعيد التحقّق من النطاق عند الإنشاء أيًّا كان. */}
+        <Field label="الموظّف">
+          <UserPicker
             required
             value={form.subjectUserId}
-            aria-label="معرّف الموظّف"
-            onChange={(e) => setForm({ ...form, subjectUserId: e.target.value })}
+            onChange={(id) => setForm({ ...form, subjectUserId: id })}
+            placeholder="— اختر موظّفًا —"
+            emptyMessage="لا يوجد ضمن نطاقك موظّف يمكن تسجيل بلاغ عليه."
           />
         </Field>
 
