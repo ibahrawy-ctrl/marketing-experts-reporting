@@ -115,7 +115,7 @@ PG_RESTORE_LIST_EXIT = 0 · 520 مدخلًا · 84 TABLE DATA · 199 INDEX
 | البند | النتيجة |
 |---|---|
 | `r22a-rc-uat@khubara.local` (`cd065768…`) | `PUT /api/directory/users/{id}` بـ`isActive=false` ⟹ `200` · تسجيل الدخول الآن **403** |
-| `r22a-rc-admin@khubara.local` (`0ce50482…`) | التعطيل الذاتيّ ممنوع بحارس الخدمة (`user.self_deactivate.conflict`) ⟹ أُعيد تعيين كلمته لقيمة عشوائيّة **غير محفوظة** وأُبطِلت رموز التجديد ⟹ تسجيل الدخول بكلمته السابقة **401** |
+| `r22a-rc-admin@khubara.local` (`0ce50482…`) | **عُطِّل نهائيًّا** بأداة صيانة رسميّة تستعمل `UserManager` (التفاصيل في §10) |
 | الحذف الصلب `DELETE /users/{id}` | **لم يُستعمل عمدًا** — يُتلف أدلّة UAT ومراجع السجلّ الملحقيّ |
 | ملفّات الأسرار المحلّيّة `/tmp/r22a-secrets/` | حُذِفت بالكامل (`LOCAL_SECRETS_GONE`) |
 | ملفّات الخادم المؤقّتة | `shred -u -z` لـ15 ملفًّا في `/root` (منها رمز الدخول ونسخة ملفّ بيئة RC) + إزالة `/opt/reporting/staging-r22a` |
@@ -123,9 +123,97 @@ PG_RESTORE_LIST_EXIT = 0 · 520 مدخلًا · 84 TABLE DATA · 199 INDEX
 | فحص الأسرار في `Ops/R22A/PROMOTION` | `0` تطابق عبر 30 ملفًّا |
 | البيئات الثلاث بعد التنظيف | `PROD=200 · TEST=200 · RC=200` |
 
-`TEMP_ADMIN_DEACTIVATED = NO (بحارس بنيويّ)` · `TEMP_ADMIN_LOGIN_REVOKED = YES` — نفس السابقة الموثَّقة في R21.
+## 9) إغلاق الحوكمة (30 أغسطس · بعد اعتماد الترقية التشغيليّة نهائيًّا · بلا Rollback)
 
-## 9) مفاتيح الإغلاق
+### 9-أ) مراقبة الإنتاج بعد النشر — قراءة فقط، 15 دقيقة
+
+النافذة `2026-08-30T17:12:38Z → 17:27:38Z` (**15:00 دقيقة**، أربع عيّنات: `T0` · `T+5` · `T+7` · `T+15`).
+`diff` بين عيّنة البداية وعيّنة النهاية بعد استبعاد الطابع الزمنيّ = **`NO_DIFF`** (تطابق تامّ سطرًا بسطر).
+
+| القياس | القيمة الثابتة عبر العيّنات الأربع |
+|---|---|
+| `/health` | `200` |
+| الخدمة | `active/running` · `MainPID=1735125` · **`NRestarts=0`** · `ActiveEnter=16:40:58Z` |
+| `journalctl -p err` منذ النشر | `0` · وتحذيرات `0` |
+| 5xx على nginx (تراكميّ) | `0` |
+| `nginx error.log` (تراكميّ) | `8` **ثابت** — كلّها **قبل** النشر وتخصّ تطبيق `emarketingacademy.net` الآخر ومحاولتَي `auth_basic` على RC ⟹ صفر خطأ جديد |
+| `EFFECTIVE_VERSION` | `9` |
+| `schemaVersion` / `workItems.fields` | `2` / `5` (و`projfields=0` · `min=1` · `max=0`) |
+| الهجرات · فهارس GIN | `47` · `0` |
+| `TOTAL_SUBMISSIONS` | `328` (لا نشاط أعمال جديد في النافذة) |
+| توزيع ارتباط الإصدارات | `v5→4 · v6→5 · v8→1` — **لا إعادة ربط لأيّ تقرير تاريخيّ** |
+| بصمة التسليمات `MON_HIST_SHA256` | `c24ca8f989b8bfaee8032ce3d3c11f918e3186f4d486e6aafde1fca54c61fc52` (ثابتة) |
+| `V8_CFG_MD5` | `554bd2e116c7eff6c2e44a60aa261bb2` · `len=1105` · `schemaVersion` غائب |
+| المسودّة `bba208cd…` | `VersionNumber=8` · `Draft` · `2026-W35` — لم تُمسّ |
+| البريد | `EmailNotifications__Mode=Enabled` (الإعداد الإنتاجيّ الصحيح) · `email_outbox=0` · `email_notifications=742` **بلا زيادة** ⟹ صفر رسالة من R22A |
+| عدّادات أخرى | `notifications=1039` · `submission_field_values=3536` · `projects=35` · `refresh_tokens=3908` · `AspNetUsers=34` — كلّها ثابتة |
+
+> بصمة `MON_HIST_SHA256` معرّفة لهذه المرحلة صراحةً كـ`sha256` لسلسلة `Id|ReportTemplateVersionId|Status`
+> لكلّ التسليمات مرتَّبةً بـ`Id`؛ وهي مستقلّة عن بصمة مرحلة النشر `40523f7f…` التي بقيت مرجعًا لتلك المرحلة.
+
+### 9-ب) تعطيل حساب RC المؤقّت — بالآليّة الرسميّة
+
+أداة صيانة مبنيّة من **نفس شجرة الإصدار** (`4b8902ee`) تستعمل `UserManager<ApplicationUser>`
+وكيانات EF الرسميّة: **لا SQL خامّ · لا حذف صلب · لا إنشاء Admin دائم جديد · لا تعديل مباشر لـ`PasswordHash`**.
+
+| الخطوة | الآليّة | النتيجة |
+|---|---|---|
+| 1 | `user.IsActive = false` ثمّ `UserManager.UpdateAsync` | `OK` |
+| 2 | `UserManager.RemovePasswordAsync` | `OK` |
+| 3 | `UserManager.UpdateSecurityStampAsync` | `OK` |
+| 4 | `SetLockoutEnabledAsync` + `SetLockoutEndDateAsync(MaxValue)` | `OK` |
+| 5 | إبطال رموز التجديد لهذا المستخدم وحده (كيان `RefreshToken`) | `revoked=0` — الأربعة كلّها كانت مُبطَلة/منتهية أصلًا (`user_live=0`) |
+
+```
+TARGET = r22a-rc-admin@khubara.local  ·  0ce50482-bc9b-4ccd-8102-792574cb0c9e  ·  الدور Admin
+قبل :  IsActive=True   HasPassword=True   SecurityStamp=a51a3de42321…  LockoutEnd=-
+بعد :  IsActive=False  HasPassword=False  SecurityStamp=d7c0c577fcc6…  LockoutEnd=infinity
+رموز التجديد: user_total=4 user_live=0 (قبل = بعد)  ·  global_total=374  global_live=357 (قبل = بعد)
+OTHERS_FINGERPRINT (50 حسابًا) = af4667ce96eeae39… قبل == بعد  ⟹  OTHERS_UNCHANGED = YES
+```
+
+**إثبات رفض الدخول** (نداء رسميّ مباشر إلى `127.0.0.1:5092/api/auth/login` تفاديًا لطبقة `auth_basic`):
+
+```
+POST /api/auth/login  →  401  {"type":"auth.invalid_credentials","status":401}
+مُكرَّرًا بكلمتَي مرور مختلفتَين ⟹ الرفض بنيويّ لا عَرَضيّ: PasswordHash = NULL فأيّ كلمة تُرفَض،
+وحتّى لو مرّت لكان الحارس التالي IsActive=false يردّ auth.account_disabled.
+```
+
+الحساب الآخر `r22a-rc-uat@khubara.local` (`cd065768…`) كان **معطَّلًا مسبقًا** (`IsActive=false`) ولم يُمسّ في هذه المرحلة.
+`RC_ACTIVE_ADMINS = 3` (المشروعون فقط) · `RC_USERS_TOTAL = 51 · ACTIVE = 35` · `RC_HEALTH = 200`.
+
+### 9-ج) تثبيت نَسَب الإصدار على `origin`
+
+```
+origin/release/r22a-from-897c9b18 = 4b8902eec9b67513d115dbc49c20af0dd62de8b8   ← فرع جديد، بلا force
+tag r22a-prod-20260830            = 3ab4c32d… (موسوم موثَّق)  →  ^{}  = 4b8902eec9b67513d115dbc49c20af0dd62de8b8
+الوصوليّة: git branch -r --contains 4b8902ee  ⟹  origin/release/r22a-from-897c9b18
+origin/develop                    = ff1e337 → 32e5fec  (تقديم سريع، بلا force)
+origin/main                       = 508509ad8474b321c80cbdd48eb84ecb54bee212  ← لم يُمسّ
+```
+
+### 9-د) الالتزام التوثيقيّ
+
+`Ops/R22A/PROMOTION/` **حصرًا**: 32 ملفًّا · 1963 سطرًا مضافًا · الالتزام `32e5fec`.
+مستبعَد صراحةً وبإثبات `git diff --cached` = صفر خارج النطاق: `CLAUDE.md` · ملفّات `Ops/R21/… 2.md` ·
+أيّ أسرار أو رموز أو جلسات · أيّ حزم مؤقّتة أو نسخ احتياطيّة.
+فحص الأسرار قبل التجهيز: **`0` تطابق عبر 32 ملفًّا** (JWT · Bearer · إسنادات كلمات مرور · سلاسل اتصال ·
+ترويسات Authorization · مصادقة أساسيّة داخل URL · Set-Cookie · مفاتيح خاصّة · `me_access`/`me_refresh`).
+
+### 9-هـ) القياس النهائيّ للبيئات الثلاث
+
+| البيئة | الخدمة | `/health` | بيان الحزمة | الإصدار الإعلاميّ | الهجرات |
+|---|---|---|---|---|---|
+| **الإنتاج** | `reporting-api` (5090 · `reporting_prod`) | `200` | `e91e655b21aabd6b…` | `1.0.0+4b8902eec9b67513…` | `47` |
+| **RC** | `khubara-reporting-rc` (5092 · `reporting_rc`) | `200` | `e91e655b21aabd6b…` **مطابق للإنتاج** | `1.0.0+4b8902eec9b67513…` | `47` |
+| **TEST** | `khubara-reporting-test` (5091 · `reporting_test_uat`) | `200` | `cb6d13571b253bdd…` | `1.0.0+5b211db61982011d…` | `47` |
+
+واجهة الإنتاج `/opt/reporting/reporting-frontend/dist` = `06e4bda669164a9f…` (بلا تغيير عن لحظة النشر):
+عنوان الإنتاج داخل الحزمة `2` · عنوان RC `0` · عنوان TEST `0` · `localhost:5090` `0` · `workItems` `18`.
+TEST يحمل عمدًا خطّ مرشّح P123-R5 (`5b211db…`) وهو **خارج نطاق R22A** ولا يؤثّر على الإنتاج أو RC.
+
+## 10) مفاتيح الإغلاق
 
 ```
 R22A_RELEASE_SCOPE                = R22A_ONLY_FROM_897c9b18
@@ -134,7 +222,13 @@ RC_PROMOTION_RESULT               = PASS
 RC_FUNCTIONAL_ACCEPTANCE          = PASS
 PRODUCTION_PROMOTION_RESULT       = PASS
 PRODUCTION_OPERATIONAL_ACCEPTANCE = PASS
+POST_DEPLOY_MONITORING            = PASS
+TEMP_RC_ADMIN_DISABLED            = YES
+RELEASE_SOURCE_ON_ORIGIN          = YES
+PROMOTION_EVIDENCE_COMMITTED      = YES
 HISTORICAL_DATA_INTEGRITY         = INTACT
 ROLLBACK_READINESS                = READY
+ORIGIN_MAIN_TOUCHED               = NO
+FORCE_PUSH                        = NO
 R22A_RELEASE_STATUS               = RELEASED
 ```

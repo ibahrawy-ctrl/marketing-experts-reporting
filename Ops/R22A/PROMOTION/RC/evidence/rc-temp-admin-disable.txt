@@ -1,0 +1,50 @@
+R22A — إغلاق الحوكمة: تعطيل حساب RC المؤقّت بأداة صيانة رسميّة (UserManager)
+البيئة: RC فقط (khubara-reporting-rc · 5092 · reporting_rc) — لم تُمسّ TEST ولا الإنتاج.
+الآليّة: UserManager<ApplicationUser> + كيانات EF الرسميّة. لا SQL خامّ، لا حذف صلب،
+لا إنشاء Admin دائم جديد، لا تعديل مباشر لـPasswordHash.
+
+--- التشغيل بوضع الفحص (dry-run) ---
+MODE=DRY_RUN
+TARGET_ID=0ce50482-bc9b-4ccd-8102-792574cb0c9e
+TARGET_EMAIL=r22a-rc-admin@khubara.local
+TARGET_ROLES=Admin
+BEFORE IsActive=True HasPassword=True SecurityStampSha=a51a3de42321 LockoutEnabled=True LockoutEnd=-
+BEFORE TOKENS user_total=4 user_live=0 global_total=374 global_live=357
+BEFORE OTHERS_FINGERPRINT=50:af4667ce96eeae39210320e3971ca9f6fd5e1cd6c3b439d8121595fe31e180bd
+DRY_RUN_ONLY — no change written.
+
+--- التنفيذ (--apply) ---
+MODE=APPLY
+TARGET_ID=0ce50482-bc9b-4ccd-8102-792574cb0c9e
+TARGET_EMAIL=r22a-rc-admin@khubara.local
+TARGET_ROLES=Admin
+BEFORE IsActive=True HasPassword=True SecurityStampSha=a51a3de42321 LockoutEnabled=True LockoutEnd=-
+BEFORE TOKENS user_total=4 user_live=0 global_total=374 global_live=357
+BEFORE OTHERS_FINGERPRINT=50:af4667ce96eeae39210320e3971ca9f6fd5e1cd6c3b439d8121595fe31e180bd
+STEP1_SET_INACTIVE=OK
+STEP2_REMOVE_PASSWORD=OK
+STEP3_UPDATE_SECURITY_STAMP=OK
+STEP4_LOCKOUT=OK
+STEP5_REVOKE_REFRESH_TOKENS revoked=0 rows_written=0
+AFTER IsActive=False HasPassword=False SecurityStampSha=d7c0c577fcc6 LockoutEnabled=True LockoutEnd=9999-12-31T23:59:59.9999999+00:00
+AFTER TOKENS user_total=4 user_live=0 global_total=374 global_live=357
+AFTER OTHERS_FINGERPRINT=50:af4667ce96eeae39210320e3971ca9f6fd5e1cd6c3b439d8121595fe31e180bd
+OTHERS_UNCHANGED=YES
+
+ملاحظة: revoked=0 لأنّ رموز التجديد الأربعة كانت مُبطَلة/منتهية أصلًا (user_live=0 قبل وبعد)،
+والعدّاد العامّ 374/357 لم يتغيّر ⟹ لم يُمسّ رمز أيّ مستخدم آخر.
+
+--- إثبات رفض الدخول (نداء رسميّ محلّيّ يتجاوز طبقة auth_basic) ---
+RC_HEALTH=200
+POST /api/auth/login {"email":"r22a-rc-admin@khubara.local","password":"<محاولة 1>"} → 401
+  {"type":"auth.invalid_credentials","title":"Unauthorized","status":401,"detail":"بيانات الدخول غير صحيحة."}
+POST /api/auth/login {"email":"r22a-rc-admin@khubara.local","password":"<محاولة 2>"} → 401
+  {"type":"auth.invalid_credentials","title":"Unauthorized","status":401,"detail":"بيانات الدخول غير صحيحة."}
+الرفض بنيويّ: PasswordHash = NULL ⟹ CheckPasswordAsync تفشل لأيّ كلمة؛ ولو مرّت لَردَّ الحارس التالي
+IsActive=false بـauth.account_disabled.
+
+--- الحالة النهائيّة في قاعدة RC (قراءة فقط) ---
+r22a-rc-admin@khubara.local | IsActive=false | PwdHash=NULL     | LockoutEnd=infinity
+r22a-rc-uat@khubara.local   | IsActive=false | PwdHash=9552684f | LockoutEnd=-        ← كان معطَّلًا مسبقًا، لم يُمسّ
+RC_ACTIVE_ADMINS=3
+RC_USERS_TOTAL=51 RC_USERS_ACTIVE=35
