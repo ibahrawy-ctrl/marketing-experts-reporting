@@ -1,0 +1,32 @@
+[
+ {
+  "label": "قالب أسبوعيّ + PeriodType=Quarterly",
+  "status": 400,
+  "code": "kpi_eval.period_type_not_supported",
+  "message": "هذا القالب أسبوعيّ (نبض الأسبوع)؛ نوع الفترة يجب أن يكون Weekly."
+ },
+ {
+  "label": "قالب ربعيّ + PeriodType=Weekly",
+  "status": 400,
+  "code": "kpi_eval.period_type_not_supported",
+  "message": "هذا القالب ربعيّ (التقييم الرسميّ)؛ نوع الفترة يجب أن يكون Quarterly."
+ },
+ {
+  "label": "قالب ربعيّ + مفتاح أسبوعيّ داخل نوع ربعيّ",
+  "status": 400,
+  "code": "kpi_eval.period_format_invalid",
+  "message": "صيغة الفترة غير صحيحة؛ استخدم صيغة الربع YYYY-Qn مثل 2026-Q3."
+ },
+ {
+  "label": "قالب أسبوعيّ + PeriodType=Monthly",
+  "status": 400,
+  "code": "kpi_eval.period_type_not_supported",
+  "message": "هذا القالب أسبوعيّ (نبض الأسبوع)؛ نوع الفترة يجب أن يكون Weekly."
+ },
+ {
+  "label": "قالب ربعيّ + ربع لم يبدأ بعد",
+  "status": 400,
+  "code": "calendar.cycle_not_open",
+  "message": "لا يمكن إنشاء تقييم لربع لم يبدأ بعد."
+ }
+]
