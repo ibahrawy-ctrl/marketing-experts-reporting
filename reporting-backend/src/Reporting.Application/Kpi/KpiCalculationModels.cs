@@ -54,6 +54,42 @@ public sealed record KpiEffectiveCadence(
     string Source,
     IReadOnlyCollection<Guid> TemplateIds);
 
+/// <summary>
+/// OBS-R5-01 — المساران معًا لموظّف واحد: <b>نبض الأسبوع</b> و<b>التقييم الربعيّ الرسميّ</b>.
+/// المساران متزامنان لا متبادلان: سلّم الأولويّة (موظّف ← فريق ← مسمّى ← إدارة ← عامّ) يُطبَّق
+/// <b>داخل كلّ مسار على حدة</b>، فلا يُخفي فوزُ مستوًى في أحدهما المسارَ الآخر. غياب التهيئة في
+/// مسار حالةٌ مسمّاة لذلك المسار وحده (<c>Cadence = null</c>) ولا يمسّ المسار المقابل.
+/// </summary>
+public sealed record KpiEffectiveTracks(
+    Guid UserId,
+    KpiEffectiveCadence WeeklyPulse,
+    KpiEffectiveCadence Quarterly)
+{
+    public KpiEffectiveCadence For(KpiCadence cadence) =>
+        cadence == KpiCadence.Quarterly ? Quarterly : WeeklyPulse;
+
+    /// <summary>
+    /// المسار الأوّليّ حين لا يطلب المستهلك مسارًا بعينه (نداءات التحليلات بلا <c>cadence</c>).
+    ///
+    /// OBS-R5-01/2 — لا يجوز تفضيل مسار <b>لنوعه</b> هنا: موظّف قالبه الأسبوعيّ مُسنَد إلى مسمّاه
+    /// بينما مساره الربعيّ يأتي من قالب <b>عامّ</b> ⟹ تفضيل الربعيّ لنوعه يُلغي أخصّ إسناد قُصِد به
+    /// فعلًا ويحسب أداءه بقالب عامّ. لذلك القاعدة: <b>الأخصّ إسنادًا يفوز</b> بنفس سلّم DEC-01،
+    /// وعند تساوي المستوى يفوز الربعيّ الرسميّ لأنّه المسار الحاسم في المتوسّط والمكافآت.
+    /// المسار غير المُهيّأ لا ينافس أصلًا. والمساران يبقيان متاحين صراحةً عبر <see cref="For"/>.
+    /// </summary>
+    public KpiEffectiveCadence Primary =>
+        Quarterly.Cadence is null ? WeeklyPulse
+        : WeeklyPulse.Cadence is null ? Quarterly
+        : KpiCadenceSources.Specificity(WeeklyPulse.Source) < KpiCadenceSources.Specificity(Quarterly.Source)
+            ? WeeklyPulse
+            : Quarterly;
+
+    public static KpiEffectiveTracks NotConfigured(Guid userId) => new(
+        userId,
+        new KpiEffectiveCadence(userId, null, KpiCadenceSources.NotConfigured, Array.Empty<Guid>()),
+        new KpiEffectiveCadence(userId, null, KpiCadenceSources.NotConfigured, Array.Empty<Guid>()));
+}
+
 /// <summary>مصادر التواتر الفعّال كما تُسلَّم في العقد — نصوص ثابتة لا تُترجَم في الخادم.</summary>
 public static class KpiCadenceSources
 {
@@ -65,6 +101,21 @@ public static class KpiCadenceSources
     public const string NotConfigured = "notConfigured";
     /// <summary>الكادنس أتى صراحةً من الطلب (مسار «النبض الأسبوعيّ» المنفصل — DEC-01/3).</summary>
     public const string ExplicitRequest = "explicitRequest";
+
+    /// <summary>
+    /// درجة أخصّية مصدر الحسم — الأصغر أخصّ، بنفس سلّم DEC-01: موظّف ← فريق ← مسمّى ← إدارة ← عامّ.
+    /// مصدر واحد للسلّم يقرأه حاسم المسار ومنتقي المسار الأوّليّ معًا، فلا يتكرّر السلّم بصيغتين
+    /// قابلتين للتباعد (وهو بعينه العيب الذي عولج في <c>KpiTemplateService</c>).
+    /// </summary>
+    public static int Specificity(string source) => source switch
+    {
+        EmployeeAssignment => 1,
+        TeamAssignment => 2,
+        JobRole => 3,
+        DepartmentAssignment => 4,
+        GeneralTemplate => 5,
+        _ => 6
+    };
 }
 
 /// <summary>الفترة المحلولة كما تُسلَّم في العقد (§5.5 <c>periodResolved</c>).</summary>

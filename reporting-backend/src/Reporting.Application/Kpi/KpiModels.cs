@@ -230,23 +230,34 @@ public record EvaluatableSubjectsDto(bool IsAdminOverride, IReadOnlyList<Evaluat
 public record KpiEvaluationSetupTemplateDto(Guid Id, string Name);
 
 /// <summary>
-/// DEC-01/2+5 — «الإعداد الفعّال» لإنشاء تقييم لموظّف بعينه، محسومًا <b>خادميًّا بالكامل</b>.
-/// المستخدم لا يُسأل عن نوع التقييم ولا عن التواتر: الخادم يحسم التواتر بسلّم DEC-01/5،
-/// ويشتقّ منه نوع الفترة ومفتاح الفترة الجارية، ويُرجِع القوالب المؤهَّلة <b>لهذا التواتر وحده</b>.
+/// مسار تقييم واحد للموظّف — نبض الأسبوع أو التقييم الربعيّ الرسميّ — محسومًا خادميًّا وحده:
+/// مصدر الحسم، ونوع الفترة، ومفتاح الفترة الجارية، والقوالب المؤهَّلة <b>لهذا المسار وحده</b>.
+/// <c>IsConfigured = false</c> حالة مسمّاة لهذا المسار: إمّا لا إسناد فعّال عليه وإمّا لا قالب
+/// منشور له إصدار منشور. لا يمسّ ذلك المسار المقابل إطلاقًا (OBS-R5-01/3).
+/// </summary>
+public record KpiEvaluationTrackDto(
+    KpiCadence Cadence,
+    string CadenceSource,
+    PeriodType PeriodType,
+    string CurrentPeriodKey,
+    IReadOnlyList<KpiEvaluationSetupTemplateDto> Templates,
+    bool IsConfigured,
+    string? BlockingReason);
+
+/// <summary>
+/// DEC-01/2+5 و OBS-R5-01 — «الإعداد الفعّال» لإنشاء تقييم لموظّف بعينه، محسومًا <b>خادميًّا بالكامل</b>.
+/// المستخدم لا يُسأل عن نوع التقييم ولا عن التواتر، ويُعاد إليه <b>المساران معًا</b> لأنّهما متزامنان
+/// لا متبادلان: قالب ربعيّ لا يُلغي نبض الأسبوع ولا العكس.
 /// <para>
-/// <c>IsConfigured = false</c> حالة مسمّاة لا صمت: إمّا لا تواتر فعّال (<c>CadenceSource =
-/// notConfigured</c>) وإمّا لا قالب منشور مطابق. عندها تعرض الواجهة <c>BlockingReason</c>
-/// ولا تُرسل طلب إنشاء غير صالح أصلًا.
+/// <c>Tracks</c> يحوي دائمًا مدخلًا لكلّ مسار بحالته المسمّاة، فلا يُخفي غيابُ أحدهما الآخرَ.
+/// <c>IsConfigured = false</c> على مستوى الموظّف يعني أنّ <b>كلا</b> المسارين غير مُهيّأ، وعندها
+/// تعرض الواجهة <c>BlockingReason</c> ولا تُرسل طلب إنشاء غير صالح أصلًا.
 /// </para>
 /// </summary>
 public record KpiEvaluationSetupDto(
     Guid SubjectUserId,
     string SubjectName,
-    KpiCadence? EffectiveCadence,
-    string CadenceSource,
-    PeriodType? PeriodType,
-    string? CurrentPeriodKey,
-    IReadOnlyList<KpiEvaluationSetupTemplateDto> Templates,
+    IReadOnlyList<KpiEvaluationTrackDto> Tracks,
     bool IsConfigured,
     string? BlockingReason);
 

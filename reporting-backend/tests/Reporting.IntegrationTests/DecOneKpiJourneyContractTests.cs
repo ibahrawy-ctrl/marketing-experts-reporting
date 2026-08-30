@@ -140,6 +140,13 @@ public class DecOneKpiJourneyContractTests
     private static async Task<KpiEmployeeScoreDto> RowAsync(HttpClient c, string query, Guid userId)
         => (await PerfAsync(c, query)).Employees.Single(e => e.UserId == userId);
 
+    private static async Task<KpiEvaluationSetupDto> SetupAsync(HttpClient c, Guid subjectId)
+    {
+        var res = await c.GetAsync($"/api/kpi-evaluations/effective-setup?subjectUserId={subjectId}");
+        res.EnsureSuccessStatusCode();
+        return (await res.ReadAsync<KpiEvaluationSetupDto>())!;
+    }
+
     /// <summary>
     /// DEC-01/5 — «لا إعداد فعّال» يجب أن يكون حالةً قابلة للبلوغ فعليًّا كي يُختبَر.
     /// قوالب البذر المنشورة بلا مسمًّى وظيفيّ هي «إسناد عامّ» (المستوى الخامس في سلّم الأولويّة)
@@ -221,16 +228,23 @@ public class DecOneKpiJourneyContractTests
         var (_, leaderId) = await TestAuth.CreateUserAsync(_factory, "TeamLeader");
         var teamId = await TestAuth.CreateTeamWithLeaderAsync(_factory, leaderId, employee);
 
-        // قالب ربعيّ يطابق المسمّى مباشرةً، وقالب أسبوعيّ مُسنَد للفريق: الفريق أعلى أولويّةً.
-        await PublishAsync(admin, KpiCadence.Quarterly, role);
+        // OBS-R5-01/2 — السلّم يُطبَّق **داخل المسار الواحد** لا عبر المسارين: فمقارنة «فريق أسبوعيّ»
+        // بـ«مسمّى ربعيّ» لم تعد مقارنة أولويّة أصلًا بل مسارين متزامنين. لذلك يُقاس التفوّق هنا
+        // بقالبين أسبوعيَّين: أحدهما يطابق مسمّى الموظّف، والآخر مُسنَد لفريقه — والفريق أعلى.
+        await PublishAsync(admin, KpiCadence.WeeklyPulse, role);
         var otherRole = await TestAuth.GetOrCreateJobRoleAsync(_factory, $"{code}_OTHER");
         var (weeklyTemplate, _, _) = await PublishAsync(admin, KpiCadence.WeeklyPulse, otherRole);
         await AssignAsync(admin, weeklyTemplate, TemplateAssignmentScope.Team, teamId);
 
-        var row = await RowAsync(manager, $"periodType=Quarter&periodKey={Q}", employee);
+        var row = await RowAsync(manager, $"cadence=WeeklyPulse&periodType=Quarter&periodKey={Q}", employee);
 
         Assert.Equal(KpiCadence.WeeklyPulse, row.EffectiveCadence);
         Assert.Equal(KpiCadenceSources.TeamAssignment, row.CadenceSource);
+
+        // والقالب الفائز فعلًا هو قالب الفريق لا قالب المسمّى — لا مجرّد تطابق اسم المصدر.
+        var setup = await SetupAsync(manager, employee);
+        var weeklyTrack = setup.Tracks.Single(t => t.Cadence == KpiCadence.WeeklyPulse);
+        Assert.Equal(weeklyTemplate, Assert.Single(weeklyTrack.Templates).Id);
     }
 
     [Fact]

@@ -196,69 +196,76 @@ public class KpiEvaluationService : IKpiEvaluationService
         if (subject is null)
             return Result<KpiEvaluationSetupDto>.Failure("الموظف المُقيَّم غير موجود.", "kpi_eval.subject_not_found");
 
-        var (effective, templates) = await ResolveEffectiveSetupAsync(subjectUserId, ct);
+        var asOf = ReportingCalendarPolicy.RiyadhToday();
+        var map = await _templates.ResolveEffectiveTracksAsync(new[] { subjectUserId }, asOf, ct);
+        var tracks = map.TryGetValue(subjectUserId, out var t) ? t : KpiEffectiveTracks.NotConfigured(subjectUserId);
 
-        // DEC-01/5 — «التواتر غير مُهيّأ» حالة مسمّاة لا صمت ولا سقوط إلى الأسبوعيّ.
-        if (effective.Cadence is null)
-            return Result<KpiEvaluationSetupDto>.Success(new KpiEvaluationSetupDto(
-                subjectUserId, subject.FullName, null, KpiCadenceSources.NotConfigured,
-                null, null, Array.Empty<KpiEvaluationSetupTemplateDto>(), false,
-                "التواتر غير مُهيّأ لهذا الموظّف: لا يوجد قالب KPI فعّال مُسنَد له. اربط قالبًا بمسمّاه أو فريقه أو إدارته قبل إنشاء التقييم."));
+        var rows = new List<KpiEvaluationTrackDto>
+        {
+            await BuildTrackAsync(subjectUserId, tracks.WeeklyPulse, KpiCadence.WeeklyPulse, ct),
+            await BuildTrackAsync(subjectUserId, tracks.Quarterly, KpiCadence.Quarterly, ct)
+        };
 
-        var cadence = effective.Cadence.Value;
+        var anyConfigured = rows.Any(r => r.IsConfigured);
+        return Result<KpiEvaluationSetupDto>.Success(new KpiEvaluationSetupDto(
+            subjectUserId,
+            subject.FullName,
+            rows,
+            anyConfigured,
+            anyConfigured
+                ? null
+                : "لا يوجد إعداد KPI فعّال لهذا الموظّف على أيّ مسار: لا قالب نبض أسبوعيّ ولا قالب ربعيّ رسميّ مُسنَد له. اربط قالبًا بمسمّاه أو فريقه أو إدارته قبل إنشاء التقييم."));
+    }
+
+    /// <summary>
+    /// المصدر الخادميّ الوحيد لمسار واحد من «الإعداد الفعّال»: المسار يُحسم بمنتقي DEC-01/5 نفسه
+    /// المستعمَل في التجميع (وبسلّم الأولويّة <b>داخل المسار وحده</b> — OBS-R5-01)، والقوالب تُجلب
+    /// بسلّم الأخصّية نفسه المستعمَل في حارس الإنشاء (<c>ListAsync</c> بمرشّح تواتر هذا المسار)
+    /// — فلا ينفصل ما تراه الواجهة عمّا يقبله الخادم. يبقى منها ما له إصدار منشور فعلًا،
+    /// لأنّ الإنشاء يتطلّب إصدارًا منشورًا.
+    /// </summary>
+    private async Task<KpiEvaluationTrackDto> BuildTrackAsync(
+        Guid subjectUserId, KpiEffectiveCadence effective, KpiCadence cadence, CancellationToken ct)
+    {
         var isQuarterly = cadence == KpiCadence.Quarterly;
         // DEC-01/1 — الفترة الجارية تُحسم خادميًّا بتوقيت Asia/Riyadh؛ المستخدم لا يُسأل عنها.
         var periodKey = isQuarterly
             ? _periods.CurrentQuarter().Key
             : ReportingCalendarPolicy.CycleKeyFor(ReportingCalendarPolicy.RiyadhToday());
+        var periodType = isQuarterly ? PeriodType.Quarterly : PeriodType.Weekly;
 
-        return Result<KpiEvaluationSetupDto>.Success(new KpiEvaluationSetupDto(
-            subjectUserId,
-            subject.FullName,
-            cadence,
-            effective.Source,
-            isQuarterly ? PeriodType.Quarterly : PeriodType.Weekly,
-            periodKey,
-            templates.Select(t => new KpiEvaluationSetupTemplateDto(t.Id, t.Title)).ToList(),
-            templates.Count > 0,
-            templates.Count > 0
-                ? null
-                : (isQuarterly
-                    ? "التواتر الفعّال لهذا الموظّف ربعيّ، لكن لا يوجد قالب ربعيّ منشور له إصدار منشور. انشر إصدارًا من القالب الربعيّ قبل إنشاء التقييم."
-                    : "التواتر الفعّال لهذا الموظّف أسبوعيّ، لكن لا يوجد قالب أسبوعيّ منشور له إصدار منشور. انشر إصدارًا من قالب النبض الأسبوعيّ قبل إنشاء التقييم.")));
-    }
-
-    /// <summary>
-    /// المصدر الخادميّ الوحيد لـ«الإعداد الفعّال»: التواتر يُحسم بمنتقي DEC-01/5 نفسه المستعمَل في
-    /// التجميع، والقوالب تُجلب بسلّم الأخصّية نفسه المستعمَل في حارس الإنشاء
-    /// (<c>ListAsync</c> بمرشّح التواتر المحسوم) — فلا ينفصل ما تراه الواجهة عمّا يقبله الخادم.
-    /// يبقى منها ما له إصدار منشور فعلًا، لأنّ الإنشاء يتطلّب إصدارًا منشورًا.
-    /// </summary>
-    private async Task<(KpiEffectiveCadence Effective, List<(Guid Id, string Title)> Templates)>
-        ResolveEffectiveSetupAsync(Guid subjectUserId, CancellationToken ct)
-    {
-        var asOf = ReportingCalendarPolicy.RiyadhToday();
-        var map = await _templates.ResolveEffectiveCadencesAsync(new[] { subjectUserId }, asOf, ct);
-        var effective = map.TryGetValue(subjectUserId, out var e)
-            ? e
-            : new KpiEffectiveCadence(subjectUserId, null, KpiCadenceSources.NotConfigured, Array.Empty<Guid>());
+        KpiEvaluationTrackDto Blocked(string reason) => new(
+            cadence, effective.Source, periodType, periodKey,
+            Array.Empty<KpiEvaluationSetupTemplateDto>(), false, reason);
 
         if (effective.Cadence is null)
-            return (effective, new List<(Guid, string)>());
+            return Blocked(isQuarterly
+                ? "المسار الربعيّ الرسميّ غير مُهيّأ لهذا الموظّف: لا قالب ربعيّ فعّال مُسنَد له. هذا لا يمسّ مسار نبض الأسبوع."
+                : "مسار نبض الأسبوع غير مُهيّأ لهذا الموظّف: لا قالب أسبوعيّ فعّال مُسنَد له. هذا لا يمسّ المسار الربعيّ الرسميّ.");
 
         var eligible = await _templates.ListAsync(new KpiTemplateFilter(
-            null, effective.Cadence.Value, TemplateStatus.Published, true, subjectUserId), ct);
-        if (!eligible.Succeeded || eligible.Value!.Count == 0)
-            return (effective, new List<(Guid, string)>());
+            null, cadence, TemplateStatus.Published, true, subjectUserId), ct);
 
-        var ids = eligible.Value!.Select(t => t.Id).ToList();
-        var rows = await _db.KpiTemplates.AsNoTracking()
-            .Where(t => ids.Contains(t.Id) && t.Versions.Any(v => v.IsPublished))
-            .OrderBy(t => t.Title)
-            .Select(t => new { t.Id, t.Title })
-            .ToListAsync(ct);
+        var titles = new List<KpiEvaluationSetupTemplateDto>();
+        if (eligible.Succeeded && eligible.Value!.Count > 0)
+        {
+            var ids = eligible.Value!.Select(x => x.Id).ToList();
+            titles = (await _db.KpiTemplates.AsNoTracking()
+                    .Where(x => ids.Contains(x.Id) && x.Versions.Any(v => v.IsPublished))
+                    .OrderBy(x => x.Title)
+                    .Select(x => new { x.Id, x.Title })
+                    .ToListAsync(ct))
+                .Select(x => new KpiEvaluationSetupTemplateDto(x.Id, x.Title))
+                .ToList();
+        }
 
-        return (effective, rows.Select(r => (r.Id, r.Title)).ToList());
+        if (titles.Count == 0)
+            return Blocked(isQuarterly
+                ? "المسار الربعيّ الرسميّ مُهيّأ لهذا الموظّف، لكن لا يوجد قالب ربعيّ له إصدار منشور. انشر إصدارًا من القالب الربعيّ قبل إنشاء التقييم."
+                : "مسار نبض الأسبوع مُهيّأ لهذا الموظّف، لكن لا يوجد قالب أسبوعيّ له إصدار منشور. انشر إصدارًا من قالب النبض الأسبوعيّ قبل إنشاء التقييم.");
+
+        return new KpiEvaluationTrackDto(
+            cadence, effective.Source, periodType, periodKey, titles, true, null);
     }
 
     /// <summary>

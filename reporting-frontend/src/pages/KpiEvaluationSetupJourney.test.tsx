@@ -17,20 +17,22 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { api } from '../lib/api';
 import { ToastProvider } from '../components/ActionResultToast';
-import type { KpiEvaluationSetupDto } from '../types/api';
+import type { KpiEvaluationSetupDto, KpiEvaluationTrackDto } from '../types/api';
+import { blockedTrack, quarterlyTrack, weeklyTrack } from '../test/kpiTrackFixtures';
 
 const QUARTERLY_SUBJECT = '11111111-1111-1111-1111-111111111111';
 const WEEKLY_SUBJECT = '22222222-2222-2222-2222-222222222222';
 const UNCONFIGURED_SUBJECT = '33333333-3333-3333-3333-333333333333';
 
+const tracksOf = (...rows: KpiEvaluationTrackDto[]) => rows;
+
 const QUARTERLY_SETUP: KpiEvaluationSetupDto = {
   subjectUserId: QUARTERLY_SUBJECT,
   subjectName: 'سارة الربعيّة',
-  effectiveCadence: 'Quarterly',
-  cadenceSource: 'jobRole',
-  periodType: 'Quarterly',
-  currentPeriodKey: '2026-Q3',
-  templates: [{ id: 'tpl-quarterly', name: 'قالب المسمّى الربعيّ' }],
+  tracks: tracksOf(
+    blockedTrack('WeeklyPulse'),
+    quarterlyTrack('jobRole', [{ id: 'tpl-quarterly', name: 'قالب المسمّى الربعيّ' }]),
+  ),
   isConfigured: true,
   blockingReason: null,
 };
@@ -38,25 +40,23 @@ const QUARTERLY_SETUP: KpiEvaluationSetupDto = {
 const WEEKLY_SETUP: KpiEvaluationSetupDto = {
   subjectUserId: WEEKLY_SUBJECT,
   subjectName: 'خالد الأسبوعيّ',
-  effectiveCadence: 'WeeklyPulse',
-  cadenceSource: 'teamAssignment',
-  periodType: 'Weekly',
-  currentPeriodKey: '2026-W35',
-  templates: [{ id: 'tpl-weekly', name: 'قالب نبض الفريق' }],
+  tracks: tracksOf(
+    weeklyTrack('teamAssignment', [{ id: 'tpl-weekly', name: 'قالب نبض الفريق' }]),
+    blockedTrack('Quarterly'),
+  ),
   isConfigured: true,
   blockingReason: null,
 };
 
+const NO_TRACK_REASON =
+  'لا يوجد إعداد KPI فعّال لهذا الموظّف على أيّ مسار: لا قالب نبض أسبوعيّ ولا قالب ربعيّ رسميّ مُسنَد له.';
+
 const UNCONFIGURED_SETUP: KpiEvaluationSetupDto = {
   subjectUserId: UNCONFIGURED_SUBJECT,
   subjectName: 'نورة غير المهيّأة',
-  effectiveCadence: null,
-  cadenceSource: 'notConfigured',
-  periodType: null,
-  currentPeriodKey: null,
-  templates: [],
+  tracks: tracksOf(blockedTrack('WeeklyPulse'), blockedTrack('Quarterly')),
   isConfigured: false,
-  blockingReason: 'التواتر غير مُهيّأ لهذا الموظّف — لا يوجد إسناد قالب فعّال على أيّ مستوى.',
+  blockingReason: NO_TRACK_REASON,
 };
 
 const SETUPS: Record<string, KpiEvaluationSetupDto> = {
@@ -127,7 +127,7 @@ async function renderEvaluationForm() {
 
 describe('DEF-R5-001 — الواجهة تعرض المسار المحسوم خادميًّا ولا تختاره', () => {
   // ===== 1: لا منتقي تقنيّ للتواتر بأيّ حال =====
-  it('لا تعرض الواجهة قائمة اختيار للتواتر — المسار يُعرض بادجًا للاطّلاع', async () => {
+  it('لا تعرض الواجهة قائمة اختيار للتواتر — المساران يُعرضان كإجراءات مستحقّة', async () => {
     const subjectSelect = await renderEvaluationForm();
     await userEvent.selectOptions(subjectSelect, QUARTERLY_SUBJECT);
     await screen.findByText('التقييم الربعيّ الرسميّ');
@@ -135,7 +135,9 @@ describe('DEF-R5-001 — الواجهة تعرض المسار المحسوم خ�
     // الحقول القابلة للاختيار هي «الموظّف» و«القالب» فقط — لا حقل ثالث للتواتر.
     const selects = screen.getAllByRole('combobox');
     expect(selects).toHaveLength(2);
-    expect(screen.queryByText('نبض الأسبوع')).not.toBeInTheDocument();
+    // OBS-R5-01/4 — بديل المنتقي التقنيّ إجراءان مستحقّان بنصّ الأعمال لا بنصّ التواتر.
+    expect(screen.getByRole('button', { name: 'إجراء التقييم الربعي الرسمي' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'تسجيل نبض الأسبوع الحالي' })).toBeDisabled();
     // ومصدر الحسم معروض شرحًا لا خيارًا.
     expect(screen.getByText(/يحدّده النظام من مسمّاه الوظيفيّ — لا يُختار يدويًّا/)).toBeInTheDocument();
   });
@@ -146,7 +148,8 @@ describe('DEF-R5-001 — الواجهة تعرض المسار المحسوم خ�
     await userEvent.selectOptions(subjectSelect, QUARTERLY_SUBJECT);
     // الربع الجاري محسوم خادميًّا ويُعرض بلا منتقي (DEC-01/1).
     expect(await screen.findByText('الفترة (الربع الجاري)')).toBeInTheDocument();
-    expect(screen.getByText('2026-Q3')).toBeInTheDocument();
+    // يظهر مرّتين: في بطاقة المسار الربعيّ وفي حقل الفترة المحسوم — كلاهما من إعلان الخادم.
+    expect(screen.getAllByText('2026-Q3').length).toBeGreaterThan(0);
 
     await userEvent.click(await screen.findByRole('button', { name: 'إنشاء تقييم' }));
 
@@ -178,7 +181,10 @@ describe('DEF-R5-001 — الواجهة تعرض المسار المحسوم خ�
     await userEvent.selectOptions(subjectSelect, UNCONFIGURED_SUBJECT);
 
     expect(await screen.findByText(UNCONFIGURED_SETUP.blockingReason!)).toBeInTheDocument();
-    expect(screen.getByText('التواتر غير مُهيّأ')).toBeInTheDocument();
+    // المساران معًا معلَنان «غير مُهيّأ» — لا أحدهما صامت بسبب الآخر.
+    expect(screen.getAllByText('غير مُهيّأ')).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'تسجيل نبض الأسبوع الحالي' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'إجراء التقييم الربعي الرسمي' })).toBeDisabled();
     // الزرّ معطَّل، ومحاولة النقر لا تُنتج نداءً — لا طلب غير صالح يصل الخادم أصلًا.
     const create = screen.getByRole('button', { name: 'إنشاء تقييم' });
     expect(create).toBeDisabled();

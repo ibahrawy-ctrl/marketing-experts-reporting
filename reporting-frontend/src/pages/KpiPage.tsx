@@ -22,6 +22,7 @@ import type {
   KpiEvaluationLookupDto,
   KpiEvaluationReviewEventDto,
   KpiEvaluationSetupDto,
+  KpiCadence,
   KpiCadenceSource,
   KpiResultDto,
 } from '../types/api';
@@ -43,6 +44,17 @@ const cadenceSourceLabel: Record<KpiCadenceSource, string> = {
   generalTemplate: 'الإعداد العامّ',
   notConfigured: 'غير مُهيّأ',
   explicitRequest: 'طلب صريح',
+};
+
+// OBS-R5-01 — المساران متزامنان: لكلٍّ اسمه المعروض وإجراؤه المستحقّ. لا منتقي cadence تقنيّ
+// في الواجهة: المستخدم يضغط الإجراء المستحقّ نفسه، والمسار الآخر يبقى ظاهرًا ومتاحًا دائمًا.
+const cadenceTrackLabel: Record<KpiCadence, string> = {
+  WeeklyPulse: 'نبض الأسبوع',
+  Quarterly: 'التقييم الربعيّ الرسميّ',
+};
+const cadenceActionLabel: Record<KpiCadence, string> = {
+  WeeklyPulse: 'تسجيل نبض الأسبوع الحالي',
+  Quarterly: 'إجراء التقييم الربعي الرسمي',
 };
 
 // عناوين عربية لأحداث سجلّ المراجعة (ADMIN-GOVERNANCE-R1).
@@ -143,9 +155,10 @@ function KpiList({ isManagement, onOpen, hideTitle, subjectFilter }: { isManagem
   });
   const subjects = evaluatable?.subjects ?? [];
 
-  // DEF-R5-001 — «الإعداد الفعّال» يُحسم خادميًّا بالكامل: التواتر (سلّم DEC-01/5) ومصدره، ونوع
-  // الفترة المشتقّ منه، ومفتاح الفترة الجارية بتوقيت الرياض، والقوالب المؤهَّلة لهذا التواتر وحده.
-  // الواجهة لا تثبّت تواترًا ولا تعرض منتقيًا تقنيًّا له، ولا ترسل طلبًا حين لا يكون الإعداد مكتملًا.
+  // DEF-R5-001 + OBS-R5-01 — «الإعداد الفعّال» يُحسم خادميًّا بالكامل ويُعاد **مسارَين معًا**:
+  // نبض الأسبوع والتقييم الربعيّ الرسميّ. لكلّ مسار مصدر حسمه (سلّم DEC-01/5 مُطبَّقًا داخله وحده)
+  // ونوع فترته ومفتاح فترته الجارية بتوقيت الرياض وقوالبه المؤهَّلة وحالته المسمّاة عند غياب التهيئة.
+  // الواجهة لا تثبّت تواترًا ولا تعرض منتقيًا تقنيًّا له، ولا تُخفي مسارًا بسبب غياب الآخر.
   const { data: setup, isFetching: setupLoading } = useQuery({
     queryKey: ['kpi-evaluation-setup', subjectUserId],
     queryFn: async () =>
@@ -154,25 +167,45 @@ function KpiList({ isManagement, onOpen, hideTitle, subjectFilter }: { isManagem
       })).data,
     enabled: isManagement && !!subjectUserId,
   });
-  const templates = setup?.templates;
-  const periodType = setup?.periodType ?? null;
-  const isQuarterly = setup?.effectiveCadence === 'Quarterly';
+  const tracks = setup?.tracks ?? [];
+  const configuredTracks = tracks.filter((t) => t.isConfigured);
+  // المسار الذي يعمل عليه المُقيّم الآن: يُختار بالضغط على الإجراء المستحقّ نفسه لا من قائمة تقنيّة.
+  // وإن كان مسار واحد فقط مُهيّأً فهو النشط تلقائيًّا — بلا خطوة زائدة وبلا إخفاء للمسار الآخر.
+  const [trackCadence, setTrackCadence] = useState<KpiCadence | ''>('');
+  const activeTrack =
+    configuredTracks.find((t) => t.cadence === trackCadence)
+    ?? (configuredTracks.length === 1 ? configuredTracks[0] : null);
 
-  // عند تغيير الموظّف نُفرّغ القالب والفترة معًا: كلاهما مشتقّ من إعداد الموظّف المختار.
+  const templates = activeTrack?.templates;
+  const periodType = activeTrack?.periodType ?? null;
+  const isQuarterly = activeTrack?.cadence === 'Quarterly';
+
+  // عند تغيير الموظّف نُفرّغ المسار والقالب والفترة: الثلاثة مشتقّة من إعداد الموظّف المختار.
   const onSubjectChange = (id: string) => {
     setSubjectUserId(id);
+    setTrackCadence('');
     setKpiTemplateId('');
     setPeriodKey('');
     setErr(null);
   };
 
-  // الخادم يُطبّق أولوية اختيار القالب: الأخصّ يطغى داخل تواتر الموظّف الفعّال.
+  // تبديل المسار لا يحمل معه قالب المسار الآخر ولا فترته — منعًا لأيّ خلط بين المسارين.
+  const onTrackChange = (cadence: KpiCadence) => {
+    setTrackCadence(cadence);
+    setKpiTemplateId('');
+    setPeriodKey('');
+    setErr(null);
+  };
+
+  // الخادم يُطبّق أولوية اختيار القالب: الأخصّ يطغى داخل مسار الموظّف وحده.
   // فإن أُرجِع قالب واحد فقط نختاره تلقائيًّا (قيمة مُشتقّة) لتبسيط الإنشاء وتأكيد أنه القالب المناسب.
-  const effectiveTemplateId = kpiTemplateId || (templates?.length === 1 ? templates[0].id : '');
+  const effectiveTemplateId =
+    (kpiTemplateId && templates?.some((t) => t.id === kpiTemplateId) ? kpiTemplateId : '')
+    || (templates?.length === 1 ? templates[0].id : '');
 
   // DEC-01/1 — الفترة الربعيّة لا تُختار: الربع الجاري محسوم خادميًّا. الأسبوعيّة تبقى بمنتقي الدورة.
-  const effectivePeriodKey = isQuarterly ? (setup?.currentPeriodKey ?? '') : periodKey;
-  const canCreate = !!setup?.isConfigured && !!effectiveTemplateId && !!effectivePeriodKey && !!periodType;
+  const effectivePeriodKey = isQuarterly ? (activeTrack?.currentPeriodKey ?? '') : periodKey;
+  const canCreate = !!activeTrack && !!effectiveTemplateId && !!effectivePeriodKey && !!periodType;
 
   // KPI-REVIEWER-OVERRIDE-R1: بحث قرائيّ صرف عن تقييم قائم لهذا (الموظّف + القالب + الفترة) قبل الإنشاء.
   // لا ينشئ سجلًّا ولا يعدّل شيئًا، ويمنع ازدواج التقييم ويُظهر التقييم التاريخيّ للاطّلاع.
@@ -246,38 +279,64 @@ function KpiList({ isManagement, onOpen, hideTitle, subjectFilter }: { isManagem
                 </Field>
                 <p className="mt-1 text-xs text-ink-3">تظهر هنا فقط الأسماء التي يحق لك تقييمها حسب الهيكل الإداري.</p>
               </div>
-              <div className="w-56">
-                <Field label="قالب التقييم">
-                  <Select value={effectiveTemplateId} onChange={(e) => setKpiTemplateId(e.target.value)} disabled={!subjectUserId}>
-                    <option value="">{subjectUserId ? 'اختر قالبًا…' : 'اختر الموظف أولًا'}</option>
-                    {templates?.map((t) => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
-                    ))}
-                  </Select>
-                </Field>
-                <p className="mt-1 text-xs text-ink-3">تظهر هنا قوالب KPI الفعّالة لهذا الموظّف ضمن مساره فقط.</p>
-              </div>
-              {/* المسار محسوم خادميًّا (DEC-01/5): يُعرض للاطّلاع مع مصدر حسمه — ولا يُختار من الواجهة. */}
-              <div className="w-56">
-                <Field label="مسار التقييم">
-                  <div className="flex h-10 items-center rounded-lg border border-line bg-offwhite px-3">
-                    <Badge tone="navy">
-                      {!subjectUserId
-                        ? 'اختر الموظف أولًا'
-                        : setup?.effectiveCadence === 'Quarterly'
-                          ? 'التقييم الربعيّ الرسميّ'
-                          : setup?.effectiveCadence === 'WeeklyPulse'
-                            ? 'نبض الأسبوع'
-                            : setupLoading ? '…' : 'التواتر غير مُهيّأ'}
-                    </Badge>
+            </div>
+
+            {/* OBS-R5-01/4 — إجراءات مستحقّة لا منتقي cadence تقنيّ: يُعرض المساران معًا دائمًا،
+                كلٌّ بمصدر حسمه وفترته الجارية، والمسار غير المُهيّأ يُعلن سببه ولا يُخفي الآخر. */}
+            {subjectUserId && setup && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {setup.tracks.map((t) => (
+                  <div
+                    key={t.cadence}
+                    data-testid={`kpi-track-${t.cadence}`}
+                    className={`rounded-lg border p-3 ${
+                      activeTrack?.cadence === t.cadence ? 'border-orange-400 bg-orange-50' : 'border-line bg-offwhite'
+                    }`}
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge tone={t.cadence === 'Quarterly' ? 'gold' : 'navy'}>{cadenceTrackLabel[t.cadence]}</Badge>
+                      {t.isConfigured ? (
+                        <span className="text-xs text-ink-3">{formatPeriod(t.currentPeriodKey)}</span>
+                      ) : (
+                        <Badge tone="alert">غير مُهيّأ</Badge>
+                      )}
+                    </div>
+                    <p className="mt-1 text-xs text-ink-3">
+                      {t.isConfigured
+                        ? `يحدّده النظام من ${cadenceSourceLabel[t.cadenceSource]} — لا يُختار يدويًّا.`
+                        : t.blockingReason}
+                    </p>
+                    <div className="mt-2">
+                      <Button
+                        variant={activeTrack?.cadence === t.cadence ? 'primary' : 'ghost'}
+                        disabled={!t.isConfigured}
+                        onClick={() => onTrackChange(t.cadence)}
+                      >
+                        {cadenceActionLabel[t.cadence]}
+                      </Button>
+                    </div>
                   </div>
-                </Field>
-                <p className="mt-1 text-xs text-ink-3">
-                  {setup?.effectiveCadence
-                    ? `يحدّده النظام من ${cadenceSourceLabel[setup.cadenceSource]} — لا يُختار يدويًّا.`
-                    : 'يحدّده النظام من إعداد الموظّف — لا يُختار يدويًّا.'}
-                </p>
+                ))}
               </div>
+            )}
+
+            <div className="w-56">
+              {/* القوالب تخصّ المسار النشط وحده — لا تُخلَط قوالب المسارين في قائمة واحدة. */}
+              <Field label="قالب التقييم">
+                <Select value={effectiveTemplateId} onChange={(e) => setKpiTemplateId(e.target.value)} disabled={!activeTrack}>
+                  <option value="">
+                    {!subjectUserId ? 'اختر الموظف أولًا' : !activeTrack ? 'اختر الإجراء المستحقّ أولًا' : 'اختر قالبًا…'}
+                  </option>
+                  {templates?.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </Select>
+              </Field>
+              <p className="mt-1 text-xs text-ink-3">
+                {activeTrack
+                  ? `تظهر هنا قوالب «${cadenceTrackLabel[activeTrack.cadence]}» الفعّالة لهذا الموظّف وحدها.`
+                  : 'تظهر هنا قوالب KPI الفعّالة لهذا الموظّف ضمن مساره فقط.'}
+              </p>
             </div>
 
             <div className="max-w-md">

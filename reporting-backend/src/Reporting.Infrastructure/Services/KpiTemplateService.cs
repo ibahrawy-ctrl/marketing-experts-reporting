@@ -277,7 +277,13 @@ public class KpiTemplateService : IKpiTemplateService
     // ===== محرّك أولوية إسناد قوالب KPI (Phase T1) — يحاكي محرّك إسناد التقارير =====
 
     // مستوى أخصّية الإسناد (تنازليًّا): الأصغر رقمًا = الأخصّ.
-    private enum MatchTier { Employee = 1, JobRole = 2, Team = 3, Department = 4, General = 5 }
+    //
+    // OBS-R5-01/2 — سلّم KPI المعتمَد نصًّا هو: موظّف ← **فريق** ← مسمّى ← إدارة ← عامّ. كان هذا
+    // السلّم يخالف <see cref="CadencePriority"/> (الذي يطبّق العقد) في موضع الفريق والمسمّى، فينتج
+    // تناقض مقيس: الخادم يُسند المسار إلى «إسناد الفريق» ويحسب تغطيته بقالب الفريق، بينما منتقي
+    // القوالب يعرض للمُقيّم قالب المسمّى ⟹ يُنشأ التقييم بقالب غير الذي تُحسب به التغطية.
+    // التوحيد هنا يخصّ KPI وحده؛ سلّم قوالب التقارير في `ReportTemplateService` خارج هذا العقد ولم يُمسّ.
+    private enum MatchTier { Employee = 1, Team = 2, JobRole = 3, Department = 4, General = 5 }
 
     private sealed record KpiMeta(Guid Id, Guid? JobRoleId, KpiCadence Cadence);
     private sealed record UserScopes(Guid UserId, Guid? JobRoleId, Guid? TeamId, Guid? DepartmentId);
@@ -285,9 +291,12 @@ public class KpiTemplateService : IKpiTemplateService
 
     /// <summary>
     /// حلّ قالب KPI واحد لمستخدم واحد بترتيب الأولوية المعتمَد (الأخصّ أولًا، والاستثناء يتفوّق في
-    /// مستواه وما دونه): ① استثناء موظّف ② إسناد موظّف ③ استثناء مسمّى ④ إسناد مسمّى (الصريح أو
-    /// <see cref="KpiTemplate.JobRoleId"/>) ⑤ استثناء فريق ⑥ إسناد فريق ⑦ استثناء إدارة ⑧ إسناد إدارة
+    /// مستواه وما دونه): ① استثناء موظّف ② إسناد موظّف ③ استثناء فريق ④ إسناد فريق ⑤ استثناء مسمّى
+    /// ⑥ إسناد مسمّى (الصريح أو <see cref="KpiTemplate.JobRoleId"/>) ⑦ استثناء إدارة ⑧ إسناد إدارة
     /// ⑨ عام (قالب بلا مسمّى). تُرجِع null إذا كان القالب متخصصًا ولم يطابق المستخدم بأيّ مستوى.
+    ///
+    /// OBS-R5-01/2 — الفريق قبل المسمّى وفق نصّ العقد، وهو ترتيب الفحص نفسه المستعمَل في
+    /// <see cref="CadencePriority"/> ⟹ منتقي القوالب وحاسم المسار يقرآن السلّم ذاته لا سلّمين.
     /// </summary>
     private static ResolveResult? ResolveOne(
         KpiMeta t, UserScopes u,
@@ -301,16 +310,16 @@ public class KpiTemplateService : IKpiTemplateService
         if (Has(TemplateAssignmentScope.Employee, u.UserId, TemplateAssignmentKind.Include))
             return new(true, MatchTier.Employee, "matchedByUser");
 
+        if (Has(TemplateAssignmentScope.Team, u.TeamId, TemplateAssignmentKind.Exclude))
+            return new(false, MatchTier.Team, "excludedManually");
+        if (Has(TemplateAssignmentScope.Team, u.TeamId, TemplateAssignmentKind.Include))
+            return new(true, MatchTier.Team, "matchedByTeam");
+
         if (Has(TemplateAssignmentScope.JobRole, u.JobRoleId, TemplateAssignmentKind.Exclude))
             return new(false, MatchTier.JobRole, "excludedManually");
         if ((u.JobRoleId is Guid jr && t.JobRoleId == jr)
             || Has(TemplateAssignmentScope.JobRole, u.JobRoleId, TemplateAssignmentKind.Include))
             return new(true, MatchTier.JobRole, "matchedByJobRole");
-
-        if (Has(TemplateAssignmentScope.Team, u.TeamId, TemplateAssignmentKind.Exclude))
-            return new(false, MatchTier.Team, "excludedManually");
-        if (Has(TemplateAssignmentScope.Team, u.TeamId, TemplateAssignmentKind.Include))
-            return new(true, MatchTier.Team, "matchedByTeam");
 
         if (Has(TemplateAssignmentScope.Department, u.DepartmentId, TemplateAssignmentKind.Exclude))
             return new(false, MatchTier.Department, "excludedManually");
@@ -387,15 +396,13 @@ public class KpiTemplateService : IKpiTemplateService
         return rows.Select(r => (r.KpiTemplateId, r.ScopeType, r.ScopeId, r.Kind)).ToHashSet();
     }
 
-    /// <summary>ترتيب حسم التواتر وفق DEC-01/5 — الأصغر يفوز. مستقلّ عن <see cref="MatchTier"/> عمدًا.</summary>
-    private static int CadencePriority(string reason) => reason switch
-    {
-        "matchedByUser" => 1,
-        "matchedByTeam" => 2,
-        "matchedByJobRole" => 3,
-        "matchedByDepartment" => 4,
-        _ => 5
-    };
+    /// <summary>
+    /// ترتيب حسم مصدر المسار وفق DEC-01/5 — الأصغر يفوز، ويُقارَن <b>داخل المسار الواحد فقط</b>
+    /// (OBS-R5-01). يقرأ سلّم <see cref="KpiCadenceSources.Specificity"/> نفسه الذي يقرؤه منتقي
+    /// المسار الأوّليّ، فلا يوجد سلّم ثانٍ قابل للتباعد عنه.
+    /// </summary>
+    private static int CadencePriority(string reason) =>
+        KpiCadenceSources.Specificity(CadenceSourceOf(reason));
 
     private static string CadenceSourceOf(string reason) => reason switch
     {
@@ -407,10 +414,10 @@ public class KpiTemplateService : IKpiTemplateService
     };
 
     /// <inheritdoc />
-    public async Task<IReadOnlyDictionary<Guid, KpiEffectiveCadence>> ResolveEffectiveCadencesAsync(
+    public async Task<IReadOnlyDictionary<Guid, KpiEffectiveTracks>> ResolveEffectiveTracksAsync(
         IReadOnlyCollection<Guid> userIds, DateOnly asOf, CancellationToken ct = default)
     {
-        var result = new Dictionary<Guid, KpiEffectiveCadence>();
+        var result = new Dictionary<Guid, KpiEffectiveTracks>();
         var ids = userIds.Distinct().ToList();
         if (ids.Count == 0) return result;
 
@@ -426,8 +433,7 @@ public class KpiTemplateService : IKpiTemplateService
 
         var assignments = await LoadActiveAssignmentsAsync(metas.Select(m => m.Id).ToList(), ct, asOf);
 
-        foreach (var id in ids) result[id] = new KpiEffectiveCadence(
-            id, null, KpiCadenceSources.NotConfigured, Array.Empty<Guid>());
+        foreach (var id in ids) result[id] = KpiEffectiveTracks.NotConfigured(id);
 
         foreach (var u in users)
         {
@@ -443,23 +449,32 @@ public class KpiTemplateService : IKpiTemplateService
 
             if (matched.Count == 0) continue;
 
-            var winningPriority = matched.Min(x => CadencePriority(x.Reason));
-            var winners = matched.Where(x => CadencePriority(x.Reason) == winningPriority).ToList();
-
-            // تعدّد قوالب بتواترين مختلفين عند نفس المستوى: يُحسَم إلى الربع سنويّ لأنّه المسار الرسميّ
-            // للنتيجة والمكافآت (DEC-01/3) — حسم صريح مشتقّ من العقد، لا سقوط صامت.
-            var cadence = winners.Any(w => w.Meta.Cadence == KpiCadence.Quarterly)
-                ? KpiCadence.Quarterly
-                : winners[0].Meta.Cadence;
-
-            result[u.Id] = new KpiEffectiveCadence(
+            // OBS-R5-01 — التجميع حسب التواتر **أوّلًا**، ثمّ أدنى أولويّة **داخل كلّ مسار**.
+            // لا Min عبر التواترات مجتمعةً ولا فاصل تعادل إلى الربعيّ: كلاهما كان يُخفي المسار الآخر كلّيًّا.
+            result[u.Id] = new KpiEffectiveTracks(
                 u.Id,
-                cadence,
-                CadenceSourceOf(winners[0].Reason),
-                winners.Where(w => w.Meta.Cadence == cadence).Select(w => w.Meta.Id).Distinct().ToList());
+                TrackOf(u.Id, KpiCadence.WeeklyPulse, matched),
+                TrackOf(u.Id, KpiCadence.Quarterly, matched));
         }
 
         return result;
+
+        static KpiEffectiveCadence TrackOf(
+            Guid userId, KpiCadence cadence, List<(KpiMeta Meta, string Reason)> matched)
+        {
+            var inTrack = matched.Where(x => x.Meta.Cadence == cadence).ToList();
+            if (inTrack.Count == 0)
+                return new KpiEffectiveCadence(userId, null, KpiCadenceSources.NotConfigured, Array.Empty<Guid>());
+
+            var winningPriority = inTrack.Min(x => CadencePriority(x.Reason));
+            var winners = inTrack.Where(x => CadencePriority(x.Reason) == winningPriority).ToList();
+
+            return new KpiEffectiveCadence(
+                userId,
+                cadence,
+                CadenceSourceOf(winners[0].Reason),
+                winners.Select(w => w.Meta.Id).Distinct().ToList());
+        }
     }
 
     /// <summary>

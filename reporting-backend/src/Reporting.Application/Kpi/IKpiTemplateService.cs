@@ -41,12 +41,14 @@ public interface IKpiTemplateService
         IReadOnlyCollection<Guid> userIds, CancellationToken ct = default);
 
     /// <summary>
-    /// DEC-01/5+6 — التواتر الفعّال لكلّ مستخدم كما كان ساريًا في <paramref name="asOf"/>.
-    /// يُشتقّ من القالب الذي يُقيَّم عليه الموظّف فعلًا عبر <b>نفس</b> محرّك الأولوية أعلاه — لا آليّة موازية.
-    /// ترتيب الحسم بين القوالب المطابِقة: إسناد موظّف ← إسناد فريق ← مسمّى وظيفيّ ← إسناد إدارة ← قالب عامّ.
-    /// عند انعدام أيّ مطابقة تُعاد <see cref="KpiEffectiveCadence.Cadence"/> = <c>null</c>
-    /// بمصدر <c>notConfigured</c> — لا اختيار ولا سقوط صامت.
+    /// DEC-01/5+6 و OBS-R5-01 — <b>مسارا</b> التقييم الفعّالان لكلّ مستخدم كما كانا ساريَين في
+    /// <paramref name="asOf"/>: نبض الأسبوع والتقييم الربعيّ الرسميّ، كلٌّ بمصدر حسمه وقوالبه.
+    /// يُشتقّان من القوالب التي يُقيَّم عليها الموظّف فعلًا عبر <b>نفس</b> محرّك الأولوية أعلاه — لا آليّة موازية.
+    /// ترتيب الحسم بين القوالب المطابِقة: إسناد موظّف ← إسناد فريق ← مسمّى وظيفيّ ← إسناد إدارة ← قالب عامّ،
+    /// ويُطبَّق <b>داخل كلّ مسار على حدة</b>: فوز مستوًى في مسار لا يُلغي المسار الآخر ولا يُخفيه.
+    /// عند انعدام أيّ مطابقة في مسار تُعاد <see cref="KpiEffectiveCadence.Cadence"/> = <c>null</c>
+    /// بمصدر <c>notConfigured</c> لذلك المسار وحده — لا اختيار ولا سقوط صامت.
     /// </summary>
-    Task<IReadOnlyDictionary<Guid, KpiEffectiveCadence>> ResolveEffectiveCadencesAsync(
+    Task<IReadOnlyDictionary<Guid, KpiEffectiveTracks>> ResolveEffectiveTracksAsync(
         IReadOnlyCollection<Guid> userIds, DateOnly asOf, CancellationToken ct = default);
 }

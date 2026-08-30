@@ -268,11 +268,16 @@ public class KpiCalculationService : IKpiCalculationService
         public required ResolvedPeriod Period { get; init; }
         public required ResolvedPeriod PreviousPeriod { get; init; }
 
-        /// <summary>الكادنس المطلوب صراحةً (مسار النبض الأسبوعيّ المنفصل)؛ <c>null</c> ⇒ تلقائيّ لكلّ موظّف.</summary>
+        /// <summary>
+        /// OBS-R5-01 — المسار المطلوب حسابه: نبض الأسبوع أو التقييم الربعيّ الرسميّ.
+        /// معناه «احسب <b>هذا المسار</b> بتهيئة كلّ موظّف فيه» لا «افرض هذا التواتر على الجميع»:
+        /// من لا تهيئة له في المسار يخرج من مقامه ويُسمّى «غير مُهيّأ» <b>لهذا المسار وحده</b>.
+        /// <c>null</c> ⇒ المسار الأوّليّ لكلّ موظّف (<see cref="KpiEffectiveTracks.Primary"/>).
+        /// </summary>
         public required KpiCadence? RequestedCadence { get; init; }
 
-        /// <summary>DEC-01/5 — التواتر الفعّال لكلّ موظّف في القائمة، مع مصدره.</summary>
-        public required IReadOnlyDictionary<Guid, KpiEffectiveCadence> Cadences { get; init; }
+        /// <summary>DEC-01/5 + OBS-R5-01 — مسارا كلّ موظّف الفعّالان معًا، كلٌّ بمصدر حسمه وقوالبه.</summary>
+        public required IReadOnlyDictionary<Guid, KpiEffectiveTracks> Tracks { get; init; }
 
         public required IReadOnlyList<RosterUser> Roster { get; init; }
         public required IReadOnlyDictionary<Guid, string> TeamNames { get; init; }
@@ -283,13 +288,19 @@ public class KpiCalculationService : IKpiCalculationService
 
         public decimal MinimumCoverage { get; init; }
 
-        public KpiCadence? CadenceOf(Guid userId) =>
-            RequestedCadence ?? Cadences.GetValueOrDefault(userId)?.Cadence;
+        /// <summary>
+        /// المسار الفعّال لهذا الموظّف داخل الحساب الجاري. <c>null</c> ⇒ «غير مُهيّأ» على المسار المطلوب:
+        /// لا التزام ولا مقام ولا تغطية — لا افتراض تواتر ولا مقام كاذب (OBS-R5-01/3).
+        /// </summary>
+        public KpiCadence? CadenceOf(Guid userId) => TrackOf(userId)?.Cadence;
 
-        public string CadenceSourceOf(Guid userId) =>
-            RequestedCadence is not null
-                ? KpiCadenceSources.ExplicitRequest
-                : Cadences.GetValueOrDefault(userId)?.Source ?? KpiCadenceSources.NotConfigured;
+        public string CadenceSourceOf(Guid userId) => TrackOf(userId)?.Source ?? KpiCadenceSources.NotConfigured;
+
+        private KpiEffectiveCadence? TrackOf(Guid userId)
+        {
+            if (!Tracks.TryGetValue(userId, out var t)) return null;
+            return RequestedCadence is KpiCadence requested ? t.For(requested) : t.Primary;
+        }
 
         public (decimal Threshold, string Source) ThresholdOf(Guid userId) =>
             CadenceOf(userId) is KpiCadence c && Thresholds.TryGetValue(c, out var t)
@@ -318,10 +329,10 @@ public class KpiCalculationService : IKpiCalculationService
         // القالب الذي يُقيَّم عليه فعلًا (DEC-01/5). B-3 محفوظ: ما زال لا يوجد سقوط صامت — غياب الإعداد
         // يُنتج حالة «التواتر غير مُهيّأ» الصريحة لا افتراضًا للنبض الأسبوعيّ.
         // DEC-01/6 — مرساة السريان هي نهاية الفترة: الأرباع التاريخيّة تُقرأ بإعدادها الساري حينها.
-        var cadences = query.Cadence is null
-            ? await _templates.ResolveEffectiveCadencesAsync(
-                roster.Select(u => u.UserId).ToList(), period.End, ct)
-            : new Dictionary<Guid, KpiEffectiveCadence>();
+        // OBS-R5-01 — المسارات تُحسم دائمًا (حتّى مع مسار مطلوب صراحةً): المسار الصريح يعني «احسب هذا
+        // المسار بتهيئة كلّ موظّف فيه»، فمن لا تهيئة له عليه لا يُصنَع له مقام ولا تُلفَّق له تغطية.
+        var tracks = await _templates.ResolveEffectiveTracksAsync(
+            roster.Select(u => u.UserId).ToList(), period.End, ct);
 
         var teamIds = roster.Where(u => u.TeamId is not null).Select(u => u.TeamId!.Value).Distinct().ToList();
         var deptIds = roster.Where(u => u.DepartmentId is not null).Select(u => u.DepartmentId!.Value).Distinct().ToList();
@@ -345,7 +356,7 @@ public class KpiCalculationService : IKpiCalculationService
             Period = period,
             PreviousPeriod = _periods.PreviousComparable(period),
             RequestedCadence = query.Cadence,
-            Cadences = cadences,
+            Tracks = tracks,
             Roster = roster,
             TeamNames = teamNames,
             DepartmentNames = deptNames,
@@ -409,14 +420,9 @@ public class KpiCalculationService : IKpiCalculationService
                 where periodKeys.Contains(e.PeriodKey)
                 select new EvaluationJoin { e = e, t = t };
 
-        if (ctx.RequestedCadence is KpiCadence requested)
-        {
-            // المسار الصريح (DEC-01/3): مسار واحد لكلّ من في النطاق — سلوك ما قبل R5 حرفيًّا.
-            var userIds = ctx.Roster.Select(u => u.UserId).ToList();
-            return q.Where(x => x.t.Cadence == requested && userIds.Contains(x.e.SubjectUserId));
-        }
-
-        // المسار التلقائيّ: تواتر كلّ موظّف على حدة. قائمتان فقط ⇒ استعلام واحد بلا N+1.
+        // OBS-R5-01/5 — لا خلط بين المسارين مطلقًا: البسط لا يضمّ إلّا تقييمات القوالب التي تواترها
+        // هو مسار الموظّف الفعّال في هذا الحساب. فنتيجة نبض أسبوعيّ لا تدخل الربعيّ الرسميّ أبدًا،
+        // والتقييم الربعيّ لا يُعدّ أسبوعًا إضافيًّا داخل النبض. قائمتان فقط ⇒ استعلام واحد بلا N+1.
         var weeklyIds = ctx.Roster.Where(u => ctx.CadenceOf(u.UserId) == KpiCadence.WeeklyPulse)
             .Select(u => u.UserId).ToList();
         var quarterlyIds = ctx.Roster.Where(u => ctx.CadenceOf(u.UserId) == KpiCadence.Quarterly)

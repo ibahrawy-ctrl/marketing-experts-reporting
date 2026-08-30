@@ -1476,14 +1476,23 @@ export interface KpiEvaluationSetupTemplateDto {
   name: string;
 }
 
+// OBS-R5-01 — مساران متزامنان لا متبادلان: نبض الأسبوع والتقييم الربعيّ الرسميّ. سلّم الأولويّة
+// يُطبَّق داخل كلّ مسار على حدة، ولكلّ مسار مصدر حسمه وفترته وقوالبه وحالته المسمّاة. غياب
+// أحد المسارين لا يُخفي الآخر مطلقًا — لذلك لا يوجد حقل مسطّح واحد يمكنه ابتلاع المسارين.
+export interface KpiEvaluationTrackDto {
+  cadence: KpiCadence;
+  cadenceSource: KpiCadenceSource;
+  periodType: PeriodType;
+  currentPeriodKey: string;
+  templates: KpiEvaluationSetupTemplateDto[];
+  isConfigured: boolean;
+  blockingReason: string | null;
+}
+
 export interface KpiEvaluationSetupDto {
   subjectUserId: string;
   subjectName: string;
-  effectiveCadence: KpiCadence | null;
-  cadenceSource: KpiCadenceSource;
-  periodType: PeriodType | null;
-  currentPeriodKey: string | null;
-  templates: KpiEvaluationSetupTemplateDto[];
+  tracks: KpiEvaluationTrackDto[];
   isConfigured: boolean;
   blockingReason: string | null;
 }

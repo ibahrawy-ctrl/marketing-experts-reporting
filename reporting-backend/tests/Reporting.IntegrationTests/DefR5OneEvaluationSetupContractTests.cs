@@ -67,6 +67,13 @@ public class DefR5OneEvaluationSetupContractTests
         return (await res.ReadAsync<KpiEvaluationSetupDto>())!;
     }
 
+    /// <summary>
+    /// مسار بعينه من «الإعداد الفعّال». التسمية صريحة لأنّ العقد يُعيد <b>المسارين معًا دائمًا</b>
+    /// (OBS-R5-01): لا حقل مسطّح واحد يمكنه ابتلاع أحدهما، ولا اختبار يقرأ «التواتر الفعّال» مجرَّدًا.
+    /// </summary>
+    private static KpiEvaluationTrackDto Track(KpiEvaluationSetupDto setup, KpiCadence cadence)
+        => setup.Tracks.Single(t => t.Cadence == cadence);
+
     private static async Task<string[]> WeekKeysAsync(HttpClient client, string type, string periodKey)
     {
         var res = await client.GetAsync($"/api/kpi/periods/resolve?type={type}&periodKey={periodKey}");
@@ -108,15 +115,16 @@ public class DefR5OneEvaluationSetupContractTests
 
         var setup = await SetupAsync(manager, employee);
 
+        var track = Track(setup, KpiCadence.Quarterly);
         Assert.True(setup.IsConfigured);
         Assert.Null(setup.BlockingReason);
-        Assert.Equal(KpiCadence.Quarterly, setup.EffectiveCadence);
-        Assert.Equal(KpiCadenceSources.EmployeeAssignment, setup.CadenceSource);
+        Assert.True(track.IsConfigured);
+        Assert.Equal(KpiCadenceSources.EmployeeAssignment, track.CadenceSource);
         // نوع الفترة ومفتاحها يأتيان من الخادم — لا تشتقّهما الواجهة ولا تسأل عنهما المستخدم.
-        Assert.Equal(PeriodType.Quarterly, setup.PeriodType);
-        Assert.Matches(@"^\d{4}-Q[1-4]$", setup.CurrentPeriodKey);
-        Assert.Contains(setup.Templates, t => t.Id == quarterly);
-        Assert.All(setup.Templates, t => Assert.False(string.IsNullOrWhiteSpace(t.Name)));
+        Assert.Equal(PeriodType.Quarterly, track.PeriodType);
+        Assert.Matches(@"^\d{4}-Q[1-4]$", track.CurrentPeriodKey);
+        Assert.Contains(track.Templates, t => t.Id == quarterly);
+        Assert.All(track.Templates, t => Assert.False(string.IsNullOrWhiteSpace(t.Name)));
     }
 
     [Fact]
@@ -133,12 +141,13 @@ public class DefR5OneEvaluationSetupContractTests
 
         var setup = await SetupAsync(manager, employee);
 
+        var track = Track(setup, KpiCadence.WeeklyPulse);
         Assert.True(setup.IsConfigured);
-        Assert.Equal(KpiCadence.WeeklyPulse, setup.EffectiveCadence);
-        Assert.Equal(KpiCadenceSources.TeamAssignment, setup.CadenceSource);
-        Assert.Equal(PeriodType.Weekly, setup.PeriodType);
-        Assert.Matches(@"^\d{4}-W\d{2}$", setup.CurrentPeriodKey);
-        Assert.Contains(setup.Templates, t => t.Id == weekly);
+        Assert.True(track.IsConfigured);
+        Assert.Equal(KpiCadenceSources.TeamAssignment, track.CadenceSource);
+        Assert.Equal(PeriodType.Weekly, track.PeriodType);
+        Assert.Matches(@"^\d{4}-W\d{2}$", track.CurrentPeriodKey);
+        Assert.Contains(track.Templates, t => t.Id == weekly);
     }
 
     [Fact]
@@ -154,13 +163,18 @@ public class DefR5OneEvaluationSetupContractTests
         var setup = await SetupAsync(manager, orphan);
 
         // DEC-01/5 — حالة مسمّاة معروضة، لا صمت ولا سقوط افتراضيّ إلى الأسبوعيّ.
+        // OBS-R5-01/3 — وحين يغيب المساران معًا يُعلَن كلٌّ منهما بسببه الخاصّ، ويبقى المسارَان
+        // ظاهرَين بفترتهما ونوعها (المعرفة الزمنيّة ليست تهيئة) — فلا يختفي أحدهما بسبب الآخر.
         Assert.False(setup.IsConfigured);
-        Assert.Null(setup.EffectiveCadence);
-        Assert.Equal(KpiCadenceSources.NotConfigured, setup.CadenceSource);
-        Assert.Null(setup.PeriodType);
-        Assert.Null(setup.CurrentPeriodKey);
-        Assert.Empty(setup.Templates);
         Assert.False(string.IsNullOrWhiteSpace(setup.BlockingReason));
+        Assert.Equal(2, setup.Tracks.Count);
+        Assert.All(setup.Tracks, t =>
+        {
+            Assert.False(t.IsConfigured);
+            Assert.Equal(KpiCadenceSources.NotConfigured, t.CadenceSource);
+            Assert.Empty(t.Templates);
+            Assert.False(string.IsNullOrWhiteSpace(t.BlockingReason));
+        });
     }
 
     [Fact]
@@ -176,20 +190,27 @@ public class DefR5OneEvaluationSetupContractTests
         await AssignAsync(admin, quarterly, TemplateAssignmentScope.Employee, quarterlySubject);
         await AssignAsync(admin, weekly, TemplateAssignmentScope.Employee, weeklySubject);
 
-        foreach (var subject in new[] { quarterlySubject, weeklySubject })
+        var cases = new[]
         {
-            var setup = await SetupAsync(manager, subject);
-            Assert.True(setup.IsConfigured);
+            (Subject: quarterlySubject, Cadence: KpiCadence.Quarterly, Template: quarterly),
+            (Subject: weeklySubject, Cadence: KpiCadence.WeeklyPulse, Template: weekly)
+        };
 
-            // ما ترسله الواجهة = ما أعلنه الخادم حرفيًّا: قالب من قائمته، ونوع فترة ومفتاحًا من عنده.
+        foreach (var (subject, cadence, template) in cases)
+        {
+            var track = Track(await SetupAsync(manager, subject), cadence);
+            Assert.True(track.IsConfigured);
+            Assert.Contains(track.Templates, t => t.Id == template);
+
+            // ما ترسله الواجهة = ما أعلنه الخادم حرفيًّا لهذا المسار: قالب من قائمته، ونوع فترة ومفتاحًا من عنده.
             var res = await manager.PostAsJsonAsync("/api/kpi-evaluations", new CreateKpiEvaluationRequest(
-                setup.Templates.First().Id, subject, setup.PeriodType!.Value, setup.CurrentPeriodKey!));
+                template, subject, track.PeriodType, track.CurrentPeriodKey));
             res.EnsureSuccessStatusCode();
 
             var ev = (await res.ReadAsync<KpiEvaluationDto>())!;
             Assert.Equal(subject, ev.SubjectUserId);
-            Assert.Equal(setup.PeriodType!.Value, ev.PeriodType);
-            Assert.Equal(setup.CurrentPeriodKey, ev.PeriodKey);
+            Assert.Equal(track.PeriodType, ev.PeriodType);
+            Assert.Equal(track.CurrentPeriodKey, ev.PeriodKey);
         }
     }
 
@@ -209,11 +230,11 @@ public class DefR5OneEvaluationSetupContractTests
         var foreign = await TestAuth.GetOrCreateJobRoleAsync(_factory, $"R5_S5B_{Guid.NewGuid():N}");
         var (notAssigned, _, _) = await PublishAsync(admin, KpiCadence.Quarterly, foreign);
 
-        var setup = await SetupAsync(manager, employee);
-        Assert.DoesNotContain(setup.Templates, t => t.Id == notAssigned);
+        var track = Track(await SetupAsync(manager, employee), KpiCadence.Quarterly);
+        Assert.DoesNotContain(track.Templates, t => t.Id == notAssigned);
 
         var res = await manager.PostAsJsonAsync("/api/kpi-evaluations", new CreateKpiEvaluationRequest(
-            notAssigned, employee, PeriodType.Quarterly, setup.CurrentPeriodKey!));
+            notAssigned, employee, PeriodType.Quarterly, track.CurrentPeriodKey));
 
         Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode);
         Assert.Contains("kpi_eval.template_not_assigned", await res.Content.ReadAsStringAsync());
@@ -305,15 +326,16 @@ public class DefR5OneEvaluationSetupContractTests
         // وقالب أخصّ مربوط بمسمّى هذا الموظّف — المستوى الثاني.
         var (specific, _, _) = await PublishAsync(admin, KpiCadence.Quarterly, role);
 
-        var setup = await SetupAsync(manager, employee);
+        var track = Track(await SetupAsync(manager, employee), KpiCadence.Quarterly);
 
-        // «الأخصّ يطغى» غير تراكميّ: القالب العامّ لا يظهر أصلًا، ولا يُقبل عند الإنشاء.
-        Assert.Equal(KpiCadenceSources.JobRole, setup.CadenceSource);
-        Assert.Contains(setup.Templates, t => t.Id == specific);
-        Assert.DoesNotContain(setup.Templates, t => t.Id == general);
+        // «الأخصّ يطغى» غير تراكميّ **داخل المسار الواحد**: القالب العامّ الربعيّ لا يظهر أصلًا،
+        // ولا يُقبل عند الإنشاء — والمسار الأسبوعيّ لا يتأثّر بهذا الحسم إطلاقًا (OBS-R5-01/2).
+        Assert.Equal(KpiCadenceSources.JobRole, track.CadenceSource);
+        Assert.Contains(track.Templates, t => t.Id == specific);
+        Assert.DoesNotContain(track.Templates, t => t.Id == general);
 
         var res = await manager.PostAsJsonAsync("/api/kpi-evaluations", new CreateKpiEvaluationRequest(
-            general, employee, PeriodType.Quarterly, setup.CurrentPeriodKey!));
+            general, employee, PeriodType.Quarterly, track.CurrentPeriodKey));
         Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode);
         Assert.Contains("kpi_eval.template_not_assigned", await res.Content.ReadAsStringAsync());
     }
@@ -333,12 +355,21 @@ public class DefR5OneEvaluationSetupContractTests
         await AssignAsync(admin, quarterly, TemplateAssignmentScope.Employee, employee);
 
         var setup = await SetupAsync(manager, employee);
+        var weeklyTrack = Track(setup, KpiCadence.WeeklyPulse);
+        var quarterlyTrack = Track(setup, KpiCadence.Quarterly);
 
-        // التواتر المحسوم واحد، وقوالبه من مساره وحده — لا خلط ولا خيار تقنيّ للمستخدم.
-        Assert.Equal(KpiCadence.Quarterly, setup.EffectiveCadence);
-        Assert.Equal(PeriodType.Quarterly, setup.PeriodType);
-        Assert.Contains(setup.Templates, t => t.Id == quarterly);
-        Assert.DoesNotContain(setup.Templates, t => t.Id == weekly);
+        // OBS-R5-01/1+5 — المساران مُهيّآن معًا لهذا الموظّف (لا أحدهما يُقصي الآخر)، ومع ذلك
+        // تبقى قوالب كلّ مسار داخل مساره وحده: لا خلط ولا خيار تقنيّ للمستخدم.
+        Assert.True(weeklyTrack.IsConfigured);
+        Assert.True(quarterlyTrack.IsConfigured);
+
+        Assert.Equal(PeriodType.Quarterly, quarterlyTrack.PeriodType);
+        Assert.Contains(quarterlyTrack.Templates, t => t.Id == quarterly);
+        Assert.DoesNotContain(quarterlyTrack.Templates, t => t.Id == weekly);
+
+        Assert.Equal(PeriodType.Weekly, weeklyTrack.PeriodType);
+        Assert.Contains(weeklyTrack.Templates, t => t.Id == weekly);
+        Assert.DoesNotContain(weeklyTrack.Templates, t => t.Id == quarterly);
     }
 
     // ===================== DEVIATION-02 — لا اختلاط بين نتائج المسارين =====================
