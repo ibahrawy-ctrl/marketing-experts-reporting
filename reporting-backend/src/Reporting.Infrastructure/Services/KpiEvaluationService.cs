@@ -986,9 +986,13 @@ public class KpiEvaluationService : IKpiEvaluationService
         var (from, to) = ReportCalendarPolicy.QuarterRange(filter.Year, filter.Quarter);
         var label = $"الربع {filter.Quarter} — {filter.Year}";
 
-        // عرض على مستوى الشركة (بلا ScopeResolver؛ النطاق مفروض بالسياسة). تقييمات أسبوعية بالحالة المختارة فقط.
+        // DEC-01 §5 — التصدير المالي يستهلك **المسار الربعيّ الرسميّ وحده**: نبض الأسبوع مؤشّر تشغيليّ
+        // غير رسميّ ولا يجوز أن يكون مصدرًا ماليًّا. مفتاح الفترة هنا مطابقة تامّة لا مدى أسابيع.
+        var quarterKey = $"{filter.Year}-Q{filter.Quarter}";
+
+        // عرض على مستوى الشركة (بلا ScopeResolver؛ النطاق مفروض بالسياسة). تقييمات ربعيّة بالحالة المختارة فقط.
         var q = _db.KpiEvaluations.AsNoTracking()
-            .Where(e => e.PeriodType == PeriodType.Weekly && e.Status == status);
+            .Where(e => e.PeriodType == PeriodType.Quarterly && e.PeriodKey == quarterKey && e.Status == status);
         if (filter.DepartmentId is Guid d) q = q.Where(e => e.DepartmentId == d);
         if (filter.TeamId is Guid t) q = q.Where(e => e.TeamId == t);
 
@@ -1007,8 +1011,8 @@ public class KpiEvaluationService : IKpiEvaluationService
             e.CreatedAtUtc
         }).ToListAsync(ct);
 
-        // فلترة الأسابيع الواقعة داخل مدى الربع (بحسب خميس بداية الأسبوع).
-        var inRange = raw.Where(r => ReportCalendarPolicy.WeekInRange(r.PeriodKey, from, to)).ToList();
+        // المفتاح الربعيّ مطابَق في الاستعلام نفسه؛ لا فلترة مدى بعديّة.
+        var inRange = raw;
 
         // حلّ الأسماء على دفعات: الموظّفون (الاسم/المسمّى/الإدارة/الفريق الحاليّ)، الإدارات، الفِرق، عناوين القوالب.
         var subjectIds = inRange.Select(r => r.SubjectUserId).Distinct().ToList();

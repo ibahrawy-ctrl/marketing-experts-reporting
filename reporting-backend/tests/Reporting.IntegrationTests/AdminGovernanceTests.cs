@@ -24,10 +24,11 @@ public class AdminGovernanceTests
 
     // ===================== مساعدو KPI =====================
 
-    private static async Task<(Guid TemplateId, Guid ManualMetricId, Guid AutoMetricId)> PublishKpiAsync(HttpClient admin)
+    private static async Task<(Guid TemplateId, Guid ManualMetricId, Guid AutoMetricId)> PublishKpiAsync(
+        HttpClient admin, KpiCadence cadence = KpiCadence.WeeklyPulse)
     {
         var created = await (await admin.PostAsJsonAsync("/api/kpi-templates",
-            new CreateKpiTemplateRequest($"حوكمة {Guid.NewGuid():N}", null, null, KpiCadence.WeeklyPulse)))
+            new CreateKpiTemplateRequest($"حوكمة {Guid.NewGuid():N}", null, null, cadence)))
             .ReadAsync<KpiTemplateDetailDto>();
         var versionId = created!.Versions.Single().Id;
         var manual = await (await admin.PostAsJsonAsync($"/api/kpi-templates/versions/{versionId}/metrics",
@@ -47,10 +48,11 @@ public class AdminGovernanceTests
     /// <c>Guid.Empty</c> يظهر لاحقًا على هيئة 404 مضلِّل يُبلّغ العرَض لا العلّة.
     /// </summary>
     private static async Task<KpiEvaluationDto> SubmitEvalAsync(
-        HttpClient evaluator, Guid templateId, Guid subjectId, Guid manualId, Guid autoId, string weekKey, decimal score = 70m)
+        HttpClient evaluator, Guid templateId, Guid subjectId, Guid manualId, Guid autoId, string weekKey, decimal score = 70m,
+        PeriodType periodType = PeriodType.Weekly)
     {
         var createRes = await evaluator.PostAsJsonAsync("/api/kpi-evaluations",
-            new CreateKpiEvaluationRequest(templateId, subjectId, PeriodType.Weekly, weekKey));
+            new CreateKpiEvaluationRequest(templateId, subjectId, periodType, weekKey));
         await EnsureSuccessAsync(createRes, "إنشاء تقييم KPI");
         var ev = await createRes.ReadAsync<KpiEvaluationDto>();
         Assert.NotNull(ev);
@@ -324,7 +326,15 @@ public class AdminGovernanceTests
             .ReadAsync<KpiEvaluationDto>();
         Assert.Equal(KpiEvaluationStatus.Approved, approved!.Status);
 
-        // قبل الحذف: التجميع يعكس الدرجة، والتصدير يحوي التقييم.
+        // التصدير المالي مصدره المسار الربعيّ الرسميّ وحده (DEC-01 §5) ⇒ نقيسه على تقييم ربعيّ لنفس الموظّف.
+        var (qTemplate, qManual, qAuto) = await PublishKpiAsync(admin, KpiCadence.Quarterly);
+        var qSubmitted = await SubmitEvalAsync(manager, qTemplate, subjectId, qManual, qAuto, "2026-Q2", 80m,
+            PeriodType.Quarterly);
+        var qApproved = await (await admin.PostAsync($"/api/kpi-evaluations/{qSubmitted.Id}/approve", null))
+            .ReadAsync<KpiEvaluationDto>();
+        Assert.Equal(KpiEvaluationStatus.Approved, qApproved!.Status);
+
+        // قبل الحذف: التجميع يعكس الدرجة، والتصدير يحوي التقييم الربعيّ.
         var beforeAgg = await (await manager.GetAsync(
             $"/api/kpi-evaluations/aggregate?granularity=Monthly&periodKey=2026-05&subjectUserId={subjectId}"))
             .ReadAsync<KpiAggregateDto>();
@@ -333,12 +343,15 @@ public class AdminGovernanceTests
 
         var beforeExport = await (await admin.GetAsync("/api/kpi-evaluations/finance-export?year=2026&quarter=2"))
             .ReadAsync<KpiFinanceExportDto>();
-        Assert.Contains(beforeExport!.Rows, r => r.EvaluationId == submitted.Id);
+        Assert.Contains(beforeExport!.Rows, r => r.EvaluationId == qSubmitted.Id);
 
-        // حذف إداريّ.
-        var del = await admin.PostAsJsonAsync($"/api/kpi-evaluations/{submitted.Id}/admin-delete",
-            new KpiReviewActionRequest("استبعاد من التجميع"));
-        Assert.Equal(HttpStatusCode.OK, del.StatusCode);
+        // حذف إداريّ للتقييمَين معًا.
+        foreach (var id in new[] { submitted.Id, qSubmitted.Id })
+        {
+            var del = await admin.PostAsJsonAsync($"/api/kpi-evaluations/{id}/admin-delete",
+                new KpiReviewActionRequest("استبعاد من التجميع"));
+            Assert.Equal(HttpStatusCode.OK, del.StatusCode);
+        }
 
         // بعد الحذف: التجميع يسقط، والتصدير لا يحوي التقييم.
         var afterAgg = await (await manager.GetAsync(
@@ -349,7 +362,7 @@ public class AdminGovernanceTests
 
         var afterExport = await (await admin.GetAsync("/api/kpi-evaluations/finance-export?year=2026&quarter=2"))
             .ReadAsync<KpiFinanceExportDto>();
-        Assert.DoesNotContain(afterExport!.Rows, r => r.EvaluationId == submitted.Id);
+        Assert.DoesNotContain(afterExport!.Rows, r => r.EvaluationId == qSubmitted.Id);
     }
 
     // §سجلّ أحداث المراجعة (Timeline) يُملأ بأحداث الإرسال والاعتماد.
