@@ -180,6 +180,11 @@ POST /api/auth/login  →  401  {"type":"auth.invalid_credentials","status":401}
 وحتّى لو مرّت لكان الحارس التالي IsActive=false يردّ auth.account_disabled.
 ```
 
+أداة الصيانة بُنِيت خارج المستودع وحُذِفت بعد الاستعمال مع كلّ ملفّات المراقبة المؤقّتة
+(`/root/r22a-maint*` · `/root/r22a-mon-*` · `/tmp/r22a_mon.sql` على الخادم، و`/tmp/r22a-*` محلّيًّا
+بما فيها حزم النشر المؤقّتة). ملفّا بيئة الإنتاج وRC سليمان (`74ecfd78…` · `81caf91e…`)،
+و`staging-r22a` غير موجود، والخدمات الثلاث `active` بـ`NRestarts=0`.
+
 الحساب الآخر `r22a-rc-uat@khubara.local` (`cd065768…`) كان **معطَّلًا مسبقًا** (`IsActive=false`) ولم يُمسّ في هذه المرحلة.
 `RC_ACTIVE_ADMINS = 3` (المشروعون فقط) · `RC_USERS_TOTAL = 51 · ACTIVE = 35` · `RC_HEALTH = 200`.
 
