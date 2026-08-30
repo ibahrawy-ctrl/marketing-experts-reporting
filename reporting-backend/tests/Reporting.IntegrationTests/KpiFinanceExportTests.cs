@@ -510,4 +510,39 @@ public class KpiFinanceExportTests
         Assert.Contains("2026-Q2", text);
         Assert.DoesNotContain("2026-W25", text);
     }
+
+    // ===== 23) DEC-01 §5 (OBS-R5-02) — التصدير يرى ما يراه المتوسّط الرسميّ، لا أقلّ =====
+    // سجلّ **من المسار الربعيّ** (قالبه Quarterly) أُنشئ بمفتاح دورة داخل الربع — كما تفعل السجلّات
+    // السابقة لـDEC-01 — يجب أن يظهر في التصدير: تمييز المسار بتواتر القالب لا بشكل المفتاح.
+    // ولولا ذلك لَاختلف الرقم الرسميّ عن الرقم المالي على البيانات نفسها، وهو خلط من نوع آخر.
+    [Fact]
+    public async Task DecOne_FinanceExport_IncludesQuarterlyTrackRow_EvenWhenKeyedByCycle()
+    {
+        var org = await BuildOrgAsync();
+        var (_, subject) = await TestAuth.CreateUserAsync(_factory, Roles.Employee);
+        var (deptId, _) = await AssignSubjectOrgAsync(subject);
+
+        var (quarterlyTemplate, qManual, qAuto) = await PublishKpiAsync(org.Admin, KpiCadence.Quarterly);
+        var (weeklyTemplate, wManual, wAuto) = await PublishKpiAsync(org.Admin, KpiCadence.WeeklyPulse);
+
+        var legacyQuarterlyId = await ApproveAsync(
+            org.Admin, quarterlyTemplate, subject, qManual, qAuto, "2026-Q2", 77m, PeriodType.Quarterly);
+        // ونبض أسبوعيّ معتمَد داخل الربع نفسه — يبقى خارج التصدير رغم تطابق المدى.
+        var pulseId = await ApproveAsync(
+            org.Admin, weeklyTemplate, subject, wManual, wAuto, "2026-W21", 60m, PeriodType.Weekly);
+
+        // محاكاة السجلّ القديم: بعد DEC-01 لم يعد الـAPI يقبل إنشاء ربعيّ بمفتاح دورة، فالشكل
+        // القديم لا يوجد إلّا في بيانات سابقة. نُنزِله مباشرة إلى القاعدة كما هو في الواقع.
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var legacy = await db.KpiEvaluations.FirstAsync(e => e.Id == legacyQuarterlyId);
+            legacy.PeriodKey = "2026-W20";
+            await db.SaveChangesAsync();
+        }
+
+        var dto = await PreviewAsync(org.Admin, $"?year=2026&quarter=2&departmentId={deptId}");
+        Assert.Contains(dto.Rows, r => r.EvaluationId == legacyQuarterlyId);
+        Assert.DoesNotContain(dto.Rows, r => r.EvaluationId == pulseId);
+    }
 }

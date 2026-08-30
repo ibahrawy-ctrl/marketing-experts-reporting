@@ -987,12 +987,19 @@ public class KpiEvaluationService : IKpiEvaluationService
         var label = $"الربع {filter.Quarter} — {filter.Year}";
 
         // DEC-01 §5 — التصدير المالي يستهلك **المسار الربعيّ الرسميّ وحده**: نبض الأسبوع مؤشّر تشغيليّ
-        // غير رسميّ ولا يجوز أن يكون مصدرًا ماليًّا. مفتاح الفترة هنا مطابقة تامّة لا مدى أسابيع.
+        // غير رسميّ ولا يجوز أن يكون مصدرًا ماليًّا.
+        // تمييز المسار هنا بتواتر القالب (Cadence) لا بـPeriodType، مطابقةً لما تفعله
+        // KpiCalculationService.BaseEvaluationsQuery. ولو ميّزناه بمفتاح ربعيّ تامّ وحده لاختلف ما
+        // يراه «المتوسّط الرسميّ» عمّا يراه «التصدير المالي» على البيانات نفسها — وهو خلط من نوع
+        // آخر يخالف العقد ذاته، إذ يوجب أن يستهلك الرقمان المجموعة نفسها.
         var quarterKey = $"{filter.Year}-Q{filter.Quarter}";
 
-        // عرض على مستوى الشركة (بلا ScopeResolver؛ النطاق مفروض بالسياسة). تقييمات ربعيّة بالحالة المختارة فقط.
-        var q = _db.KpiEvaluations.AsNoTracking()
-            .Where(e => e.PeriodType == PeriodType.Quarterly && e.PeriodKey == quarterKey && e.Status == status);
+        // عرض على مستوى الشركة (بلا ScopeResolver؛ النطاق مفروض بالسياسة). المسار الربعيّ بالحالة المختارة فقط.
+        var q = from e in _db.KpiEvaluations.AsNoTracking()
+                join v in _db.KpiTemplateVersions.AsNoTracking() on e.KpiTemplateVersionId equals v.Id
+                join tpl in _db.KpiTemplates.AsNoTracking() on v.KpiTemplateId equals tpl.Id
+                where tpl.Cadence == KpiCadence.Quarterly && e.Status == status
+                select e;
         if (filter.DepartmentId is Guid d) q = q.Where(e => e.DepartmentId == d);
         if (filter.TeamId is Guid t) q = q.Where(e => e.TeamId == t);
 
@@ -1011,8 +1018,12 @@ public class KpiEvaluationService : IKpiEvaluationService
             e.CreatedAtUtc
         }).ToListAsync(ct);
 
-        // المفتاح الربعيّ مطابَق في الاستعلام نفسه؛ لا فلترة مدى بعديّة.
-        var inRange = raw;
+        // عضويّة الفترة بنفس قاعدة التجميع: مفتاح الربع نفسه، أو مفتاح دورة واقع داخل مدى الربع
+        // (سجلّات ربعيّة قديمة أُنشئت بمفتاح دورة قبل DEC-01 تبقى مرئيّة للمالية كما تراها المتوسّطات).
+        var inRange = raw
+            .Where(r => string.Equals(r.PeriodKey, quarterKey, StringComparison.Ordinal)
+                        || ReportCalendarPolicy.WeekInRange(r.PeriodKey, from, to))
+            .ToList();
 
         // حلّ الأسماء على دفعات: الموظّفون (الاسم/المسمّى/الإدارة/الفريق الحاليّ)، الإدارات، الفِرق، عناوين القوالب.
         var subjectIds = inRange.Select(r => r.SubjectUserId).Distinct().ToList();
