@@ -14,7 +14,7 @@ import { useProjectReportSlice } from '../lib/useClients';
 import { submissionStatusLabel, periodTypeLabel, formatDate } from '../lib/format';
 import { apiErrorMessage } from '../lib/api';
 import { parseRepeatableConfig, ProjectRepeatableDisplay } from './SubmissionsPage';
-import type { ProjectNameRef, ProjectRepeatableEntry } from '../types/api';
+import type { ProjectNameRef, ProjectRepeatableEntry, ProjectReportSliceEntry } from '../types/api';
 import axios from 'axios';
 
 export default function ProjectReportSlicePage() {
@@ -133,10 +133,16 @@ function Meta({ label, value }: { label: string; value: string }) {
  * الشريحة تصل بلا `projectId` داخل العنصر (كلّها لهذا المشروع أصلًا)، فيُعاد بناؤه هنا من
  * معرّف المشروع المطلوب — لا من أيّ قيمة قادمة من الحمولة — كي يبقى العرض متّسقًا مع نطاق الصفحة.
  * القيم `null` تصبح نصًّا فارغًا لأنّ عارض القسم المتكرّر يتعامل مع «فارغ» بـ«—».
+ * بنود العمل تصل مبنيّةً من الخادم لهذا المشروع وحده (بما فيها البند الضمنيّ لبيانات v1).
  */
-function toEntries(entries: Record<string, string | null>[], projectId: string): ProjectRepeatableEntry[] {
-  return entries.map((answers) => ({
+function toEntries(entries: ProjectReportSliceEntry[], projectId: string): ProjectRepeatableEntry[] {
+  return entries.map((e) => ({
     projectId,
-    answers: Object.fromEntries(Object.entries(answers).map(([k, v]) => [k, v ?? ''])),
+    answers: denull(e.answers),
+    workItems: (e.workItems ?? []).map((answers) => ({ answers: denull(answers) })),
   }));
+}
+
+function denull(answers: Record<string, string | null>): Record<string, string> {
+  return Object.fromEntries(Object.entries(answers).map(([k, v]) => [k, v ?? '']));
 }

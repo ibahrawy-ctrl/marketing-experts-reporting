@@ -54,7 +54,7 @@ function sliceFixture(): ProjectReportSliceDto {
         label: 'أداء المشاريع',
         configJson: CONFIG,
         order: 1,
-        entries: [{ spend: MARKER_A }],
+        entries: [{ answers: { spend: MARKER_A }, workItems: [] }],
       },
     ],
   };

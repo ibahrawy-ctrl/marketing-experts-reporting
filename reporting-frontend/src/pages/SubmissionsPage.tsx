@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorMessage, approvalErrorMessage } from '../lib/api';
@@ -38,6 +38,7 @@ import type {
   ApprovalStepDto,
   ProjectDto,
   ProjectRepeatableConfig,
+  ProjectRepeatableWorkItemsConfig,
   ProjectRepeatableEntry,
   ProjectNameRef,
   RepeatableSubField,
@@ -728,10 +729,30 @@ export function parseRepeatableConfig(json: string | null): ProjectRepeatableCon
       minProjects: Number.isFinite(p.minProjects) ? Number(p.minProjects) : 1,
       maxProjects: Number.isFinite(p.maxProjects) ? Number(p.maxProjects) : 10,
       fields: Array.isArray(p.fields) ? p.fields.map(normalizeSubField) : [],
+      schemaVersion: Number.isFinite(p.schemaVersion) ? Number(p.schemaVersion) : undefined,
+      workItems: normalizeWorkItems(p.workItems),
     };
   } catch {
     return fallback;
   }
+}
+
+// مجموعة بنود العمل اختياريّة: غيابها — أو غياب حقولها — يعني قالب v1 يسلك سلوكه الحرفيّ.
+// المجموعة بلا حقول لا معنى لها ولا تُعرَض، وإلّا ظهرت بطاقة «بند عمل» خاوية لا يملأها المستخدم.
+function normalizeWorkItems(
+  w: ProjectRepeatableWorkItemsConfig | undefined,
+): ProjectRepeatableWorkItemsConfig | undefined {
+  if (!w || !Array.isArray(w.fields) || w.fields.length === 0) return undefined;
+  return {
+    key: w.key || 'workItems',
+    label: w.label || 'بنود العمل',
+    itemLabel: w.itemLabel || 'بند عمل',
+    addLabel: w.addLabel || '+ إضافة بند عمل',
+    minItems: Number.isFinite(w.minItems) ? Number(w.minItems) : 0,
+    maxItems: Number.isFinite(w.maxItems) ? Number(w.maxItems) : 0,
+    uniqueBy: Array.isArray(w.uniqueBy) ? w.uniqueBy : [],
+    fields: w.fields.map(normalizeSubField),
+  };
 }
 
 // تطبيع القيود الرقميّة الاختيارية لحقل فرعيّ (PROJECT-REPEATABLE-NUMERIC-VALIDATION-R1).
@@ -750,10 +771,21 @@ export function parseRepeatableEntries(json: string | null | undefined): Project
   try {
     const v = JSON.parse(json);
     if (!Array.isArray(v)) return [];
-    return (v as ProjectRepeatableEntry[]).map((e) => ({
-      projectId: e?.projectId ?? null,
-      answers: e?.answers && typeof e.answers === 'object' ? e.answers : {},
-    }));
+    return (v as ProjectRepeatableEntry[]).map((e) => {
+      const entry: ProjectRepeatableEntry = {
+        projectId: e?.projectId ?? null,
+        answers: e?.answers && typeof e.answers === 'object' ? e.answers : {},
+      };
+      // بنود العمل تُنقَل كما هي حين توجد فقط. إسقاطها هنا كان يعني فقدانها صامتًا عند إعادة فتح
+      // المسودّة ثمّ محوَها من المخزَّن عند الحفظ التالي؛ وإضافة مفتاح فارغ لبيانات v1 كان يعني
+      // كتابة مفتاح جديد في تقارير لم تعرفه — وكلاهما ممنوع.
+      if (Array.isArray(e?.workItems)) {
+        entry.workItems = e.workItems.map((it) => ({
+          answers: it?.answers && typeof it.answers === 'object' ? it.answers : {},
+        }));
+      }
+      return entry;
+    });
   } catch {
     return [];
   }
@@ -1519,6 +1551,92 @@ export function TaxonomySelect({
   );
 }
 
+// ===== شبكة حقول فرعيّة قابلة لإعادة الاستعمال =====
+// مستخرَجة من محرّر المشروع كي يستعملها **مستوى المشروع ومستوى بند العمل بنفس القواعد حرفيًّا**
+// (PROJECT360-MULTI-WORK-ITEMS-R2): قواعد مختلفة بين المستويين تعني نموذجين للحقيقة وسلوكًا لا يُختبَر.
+export function RepeatableAnswersGrid({
+  fields, answers, onSet, guidance = true,
+}: {
+  fields: RepeatableSubField[];
+  answers: Record<string, string>;
+  onSet: (key: string, value: string) => void;
+  guidance?: boolean;
+}) {
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      {fields.map((sf) => {
+        const val = answers[sf.key] ?? '';
+        const label = `${sf.label}${sf.required ? ' *' : ''}`;
+        // حقل الخطر التفصيلي يظهر فقط عند «نعم»؛ التبديل إلى «لا» لا يمسح القيمة (تبقى محفوظة في answers).
+        if (sf.key === 'risk_note' && (answers['risk_exists'] ?? '') !== 'نعم') return null;
+        // تحليل المحتوى: بطاقات تحليل بدل جدول Grid التقليدي (تخزين مطابق: مصفوفة صفوف JSON في answers[key]).
+        if (sf.key === 'content_highlights') {
+          return (
+            <div key={sf.key} className="md:col-span-2">
+              <p className="mb-1 text-sm font-medium text-ink">{label}</p>
+              <ContentAnalysisCardsEditor
+                rows={parseGrid(val)}
+                onChange={(rows) => onSet(sf.key, JSON.stringify(rows))}
+              />
+            </div>
+          );
+        }
+        // جدول صفوف داخل المشروع: يمتدّ على عرض كامل، صفوفه محفوظة كنصّ JSON في answers[key].
+        if (sf.type === 'Grid') {
+          return (
+            <div key={sf.key} className="md:col-span-2">
+              <p className="mb-1 text-sm font-medium text-ink">{label}</p>
+              <GridEditor
+                columns={sf.columns ?? []}
+                rows={parseGrid(val)}
+                onChange={(rows) => onSet(sf.key, JSON.stringify(rows))}
+              />
+            </div>
+          );
+        }
+        const k = subFieldInputKind(sf.type);
+        const numError = k === 'number' ? validateRepeatableNumber(sf, val) : null;
+        return (
+          <Field key={sf.key} label={label} help={guidance ? MOD_FIELD_GUIDANCE[sf.key] : undefined}>
+            {k === 'bool' ? (
+              <Select value={val} onChange={(e) => onSet(sf.key, e.target.value)}>
+                <option value="">—</option>
+                <option value="true">نعم</option>
+                <option value="false">لا</option>
+              </Select>
+            ) : k === 'select' ? (
+              <TaxonomySelect sf={sf} value={val} onChange={(v) => onSet(sf.key, v)} />
+            ) : k === 'longtext' ? (
+              <textarea
+                className="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-navy focus:outline-none"
+                rows={2}
+                value={val}
+                onChange={(e) => onSet(sf.key, e.target.value)}
+              />
+            ) : k === 'number' ? (
+              <>
+                <Input
+                  type="number"
+                  value={val}
+                  min={sf.min}
+                  max={sf.max}
+                  step={sf.integerOnly ? (sf.step ?? 1) : sf.step}
+                  onChange={(e) => onSet(sf.key, e.target.value)}
+                />
+                {numError && <p className="mt-1 text-xs text-red-600">{numError}</p>}
+              </>
+            ) : k === 'date' ? (
+              <Input type="date" value={val ? val.slice(0, 10) : ''} onChange={(e) => onSet(sf.key, e.target.value)} />
+            ) : (
+              <Input value={val} onChange={(e) => onSet(sf.key, e.target.value)} />
+            )}
+          </Field>
+        );
+      })}
+    </div>
+  );
+}
+
 // ===== قسم المشاريع المتكرر: محرّر التعبئة =====
 // «نشط» في هذا السياق = مشروع غير مغلق وغير مكتمل (مرتبط بعمل جارٍ). النطاق مفروض خادميًّا أصلًا.
 export function ProjectRepeatableEditor({
@@ -1532,13 +1650,66 @@ export function ProjectRepeatableEditor({
 }) {
   const selectable = projects;
   const atMax = config.maxProjects > 0 && entries.length >= config.maxProjects;
+  const wi = config.workItems ?? null;
 
-  const addEntry = () => onChange([...entries, { projectId: null, answers: {} }]);
-  const removeEntry = (i: number) => onChange(entries.filter((_, idx) => idx !== i));
-  const setProject = (i: number, projectId: string | null) =>
+  // رسالة واحدة فقط لحالة تكرار المشروع (§12.1): لا Toast، ولا رسالة لكلّ محاولة.
+  // Toast متكرّر يخفي السبب ويوحي بعطل؛ المطلوب توجيه المستخدم إلى البطاقة القائمة.
+  const [duplicateAt, setDuplicateAt] = useState<number | null>(null);
+  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  const newEntry = (): ProjectRepeatableEntry =>
+    wi ? { projectId: null, answers: {}, workItems: [{ answers: {} }] } : { projectId: null, answers: {} };
+
+  const addEntry = () => { setDuplicateAt(null); onChange([...entries, newEntry()]); };
+
+  const removeEntry = (i: number) => {
+    // تحذير قبل حذف مشروع يحمل بنود عمل (§12.7): الحذف الصامت يفقد عملًا مسجَّلًا.
+    const count = entries[i]?.workItems?.length ?? 0;
+    if (count > 0 && !window.confirm(`سيُحذف هذا المشروع مع ${count} ${wi?.itemLabel ?? 'بند'} بداخله. هل تريد المتابعة؟`)) return;
+    setDuplicateAt(null);
+    onChange(entries.filter((_, idx) => idx !== i));
+  };
+
+  const focusCard = (idx: number) => {
+    const el = cardRefs.current[idx];
+    // التمرير رفاهيّة لا شرط: بيئات بلا scrollIntoView يجب أن تنقل التركيز لا أن ترمي استثناءً
+    // يُسقِط الشجرة ويُظهر للمستخدم شاشة عطل بدل رسالة «المشروع مضاف بالفعل».
+    el?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+    el?.focus();
+  };
+
+  const setProject = (i: number, projectId: string | null) => {
+    // منع تكرار بطاقة المشروع في الواجهة — نفس قاعدة الخادم حرفيًّا، لا قاعدة ثانية.
+    // الحارس الحقيقيّ خادميّ؛ هذا يمنع فقط رحلة ذهاب وإياب تنتهي برفض بعد إدخال طويل.
+    if (projectId) {
+      const existing = entries.findIndex((e, idx) => idx !== i && e.projectId === projectId);
+      if (existing >= 0) {
+        setDuplicateAt(existing);
+        focusCard(existing);
+        return;
+      }
+    }
+    setDuplicateAt(null);
     onChange(entries.map((e, idx) => (idx === i ? { ...e, projectId } : e)));
+  };
+
   const setAnswer = (i: number, key: string, value: string) =>
     onChange(entries.map((e, idx) => (idx === i ? { ...e, answers: { ...e.answers, [key]: value } } : e)));
+
+  const itemsOf = (e: ProjectRepeatableEntry) => e.workItems ?? [];
+
+  const addItem = (i: number) =>
+    onChange(entries.map((e, idx) => (idx === i ? { ...e, workItems: [...itemsOf(e), { answers: {} }] } : e)));
+
+  // حذف بند عمل لا يمسّ المشروع إطلاقًا (§12.8).
+  const removeItem = (i: number, j: number) =>
+    onChange(entries.map((e, idx) => (idx === i ? { ...e, workItems: itemsOf(e).filter((_, x) => x !== j) } : e)));
+
+  const setItemAnswer = (i: number, j: number, key: string, value: string) =>
+    onChange(entries.map((e, idx) => (idx !== i ? e : {
+      ...e,
+      workItems: itemsOf(e).map((it, x) => (x === j ? { ...it, answers: { ...it.answers, [key]: value } } : it)),
+    })));
 
   // قائمة الخيارات: المشاريع القابلة للاختيار + المشروع المختار حاليًا إن لم يكن ضمنها (كي لا تنكسر القيم القديمة).
   const optionsFor = (selected: string | null): ProjectDto[] => {
@@ -1556,8 +1727,16 @@ export function ProjectRepeatableEditor({
       </p>
       {entries.length === 0 && <p className="text-xs text-ink-3">لا توجد مشاريع مضافة بعد.</p>}
 
-      {entries.map((entry, i) => (
-        <div key={i} className="rounded-lg border border-line bg-white p-3">
+      {entries.map((entry, i) => {
+        const items = itemsOf(entry);
+        const itemsAtMax = !!wi && wi.maxItems > 0 && items.length >= wi.maxItems;
+        return (
+        <div
+          key={i}
+          ref={(el) => { cardRefs.current[i] = el; }}
+          tabIndex={-1}
+          className={`rounded-lg border bg-white p-3 outline-none ${duplicateAt === i ? 'border-gold ring-2 ring-gold/40' : 'border-line'}`}
+        >
           <div className="mb-2 flex items-end justify-between gap-2">
             <div className="w-72">
               <Field label={`المشروع${config.projectRequired ? ' *' : ''}`}>
@@ -1573,79 +1752,54 @@ export function ProjectRepeatableEditor({
             </div>
             <Button variant="danger" onClick={() => removeEntry(i)}>حذف المشروع</Button>
           </div>
-          <div className="grid gap-3 md:grid-cols-2">
-            {config.fields.map((sf) => {
-              const val = entry.answers[sf.key] ?? '';
-              const label = `${sf.label}${sf.required ? ' *' : ''}`;
-              // حقل الخطر التفصيلي يظهر فقط عند «نعم»؛ التبديل إلى «لا» لا يمسح القيمة (تبقى محفوظة في answers).
-              if (sf.key === 'risk_note' && (entry.answers['risk_exists'] ?? '') !== 'نعم') return null;
-              // تحليل المحتوى: بطاقات تحليل بدل جدول Grid التقليدي (تخزين مطابق: مصفوفة صفوف JSON في answers[key]).
-              if (sf.key === 'content_highlights') {
-                return (
-                  <div key={sf.key} className="md:col-span-2">
-                    <p className="mb-1 text-sm font-medium text-ink">{label}</p>
-                    <ContentAnalysisCardsEditor
-                      rows={parseGrid(val)}
-                      onChange={(rows) => setAnswer(i, sf.key, JSON.stringify(rows))}
-                    />
+
+          {duplicateAt === i && (
+            <p role="alert" className="mb-2 rounded-lg border border-gold/60 bg-gold/10 px-3 py-2 text-sm text-ink">
+              هذا المشروع مضاف بالفعل داخل التقرير. أضف نوع العمل الجديد داخل بطاقة المشروع الحالية.
+            </p>
+          )}
+
+          <RepeatableAnswersGrid
+            fields={config.fields}
+            answers={entry.answers}
+            onSet={(key, value) => setAnswer(i, key, value)}
+          />
+
+          {wi && (
+            <div className="mt-3 rounded-lg border border-dashed border-navy/25 bg-offwhite/60 p-3">
+              <p className="mb-2 text-sm font-semibold text-ink">{wi.label}</p>
+              {items.length === 0 && (
+                <p className="mb-2 text-xs text-ink-3">لا توجد بنود عمل مضافة لهذا المشروع بعد.</p>
+              )}
+              {items.map((item, j) => (
+                <div key={j} className="mb-2 rounded-lg border border-line bg-white p-3">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <span className="text-xs font-medium text-ink-2">{wi.itemLabel} {j + 1}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeItem(i, j)}
+                      className="text-xs text-alert hover:underline"
+                    >
+                      حذف {wi.itemLabel}
+                    </button>
                   </div>
-                );
-              }
-              // جدول صفوف داخل المشروع: يمتدّ على عرض كامل، صفوفه محفوظة كنصّ JSON في answers[key].
-              if (sf.type === 'Grid') {
-                return (
-                  <div key={sf.key} className="md:col-span-2">
-                    <p className="mb-1 text-sm font-medium text-ink">{label}</p>
-                    <GridEditor
-                      columns={sf.columns ?? []}
-                      rows={parseGrid(val)}
-                      onChange={(rows) => setAnswer(i, sf.key, JSON.stringify(rows))}
-                    />
-                  </div>
-                );
-              }
-              const k = subFieldInputKind(sf.type);
-              const numError = k === 'number' ? validateRepeatableNumber(sf, val) : null;
-              return (
-                <Field key={sf.key} label={label} help={MOD_FIELD_GUIDANCE[sf.key]}>
-                  {k === 'bool' ? (
-                    <Select value={val} onChange={(e) => setAnswer(i, sf.key, e.target.value)}>
-                      <option value="">—</option>
-                      <option value="true">نعم</option>
-                      <option value="false">لا</option>
-                    </Select>
-                  ) : k === 'select' ? (
-                    <TaxonomySelect sf={sf} value={val} onChange={(v) => setAnswer(i, sf.key, v)} />
-                  ) : k === 'longtext' ? (
-                    <textarea
-                      className="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-navy focus:outline-none"
-                      rows={2}
-                      value={val}
-                      onChange={(e) => setAnswer(i, sf.key, e.target.value)}
-                    />
-                  ) : k === 'number' ? (
-                    <>
-                      <Input
-                        type="number"
-                        value={val}
-                        min={sf.min}
-                        max={sf.max}
-                        step={sf.integerOnly ? (sf.step ?? 1) : sf.step}
-                        onChange={(e) => setAnswer(i, sf.key, e.target.value)}
-                      />
-                      {numError && <p className="mt-1 text-xs text-red-600">{numError}</p>}
-                    </>
-                  ) : k === 'date' ? (
-                    <Input type="date" value={val ? val.slice(0, 10) : ''} onChange={(e) => setAnswer(i, sf.key, e.target.value)} />
-                  ) : (
-                    <Input value={val} onChange={(e) => setAnswer(i, sf.key, e.target.value)} />
-                  )}
-                </Field>
-              );
-            })}
-          </div>
+                  <RepeatableAnswersGrid
+                    fields={wi.fields}
+                    answers={item.answers}
+                    onSet={(key, value) => setItemAnswer(i, j, key, value)}
+                    guidance={false}
+                  />
+                </div>
+              ))}
+              <Button variant="ghost" onClick={() => addItem(i)} disabled={itemsAtMax}
+                title={itemsAtMax ? `الحد الأقصى ${wi.maxItems} ${wi.itemLabel}` : undefined}>
+                {wi.addLabel}
+              </Button>
+            </div>
+          )}
         </div>
-      ))}
+        );
+      })}
 
       <Button variant="ghost" onClick={addEntry} disabled={atMax}
         title={atMax ? `الحد الأقصى ${config.maxProjects} مشروعًا` : undefined}>
@@ -1699,7 +1853,9 @@ export function ProjectRepeatableDisplay({
 }) {
   // AMR-OUTPUT-REDESIGN-R1: إن طابق القالب ميفولة عرض (Presentation Profile) نصيّره بالمصيّر
   // المدفوع بالميتاداتا (مخرَج قراريّ). القوالب بلا Profile تبقى على المصيّر العامّ القائم (fallback).
-  const profile = resolvePresentationProfile(config.fields, templateTitle);
+  // ميفولة العرض لا تعرف بنود العمل، فتفعيلها على قالب أعلنها كان سيُسقطها من العرض صامتةً.
+  // لذلك تُتخطّى الميفولة حين يُعلن القالب مجموعة بنود عمل، ويسقط العرض إلى المصيّر العامّ الذي يعرضها.
+  const profile = config.workItems ? null : resolvePresentationProfile(config.fields, templateTitle);
   if (profile) {
     return <PresentationProfileReport profile={profile} config={config} entries={entries} projects={projects} />;
   }
@@ -1718,7 +1874,7 @@ export function ProjectRepeatableDisplay({
     return raw;
   };
 
-  const renderFields = (fields: RepeatableSubField[], entry: ProjectRepeatableEntry) => {
+  const renderFields = (fields: RepeatableSubField[], answers: Record<string, string>) => {
     const nonGrid = fields.filter((sf) => sf.type !== 'Grid');
     const grids = fields.filter((sf) => sf.type === 'Grid');
     return (
@@ -1728,7 +1884,7 @@ export function ProjectRepeatableDisplay({
             {nonGrid.map((sf) => (
               <div key={sf.key} className="flex justify-between gap-3 border-b border-line/60 pb-1">
                 <dt className="text-ink-2">{sf.label}</dt>
-                <dd className="font-medium text-ink whitespace-pre-wrap">{showAnswer(sf, entry.answers[sf.key])}</dd>
+                <dd className="font-medium text-ink whitespace-pre-wrap">{showAnswer(sf, answers[sf.key])}</dd>
               </div>
             ))}
           </dl>
@@ -1737,13 +1893,34 @@ export function ProjectRepeatableDisplay({
           <div key={sf.key} className="mt-3">
             <p className="mb-1 text-sm font-medium text-ink-2">{sf.label}</p>
             {sf.key === 'content_highlights' ? (
-              <ContentAnalysisCardsDisplay rows={parseGrid(entry.answers[sf.key])} />
+              <ContentAnalysisCardsDisplay rows={parseGrid(answers[sf.key])} />
             ) : (
-              <GridDisplay columns={sf.columns ?? []} rows={parseGrid(entry.answers[sf.key])} />
+              <GridDisplay columns={sf.columns ?? []} rows={parseGrid(answers[sf.key])} />
             )}
           </div>
         ))}
       </>
+    );
+  };
+
+  // بنود العمل المنفَّذة داخل بطاقة المشروع (PROJECT360-MULTI-WORK-ITEMS-R2).
+  // لا يُصيَّر شيء إن لم يُعلن القالب المجموعة أو إن خلا العنصر منها ⇒ كل تقارير v1 تُعرض كما كانت حرفيًّا.
+  const renderWorkItems = (entry: ProjectRepeatableEntry) => {
+    const wi = config.workItems;
+    const items = entry.workItems ?? [];
+    if (!wi || items.length === 0) return null;
+    return (
+      <div className="mt-3 rounded-lg border border-dashed border-navy/25 bg-offwhite/60 p-3">
+        <p className="mb-2 text-sm font-semibold text-ink">{wi.label}</p>
+        <div className="space-y-2">
+          {items.map((item, j) => (
+            <div key={j} className="rounded-lg border border-line bg-white p-3">
+              <p className="mb-1.5 text-xs font-medium text-ink-2">{wi.itemLabel} {j + 1}</p>
+              {renderFields(wi.fields, item.answers)}
+            </div>
+          ))}
+        </div>
+      </div>
     );
   };
 
@@ -1775,15 +1952,16 @@ export function ProjectRepeatableDisplay({
                 {entryGroups.map((g) => (
                   <section key={g.title}>
                     <h5 className="mb-1.5 text-sm font-semibold text-navy/80">{g.title}</h5>
-                    {renderFields(g.fields, entry)}
+                    {renderFields(g.fields, entry.answers)}
                   </section>
                 ))}
                 {extra.length > 0 && (
                   <section>
                     <h5 className="mb-1.5 text-sm font-semibold text-ink-2">حقول إضافية</h5>
-                    {renderFields(extra, entry)}
+                    {renderFields(extra, entry.answers)}
                   </section>
                 )}
+                {renderWorkItems(entry)}
               </div>
             </div>
           );
@@ -1798,7 +1976,8 @@ export function ProjectRepeatableDisplay({
       {entries.map((entry, i) => (
         <div key={i} className="rounded-lg border border-line bg-white p-3">
           <p className="mb-2 font-semibold text-navy">{projectName(entry.projectId)}</p>
-          {renderFields(config.fields, entry)}
+          {renderFields(config.fields, entry.answers)}
+          {renderWorkItems(entry)}
         </div>
       ))}
     </div>

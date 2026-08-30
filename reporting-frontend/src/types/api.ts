@@ -1231,11 +1231,35 @@ export interface ProjectRepeatableConfig {
   minProjects: number;
   maxProjects: number;
   fields: RepeatableSubField[];
+  // امتداد المخطّط v2 (PROJECT360-MULTI-WORK-ITEMS-R2) — اختياريّ بالكامل:
+  // غيابه ⇒ القالب يسلك سلوك v1 حرفيًّا (بطاقة مشروع مسطّحة بلا بنود عمل).
+  schemaVersion?: number;
+  workItems?: ProjectRepeatableWorkItemsConfig;
+}
+
+// مجموعة بنود العمل المتداخلة داخل بطاقة المشروع — كلّ تعريفها مقاد بالقالب (Template-Driven):
+// لا ترميز صلب لأيّ قالب بعينه، والحقول قد تكون «نوع المحتوى» أو «نوع التصميم» أو «نشاط السيو»… إلخ.
+export interface ProjectRepeatableWorkItemsConfig {
+  key: string;
+  label: string;
+  itemLabel: string;
+  addLabel: string;
+  minItems: number;
+  maxItems: number;
+  // مفاتيح الحقول التي يُمنع تكرار توليفتها داخل المشروع الواحد. فارغة/غائبة ⇒ لا قيد تفرّد.
+  uniqueBy?: string[];
+  fields: RepeatableSubField[];
 }
 
 // عنصر مشروع واحد في قيمة القسم — يُخزَّن ضمن مصفوفة في valueJson.
 export interface ProjectRepeatableEntry {
   projectId: string | null;
+  answers: Record<string, string>;
+  // v2: بنود العمل المنفَّذة داخل هذا المشروع. غيابها ⇒ بيانات v1 تبقى كما هي بلا أيّ تحويل.
+  workItems?: ProjectRepeatableWorkItem[];
+}
+
+export interface ProjectRepeatableWorkItem {
   answers: Record<string, string>;
 }
 
@@ -2348,7 +2372,15 @@ export interface ProjectReportSliceField {
   label: string;
   configJson: string | null;
   order: number;
-  entries: Record<string, string | null>[];
+  entries: ProjectReportSliceEntry[];
+}
+
+// عنصر مشروع واحد داخل الشريحة: إجابات مستوى المشروع + بنود العمل المنفَّذة داخله.
+// العناصر القديمة (v1) تصل بـ workItems فارغة، أو ببندٍ ضمنيّ واحد إن أعلن القالب مجموعة بنود عمل —
+// وهو محوِّل قراءة خادميّ لا يكتب شيئًا على البيانات المخزَّنة.
+export interface ProjectReportSliceEntry {
+  answers: Record<string, string | null>;
+  workItems: Record<string, string | null>[];
 }
 
 export interface ProjectReportSliceDto {
