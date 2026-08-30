@@ -1,0 +1,95 @@
+{
+ "network": [
+  {
+   "method": "GET",
+   "status": 200,
+   "url": "/api/auth/me"
+  },
+  {
+   "method": "GET",
+   "status": 200,
+   "url": "/api/notifications/unread-count"
+  },
+  {
+   "method": "GET",
+   "status": 200,
+   "url": "/api/notifications"
+  },
+  {
+   "method": "GET",
+   "status": 200,
+   "url": "/api/projects/2c1e6a2f-a9d9-40d1-b81e-7bed55a08157/reports/39dfdaeb-af60-46e3-8631-923fe91c7945"
+  },
+  {
+   "method": "GET",
+   "status": 200,
+   "url": "/api/auth/me"
+  },
+  {
+   "method": "GET",
+   "status": 200,
+   "url": "/api/notifications"
+  },
+  {
+   "method": "GET",
+   "status": 200,
+   "url": "/api/notifications/unread-count"
+  },
+  {
+   "method": "GET",
+   "status": 200,
+   "url": "/api/projects/2c1e6a2f-a9d9-40d1-b81e-7bed55a08157/overview"
+  },
+  {
+   "method": "GET",
+   "status": 200,
+   "url": "/api/auth/me"
+  },
+  {
+   "method": "GET",
+   "status": 200,
+   "url": "/api/notifications/unread-count"
+  },
+  {
+   "method": "GET",
+   "status": 200,
+   "url": "/api/notifications"
+  },
+  {
+   "method": "GET",
+   "status": 200,
+   "url": "/api/projects/2c1e6a2f-a9d9-40d1-b81e-7bed55a08157/reports"
+  },
+  {
+   "method": "GET",
+   "status": 200,
+   "url": "/api/projects/2c1e6a2f-a9d9-40d1-b81e-7bed55a08157/summary"
+  },
+  {
+   "method": "GET",
+   "status": 200,
+   "url": "/api/projects/2c1e6a2f-a9d9-40d1-b81e-7bed55a08157"
+  },
+  {
+   "method": "GET",
+   "status": 200,
+   "url": "/api/projects/2c1e6a2f-a9d9-40d1-b81e-7bed55a08157/workstreams?includeInactive=false"
+  }
+ ],
+ "consoleErrors": [],
+ "server5xx": [],
+ "writes": [],
+ "hist_url": "https://reports.emarketingacademy.net/app/projects/2c1e6a2f-a9d9-40d1-b81e-7bed55a08157/reports/39dfdaeb-af60-46e3-8631-923fe91c7945",
+ "hist_api": [
+  "GET 200 /api/projects/2c1e6a2f-a9d9-40d1-b81e-7bed55a08157/reports/39dfdaeb-af60-46e3-8631-923fe91c7945"
+ ],
+ "hist_renders": true,
+ "p360_url": "https://reports.emarketingacademy.net/app/projects/2c1e6a2f-a9d9-40d1-b81e-7bed55a08157/360",
+ "p360_renders": true,
+ "workspace_report_links": 28,
+ "workspace_renders": true,
+ "network_total": 15,
+ "statuses": [
+  200
+ ]
+}

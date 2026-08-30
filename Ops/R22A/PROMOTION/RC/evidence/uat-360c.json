@@ -1,0 +1,182 @@
+{
+ "discovery_list_calls": [
+  "GET 200 /api/reports/due/my-status",
+  "GET 200 /api/reports/media-buyer-rollup?periodType=Weekly&periodKey=2026-W36",
+  "GET 200 /api/reports/b2c-rollup?periodType=Weekly&periodKey=2026-W36",
+  "GET 200 /api/reports/seo-rollup?periodType=Weekly&periodKey=2026-W36",
+  "GET 200 /api/reports/content-writer-rollup?periodType=Weekly&periodKey=2026-W36",
+  "GET 200 /api/reports/moderation-rollup?periodType=Weekly&periodKey=2026-W36",
+  "GET 200 /api/reports/designer-rollup?periodType=Weekly&periodKey=2026-W36",
+  "GET 200 /api/reports/video-rollup?periodType=Weekly&periodKey=2026-W36",
+  "GET 200 /api/projects/64210828-15c9-4d98-9f3d-1e42f10e679d/reports"
+ ],
+ "discovery_mentions_template": false,
+ "discovery_snippet": "☰\nنظام تقارير الأداء والتشغيل\n🔔\nR\nR22A RC UAT موظّف\nموظف\nالرئيسية\nالموظفون\nالتقارير\nالأداء وKPI\nالحوكمة\nالعملاء والمشروعات\n›\nالمشروعات\n›\nالتفاصيل\nالمشاريع / عميل UAT-RC / R22A-UAT-MAIN\nR22A-UAT-MAIN\nنشِط\nمساحة عمل المشروع (360)\nالعميل\nعميل UAT-RC\nنوع الخدمة\nسوشيال ميديا\nالفريق المسؤول\nفريق B2C\nمدير العميل\n—\nتاريخ البداية\n—\nتاريخ النهاية\n—\nتاريخ الإضافة\n٣٠ أغسطس ٢٠٢٦\nملاحظات: R22A RC UAT\n\nإجمالي التقارير\n\n1\n\nمُغلقة\n\n0\n\nقيد المعالجة\n\n1\n\nمخاطر مفتوحة\n\n0\n\nملاحظات مفتوحة\n\n0\n\nآخر تقرير مرتبط: ٣٠ أغسطس ٢٠٢٦\n\nأهداف العمل داخل المشروع\n\nحدد الفرق المشاركة، وما هو المطلوب من كل هدف عمل داخل المشروع.\n\nإظهار المعطّلة\n\nلا توجد أهداف عمل لهذا المشروع بعد.\n\nتقارير المشروع المرتبطة\nمُقدِّم التقرير\tالدورية\tالفترة\tالحالة\tتاريخ الإرسال\t\nR22A RC UAT موظّف\tأسبوعي\t2026-W36\tمُرسَل\t٣٠ أغسطس ٢٠٢٦\tفتح",
+ "report_links": 1,
+ "opened_url": "https://rc-report.emarketingacademy.net/app/projects/64210828-15c9-4d98-9f3d-1e42f10e679d/reports/a7d51298-5461-4ac1-bc41-5d7c45dd7181",
+ "in_project_scope": true,
+ "shows_item1": true,
+ "shows_item2": true,
+ "shows_both_labels": true,
+ "opened_snippet": "ف في مشروع R22A-UAT-MAIN / 2026-W36\nمُقدِّم التقرير\nR22A RC UAT موظّف\nالعميل\nعميل UAT-RC\nالقالب\nتقرير كاتب المحتوى الأسبوعي\nالدورية\nأسبوعي\nالفترة\n2026-W36\nتاريخ الإرسال\n٣٠ أغسطس ٢٠٢٦\nالحالة\nمُرسَل\nتفاصيل المشروع\n\nR22A-UAT-MAIN — عميل UAT-RC\n\nبنود العمل\n\nبند عمل 1\n\nنوع المحتوى\nCarousel\nهدف المحتوى\nAwareness\nحالة العمل\nApproved\nالعدد\n5\nملاحظات\nR22A UAT — البند الأول\n\nبند عمل 2\n\nنوع المحتوى\nBlog\nهدف المحتوى\nSales\nحالة العمل\nDraft\nالعدد\n9\nملاحظات\nR22A UAT — البند الثاني",
+ "other_project_report_links": 0,
+ "consoleErrors": [],
+ "server5xx": [],
+ "network": [
+  {
+   "status": 200,
+   "method": "POST",
+   "url": "/api/auth/login"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/notifications"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/notifications/unread-count"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/dashboard/me"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/reports/due/my-status"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/reports/media-buyer-rollup?periodType=Weekly&periodKey=2026-W36"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/reports/b2c-rollup?periodType=Weekly&periodKey=2026-W36"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/reports/seo-rollup?periodType=Weekly&periodKey=2026-W36"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/reports/content-writer-rollup?periodType=Weekly&periodKey=2026-W36"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/submissions/mine"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/reports/moderation-rollup?periodType=Weekly&periodKey=2026-W36"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/reports/designer-rollup?periodType=Weekly&periodKey=2026-W36"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/improvement-plans"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/reports/video-rollup?periodType=Weekly&periodKey=2026-W36"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/training-needs"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/reporting-calendar/my-cycles?context=Report&past=8&future=1"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/auth/me"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/notifications/unread-count"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/projects/64210828-15c9-4d98-9f3d-1e42f10e679d"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/notifications"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/projects/64210828-15c9-4d98-9f3d-1e42f10e679d/summary"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/projects/64210828-15c9-4d98-9f3d-1e42f10e679d/reports"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/projects/64210828-15c9-4d98-9f3d-1e42f10e679d/workstreams?includeInactive=false"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/projects/64210828-15c9-4d98-9f3d-1e42f10e679d/reports/a7d51298-5461-4ac1-bc41-5d7c45dd7181"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/auth/me"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/notifications/unread-count"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/notifications"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/projects/f2bd7111-e96e-4cf6-833d-b07de4c53448"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/projects/f2bd7111-e96e-4cf6-833d-b07de4c53448/summary"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/projects/f2bd7111-e96e-4cf6-833d-b07de4c53448/reports"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/projects/f2bd7111-e96e-4cf6-833d-b07de4c53448/workstreams?includeInactive=false"
+  }
+ ]
+}

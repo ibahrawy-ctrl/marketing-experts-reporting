@@ -1,0 +1,364 @@
+{
+ "step1_draft_open": true,
+ "before_save": {
+  "projects": 1,
+  "items": 2
+ },
+ "after_reload": {
+  "projects": 1,
+  "items": 2
+ },
+ "after_reload_values": {
+  "sel": [
+   "64210828-15c9-4d98-9f3d-1e42f10e679d",
+   "Carousel",
+   "Awareness",
+   "Approved",
+   "Blog",
+   "Sales",
+   "Draft"
+  ],
+  "nums": [
+   "5",
+   "3"
+  ],
+  "notes": [
+   "",
+   "",
+   "R22A UAT — البند الأول",
+   "R22A UAT — البند الثاني"
+  ]
+ },
+ "after_edit": {
+  "projects": 1,
+  "items": 2
+ },
+ "after_edit_values": {
+  "sel": [
+   "64210828-15c9-4d98-9f3d-1e42f10e679d",
+   "Carousel",
+   "Awareness",
+   "Approved",
+   "Blog",
+   "Sales",
+   "Draft"
+  ],
+  "nums": [
+   "5",
+   "9"
+  ],
+  "notes": [
+   "",
+   "",
+   "R22A UAT — البند الأول",
+   "R22A UAT — البند الثاني"
+  ]
+ },
+ "step10_item1_stable": true,
+ "step11_body_has_submitted": false,
+ "step11_snippet": " تابع حالته في المسار أدناه.\nمسار الاعتماد\n✓\nالمُرسِل\n●\nخالد مجدي\nنظرة عامة\nملخّص أسبوعي سريع\n\n—\n\nأبرز التحديات هذا الأسبوع\n\n—\n\n📁 تفاصيل المشاريع / العملاء\n\nجسم التقرير — كل مشروع/عميل في بطاقة مستقلّة تحوي كل التفاصيل والجداول.\n\nR22A-UAT-MAIN — عميل UAT-RC\n\nبنود العمل\n\nبند عمل 1\n\nنوع المحتوى\nCarousel\nهدف المحتوى\nAwareness\nحالة العمل\nApproved\nالعدد\n5\nملاحظات\nR22A UAT — البند الأول\n\nبند عمل 2\n\nنوع المحتوى\nBlog\nهدف المحتوى\nSales\nحالة العمل\nDraft\nالعدد\n9\nملاحظات\nR22A UAT — البند الثاني\n✅ تم إرسال التقرير للاعتماد\n×",
+ "consoleErrors": [],
+ "server5xx": [],
+ "network": [
+  {
+   "status": 200,
+   "method": "POST",
+   "url": "/api/auth/login"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/notifications/unread-count"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/notifications"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/dashboard/me"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/reports/due/my-status"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/reports/seo-rollup?periodType=Weekly&periodKey=2026-W36"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/reports/media-buyer-rollup?periodType=Weekly&periodKey=2026-W36"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/reports/content-writer-rollup?periodType=Weekly&periodKey=2026-W36"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/reports/b2c-rollup?periodType=Weekly&periodKey=2026-W36"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/reports/designer-rollup?periodType=Weekly&periodKey=2026-W36"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/reports/moderation-rollup?periodType=Weekly&periodKey=2026-W36"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/reports/video-rollup?periodType=Weekly&periodKey=2026-W36"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/improvement-plans"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/submissions/mine"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/training-needs"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/reporting-calendar/my-cycles?context=Report&past=8&future=1"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/auth/me"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/notifications/unread-count"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/notifications"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/submissions/a7d51298-5461-4ac1-bc41-5d7c45dd7181"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/projects?selectableOnly=true"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/courses"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/services"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/management-notes?entityType=ReportSubmission&entityId=a7d51298-5461-4ac1-bc41-5d7c45dd7181"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/projects?includeClosed=true"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/execution-taxonomy/options?domain=content_goal"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/execution-taxonomy/options?domain=work_status"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/execution-taxonomy/options?domain=content_type"
+  },
+  {
+   "status": 200,
+   "method": "PUT",
+   "url": "/api/submissions/a7d51298-5461-4ac1-bc41-5d7c45dd7181/values"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/submissions/a7d51298-5461-4ac1-bc41-5d7c45dd7181"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/auth/me"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/notifications/unread-count"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/notifications"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/submissions/a7d51298-5461-4ac1-bc41-5d7c45dd7181"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/projects?selectableOnly=true"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/courses"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/services"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/projects?includeClosed=true"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/execution-taxonomy/options?domain=content_goal"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/execution-taxonomy/options?domain=content_type"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/execution-taxonomy/options?domain=work_status"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/management-notes?entityType=ReportSubmission&entityId=a7d51298-5461-4ac1-bc41-5d7c45dd7181"
+  },
+  {
+   "status": 200,
+   "method": "PUT",
+   "url": "/api/submissions/a7d51298-5461-4ac1-bc41-5d7c45dd7181/values"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/submissions/a7d51298-5461-4ac1-bc41-5d7c45dd7181"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/auth/me"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/notifications"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/notifications/unread-count"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/submissions/a7d51298-5461-4ac1-bc41-5d7c45dd7181"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/projects?selectableOnly=true"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/courses"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/services"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/projects?includeClosed=true"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/execution-taxonomy/options?domain=content_type"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/execution-taxonomy/options?domain=content_goal"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/execution-taxonomy/options?domain=work_status"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/management-notes?entityType=ReportSubmission&entityId=a7d51298-5461-4ac1-bc41-5d7c45dd7181"
+  },
+  {
+   "status": 200,
+   "method": "PUT",
+   "url": "/api/submissions/a7d51298-5461-4ac1-bc41-5d7c45dd7181/values"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/submissions/a7d51298-5461-4ac1-bc41-5d7c45dd7181"
+  },
+  {
+   "status": 200,
+   "method": "POST",
+   "url": "/api/submissions/a7d51298-5461-4ac1-bc41-5d7c45dd7181/submit"
+  },
+  {
+   "status": 200,
+   "method": "GET",
+   "url": "/api/submissions/a7d51298-5461-4ac1-bc41-5d7c45dd7181"
+  }
+ ]
+}
