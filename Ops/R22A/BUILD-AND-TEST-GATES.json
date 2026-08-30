@@ -1,0 +1,161 @@
+{
+  "ticket": "R22A — REAL OPERATIONAL MULTI-WORK-ITEM ACTIVATION & FUNCTIONAL ACCEPTANCE",
+  "capturedAtUtc": "2026-08-29T18:30:00Z",
+  "scope": "بوّابات محلّيّة فقط — لم تُلمَس أيّ بيئة حيّة (لا كتابة على TEST ولا RC ولا Production)",
+  "codeUnderTest": {
+    "branch": "develop",
+    "headSha": "16983d2d4f5a3116aeea630af5b7c5fbcf21ce10",
+    "workingTreeModifications": [
+      "reporting-backend/src/Reporting.Infrastructure/Services/ReportTemplateService.cs",
+      "reporting-backend/tests/Reporting.IntegrationTests/TemplateVersionManagementTests.cs"
+    ],
+    "md5": {
+      "ReportTemplateService.cs": "0454f1523a7f2ef9a2ef74612e4522e0",
+      "TemplateVersionManagementTests.cs": "0bcbe17ea9a320293374cedc16f80e3c",
+      "REAL-TEMPLATE-ROOT-CAUSE.md": "7ed9cbe62fa45aeaf76204bf454afac4",
+      "TEMPLATE-VERSION-IMPACT.json": "c9fa10d49954fdae8ea59af5bae144cc"
+    },
+    "uncommitted": true,
+    "commitPending": "الالتزام المحلّيّ مطلوب قبل النشر المُصرَّح به على TEST لإثبات النَسَب عبر SourceLink"
+  },
+  "testDatabase": {
+    "name": "reporting_r22a_1788027241",
+    "kind": "قاعدة PostgreSQL محلّيّة معزولة نظيفة أُنشئت لهذه التذكرة عبر TEST_DB_CONNECTION",
+    "reason": "reporting_test المشتركة ملوَّثة (23 فشلًا و~1س48د) ⇒ لا يُقاس عليها مرشَّح",
+    "cleanupPending": "dropdb reporting_r22a_1788027241 بعد إغلاق البوّابات"
+  },
+
+  "gates": [
+    {
+      "id": "BACKEND_BUILD",
+      "status": "PASS",
+      "command": "dotnet build reporting-backend/Reporting.sln -c Debug",
+      "result": "0 errors",
+      "notes": "14 تحذيرًا سابقة الوجود، غير مرتبطة بالتغيير"
+    },
+    {
+      "id": "BEFORE_FIX_REGRESSION_PROOF",
+      "status": "PASS (فشل متوقَّع ومقصود)",
+      "purpose": "إثبات أنّ الاختبارَين الجديدَين يفشلان فعلًا قبل الإصلاح — أي أنّهما يقيسان العيب لا شيئًا آخر",
+      "method": "أُعيد حارس CreateDraftVersionAsync إلى صيغته الأصليّة مؤقّتًا ثمّ أُعيد الإصلاح من /tmp/r22a/ReportTemplateService.fixed.cs",
+      "result": "2 FAILED",
+      "failures": [
+        "TemplateVersionManagementTests.cs:247 — Expected: OK / Actual: Conflict",
+        "TemplateVersionManagementTests.cs:272 — Expected: OK / Actual: Conflict"
+      ]
+    },
+    {
+      "id": "TEMPLATE_VERSION_MANAGEMENT_TESTS",
+      "status": "PASS",
+      "result": "12 passed / 0 failed",
+      "notes": "بعد الإصلاح — يشمل الاختبارَين الجديدَين CreateDraftVersion_Allowed_WhenStaleDraftsAreBelowPublishedHead و CreateDraftVersion_Blocked_WhenLatestVersionIsAnOpenDraft"
+    },
+    {
+      "id": "TEMPLATE_GOVERNANCE_SUITES",
+      "status": "PASS",
+      "result": "43 passed / 0 failed",
+      "suites": [
+        "TemplateVersionManagementTests",
+        "Phase4TemplateGovernanceTests",
+        "V102TemplateAdminTests",
+        "ReportTemplateTests"
+      ],
+      "purpose": "إثبات أنّ تعديل الحارس لم يكسر أيًّا من قواعد حوكمة القوالب القائمة"
+    },
+    {
+      "id": "UNIT_TESTS",
+      "status": "PASS",
+      "result": "556 passed / 0 failed / 0 skipped",
+      "duration": "42 ms",
+      "assembly": "Reporting.UnitTests.dll (net8.0)"
+    },
+    {
+      "id": "TARGETED_MULTI_WORK_ITEM_TESTS",
+      "status": "PASS",
+      "result": "85 passed / 0 failed / 0 skipped",
+      "duration": "28 s",
+      "assembly": "Reporting.IntegrationTests.dll (net8.0)",
+      "coverage": "بنود العمل المتعدّدة + Project 360 + مرشِّح شريحة تقرير المشروع"
+    },
+    {
+      "id": "FRONTEND_TSC",
+      "status": "PASS",
+      "command": "npx tsc --noEmit",
+      "result": "exit 0 — لا أخطاء أنواع"
+    },
+    {
+      "id": "FRONTEND_TESTS",
+      "status": "PASS",
+      "command": "npx vitest run",
+      "result": "65 test files passed / 767 tests passed / 0 failed",
+      "duration": "22.60s",
+      "notes": "المُبلِّغ الافتراضيّ (--reporter=basic غير مدعوم في vitest 4.1.8 ويسقط بـERR_LOAD_URL)"
+    },
+    {
+      "id": "FRONTEND_BUILD",
+      "status": "PASS",
+      "command": "npm run build",
+      "result": "exit 0 — built in 4.77s",
+      "notes": "تحذيرات rolldown حول تعليقات PURE داخل node_modules/@microsoft/signalr — سابقة الوجود وغير مرتبطة بالتغيير"
+    },
+    {
+      "id": "SECRET_SCAN",
+      "status": "PASS",
+      "scanned": [
+        "Ops/R22A/**",
+        "reporting-backend/src/Reporting.Infrastructure/Services/ReportTemplateService.cs",
+        "reporting-backend/tests/Reporting.IntegrationTests/TemplateVersionManagementTests.cs",
+        "git ls-files (كامل المستودع) بحثًا عن *.pw|*.adminpw|*.basic|*.pem|*.key"
+      ],
+      "patterns": "Admin#*, password=…, BEGIN * PRIVATE KEY, eyJ* (JWT), AKIA* (AWS), ghp_* (GitHub)",
+      "result": "0 مطابقة حقيقيّة",
+      "falsePositivesExcluded": "CancellationToken (كلمة token داخل توقيعات الدوالّ) وأسماء خدمات khubara-reporting-test — ليست أسرارًا",
+      "secretsLocation": "الأسرار التشغيليّة تبقى خارج المستودع في /tmp/r22a/ (غير متتبَّعة) ولا تُطبَع أبدًا"
+    },
+
+    {
+      "id": "ACTUAL_TEMPLATE_API_TEST",
+      "status": "BLOCKED",
+      "blocker": "MISSING_TEST_ADMIN_CREDENTIAL",
+      "detail": "إنشاء مسودة v5 من v4 المنشورة وتحرير ConfigJson ونشرها يجري عبر واجهة المنتج البرمجيّة حصرًا (ممنوع SQL مباشر بقرار المستخدم)، ويتطلّب مصادقة admin@marketingexperts.local على TEST"
+    },
+    {
+      "id": "REAL_BROWSER_UAT",
+      "status": "BLOCKED",
+      "blocker": "MISSING_TEST_ADMIN_CREDENTIAL",
+      "detail": "سيناريو القبول الإلزاميّ (مشروع واحد · بند 1 Carousel كمّيّة 2 · بند 2 Reel كمّيّة 1 · حفظ · Reload · تحرير مستقلّ · إرسال) على قالب «تقرير كاتب المحتوى الأسبوعي» الحقيقيّ"
+    },
+    {
+      "id": "PROJECT360_PROJECT_SLICE_TEST",
+      "status": "BLOCKED",
+      "blocker": "MISSING_TEST_ADMIN_CREDENTIAL",
+      "detail": "الجزء الآليّ منه اجتاز ضمن TARGETED_MULTI_WORK_ITEM_TESTS (85/85)؛ المتبقّي هو الإثبات الحيّ على TEST بعرض البندَين داخل Project 360 وغياب أيّ تسريب بين المشاريع"
+    }
+  ],
+
+  "summary": {
+    "localGatesTotal": 9,
+    "localGatesPassed": 9,
+    "localGatesFailed": 0,
+    "liveGatesBlocked": 3,
+    "AUTOMATED_TESTS_PASS": "YES",
+    "FUNCTIONAL_ACCEPTANCE": "NOT_YET — البوّابات الآليّة ليست قبولًا وظيفيًّا؛ القبول يتقرّر بـREAL_BROWSER_UAT على القالب الحقيقيّ"
+  },
+
+  "knownBaselineDefect": {
+    "id": "BASELINE-UNIFIED-STATUS-CURRENT-CYCLE",
+    "count": 8,
+    "area": "الحالة الموحّدة / استحقاق الدورة الحاليّة (حسّاسة لحدود أسبوع العمل السعوديّ)",
+    "relationToTicket": "غير حاجب ومستقلّ تمامًا عن بنود العمل المتعدّدة — مسجَّل مسبقًا في طابور الذاكرة ولا يُستعمل كإلهاء ولا كذريعة",
+    "includedInGateCounts": false,
+    "note": "لم يُشغَّل ملفّ UnifiedReportStatusTests ضمن البوّابات المستهدَفة أعلاه؛ الأرقام المذكورة تخصّ النطاقات المستهدَفة فقط"
+  },
+
+  "untouched": [
+    "RC (khubara-reporting-rc / reporting_rc)",
+    "Production (reports.emarketingacademy.net)",
+    "origin/main",
+    "بيانات TEST — الوصول حتّى هذه اللحظة قراءة فقط",
+    "مسودات القالب الحقيقيّ v1/v2/v3 — لم تُحذف ولا تُنشَر ولا تُغيَّر حالتها"
+  ]
+}

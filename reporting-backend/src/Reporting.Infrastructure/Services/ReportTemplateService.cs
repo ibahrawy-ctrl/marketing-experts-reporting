@@ -718,10 +718,13 @@ public class ReportTemplateService : IReportTemplateService
             .FirstOrDefaultAsync(t => t.Id == templateId, ct);
         if (template is null) return Result<TemplateVersionDto>.Failure("القالب غير موجود.", "template.not_found");
 
-        if (template.Versions.Any(v => !v.IsPublished))
-            return Result<TemplateVersionDto>.Failure("يوجد إصدار مسودة مفتوح بالفعل.", "version.draft_exists.conflict");
-
+        // المسودة المفتوحة الوحيدة الممكنة هي **أحدث** إصدار حين لا يكون منشورًا: الإصدار الجديد يُبنى دائمًا
+        // فوق الأحدث، والفعّال هو أعلى رقم منشور (انظر GetEffective أعلاه). لذا مسودة رقمها أدنى من المنشور
+        // الحالي بقيّة بذر لا يمكن بلوغها ولا نشرها بأثر، وحجبُها الإصدارَ الجديد كان يُجمِّد القالب إلى الأبد.
+        // الفحص على الأحدث وحده يحفظ القاعدة الأصليّة كاملة: لا تزيد المسودات المفتوحة عن واحدة أبدًا.
         var latest = template.Versions.OrderByDescending(v => v.VersionNumber).First();
+        if (!latest.IsPublished)
+            return Result<TemplateVersionDto>.Failure("يوجد إصدار مسودة مفتوح بالفعل.", "version.draft_exists.conflict");
         var draft = new ReportTemplateVersion
         {
             ReportTemplateId = templateId,

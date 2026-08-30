@@ -1,0 +1,90 @@
+{
+  "ticket": "R22A — REAL OPERATIONAL MULTI-WORK-ITEM ACTIVATION & FUNCTIONAL ACCEPTANCE",
+  "capturedAtUtc": "2026-08-29T21:40:00Z",
+  "supersedes": "النسخة السابقة من هذا الملفّ (2026-08-29T20:20:00Z) التي كانت BLOCKED_ON_AUTHENTICATION",
+
+  "TICKET_STATUS": "COMPLETED_ON_TEST",
+  "V5_CREATED": "YES",
+  "V5_PUBLISHED": "YES",
+  "REAL_OPERATIONAL_TEMPLATE_ACCEPTANCE": "PASS",
+  "FUNCTIONAL_ACCEPTANCE": "PASS",
+  "TEST_READY_FOR_OWNER_REVIEW": "YES",
+  "PRODUCT_OWNER_SIGN_OFF": "PENDING",
+  "officialStatusSetBy": "قياس آليّ موثَّق — 29 أغسطس 2026؛ الاعتماد النهائيّ يبقى لمالك المنتج",
+
+  "businessOutcome": {
+    "requirement": "الموظّف ينفّذ عدّة أنواع عمل لمشروع واحد في الأسبوع الواحد ⇒ المشروع يظهر مرّة واحدة، وبداخله قائمة بنود عمل مستقلّة.",
+    "measuredResult": "بطاقة مشروع واحدة (deleteProjectButtons=1) تضمّ «بنود العمل» ببندَين مستقلَّين (Carousel و Reel Script)، محفوظَين ومستمرَّين بعد إعادة التحميل وقابلَين للتعديل كلٌّ على حدة، ومعروضَين معًا داخل الشريحة المقيَّدة بالمشروع.",
+    "verdict": "المتطلّب مُحقَّق على القالب التشغيليّ الحقيقيّ لا على قالب صناعيّ."
+  },
+
+  "acceptanceCriteria": [
+    { "id": "PROJECT_ENTRY_COUNT", "required": 1, "measured": 1, "status": "PASS", "evidence": "payloads/submission-after-submit.json" },
+    { "id": "WORK_ITEM_COUNT", "required": 2, "measured": 2, "status": "PASS", "evidence": "payloads/submission-after-submit.json" },
+    { "id": "PROJECT_ID_OCCURRENCES_AS_ENTRY", "required": 1, "measured": 1, "status": "PASS", "evidence": "valueJson — مصفوفة من عنصر واحد فيه projectId واحد" },
+    { "id": "ADD_WORK_ITEM_BUTTON_VISIBLE", "required": true, "measured": true, "status": "PASS", "evidence": "زرّ «+ إضافة بند عمل» · screenshots/02" },
+    { "id": "SECOND_ITEM_ADDED_WITHOUT_DUPLICATING_PROJECT", "required": true, "measured": true, "status": "PASS", "evidence": "addProjectButtons=1 و deleteProjectButtons=1 بعد إضافة البند الثاني" },
+    { "id": "BOTH_ITEMS_VISIBLE_TOGETHER", "required": true, "measured": true, "status": "PASS", "evidence": "screenshots/02 و 04 — «بند عمل 1» و«بند عمل 2» في اللقطة نفسها" },
+    { "id": "SAVE_AND_RELOAD_PRESERVES_BOTH", "required": true, "measured": true, "status": "PASS", "evidence": "PUT .../values = 200 ثمّ إعادة تحميل كاملة ⇒ كلّ القيم كما هي · screenshots/04" },
+    { "id": "INDEPENDENT_EDIT_OF_EACH_ITEM", "required": true, "measured": true, "status": "PASS", "evidence": "تعديل البند 2 (2⟶5) والبند 1 لم يتغيّر · screenshots/05 و 06" },
+    { "id": "SUBMIT_WORKS", "required": true, "measured": true, "status": "PASS", "evidence": "POST .../submit = 200 والحالة Closed · screenshots/07" },
+    { "id": "PROJECT360_SHOWS_BOTH_ITEMS", "required": true, "measured": true, "status": "PASS", "evidence": "الشريحة المقيَّدة بالمشروع تعرض «بنود العمل» ببندَيها · screenshots/08 · payloads/project-scoped-slice.json" },
+    { "id": "NO_CROSS_PROJECT_LEAKAGE", "required": true, "measured": true, "status": "PASS", "evidence": "GET /api/projects/{other}/reports/{sub} = 404 project.not_found؛ وقائمة تقارير المشروع الآخر لا تحوي التسليم · screenshots/09" },
+    { "id": "ZERO_UNEXPECTED_CONSOLE_ERRORS", "required": true, "measured": 0, "status": "PASS", "evidence": "network/console-errors.json — [] على المسار السليم؛ الخطآن الوحيدان في الجلسة كانا 404 المقصودَين في اختبار التسريب" },
+    { "id": "ZERO_5XX", "required": true, "measured": 0, "status": "PASS", "evidence": "network/happy-path-network.json — 24 نداءً، 0 من فئة 5xx و0 من فئة 4xx" },
+    { "id": "UNIQUE_SEQUENTIAL_SCREENSHOTS", "required": true, "measured": "10/10 فريدة", "status": "PASS", "evidence": "checksums/screenshots.md5 — 10 ملفّات و10 بصمات مختلفة" }
+  ],
+
+  "criteriaSummary": { "total": 14, "pass": 14, "fail": 0, "notMeasured": 0 },
+
+  "rootCauseConfirmedByOutcome": {
+    "diagnosis": "الحاجب كان بيانات القالب لا الشيفرة: ConfigJson الخاصّ بـv4 بلا schemaVersion وبلا workItems، والميزة مسوّقة بالقالب (SubmissionsPage.tsx:1665).",
+    "proof": "خلفيّة TEST لم تتغيّر بايتًا واحدًا خلال §5/§6 (1.0.0+36a6a5b5…، 37 DLL ببصمة تجميعيّة ceb6ba56ab1b8b7d، MainPID 1685370 قبل وبعد، 46 هجرة قبل وبعد) ومع ذلك ظهرت الميزة فور نشر v5 ⇒ التشخيص صحيح قطعًا.",
+    "BACKEND_REDEPLOY_REQUIRED": "NO",
+    "MIGRATION_APPLIED": "NO"
+  },
+
+  "explicitlyRejectedAsEvidence": {
+    "syntheticUatTemplate": "aed0016c-… — نتيجته السابقة 57/57 لم تُستعمل في هذا الإغلاق بأيّ حال. كلّ دليل أعلاه من القالب التشغيليّ 9e375ad7-8a65-46f4-849f-886d5b795bfe.",
+    "automatedTestsAsAcceptance": "AUTOMATED_TESTS_PASS ≠ FUNCTIONAL_ACCEPTANCE — البوّابات الآليّة 9/9 مذكورة كسياق فقط، والقبول أعلاه مبنيّ على قياس حيّ في المتصفّح وعلى الحمولة المخزَّنة."
+  },
+
+  "baselineDefectNotADistraction": {
+    "id": "BASELINE-UNIFIED-STATUS-CURRENT-CYCLE",
+    "count": 8,
+    "status": "مستقلّ وغير حاجب ومسجَّل مسبقًا",
+    "notUsedAsExcuse": true
+  },
+
+  "testAccountChange": {
+    "authorizedBy": "AUTHORIZATION — TEST ADMIN PASSWORD RESET & CONTINUOUS R22A COMPLETION (29 أغسطس 2026)",
+    "scope": "TEST فقط — reporting_test_uat على 127.0.0.1:5091",
+    "targetUser": "admin@marketingexperts.local",
+    "mechanism": "ASP.NET Identity UserManager — GeneratePasswordResetTokenAsync ثمّ ResetPasswordAsync ثمّ UpdateSecurityStampAsync؛ بلا أيّ Hash يدويّ وبلا SQL مباشر",
+    "changedAccountCount": 1,
+    "onlyTargetChanged": true,
+    "preserved": ["UserId", "Roles=[Admin]", "Claims=0", "IsActive=true", "LockoutEnabled=true", "EmailConfirmed=true", "روابط الإدارة/الفريق/المسمّى/المدير"],
+    "refreshTokensRevoked": 104,
+    "passwordVerifiedWithNewValue": true,
+    "emailSent": false,
+    "passwordDisclosure": "شفويًّا لمالك المنتج في الرسالة النهائيّة فقط — لا في هذا الملفّ ولا في أيّ ملفّ داخل المستودع ولا في أيّ لقطة"
+  },
+
+  "backup": {
+    "path": "/root/db-backups/reporting_test_uat-r22a-pre-uat-20260830T210947Z.dump",
+    "bytes": 809257,
+    "sha256": "ce780311fdc222894fb3fd9af600e1353268366206a5232cc3a0b868b3c2849e",
+    "tableDataEntries": 84
+  },
+
+  "untouched": [
+    "RC — لم تُمسّ؛ khubara-reporting-rc MainPID 1592241 كما هو",
+    "Production — لم تُمسّ؛ reporting-api MainPID 1603719 كما هو",
+    "origin/main — لا Push ولا Tag ولا Merge",
+    "Force Push — لم يُستعمل إطلاقًا",
+    "تقارير تاريخيّة — لم يُعدَّل أيّ تسليم قائم",
+    "مسودات القالب v1/v2/v3 — لم تُحذف ولم تُنشَر ولم تتغيّر حالتها",
+    "v4 المنشور — ConfigJson كما هو حرفيًّا وما زال منشورًا",
+    "خلفيّة TEST وواجهتها — بايتاتها كما هي، ولا هجرة جديدة"
+  ]
+}

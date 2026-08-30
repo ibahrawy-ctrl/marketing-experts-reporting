@@ -1,0 +1,42 @@
+[
+  {
+    "status": 200,
+    "url": "/api/notifications/unread-count"
+  },
+  {
+    "status": 200,
+    "url": "/api/projects?includeClosed=true"
+  },
+  {
+    "status": 200,
+    "url": "/api/auth/me"
+  },
+  {
+    "status": 200,
+    "url": "/api/notifications/unread-count"
+  },
+  {
+    "status": 200,
+    "url": "/api/notifications"
+  },
+  {
+    "status": 200,
+    "url": "/api/projects/9e731196-f87f-4bbf-82cd-260d06d90b56/overview"
+  },
+  {
+    "status": 200,
+    "url": "/api/auth/me"
+  },
+  {
+    "status": 200,
+    "url": "/api/notifications/unread-count"
+  },
+  {
+    "status": 200,
+    "url": "/api/notifications"
+  },
+  {
+    "status": 200,
+    "url": "/api/projects/c7ea6b1d-9bcd-4cda-a103-4de88c77f9cb/overview"
+  }
+]

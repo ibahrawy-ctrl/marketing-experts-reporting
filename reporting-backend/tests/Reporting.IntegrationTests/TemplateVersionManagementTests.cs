@@ -197,4 +197,84 @@ public class TemplateVersionManagementTests
         Assert.NotNull(list);
         Assert.Contains(list!, t => t.Id == templateId);
     }
+
+    // ===== R22A — حارس إنشاء الإصدارات: مسودات بذر راكدة أدنى من المنشور الحاليّ =====
+    // كانت القاعدة «أيّ إصدار غير منشور يحجب» تُجمِّد القالب إلى الأبد حين تُخلِّف البذرة مسودات
+    // أرقامها أدنى من الإصدار المنشور (غير قابلة للبلوغ: الفعّال هو أعلى رقم منشور).
+
+    /// <summary>يزرع في القاعدة إصدارات إضافيّة تحاكي شذوذ البذر: مسودتان راكدتان ثمّ منشور أعلى رقمًا بحقل واحد.</summary>
+    private async Task<Guid> SeedStaleDraftsBelowPublishedHeadAsync(Guid templateId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var maxNumber = await db.ReportTemplateVersions
+            .Where(v => v.ReportTemplateId == templateId).MaxAsync(v => v.VersionNumber);
+
+        db.ReportTemplateVersions.AddRange(
+            new Domain.Entities.Templates.ReportTemplateVersion
+            { ReportTemplateId = templateId, VersionNumber = maxNumber + 1, IsPublished = false },
+            new Domain.Entities.Templates.ReportTemplateVersion
+            { ReportTemplateId = templateId, VersionNumber = maxNumber + 2, IsPublished = false });
+
+        var head = new Domain.Entities.Templates.ReportTemplateVersion
+        {
+            ReportTemplateId = templateId,
+            VersionNumber = maxNumber + 3,
+            IsPublished = true,
+            PublishedAtUtc = DateTime.UtcNow,
+        };
+        head.Fields.Add(new Domain.Entities.Templates.TemplateField
+        {
+            Label = "قيمة الرأس",
+            Key = "head_value",
+            FieldType = FieldType.Number,
+            IsRequired = true,
+            Order = 1,
+        });
+        db.ReportTemplateVersions.Add(head);
+        await db.SaveChangesAsync();
+        return head.Id;
+    }
+
+    [Fact]
+    public async Task CreateDraftVersion_Allowed_WhenStaleDraftsAreBelowPublishedHead()
+    {
+        var admin = await TestAuth.LoginAsAdminAsync(_factory);
+        var (templateId, v1) = await CreatePublishedTemplateAsync(admin);
+        var headId = await SeedStaleDraftsBelowPublishedHeadAsync(templateId);
+
+        var res = await admin.PostAsync($"/api/report-templates/{templateId}/versions", null);
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+
+        var draft = await res.ReadAsync<TemplateVersionDto>();
+        Assert.NotNull(draft);
+        Assert.False(draft!.IsPublished);
+
+        var detail = await GetDetailAsync(admin, templateId);
+        // المسودات الراكدة لم تُمَسّ: تبقى موجودة وغير منشورة، والإصدار الجديد أعلى رقمًا من رأس المنشور.
+        var head = detail.Versions.Single(v => v.Id == headId);
+        Assert.True(draft.VersionNumber > head.VersionNumber);
+        Assert.Equal(3, detail.Versions.Count(v => !v.IsPublished));  // المسودتان الراكدتان + المسودة الجديدة
+        Assert.Contains(detail.Versions, v => v.Id == v1);
+        // الحقول تُنسَخ من رأس المنشور لا من المسودات الراكدة.
+        var fields = detail.Versions.Single(v => v.Id == draft.Id).Fields;
+        Assert.Equal("head_value", Assert.Single(fields).Key);
+    }
+
+    [Fact]
+    public async Task CreateDraftVersion_Blocked_WhenLatestVersionIsAnOpenDraft()
+    {
+        var admin = await TestAuth.LoginAsAdminAsync(_factory);
+        var (templateId, _) = await CreatePublishedTemplateAsync(admin);
+        await SeedStaleDraftsBelowPublishedHeadAsync(templateId);
+
+        var first = await admin.PostAsync($"/api/report-templates/{templateId}/versions", null);
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+
+        // مسودة مفتوحة واحدة فقط: المحاولة الثانية تُرفَض ولا تُنشِئ صفًّا جديدًا.
+        var before = (await GetDetailAsync(admin, templateId)).Versions.Count;
+        var second = await admin.PostAsync($"/api/report-templates/{templateId}/versions", null);
+        Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
+        Assert.Equal(before, (await GetDetailAsync(admin, templateId)).Versions.Count);
+    }
 }

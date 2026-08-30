@@ -1,0 +1,159 @@
+{
+  "ticket": "R22A — REAL OPERATIONAL MULTI-WORK-ITEM ACTIVATION & FUNCTIONAL ACCEPTANCE",
+  "phase": "§5 التفعيل + §6 UAT المتصفّحيّ على القالب التشغيليّ الحقيقيّ",
+  "capturedAtUtc": "2026-08-29T21:35:00Z",
+  "environment": {
+    "ENVIRONMENT": "TEST / Staging",
+    "ASPNETCORE_ENVIRONMENT": "Staging",
+    "DATABASE": "reporting_test_uat",
+    "BACKEND_PORT": 5091,
+    "PRODUCTION_PORT": 5090,
+    "RC_PORT": 5092,
+    "service": "khubara-reporting-test",
+    "serviceMainPidBefore": 1685370,
+    "serviceMainPidAfter": 1685370,
+    "backendInformationalVersion": "1.0.0+36a6a5b5d8ff285f048c1f4b91c9a1f4db4d7f7f",
+    "publishDllCount": 37,
+    "publishAllDllSha256Prefix": "ceb6ba56ab1b8b7d",
+    "reportingApiDllSha256Prefix": "80f8294c5f06f6e9",
+    "health": "{\"status\":\"ok\",\"service\":\"reporting-api\"}",
+    "migrationCountBefore": 46,
+    "migrationCountAfter": 46,
+    "backendRedeployRequiredForR22A": false,
+    "backendRedeployRequiredNote": "الميزة كانت موجودة في الشيفرة المنشورة على TEST منذ 29 أغسطس (36a6a5b5)؛ الحاجب كان بيانات القالب لا الشيفرة ⇒ لم يلزم أيّ إعادة نشر خلفيّة ولا أيّ هجرة."
+  },
+
+  "uatHarness": {
+    "browser": "Google Chrome مرئيّ بملفّ تعريف مؤقّت مخصّص، مقاد عبر CDP على 127.0.0.1:9333",
+    "spaOrigin": "http://127.0.0.1:4431 (نفس بايتات dist المنشورة على TEST، DIST_SHA256=8254c74a9ec3f2b7ab326c6fe065a8de5dabe0bc8777393f7b8ac2a945d32a7d)",
+    "apiPath": "وكيل محلّيّ /api ⟶ نفق SSH 127.0.0.1:15091 ⟶ خلفيّة TEST 127.0.0.1:5091",
+    "authentication": "تسجيل دخول رسميّ عبر POST /api/auth/login داخل المتصفّح؛ لم يُستخرج أيّ Token خارج الصفحة ولم يُكتب أيّ session.json",
+    "viewport": "1440×1100 و1440×1400"
+  },
+
+  "template": {
+    "id": "9e375ad7-8a65-46f4-849f-886d5b795bfe",
+    "title": "تقرير كاتب المحتوى الأسبوعي",
+    "isSyntheticUatTemplate": false,
+    "versionsBefore": "v1 مسودة (16 حقلًا) · v2 مسودة (5) · v3 مسودة (5) · v4 منشور 0ac84366-5a10-4e2c-8de0-bfa8010cd034 (5)",
+    "v5": {
+      "id": "794260c2-77a5-4d64-8c07-9de4db8639d3",
+      "createVersionHttpStatus": 200,
+      "prsFieldId": "ec99f382-af4e-4d2c-ac1c-0ed1a5af5d0c",
+      "updateFieldHttpStatus": 200,
+      "publishHttpStatus": 200,
+      "schemaVersion": 2,
+      "projectLevelFieldCount": 0,
+      "workItemFieldCount": 5,
+      "workItemFieldKeys": ["content_type", "content_goal", "work_status", "count", "notes"],
+      "fieldCount": 5,
+      "fieldOrder": "0,1,2,3,4",
+      "effectiveVersionAfterPublish": 5
+    },
+    "assignment": {
+      "id": "e294bd99-7dc0-4337-a5fb-14553d3b3518",
+      "scopeType": "Employee",
+      "scopeId": "74c79c4b-d403-494c-aafe-a2d63caf3965",
+      "kind": "Include"
+    },
+    "preservation": {
+      "V4_CONFIG_UNCHANGED": true,
+      "v4StillPublished": true,
+      "v1v2v3StillUnpublishedAndUntouched": true,
+      "OLD_TEMPLATE_DRAFTS_DELETED": "NO",
+      "HISTORICAL_REPORTS_MUTATED": "NO"
+    }
+  },
+
+  "submission": {
+    "id": "591c4b63-790b-4801-9e06-6213768f32de",
+    "reportTemplateVersionId": "794260c2-77a5-4d64-8c07-9de4db8639d3",
+    "periodType": "Weekly",
+    "periodKey": "2026-W36",
+    "projectId": "9e731196-f87f-4bbf-82cd-260d06d90b56",
+    "projectName": "P360-R21-UAT-PROJECT",
+    "clientName": "P360-R21-UAT-CLIENT",
+    "statusAfterSubmit": "Closed",
+    "submitHttpStatus": 200
+  },
+
+  "storedPayload": {
+    "templateFieldId": "ec99f382-af4e-4d2c-ac1c-0ed1a5af5d0c",
+    "fieldType": "ProjectRepeatableSection",
+    "PROJECT_ENTRY_COUNT": 1,
+    "PROJECT_ID_OCCURRENCES_AS_ENTRY": 1,
+    "WORK_ITEM_COUNT": 2,
+    "workItems": [
+      { "content_type": "Carousel", "content_goal": "Sales", "work_status": "Approved", "count": "3", "notes": "بند 1 — كاروسيل لحملة الإطلاق." },
+      { "content_type": "Reel Script", "content_goal": "Awareness", "work_status": "Draft", "count": "5", "notes": "بند 2 — سكربت ريلز للتوعية (مُعدَّل مستقلًّا: 5)." }
+    ],
+    "file": "payloads/submission-after-submit.json"
+  },
+
+  "uiObservations": {
+    "workItemsGroupLabel": "بنود العمل",
+    "itemLabelsRendered": ["بند عمل 1", "بند عمل 2"],
+    "addWorkItemButton": "+ إضافة بند عمل",
+    "deleteWorkItemButtons": 2,
+    "addProjectButtons": 1,
+    "deleteProjectButtons": 1,
+    "projectCardsRendered": 1,
+    "afterReloadSelects": ["9e731196-f87f-4bbf-82cd-260d06d90b56", "Carousel", "Sales", "Approved", "Reel Script", "Awareness", "Draft"],
+    "afterReloadCounts": ["3", "5"],
+    "afterReloadNotes": ["بند 1 — كاروسيل لحملة الإطلاق.", "بند 2 — سكربت ريلز للتوعية (مُعدَّل مستقلًّا: 5)."]
+  },
+
+  "independentEditProof": {
+    "editedItem": 2,
+    "changes": { "count": "2 ⟶ 5", "notes": "أُضيفت عبارة (مُعدَّل مستقلًّا: 5)" },
+    "item1BeforeEdit": { "content_type": "Carousel", "content_goal": "Sales", "work_status": "Approved", "count": "3" },
+    "item1AfterEditAndReload": { "content_type": "Carousel", "content_goal": "Sales", "work_status": "Approved", "count": "3" },
+    "item1Unchanged": true
+  },
+
+  "projectScopeProof": {
+    "GET /api/projects/{linked}/reports": { "status": 200, "containsSubmission": true, "rowCount": 1 },
+    "GET /api/projects/{linked}/reports/{submission}": { "status": 200, "containsCarousel": true, "containsReelScript": true },
+    "GET /api/projects/{other}/reports/{submission}": { "status": 404, "type": "project.not_found", "detail": "المشروع غير موجود." },
+    "GET /api/projects/{other}/reports": { "containsSubmission": false },
+    "otherProjectId": "c7ea6b1d-9bcd-4cda-a103-4de88c77f9cb",
+    "otherProjectName": "P360R2-مشروع ب",
+    "uiOnCrossProject": "التقرير غير متاح ضمن هذا المشروع — التقرير غير موجود، أو غير مرتبط بهذا المشروع، أو خارج نطاق صلاحيّتك.",
+    "policy404NotForbidden": true,
+    "files": ["payloads/project-scoped-slice.json", "network/project-scope-network.json"]
+  },
+
+  "happyPathSweep": {
+    "routes": ["/app/my-reports?open={submission}", "/app/projects/{p}", "/app/projects/{p}/reports/{submission}", "/app/projects/{p}/360"],
+    "apiRequests": 24,
+    "http5xx": 0,
+    "http4xx": 0,
+    "consoleErrors": 0,
+    "files": ["network/happy-path-network.json", "network/console-errors.json"]
+  },
+
+  "screenshots": [
+    { "file": "01-create-form-real-template.png", "shows": "نموذج الإنشاء على القالب الحقيقيّ بعد تفعيل v5" },
+    { "file": "02-two-work-items-before-save.png", "shows": "بطاقة مشروع واحدة تضمّ بند عمل 1 وبند عمل 2 قبل الحفظ" },
+    { "file": "03-save-in-flight.png", "shows": "لحظة تنفيذ الحفظ" },
+    { "file": "04-after-reload-two-items-persisted.png", "shows": "بعد إعادة التحميل — البندان محفوظان بكلّ قيمهما داخل مشروع واحد" },
+    { "file": "05-independent-edit-item2-only.png", "shows": "تعديل البند الثاني وحده (العدد 5) والبند الأوّل كما هو" },
+    { "file": "06-independent-edit-persisted.png", "shows": "التعديل المستقلّ محفوظ بعد إعادة التحميل" },
+    { "file": "07-after-submit.png", "shows": "بعد الإرسال — الحالة مُغلق ومسار الاعتماد مكتمل" },
+    { "file": "08-project-scoped-report-slice.png", "shows": "الشريحة المقيَّدة بالمشروع تعرض بنود العمل الاثنين داخل بطاقة المشروع" },
+    { "file": "09-cross-project-no-leak.png", "shows": "نفس التقرير من مشروع آخر ⇒ حجب صريح بلا أيّ تسريب" },
+    { "file": "10-project-page-linked-reports.png", "shows": "صفحة المشروع وقائمة التقارير المرتبطة به" }
+  ],
+
+  "limitsHonored": {
+    "RC_TOUCHED": "NO",
+    "PRODUCTION_TOUCHED": "NO",
+    "ORIGIN_MAIN_TOUCHED": "NO",
+    "FORCE_PUSH": "NO",
+    "HISTORICAL_REPORTS_MUTATED": "NO",
+    "OLD_TEMPLATE_DRAFTS_DELETED": "NO",
+    "productionMainPid": 1603719,
+    "rcMainPid": 1592241,
+    "note": "معرّفا العمليّة لخدمتَي الإنتاج وRC مطابقان لما قيس في بوّابة العزل قبل أيّ عمل ⇒ لم تُعَد تشغيل ولم تُمسّ."
+  }
+}
