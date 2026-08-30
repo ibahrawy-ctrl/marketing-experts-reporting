@@ -668,6 +668,9 @@ export interface HrDirectoryUserDto {
   jobRoleId: string | null;
   isSensitive: boolean;
   canEdit: boolean;
+  // DEF-R5-002 — نافذة الخدمة: null = غير مسجَّل (من لم يخرج لا يُعامَل معاملة الخارج).
+  hireDate: string | null;
+  exitDate: string | null;
 }
 export interface CreateUserRequest {
   email: string;
@@ -694,6 +697,13 @@ export interface UpdateUserJobRoleRequest {
 // تعديل البيانات الأساسية غير الحسّاسة للموظف (الاسم فقط) — حزمة HR A. لا يمسّ البريد/الأدوار/الصلاحيات/كلمة المرور/التفعيل.
 export interface UpdateUserBasicRequest {
   fullName: string;
+  notes?: string | null;
+}
+// DEF-R5-002 — نافذة خدمة الموظّف (الالتحاق/انتهاء الخدمة) على سطح إدارة الموظّف نفسه.
+// الطلب يعلن الحالة النهائيّة للحقلين معًا؛ null = غير مسجَّل. التحقّق والتدقيق خادميًّا.
+export interface UpdateUserEmploymentWindowRequest {
+  hireDate: string | null;
+  exitDate: string | null;
   notes?: string | null;
 }
 // تعديل الانتماء التنظيمي للموظف (الإدارة/الفريق/المدير المباشر) — حزمة HR A. القيود الأمنية مفروضة خادمًا.
@@ -1453,6 +1463,29 @@ export interface EvaluatableSubjectDto {
 export interface EvaluatableSubjectsDto {
   isAdminOverride: boolean;
   subjects: EvaluatableSubjectDto[];
+}
+
+// DEC-01/2+5 (DEF-R5-001) — «الإعداد الفعّال» لإنشاء تقييم: الخادم يحسم التواتر ونوع الفترة
+// ومفتاح الفترة الجارية والقوالب المؤهَّلة. الواجهة تعرض ولا تختار ولا تفترض تواترًا.
+export type KpiCadenceSource =
+  | 'employeeAssignment' | 'teamAssignment' | 'jobRole'
+  | 'departmentAssignment' | 'generalTemplate' | 'notConfigured' | 'explicitRequest';
+
+export interface KpiEvaluationSetupTemplateDto {
+  id: string;
+  name: string;
+}
+
+export interface KpiEvaluationSetupDto {
+  subjectUserId: string;
+  subjectName: string;
+  effectiveCadence: KpiCadence | null;
+  cadenceSource: KpiCadenceSource;
+  periodType: PeriodType | null;
+  currentPeriodKey: string | null;
+  templates: KpiEvaluationSetupTemplateDto[];
+  isConfigured: boolean;
+  blockingReason: string | null;
 }
 
 // ===== Dashboard (role-driven, server-decided) =====

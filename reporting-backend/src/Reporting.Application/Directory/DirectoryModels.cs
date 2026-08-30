@@ -29,7 +29,11 @@ public record HrDirectoryUserDto(
     Guid? ManagerId,
     Guid? JobRoleId,
     bool IsSensitive,
-    bool CanEdit);
+    bool CanEdit,
+    // DEF-R5-002 — نافذة الخدمة مصدرًا تشغيليًّا معلَنًا: تُعرَض داخل ملفّ الموظّف نفسه لا في شاشة مستقلّة.
+    // NULL معناه «غير مسجَّل»: من لم يخرج لا يُعامَل معاملة الخارج، ومن لا تاريخ التحاق له لا يُخصم عنه شيء.
+    DateOnly? HireDate = null,
+    DateOnly? ExitDate = null);
 
 public record DepartmentDto(
     Guid Id,
@@ -122,6 +126,15 @@ public record UpdateUserJobRoleRequest(Guid? JobRoleId, string? Notes = null);
 /// لا يمسّ البريد/الأدوار/الصلاحيات/التفعيل/كلمة المرور/الانتماء التنظيمي.
 /// </summary>
 public record UpdateUserBasicRequest(string FullName, string? Notes = null);
+
+/// <summary>
+/// DEF-R5-002 — تسجيل نافذة خدمة الموظّف (تاريخ الالتحاق/تاريخ انتهاء الخدمة) على سطح إدارة الموظّف
+/// القائم — Admin/CeoSupport/HR. الطلب يعلن <b>الحالة النهائيّة</b> للحقلين معًا: القيمة null تعني
+/// «غير مسجَّل» صراحةً (لم يلتحق بعد بتاريخ معلوم / لم ينتهِ خدمته)، فلا يُستنتج خروج من فراغ.
+/// لا يمسّ الاسم/البريد/الأدوار/التفعيل/كلمة المرور/الانتماء التنظيمي، ولا يُعيد كتابة أيّ تقييم تاريخيّ:
+/// أثره حسابيّ فقط عبر مقام DEC-01/8 عند كلّ فترة تُطلَب.
+/// </summary>
+public record UpdateUserEmploymentWindowRequest(DateOnly? HireDate, DateOnly? ExitDate, string? Notes = null);
 
 /// <summary>
 /// تعديل الانتماء التنظيمي للموظف (الإدارة/الفريق/المدير) عند نقل تنظيمي — Admin/CeoSupport/HR/GM/CEO.

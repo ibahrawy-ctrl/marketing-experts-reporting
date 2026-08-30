@@ -15,6 +15,7 @@ import type {
   UpdateUserRequest,
   UpdateUserJobRoleRequest,
   UpdateUserBasicRequest,
+  UpdateUserEmploymentWindowRequest,
   UpdateUserOrgAssignmentRequest,
   CreateTeamRequest,
   UpdateTeamRequest,
@@ -232,6 +233,21 @@ export function useUpdateUserBasic() {
       qc.invalidateQueries({ queryKey: ['directory-users'] });
       qc.invalidateQueries({ queryKey: ['hr-directory-users'] });
       qc.invalidateQueries({ queryKey: ['hr-directory-managers'] });
+    },
+  });
+}
+
+// DEF-R5-002 — نافذة خدمة الموظّف (الالتحاق/انتهاء الخدمة) على سطح إدارة الموظّف نفسه (PATCH).
+// لا تُعيد كتابة أيّ تقييم تاريخيّ؛ أثرها حسابيّ عند كلّ فترة تُطلَب ⇒ نُبطِل مؤشّرات الأداء كذلك.
+export function useUpdateUserEmploymentWindow() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ userId, req }: { userId: string; req: UpdateUserEmploymentWindowRequest }) =>
+      (await api.patch<DirectoryUserDto>(`/directory/users/${userId}/employment-window`, req)).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['hr-directory-users'] });
+      qc.invalidateQueries({ queryKey: ['directory-users'] });
+      qc.invalidateQueries({ queryKey: ['kpi-performance'] });
     },
   });
 }

@@ -10,6 +10,7 @@ import {
   useHrDirectoryManagers,
   useJobRoles,
   useUpdateUserBasic,
+  useUpdateUserEmploymentWindow,
   useUpdateUserOrgAssignment,
 } from '../lib/useDirectory';
 import { Alert, Badge, Button, Card, Field, Input, Select } from '../components/ui';
@@ -23,7 +24,7 @@ const BASIC_EDIT_ROLES: Role[] = ['Admin', 'CeoSupport', 'HR'];
 // أدوار تعديل التنظيم الوظيفي — تطابق سياسة UserOrgAssignment بالخادم.
 const ORG_EDIT_ROLES: Role[] = ['Admin', 'CeoSupport', 'HR', 'GeneralManager', 'CEO'];
 
-type Editing = { userId: string; mode: 'basic' | 'org' } | null;
+type Editing = { userId: string; mode: 'basic' | 'org' | 'employment' } | null;
 
 export default function HrEmployeesPage() {
   const { hasAnyRole } = useAuth();
@@ -112,13 +113,14 @@ export default function HrEmployeesPage() {
               <th className="px-4 py-3 font-semibold">الفريق</th>
               <th className="px-4 py-3 font-semibold">المدير المباشر</th>
               <th className="px-4 py-3 font-semibold">المسمى الوظيفي</th>
+              <th className="px-4 py-3 font-semibold">نافذة الخدمة</th>
               <th className="px-4 py-3 font-semibold">إجراءات</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-ink-3">
+                <td colSpan={7} className="px-4 py-10 text-center text-ink-3">
                   لا يوجد موظفون مطابقون للبحث.
                 </td>
               </tr>
@@ -141,6 +143,11 @@ export default function HrEmployeesPage() {
                     <td className="px-4 py-3 text-ink-2">{u.teamId ? teamName.get(u.teamId) ?? '—' : '—'}</td>
                     <td className="px-4 py-3 text-ink-2">{u.managerId ? userName.get(u.managerId) ?? '—' : '—'}</td>
                     <td className="px-4 py-3 text-ink-2">{u.jobRoleId ? roleName.get(u.jobRoleId) ?? '—' : '—'}</td>
+                    {/* DEF-R5-002 — «غير مسجَّل» حالة معلَنة لا فراغ يُفسَّر خروجًا. */}
+                    <td className="px-4 py-3 text-xs text-ink-2">
+                      <div>التحاق: {u.hireDate ?? 'غير مسجَّل'}</div>
+                      <div>انتهاء الخدمة: {u.exitDate ?? 'على رأس العمل'}</div>
+                    </td>
                     <td className="px-4 py-3">
                       {u.canEdit ? (
                         <div className="flex flex-col gap-1.5">
@@ -169,6 +176,20 @@ export default function HrEmployeesPage() {
                                 تعديل التنظيم الوظيفي
                               </Button>
                             )}
+                            {canEditBasic && (
+                              <Button
+                                variant="ghost"
+                                onClick={() =>
+                                  setEditing((e) =>
+                                    e?.userId === u.id && e.mode === 'employment'
+                                      ? null
+                                      : { userId: u.id, mode: 'employment' },
+                                  )
+                                }
+                              >
+                                تعديل نافذة الخدمة
+                              </Button>
+                            )}
                           </div>
                           {/* الأدمن يعدّل الاسم/التنظيم من هنا؛ الأدوار/كلمة المرور/التفعيل والتعطيل تتم من شاشة إدارة المستخدمين. */}
                           {u.isSensitive && isAdmin && (
@@ -186,14 +207,21 @@ export default function HrEmployeesPage() {
                   </tr>
                   {editing?.userId === u.id && editing.mode === 'basic' && (
                     <tr className="bg-offwhite">
-                      <td colSpan={6} className="px-4 py-4">
+                      <td colSpan={7} className="px-4 py-4">
                         <BasicEditor user={u} onClose={() => setEditing(null)} />
+                      </td>
+                    </tr>
+                  )}
+                  {editing?.userId === u.id && editing.mode === 'employment' && (
+                    <tr className="bg-offwhite">
+                      <td colSpan={7} className="px-4 py-4">
+                        <EmploymentWindowEditor user={u} onClose={() => setEditing(null)} />
                       </td>
                     </tr>
                   )}
                   {editing?.userId === u.id && editing.mode === 'org' && (
                     <tr className="bg-offwhite">
-                      <td colSpan={6} className="px-4 py-4">
+                      <td colSpan={7} className="px-4 py-4">
                         <OrgEditor
                           user={u}
                           departments={departments.data ?? []}
@@ -240,6 +268,59 @@ function BasicEditor({ user, onClose }: { user: HrDirectoryUserDto; onClose: () 
       <div className="flex gap-2">
         <Button onClick={save} disabled={!dirty || mutation.isPending}>
           {mutation.isPending ? 'جارٍ الحفظ…' : 'حفظ'}
+        </Button>
+        <Button variant="ghost" onClick={onClose}>
+          إلغاء
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ===== DEF-R5-002: نافذة الخدمة (تاريخ الالتحاق / تاريخ انتهاء الخدمة) =====
+// سطح مقيَّد داخل شاشة الموظّفين نفسها — لا شاشة مستقلّة. الحقلان يُرسلان معًا كحالة نهائيّة،
+// والفراغ يعني «غير مسجَّل» صراحةً: من لم يخرج لا يُعامَل معاملة الخارج.
+function EmploymentWindowEditor({ user, onClose }: { user: HrDirectoryUserDto; onClose: () => void }) {
+  const [hireDate, setHireDate] = useState(user.hireDate ?? '');
+  const [exitDate, setExitDate] = useState(user.exitDate ?? '');
+  const mutation = useUpdateUserEmploymentWindow();
+
+  async function save() {
+    try {
+      await mutation.mutateAsync({
+        userId: user.id,
+        req: { hireDate: hireDate || null, exitDate: exitDate || null },
+      });
+      onClose();
+    } catch {
+      /* الرسالة تُعرض أسفله */
+    }
+  }
+
+  const changed =
+    (hireDate || null) !== (user.hireDate ?? null) || (exitDate || null) !== (user.exitDate ?? null);
+
+  return (
+    <div className="max-w-2xl space-y-3">
+      <h3 className="text-sm font-bold text-navy">نافذة الخدمة — {user.fullName}</h3>
+      <Alert tone="gold">
+        هذان التاريخان يحدّدان الفترات التي <span className="font-bold">يُطالَب</span> فيها الموظف بالتقييم:
+        ما قبل الالتحاق وما بعد انتهاء الخدمة يخرج من المقام ولا يُحتسب نقصًا. تغييرهما{' '}
+        <span className="font-bold">لا يُعدّل أيّ تقييم سابق</span>؛ يُعاد الحساب لكل فترة عند طلبها. ترك الحقل
+        فارغًا معناه «غير مسجَّل»، ومن لم تنتهِ خدمته يُترك تاريخ الانتهاء فارغًا.
+      </Alert>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="تاريخ الالتحاق">
+          <Input type="date" value={hireDate} onChange={(e) => setHireDate(e.target.value)} />
+        </Field>
+        <Field label="تاريخ انتهاء الخدمة">
+          <Input type="date" value={exitDate} onChange={(e) => setExitDate(e.target.value)} />
+        </Field>
+      </div>
+      {mutation.isError && <Alert tone="alert">{apiErrorMessage(mutation.error)}</Alert>}
+      <div className="flex gap-2">
+        <Button onClick={save} disabled={!changed || mutation.isPending}>
+          {mutation.isPending ? 'جارٍ الحفظ…' : 'حفظ نافذة الخدمة'}
         </Button>
         <Button variant="ghost" onClick={onClose}>
           إلغاء

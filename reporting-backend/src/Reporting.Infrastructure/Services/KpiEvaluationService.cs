@@ -8,6 +8,7 @@ using Reporting.Application.Audit;
 using Reporting.Application.Common;
 using Reporting.Application.Kpi;
 using Reporting.Application.Notifications;
+using Reporting.Application.Periods;
 using Reporting.Domain.Entities.Kpi;
 using Reporting.Domain.Enums;
 using Reporting.Infrastructure.Persistence;
@@ -21,6 +22,8 @@ public class KpiEvaluationService : IKpiEvaluationService
     private readonly INotificationService _notifications;
     private readonly IAuditService _audit;
     private readonly IScopeResolver _scope;
+    private readonly IKpiTemplateService _templates;
+    private readonly IPeriodService _periods;
     private readonly KpiFeatureOptions _kpiOptions;
 
     // صيغة مفتاح الفترة الأسبوعية المعتمدة: YYYY-Www (مثال 2026-W25) — تمنع إدخال قيَم حرّة غير مفهومة.
@@ -31,6 +34,7 @@ public class KpiEvaluationService : IKpiEvaluationService
 
     public KpiEvaluationService(AppDbContext db, ICurrentUser currentUser,
         INotificationService notifications, IAuditService audit, IScopeResolver scope,
+        IKpiTemplateService templates, IPeriodService periods,
         IOptions<KpiFeatureOptions> kpiOptions)
     {
         _db = db;
@@ -38,6 +42,8 @@ public class KpiEvaluationService : IKpiEvaluationService
         _notifications = notifications;
         _audit = audit;
         _scope = scope;
+        _templates = templates;
+        _periods = periods;
         _kpiOptions = kpiOptions.Value;
     }
 
@@ -108,6 +114,17 @@ public class KpiEvaluationService : IKpiEvaluationService
             return Result<KpiEvaluationDto>.Failure(
                 "لا يمكنك إنشاء تقييم لهذا الموظّف؛ التقييم متاح لمرؤوسيك المباشرين فقط.", "auth.forbidden");
 
+        // DEF-R5-001 — الخادم هو الحاسم النهائيّ لا الواجهة: القالب المطلوب يجب أن يكون ضمن القوالب
+        // الفعّالة لهذا الموظّف داخل مسار تواتره نفسه، بسلّم الأخصّية عينه المستعمَل في العرض
+        // (لا محرّك موازٍ). فتعديل طلب الواجهة — قالب موظّف آخر، أو قالب مسمّى ليس مسمّاه، أو قالب
+        // عامّ رغم وجود إسناد أخصّ، أو قالب موقوف — يُرفَض برمز مسمّى بدل أن يُنشئ تقييمًا لا يخصّه.
+        var eligible = await _templates.ListAsync(new KpiTemplateFilter(
+            null, templateCadence.Value, TemplateStatus.Published, true, request.SubjectUserId), ct);
+        if (!eligible.Succeeded || eligible.Value!.All(t => t.Id != request.KpiTemplateId))
+            return Result<KpiEvaluationDto>.Failure(
+                "القالب المطلوب ليس ضمن القوالب الفعّالة لهذا الموظّف.",
+                "kpi_eval.template_not_assigned");
+
         var version = await _db.KpiTemplateVersions
             .Where(v => v.KpiTemplateId == request.KpiTemplateId && v.IsPublished)
             .OrderByDescending(v => v.VersionNumber)
@@ -156,6 +173,92 @@ public class KpiEvaluationService : IKpiEvaluationService
             .ToListAsync(ct);
 
         return Result<EvaluatableSubjectsDto>.Success(new EvaluatableSubjectsDto(isAdmin, subjects));
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<KpiEvaluationSetupDto>> GetEvaluationSetupAsync(Guid subjectUserId, CancellationToken ct = default)
+    {
+        if (_currentUser.UserId is not Guid evaluatorId)
+            return Result<KpiEvaluationSetupDto>.Failure("غير مصرّح.", "auth.unauthenticated");
+        if (subjectUserId == Guid.Empty)
+            return Result<KpiEvaluationSetupDto>.Failure("الموظف المُقيَّم مطلوب.", "kpi_eval.subject_required");
+
+        // النطاق نفسه المفروض عند الإنشاء — لا تُكشف حالة إعداد موظّف خارج نطاق التقييم المباشر.
+        var (isAdmin, evaluatableIds) = await EvaluatableSubjectScopeAsync(evaluatorId, ct);
+        if (!isAdmin && !evaluatableIds.Contains(subjectUserId))
+            return Result<KpiEvaluationSetupDto>.Failure(
+                "لا يمكنك إنشاء تقييم لهذا الموظّف؛ التقييم متاح لمرؤوسيك المباشرين فقط.", "auth.forbidden");
+
+        var subject = await _db.Users.AsNoTracking()
+            .Where(u => u.Id == subjectUserId)
+            .Select(u => new { u.Id, u.FullName })
+            .FirstOrDefaultAsync(ct);
+        if (subject is null)
+            return Result<KpiEvaluationSetupDto>.Failure("الموظف المُقيَّم غير موجود.", "kpi_eval.subject_not_found");
+
+        var (effective, templates) = await ResolveEffectiveSetupAsync(subjectUserId, ct);
+
+        // DEC-01/5 — «التواتر غير مُهيّأ» حالة مسمّاة لا صمت ولا سقوط إلى الأسبوعيّ.
+        if (effective.Cadence is null)
+            return Result<KpiEvaluationSetupDto>.Success(new KpiEvaluationSetupDto(
+                subjectUserId, subject.FullName, null, KpiCadenceSources.NotConfigured,
+                null, null, Array.Empty<KpiEvaluationSetupTemplateDto>(), false,
+                "التواتر غير مُهيّأ لهذا الموظّف: لا يوجد قالب KPI فعّال مُسنَد له. اربط قالبًا بمسمّاه أو فريقه أو إدارته قبل إنشاء التقييم."));
+
+        var cadence = effective.Cadence.Value;
+        var isQuarterly = cadence == KpiCadence.Quarterly;
+        // DEC-01/1 — الفترة الجارية تُحسم خادميًّا بتوقيت Asia/Riyadh؛ المستخدم لا يُسأل عنها.
+        var periodKey = isQuarterly
+            ? _periods.CurrentQuarter().Key
+            : ReportingCalendarPolicy.CycleKeyFor(ReportingCalendarPolicy.RiyadhToday());
+
+        return Result<KpiEvaluationSetupDto>.Success(new KpiEvaluationSetupDto(
+            subjectUserId,
+            subject.FullName,
+            cadence,
+            effective.Source,
+            isQuarterly ? PeriodType.Quarterly : PeriodType.Weekly,
+            periodKey,
+            templates.Select(t => new KpiEvaluationSetupTemplateDto(t.Id, t.Title)).ToList(),
+            templates.Count > 0,
+            templates.Count > 0
+                ? null
+                : (isQuarterly
+                    ? "التواتر الفعّال لهذا الموظّف ربعيّ، لكن لا يوجد قالب ربعيّ منشور له إصدار منشور. انشر إصدارًا من القالب الربعيّ قبل إنشاء التقييم."
+                    : "التواتر الفعّال لهذا الموظّف أسبوعيّ، لكن لا يوجد قالب أسبوعيّ منشور له إصدار منشور. انشر إصدارًا من قالب النبض الأسبوعيّ قبل إنشاء التقييم.")));
+    }
+
+    /// <summary>
+    /// المصدر الخادميّ الوحيد لـ«الإعداد الفعّال»: التواتر يُحسم بمنتقي DEC-01/5 نفسه المستعمَل في
+    /// التجميع، والقوالب تُجلب بسلّم الأخصّية نفسه المستعمَل في حارس الإنشاء
+    /// (<c>ListAsync</c> بمرشّح التواتر المحسوم) — فلا ينفصل ما تراه الواجهة عمّا يقبله الخادم.
+    /// يبقى منها ما له إصدار منشور فعلًا، لأنّ الإنشاء يتطلّب إصدارًا منشورًا.
+    /// </summary>
+    private async Task<(KpiEffectiveCadence Effective, List<(Guid Id, string Title)> Templates)>
+        ResolveEffectiveSetupAsync(Guid subjectUserId, CancellationToken ct)
+    {
+        var asOf = ReportingCalendarPolicy.RiyadhToday();
+        var map = await _templates.ResolveEffectiveCadencesAsync(new[] { subjectUserId }, asOf, ct);
+        var effective = map.TryGetValue(subjectUserId, out var e)
+            ? e
+            : new KpiEffectiveCadence(subjectUserId, null, KpiCadenceSources.NotConfigured, Array.Empty<Guid>());
+
+        if (effective.Cadence is null)
+            return (effective, new List<(Guid, string)>());
+
+        var eligible = await _templates.ListAsync(new KpiTemplateFilter(
+            null, effective.Cadence.Value, TemplateStatus.Published, true, subjectUserId), ct);
+        if (!eligible.Succeeded || eligible.Value!.Count == 0)
+            return (effective, new List<(Guid, string)>());
+
+        var ids = eligible.Value!.Select(t => t.Id).ToList();
+        var rows = await _db.KpiTemplates.AsNoTracking()
+            .Where(t => ids.Contains(t.Id) && t.Versions.Any(v => v.IsPublished))
+            .OrderBy(t => t.Title)
+            .Select(t => new { t.Id, t.Title })
+            .ToListAsync(ct);
+
+        return (effective, rows.Select(r => (r.Id, r.Title)).ToList());
     }
 
     /// <summary>

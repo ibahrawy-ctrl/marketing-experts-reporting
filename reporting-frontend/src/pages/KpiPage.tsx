@@ -21,9 +21,9 @@ import type {
   KpiEvaluationListItemDto,
   KpiEvaluationLookupDto,
   KpiEvaluationReviewEventDto,
-  KpiTemplateDto,
+  KpiEvaluationSetupDto,
+  KpiCadenceSource,
   KpiResultDto,
-  PeriodType,
 } from '../types/api';
 import { WeeklyCycleCalendarPicker } from '../components/WeeklyCycleCalendarPicker';
 
@@ -32,6 +32,17 @@ const calcMethodHint: Record<KpiCalcMethod, string> = {
   Auto: 'تلقائي — أدخل القيمة الفعلية، وسيحسب النظام الدرجة من المستهدف.',
   Manual: 'يدوي — أدخل الدرجة مباشرة من 0 إلى 100.',
   Hybrid: 'مزيج — إن أدخلت الدرجة اليدوية فهي المعتمدة، وإلا تُحتسب من القيمة الفعلية.',
+};
+
+// DEC-01/5 (DEF-R5-001) — مصدر حسم التواتر كما يعلنه الخادم: يُعرض للمستخدم شرحًا لا خيارًا.
+const cadenceSourceLabel: Record<KpiCadenceSource, string> = {
+  employeeAssignment: 'إسناد خاصّ بهذا الموظّف',
+  teamAssignment: 'إسناد فريقه',
+  jobRole: 'مسمّاه الوظيفيّ',
+  departmentAssignment: 'إسناد إدارته',
+  generalTemplate: 'الإعداد العامّ',
+  notConfigured: 'غير مُهيّأ',
+  explicitRequest: 'طلب صريح',
 };
 
 // عناوين عربية لأحداث سجلّ المراجعة (ADMIN-GOVERNANCE-R1).
@@ -118,10 +129,7 @@ function KpiList({ isManagement, onOpen, hideTitle, subjectFilter }: { isManagem
   });
   // كل العناصر تخصّ الموظّف نفسه عند الحصر، فنشتقّ اسمه من أوّل عنصر لعرضه في الشريط التوضيحي.
   const subjectName = items?.[0]?.subjectName;
-  // حارس الدورية: تقييم KPI أسبوعي فقط في المرحلة الحالية — لا يُتاح اختيار دورية أخرى.
-  const periodType: PeriodType = 'Weekly';
-  // افتراضيًّا الأسبوع التشغيلي الحالي (الخميس→الأربعاء) المطابق لمنطق الخادم، فلا يُضطر المستخدم لنسخ الصيغة يدويًّا.
-  // فارغ في البداية — منتقي التقويم يملؤه بالدورة الحالية المحسوبة خادميًّا (بلا حساب محليّ للأسبوع).
+  // فارغ في البداية — منتقي التقويم (أسبوعيّ) أو مفتاح الربع الجاري (ربعيّ) يملؤه من حسم الخادم.
   const [periodKey, setPeriodKey] = useState('');
   const [err, setErr] = useState<string | null>(null);
 
@@ -135,43 +143,54 @@ function KpiList({ isManagement, onOpen, hideTitle, subjectFilter }: { isManagem
   });
   const subjects = evaluatable?.subjects ?? [];
 
-  // قوالب التقييم تُصفّى بحسب المسمّى الوظيفي للموظّف المُختار: لا تُجلب إلا بعد اختياره،
-  // فيظهر للمدير فقط القوالب العامّة أو المربوطة بدور هذا الموظّف.
-  const { data: templates } = useQuery({
-    queryKey: ['kpi-templates', 'for-subject', subjectUserId],
+  // DEF-R5-001 — «الإعداد الفعّال» يُحسم خادميًّا بالكامل: التواتر (سلّم DEC-01/5) ومصدره، ونوع
+  // الفترة المشتقّ منه، ومفتاح الفترة الجارية بتوقيت الرياض، والقوالب المؤهَّلة لهذا التواتر وحده.
+  // الواجهة لا تثبّت تواترًا ولا تعرض منتقيًا تقنيًّا له، ولا ترسل طلبًا حين لا يكون الإعداد مكتملًا.
+  const { data: setup, isFetching: setupLoading } = useQuery({
+    queryKey: ['kpi-evaluation-setup', subjectUserId],
     queryFn: async () =>
-      // قوالب التقييم: المنشورة النشطة الأسبوعية فقط (لا مسوّدات/مؤرشفة/غير أسبوعية)،
-      // والمطابقة لمسمّى الموظّف أو العامّة — حتى لا تظهر قوالب تجريبية أو غير مناسبة.
-      (await api.get<KpiTemplateDto[]>('/kpi-templates', {
-        params: { isActive: true, status: 'Published', cadence: 'WeeklyPulse', subjectUserId },
+      (await api.get<KpiEvaluationSetupDto>('/kpi-evaluations/effective-setup', {
+        params: { subjectUserId },
       })).data,
     enabled: isManagement && !!subjectUserId,
   });
+  const templates = setup?.templates;
+  const periodType = setup?.periodType ?? null;
+  const isQuarterly = setup?.effectiveCadence === 'Quarterly';
 
-  // عند تغيير الموظّف نُفرّغ القالب المُختار لأن قائمة القوالب تتغيّر بحسب دوره.
+  // عند تغيير الموظّف نُفرّغ القالب والفترة معًا: كلاهما مشتقّ من إعداد الموظّف المختار.
   const onSubjectChange = (id: string) => {
     setSubjectUserId(id);
     setKpiTemplateId('');
+    setPeriodKey('');
+    setErr(null);
   };
 
-  // الخادم يُطبّق أولوية اختيار القالب: قالب متخصص واحد لدور الموظّف، وإلا العام فقط.
+  // الخادم يُطبّق أولوية اختيار القالب: الأخصّ يطغى داخل تواتر الموظّف الفعّال.
   // فإن أُرجِع قالب واحد فقط نختاره تلقائيًّا (قيمة مُشتقّة) لتبسيط الإنشاء وتأكيد أنه القالب المناسب.
   const effectiveTemplateId = kpiTemplateId || (templates?.length === 1 ? templates[0].id : '');
+
+  // DEC-01/1 — الفترة الربعيّة لا تُختار: الربع الجاري محسوم خادميًّا. الأسبوعيّة تبقى بمنتقي الدورة.
+  const effectivePeriodKey = isQuarterly ? (setup?.currentPeriodKey ?? '') : periodKey;
+  const canCreate = !!setup?.isConfigured && !!effectiveTemplateId && !!effectivePeriodKey && !!periodType;
 
   // KPI-REVIEWER-OVERRIDE-R1: بحث قرائيّ صرف عن تقييم قائم لهذا (الموظّف + القالب + الفترة) قبل الإنشاء.
   // لا ينشئ سجلًّا ولا يعدّل شيئًا، ويمنع ازدواج التقييم ويُظهر التقييم التاريخيّ للاطّلاع.
   const { data: lookup, isFetching: lookupLoading } = useQuery({
-    queryKey: ['kpi-evaluation-lookup', subjectUserId, effectiveTemplateId, periodKey],
+    queryKey: ['kpi-evaluation-lookup', subjectUserId, effectiveTemplateId, effectivePeriodKey],
     queryFn: async () =>
       (await api.get<KpiEvaluationLookupDto>('/kpi-evaluations/lookup', {
-        params: { subjectUserId, kpiTemplateId: effectiveTemplateId, periodKey },
+        params: { subjectUserId, kpiTemplateId: effectiveTemplateId, periodKey: effectivePeriodKey },
       })).data,
-    enabled: isManagement && !!subjectUserId && !!effectiveTemplateId && !!periodKey,
+    enabled: isManagement && !!subjectUserId && !!effectiveTemplateId && !!effectivePeriodKey,
   });
   const existingEvaluation = lookup?.found ? lookup.evaluation : null;
 
   const create = useMutation({
-    mutationFn: () => api.post<KpiEvaluationDto>('/kpi-evaluations', { kpiTemplateId: effectiveTemplateId, subjectUserId, periodType, periodKey }),
+    // نوع الفترة يأتي من حسم الخادم لا من ثابت في الواجهة، والخادم يعيد التحقّق منه على أيّ حال.
+    mutationFn: () => api.post<KpiEvaluationDto>('/kpi-evaluations', {
+      kpiTemplateId: effectiveTemplateId, subjectUserId, periodType, periodKey: effectivePeriodKey,
+    }),
     onSuccess: (res) => {
       setSubjectUserId('');
       setKpiTemplateId('');
@@ -232,31 +251,52 @@ function KpiList({ isManagement, onOpen, hideTitle, subjectFilter }: { isManagem
                   <Select value={effectiveTemplateId} onChange={(e) => setKpiTemplateId(e.target.value)} disabled={!subjectUserId}>
                     <option value="">{subjectUserId ? 'اختر قالبًا…' : 'اختر الموظف أولًا'}</option>
                     {templates?.map((t) => (
-                      <option key={t.id} value={t.id}>{t.title}</option>
+                      <option key={t.id} value={t.id}>{t.name}</option>
                     ))}
                   </Select>
                 </Field>
-                <p className="mt-1 text-xs text-ink-3">تظهر هنا قوالب KPI المناسبة لدور الموظف فقط.</p>
+                <p className="mt-1 text-xs text-ink-3">تظهر هنا قوالب KPI الفعّالة لهذا الموظّف ضمن مساره فقط.</p>
               </div>
-              <div className="w-40">
-                <Field label="الدورية">
+              {/* المسار محسوم خادميًّا (DEC-01/5): يُعرض للاطّلاع مع مصدر حسمه — ولا يُختار من الواجهة. */}
+              <div className="w-56">
+                <Field label="مسار التقييم">
                   <div className="flex h-10 items-center rounded-lg border border-line bg-offwhite px-3">
-                    <Badge tone="navy">{periodTypeLabel[periodType]}</Badge>
+                    <Badge tone="navy">
+                      {!subjectUserId
+                        ? 'اختر الموظف أولًا'
+                        : setup?.effectiveCadence === 'Quarterly'
+                          ? 'التقييم الربعيّ الرسميّ'
+                          : setup?.effectiveCadence === 'WeeklyPulse'
+                            ? 'نبض الأسبوع'
+                            : setupLoading ? '…' : 'التواتر غير مُهيّأ'}
+                    </Badge>
                   </div>
                 </Field>
-                <p className="mt-1 text-xs text-ink-3">تقييم KPI الحالي أسبوعي. التجميع الشهري والربع سنوي والسنوي سيُدعم لاحقًا.</p>
+                <p className="mt-1 text-xs text-ink-3">
+                  {setup?.effectiveCadence
+                    ? `يحدّده النظام من ${cadenceSourceLabel[setup.cadenceSource]} — لا يُختار يدويًّا.`
+                    : 'يحدّده النظام من إعداد الموظّف — لا يُختار يدويًّا.'}
+                </p>
               </div>
             </div>
 
-            {/* منتقي دورة التقييم المُدرِك للدور (نفس نافذة السبت→الجمعة، وتاريخ الاستحقاق بحسب دور المُقيّم خادميًّا). */}
             <div className="max-w-md">
-              <Field label="الفترة (أسبوع)">
-                <WeeklyCycleCalendarPicker
-                  context="Kpi"
-                  value={periodKey || null}
-                  onChange={(key) => { setErr(null); setPeriodKey(key); }}
-                />
-              </Field>
+              {/* أسبوعيّ: منتقي الدورة المُدرِك للدور. ربعيّ: الربع الجاري محسوم خادميًّا (DEC-01/1). */}
+              {periodType === 'Quarterly' ? (
+                <Field label="الفترة (الربع الجاري)">
+                  <div className="flex h-10 items-center rounded-lg border border-line bg-offwhite px-3">
+                    <Badge tone="navy">{formatPeriod(effectivePeriodKey)}</Badge>
+                  </div>
+                </Field>
+              ) : periodType === 'Weekly' ? (
+                <Field label="الفترة (أسبوع)">
+                  <WeeklyCycleCalendarPicker
+                    context="Kpi"
+                    value={periodKey || null}
+                    onChange={(key) => { setErr(null); setPeriodKey(key); }}
+                  />
+                </Field>
+              ) : null}
               {existingEvaluation && (
                 <div className="mt-3">
                   <Alert tone="gold">
@@ -269,7 +309,7 @@ function KpiList({ isManagement, onOpen, hideTitle, subjectFilter }: { isManagem
               )}
               <div className="mt-3">
                 <Button
-                  disabled={!effectiveTemplateId || !subjectUserId || !periodKey || create.isPending || lookupLoading}
+                  disabled={!canCreate || create.isPending || lookupLoading || setupLoading}
                   onClick={() => {
                     setErr(null);
                     if (existingEvaluation) { onOpen(existingEvaluation.id); return; }
@@ -282,12 +322,10 @@ function KpiList({ isManagement, onOpen, hideTitle, subjectFilter }: { isManagem
             </div>
           </div>
           )}
-          {subjectUserId && templates && templates.length === 0 && (
+          {/* حالة مسمّاة لا صمت (DEC-01/5): سبب المنع كما يعلنه الخادم، ولا يُرسَل طلب إنشاء أصلًا. */}
+          {subjectUserId && setup && !setup.isConfigured && (
             <div className="mt-3">
-              <Alert tone="navy">
-                لا توجد قوالب مؤشّرات مرتبطة بالمسمّى الوظيفي لهذا الموظّف حاليًا. اربط قالبًا بمسمّاه من إعدادات
-                قوالب المؤشّرات، أو استخدم قالبًا عامًّا مثل «النبض الأسبوعي العام».
-              </Alert>
+              <Alert tone="gold">{setup.blockingReason}</Alert>
             </div>
           )}
         </Card>

@@ -59,8 +59,9 @@ public static class TestAuth
     }
 
     /// <summary>
-    /// DEC-01/8 — يضبط نافذة الخدمة (تاريخ الالتحاق/انتهاء الخدمة) لمستخدم قائم.
-    /// لا توجد واجهة HTTP لهذين الحقلين بعد (قيد موثَّق)، فالضبط يتمّ على الكيان مباشرةً
+    /// DEC-01/8 — يضبط نافذة الخدمة (تاريخ الالتحاق/انتهاء الخدمة) لمستخدم قائم <b>تهيئةً</b> لا اختبارًا للسطح.
+    /// السطح التشغيليّ للحقلين موجود ومختبَر في <see cref="DefR5TwoEmploymentWindowContractTests"/>
+    /// (<c>PATCH /api/directory/users/{id}/employment-window</c>)؛ هذه الطريقة اختصار تهيئة على الكيان مباشرةً
     /// في قاعدة الاختبار المعزولة — لا تُمسّ قاعدة مشتركة ولا بيانات حيّة.
     /// </summary>
     public static async Task SetEmploymentWindowAsync(

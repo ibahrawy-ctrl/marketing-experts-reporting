@@ -11,6 +11,14 @@ public interface IKpiEvaluationService
     Task<Result<EvaluatableSubjectsDto>> GetEvaluatableSubjectsAsync(CancellationToken ct = default);
 
     /// <summary>
+    /// DEC-01/2+5 (DEF-R5-001) — «الإعداد الفعّال» لإنشاء تقييم لموظّف بعينه: الخادم يحسم التواتر
+    /// بسلّم DEC-01/5، ويشتقّ منه نوع الفترة ومفتاح الفترة الجارية، ويُرجِع القوالب المؤهَّلة لهذا
+    /// التواتر وحده. الواجهة لا تختار تواترًا ولا تفترضه، وعند <c>IsConfigured = false</c>
+    /// تعرض <c>BlockingReason</c> ولا ترسل طلب إنشاء أصلًا.
+    /// </summary>
+    Task<Result<KpiEvaluationSetupDto>> GetEvaluationSetupAsync(Guid subjectUserId, CancellationToken ct = default);
+
+    /// <summary>
     /// KPI-REVIEWER-OVERRIDE-R1 — بحث قرائيّ صرف عن تقييم قائم بـ(الموظّف + القالب/الإصدار + مفتاح الفترة)
     /// بلا أيّ أثر جانبيّ: لا إنشاء ولا تعديل. يُرجِع Found=false إن لم يوجد تقييم مطابق.
     /// </summary>
