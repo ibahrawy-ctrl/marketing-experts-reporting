@@ -1,0 +1,23 @@
+[
+ {
+  "id": "U7",
+  "desc": "التلاعب من خارج الواجهة يُرفض برمز مسمًّى لا بنجاح صامت",
+  "result": "PASS",
+  "detail": "«قالب أسبوعيّ + PeriodType=Quarterly» ⇒ HTTP=400 رمز=kpi_eval.period_type_not_supported · «قالب ربعيّ + PeriodType=Weekly» ⇒ HTTP=400 رمز=kpi_eval.period_type_not_supported · «قالب ربعيّ + مفتاح أسبوعيّ داخل نوع ربعيّ» ⇒ HTTP=400 رمز=kpi_eval.period_format_invalid · «قالب أسبوعيّ + PeriodType=Monthly» ⇒ HTTP=400 رمز=kpi_eval.period_type_not_supported · «قالب ربعيّ + ربع لم يبدأ بعد» ⇒ HTTP=400 رمز=calendar.cycle_not_open",
+  "shot": "/tmp/r5uat/shots/U7-server-authority.png"
+ },
+ {
+  "id": "U6",
+  "desc": "موظّف بلا إسناد قالب فعّال: رسالة صريحة وزرّ معطَّل",
+  "result": "FAIL",
+  "detail": "عدد الموظّفين المفحوصين=35 · بلا أيّ مسار=0 · بمسار فارغ=0 — السبب: القوالب التسعة كلّها عامّة على TEST (موثَّق في خطّ الأساس §قوالب) فيطابقها كلّ موظّف. لا يُفتعَل الشرط بإسناد Exclude لأنّه تغيير تنظيميّ على بيانات مشتركة خارج نطاق التصريح.",
+  "shot": "/tmp/r5uat/shots/U6-not-reproducible.png"
+ },
+ {
+  "id": "U20",
+  "desc": "جرد القوالب المبذورة: لا تكرار ولا فقد والمساران قائمان",
+  "result": "PASS",
+  "detail": "إجمالي القوالب=9 · ربعيّ=2 (مؤشرات مندوب المبيعات · مؤشرات مشتري الإعلانات) · نبض=7 · عناوين مكرَّرة=0 · مطابق تمامًا لخطّ الأساس قبل التدخّل (9 قوالب بالتوزيع نفسه) ⇒ لم تلزم أيّ كتابة مصالحة على TEST",
+  "shot": "/tmp/r5uat/shots/U20-templates-inventory.png"
+ }
+]

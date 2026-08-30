@@ -1,0 +1,10 @@
+  Determining projects to restore...
+  Restored /private/tmp/release-mrg/reporting-backend/src/Reporting.Application/Reporting.Application.csproj (in 35 ms).
+  Restored /private/tmp/release-mrg/reporting-backend/src/Reporting.Domain/Reporting.Domain.csproj (in 32 ms).
+  Restored /private/tmp/release-mrg/reporting-backend/src/Reporting.Api/Reporting.Api.csproj (in 2.86 sec).
+  Restored /private/tmp/release-mrg/reporting-backend/src/Reporting.Infrastructure/Reporting.Infrastructure.csproj (in 2.86 sec).
+  Reporting.Domain -> /private/tmp/release-mrg/reporting-backend/src/Reporting.Domain/bin/Release/net8.0/Reporting.Domain.dll
+  Reporting.Application -> /private/tmp/release-mrg/reporting-backend/src/Reporting.Application/bin/Release/net8.0/Reporting.Application.dll
+  Reporting.Infrastructure -> /private/tmp/release-mrg/reporting-backend/src/Reporting.Infrastructure/bin/Release/net8.0/Reporting.Infrastructure.dll
+  Reporting.Api -> /private/tmp/release-mrg/reporting-backend/src/Reporting.Api/bin/Release/net8.0/Reporting.Api.dll
+  Reporting.Api -> /tmp/release-mrg/publish/
