@@ -1,0 +1,8 @@
+Test run for /Users/ibrahimelbahrawi/p123-remediation-r5/reporting-backend/tests/Reporting.IntegrationTests/bin/Release/net8.0/Reporting.IntegrationTests.dll (.NETCoreApp,Version=v8.0)
+VSTest version 17.11.1 (arm64)
+
+Starting test execution, please wait...
+A total of 1 test files matched the specified pattern.
+
+Passed!  - Failed:     0, Passed:  2278, Skipped:     0, Total:  2278, Duration: 14 m 55 s - Reporting.IntegrationTests.dll (net8.0)
+INT2_EXIT=0
