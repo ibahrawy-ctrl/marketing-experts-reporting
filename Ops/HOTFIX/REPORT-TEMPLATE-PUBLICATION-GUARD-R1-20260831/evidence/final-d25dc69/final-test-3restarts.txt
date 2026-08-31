@@ -1,0 +1,12 @@
+# TEST — ثلاثة إقلاعات على المرشّح d25dc69
+## الإقلاع 1 — فرق مقابل BEFORE:
+0
+## الإقلاع 2 — فرق مقابل BEFORE:
+0
+## الإقلاع 3 — فرق مقابل BEFORE:
+0
+# md5 اللقطات
+f28c2ca49c08355636ef8bfe6c2ecd48  /tmp/test-versions-BEFORE.csv
+f28c2ca49c08355636ef8bfe6c2ecd48  /tmp/test-versions-R1.csv
+f28c2ca49c08355636ef8bfe6c2ecd48  /tmp/test-versions-R2.csv
+f28c2ca49c08355636ef8bfe6c2ecd48  /tmp/test-versions-R3.csv

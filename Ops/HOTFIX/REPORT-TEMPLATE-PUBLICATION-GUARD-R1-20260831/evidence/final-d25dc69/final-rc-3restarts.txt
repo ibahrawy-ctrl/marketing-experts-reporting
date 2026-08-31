@@ -1,0 +1,12 @@
+# RC — ثلاثة إقلاعات على المرشّح d25dc69
+## الإقلاع 1 — فرق مقابل BEFORE:
+0
+## الإقلاع 2 — فرق مقابل BEFORE:
+0
+## الإقلاع 3 — فرق مقابل BEFORE:
+0
+# md5 اللقطات
+ff5513f3abb923df53585233d8ff8d3a  /tmp/rc-versions-BEFORE.csv
+ff5513f3abb923df53585233d8ff8d3a  /tmp/rc-versions-R1.csv
+ff5513f3abb923df53585233d8ff8d3a  /tmp/rc-versions-R2.csv
+ff5513f3abb923df53585233d8ff8d3a  /tmp/rc-versions-R3.csv
