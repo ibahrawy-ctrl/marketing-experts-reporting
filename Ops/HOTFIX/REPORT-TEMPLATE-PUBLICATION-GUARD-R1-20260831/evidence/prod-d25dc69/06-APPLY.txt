@@ -1,0 +1,27 @@
+=== PHASE6 APPLY — 2026-08-31T14:12:33Z ===
+APPLY_VERDICT=APPLIED_AND_VERIFIED REFUSALS=0
+PUBLISHED=77 -> 80 · TOTAL=107 (unchanged) · SUBMISSIONS=330 (unchanged)
+SUBMISSIONS_CSV_DIFF=0 · VERSIONS_ROWCOUNT 107=107 · CHANGED_ROWS=3 (IsPublished f->t only)
+76c76
+< a28354c2-68e2-4ed8-9905-75cc58d85ada|db8c764d-6f10-4997-8c07-512334dad30b|9|f
+---
+> a28354c2-68e2-4ed8-9905-75cc58d85ada|db8c764d-6f10-4997-8c07-512334dad30b|9|t
+101c101
+< ed4796e4-9d21-4443-8c3f-091efe6ffcb8|5e6ad325-b26c-4fd6-b4f8-d415dae44c89|9|f
+---
+> ed4796e4-9d21-4443-8c3f-091efe6ffcb8|5e6ad325-b26c-4fd6-b4f8-d415dae44c89|9|t
+104c104
+< f32ea97c-56cb-425f-8296-09a0d71e4059|32f263b9-d715-47b3-9bc9-8cd80f2f8ce5|8|f
+---
+> f32ea97c-56cb-425f-8296-09a0d71e4059|32f263b9-d715-47b3-9bc9-8cd80f2f8ce5|8|t
+AUDIT_NEW=3 (1534->1537) TemplateVersionReconciled
+2026-08-31 14:11:39.101867+00|TemplateVersionReconciled|ReportTemplateVersion|ed4796e4-9d21-4443-8c3f-091efe6ffcb8
+2026-08-31 14:11:39.092593+00|TemplateVersionReconciled|ReportTemplateVersion|f32ea97c-56cb-425f-8296-09a0d71e4059
+2026-08-31 14:11:39.033188+00|TemplateVersionReconciled|ReportTemplateVersion|a28354c2-68e2-4ed8-9905-75cc58d85ada
+NOTIFICATIONS_SINCE_APPLY=0
+EFFECTIVE_AFTER (title|v|fields|sv2|workItems):
+تقرير المديرشن الأسبوعي|9|5|t|t
+تقرير فريق التصميم|8|5|t|t
+تقرير فريق الفيديو|8|5|t|t
+تقرير كاتب المحتوى الأسبوعي|9|5|t|t
+SECOND_DRYRUN=DRY_RUN_NOTHING_TO_DO CHANGES_REQUIRED=0
