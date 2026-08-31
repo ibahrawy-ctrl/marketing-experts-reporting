@@ -177,6 +177,11 @@ git diff cc336a5 ad5df1e  =  فارغ
 
 ⟹ **ناتج الدمج مطابق وظيفيًّا وبايتيًّا للمرشّح المنشور على TEST** — لا شيء دخل `develop` لم يخضع لـUAT.
 
+**ملحوظة عن رأس `develop` النهائيّ:** التزام دمج R5 هو `ad5df1e`، ثمّ ثُبِّت هذا التقرير نفسه فوقه
+بالتزام **توثيقيّ بحت تحت `Ops/`** (`7a89725` ثمّ تصحيحته)، فصار هو رأس `develop`.
+**دلتا التشغيل بين رأس `develop` و`ad5df1e` فارغة** (`git diff ad5df1e origin/develop -- reporting-backend reporting-frontend` = فارغ)،
+أي أنّ الكود الذي في `develop` هو حرفيًّا الكود المنشور على TEST بالختم `…cc336a5…`.
+
 `origin/develop` يحتوي الآن: `4b8902ee` · `812ae903` · `93c8cb6` · `36a6a5b` · `ff1e337` · `32e5fec` · كامل R1–R5
 · **72 ملفًّا** تحت `Ops/R22A` (أحدث توثيق R22A) · **159 ملفًّا** تحت `Ops/UAT/P123-BUSINESS-OUTCOME-REMEDIATION-R5-20260830`.
 
