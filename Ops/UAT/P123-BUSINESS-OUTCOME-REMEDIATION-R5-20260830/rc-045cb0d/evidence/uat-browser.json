@@ -1,0 +1,72 @@
+[
+ {
+  "id": "B01",
+  "desc": "صفحة الدخول تُحمَّل من حزمة RC الحيّة",
+  "result": "PASS",
+  "detail": "title=نظام تقارير الأداء والتشغيل — خبراء التسويق",
+  "shot": "/tmp/rc045/shots/B01-login.png"
+ },
+ {
+  "id": "B02",
+  "desc": "تسجيل الدخول ناجح والتحويل إلى التطبيق",
+  "result": "PASS",
+  "detail": "http://127.0.0.1:4430/app",
+  "shot": "/tmp/rc045/shots/B02-home.png"
+ },
+ {
+  "id": "B03",
+  "desc": "/app/kpi يعرض الربع الجاري",
+  "result": "PASS",
+  "detail": "الربع 3 — 2026 ظاهر: true",
+  "shot": "/tmp/rc045/shots/B03-kpi.png"
+ },
+ {
+  "id": "B04",
+  "desc": "المساران ظاهران كمسارَين مستقلَّين",
+  "result": "PASS",
+  "detail": "weeklyWord=true quarterWord=true",
+  "shot": null
+ },
+ {
+  "id": "B05",
+  "desc": "مؤشّرات التغطية/المتوقَّع ظاهرة",
+  "result": "PASS",
+  "detail": "تغطية (2)",
+  "shot": null
+ },
+ {
+  "id": "B06",
+  "desc": "صفحة التصدير الماليّ (قراءة فقط)",
+  "result": "PASS",
+  "detail": "http://127.0.0.1:4430/app/kpi/finance-export",
+  "shot": "/tmp/rc045/shots/B06-finance.png"
+ },
+ {
+  "id": "B07",
+  "desc": "أسطح R22A — التسليمات",
+  "result": "PASS",
+  "detail": "len=29292",
+  "shot": "/tmp/rc045/shots/B07-submissions.png"
+ },
+ {
+  "id": "B08",
+  "desc": "أسطح R22A — المشاريع / Project 360",
+  "result": "PASS",
+  "detail": "len=3608",
+  "shot": "/tmp/rc045/shots/B08-projects.png"
+ },
+ {
+  "id": "B09",
+  "desc": "صفر 5xx في كلّ نداءات المتصفّح",
+  "result": "PASS",
+  "detail": "nets=36 5xx=0",
+  "shot": null
+ },
+ {
+  "id": "B10",
+  "desc": "صفر أخطاء Console غير مفسَّرة",
+  "result": "PASS",
+  "detail": "0",
+  "shot": null
+ }
+]

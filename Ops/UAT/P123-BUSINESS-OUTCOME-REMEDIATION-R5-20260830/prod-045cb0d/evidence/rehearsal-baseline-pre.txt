@@ -1,0 +1,39 @@
+ASSIGN_MD5|dfd2eb9f204d89e0217cb6ef13ab235c
+COL_EffectiveFrom|0
+COL_HireDate|0
+DB_SIZE|19 MB
+EVAL_MD5|8914fa6e98b203b1030027ca631b4c6e
+IDX_gin|0
+IDX_sfv_total|2
+KTA_SIZE|64 kB
+ROLES_MD5|a3ea0f521eb760825c87060a0ee7f0b4
+RPTTPL_MD5|5ebcc5cbb4885a9220ba7eee79fa9a5a
+SFV_INDEX_SIZE|320 kB
+SFV_SIZE|1096 kB
+SFV_TABLE_SIZE|680 kB
+TEMPLATE_MD5|6cc3329767f335177201cbb943cf5606
+USERS_MD5|9b4d73238c8e2c7b8780f48287d235fd
+audit_logs|1526
+clients|11
+departments|4
+kpi_evaluations|97
+kpi_results|992
+kpi_template_assignments|13
+kpi_template_versions|32
+kpi_templates|24
+last_migration|20260826073223_P123DirectoryNameUniqueness
+migrations|47
+notifications|1039
+projects|35
+report_submissions|328
+report_templates|41
+roleclaims_all|0
+roleclaims_perm|0
+roles|12
+submission_field_values|3536
+teams|9
+userclaims_all|0
+userclaims_perm|0
+userroles|39
+users_active|33
+users|34

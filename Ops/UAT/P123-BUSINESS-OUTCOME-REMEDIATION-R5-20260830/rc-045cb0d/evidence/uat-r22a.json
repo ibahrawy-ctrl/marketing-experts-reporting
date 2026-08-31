@@ -1,0 +1,128 @@
+[
+ {
+  "id": "G01",
+  "desc": "قوالب التقارير (ReportTemplateService)",
+  "result": "PASS",
+  "detail": "HTTP 200 · /api/report-templates · n=41"
+ },
+ {
+  "id": "G02",
+  "desc": "التسليمات (Submissions)",
+  "result": "PASS",
+  "detail": "HTTP 200 · /api/submissions · n=38"
+ },
+ {
+  "id": "G03",
+  "desc": "المشاريع",
+  "result": "PASS",
+  "detail": "HTTP 200 · /api/projects · n=30"
+ },
+ {
+  "id": "G04",
+  "desc": "العملاء",
+  "result": "PASS",
+  "detail": "HTTP 200 · /api/clients · n=8"
+ },
+ {
+  "id": "G08",
+  "desc": "قوالب KPI",
+  "result": "PASS",
+  "detail": "HTTP 200 · /api/kpi-templates · n=15"
+ },
+ {
+  "id": "G09",
+  "desc": "الدليل التنظيميّ",
+  "result": "PASS",
+  "detail": "HTTP 200 · /api/directory/departments · n=6"
+ },
+ {
+  "id": "G10",
+  "desc": "منح عرض التقارير",
+  "result": "PASS",
+  "detail": "HTTP 200 · /api/report-view-grants · n=0"
+ },
+ {
+  "id": "G11",
+  "desc": "نظرة عامة Project 360",
+  "result": "PASS",
+  "detail": "HTTP 200 · /api/projects/f8b97cf4-694a-49cc-9f95-92d731eaa4f4/overview"
+ },
+ {
+  "id": "G13",
+  "desc": "مسارات العمل",
+  "result": "PASS",
+  "detail": "HTTP 200 · /api/projects/f8b97cf4-694a-49cc-9f95-92d731eaa4f4/workstreams"
+ },
+ {
+  "id": "G14",
+  "desc": "الأهداف",
+  "result": "PASS",
+  "detail": "HTTP 200 · /api/projects/f8b97cf4-694a-49cc-9f95-92d731eaa4f4/objectives"
+ },
+ {
+  "id": "G05",
+  "desc": "لوحة معلوماتي (Dashboard)",
+  "result": "PASS",
+  "detail": "HTTP 200 · /api/dashboard/me · n=8"
+ },
+ {
+  "id": "G06",
+  "desc": "التقارير المستحقّة — نظرة عامة",
+  "result": "PASS",
+  "detail": "HTTP 200 · /api/reports/due/overview · n=10"
+ },
+ {
+  "id": "G07",
+  "desc": "اكتمال التسليمات",
+  "result": "PASS",
+  "detail": "HTTP 200 · /api/reports/submission-completeness · n=7"
+ },
+ {
+  "id": "G12",
+  "desc": "تقويم التقارير — دوراتي",
+  "result": "PASS",
+  "detail": "HTTP 200 · /api/reporting-calendar/my-cycles · n=7"
+ },
+ {
+  "id": "G15",
+  "desc": "نظرة عامة على التسليمات (شريحة)",
+  "result": "PASS",
+  "detail": "HTTP 200 · /api/submissions/overview · n=435"
+ },
+ {
+  "id": "G16",
+  "desc": "ملخّص التسليمات",
+  "result": "PASS",
+  "detail": "HTTP 200 · /api/submissions/summary · n=3"
+ },
+ {
+  "id": "G17",
+  "desc": "شريحة تسليمات المشروع 360",
+  "result": "PASS",
+  "detail": "HTTP 200 · /api/submissions/overview?projectId=f8b97cf4-694a-49cc-9f95-92d731eaa4f4 · n=435"
+ },
+ {
+  "id": "G18",
+  "desc": "تسليمات معلّقة للاعتماد",
+  "result": "PASS",
+  "detail": "HTTP 200 · /api/submissions/pending-approvals · n=0"
+ },
+ {
+  "id": "G19",
+  "desc": "امتثال التسليمات",
+  "result": "PASS",
+  "detail": "HTTP 200 · /api/reports/submission-compliance · n=12"
+ },
+ {
+  "id": "G20",
+  "desc": "اتّجاه الامتثال",
+  "result": "PASS",
+  "detail": "HTTP 200 · /api/reports/compliance-trend · n=2"
+ },
+ {
+  "id": "G21",
+  "desc": "استراتيجيّة المشروع (204 = لا محتوى، سلوك صحيح)",
+  "result": "PASS",
+  "detail": "HTTP 204"
+ }
+]

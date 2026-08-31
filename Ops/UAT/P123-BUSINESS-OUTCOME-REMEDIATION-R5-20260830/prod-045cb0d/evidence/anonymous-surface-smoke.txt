@@ -1,0 +1,70 @@
+# Smoke قراءة فقط بلا هويّة — الإنتاج بعد نشر 045cb0d
+# التاريخ: 2026-08-31 · القاعدة: http://127.0.0.1:5090 (خلفيّة) و https://reports.emarketingacademy.net (عام)
+# الدلالة: 401 = السطح موجود والتخويل مُفعَّل · 404 = سطح غير معروض (لا مسار مجرّد أو علم Phase 2 مطفأ)
+
+## الصحّة
+/health                                       200
+
+## أسطح R5 الجوهريّة (KPI Analytics)
+/api/kpi/performance                          401
+/api/kpi/rankings                             401
+/api/kpi/drilldown                            401
+/api/kpi/periods/resolve                      401
+/api/kpi/performance?cadence=WeeklyPulse      401
+/api/kpi/performance?cadence=Quarterly        401
+/api/kpi-templates                            401
+/api/kpi-evaluations                          401
+
+## أسطح R22A (Project 360 · Submissions · التقارير والقوالب)
+/api/submissions/overview                     401
+/api/submissions/summary                      401
+/api/reports/due/overview                     401
+/api/reports/submission-completeness          401
+/api/report-templates                         401
+/api/reporting-calendar/my-cycles             401
+/api/dashboard/me                             401
+/api/projects                                 401
+/api/clients                                  401
+
+## أسطح إداريّة وحوكميّة
+/api/directory/users                          401
+/api/directory/departments                    401
+/api/notifications                            401
+/api/audit-logs                               401
+/api/email-control/status                     401
+/api/governance/items                         401
+/api/report-view-grants                       401
+/api/employee-service-requests                401
+/api/leave-requests                           405 (المسار موجود؛ GET غير معرَّف على المجموعة)
+
+## أسطح Phase 2 — مُثبَتة مظلمة (العلم مطفأ ⟹ NotFound صراحةً في الكود)
+/api/employee-360/me                          404
+/api/attendance/me                            404
+/api/hr-operations/attendance/incidents       404
+
+## مسارات بلا GET على المجموعة المجرّدة (سلوك طبيعيّ)
+/api/kpi/analytics                            404
+/api/report-calendar                          404
+/api/balances                                 404
+/api/account-portfolio                        404
+/api/reporting/aggregation                    404
+
+## الواجهة عبر nginx (النطاق العامّ)
+/                                             200  (يقدّم index-DMOrtqov.js)
+/assets/index-DMOrtqov.js                     200
+/assets/index-Cz7lCSe8.css                    200
+/favicon.svg                                  200
+/health                                       200
+/api/submissions/overview  (مجهول)            401
+
+## تحقّق قراءة فقط من فعاليّة الفهارس الجديدة على الإنتاج
+$ set enable_seqscan=off;
+$ explain (costs off) select count(*) from submission_field_values where "ValueJson" @> '{"x":1}'::jsonb;
+ Aggregate
+   ->  Bitmap Heap Scan on submission_field_values
+         Recheck Cond: ("ValueJson" @> '{"x": 1}'::jsonb)
+         ->  Bitmap Index Scan on ix_submission_field_values_value_json_gin
+               Index Cond: ("ValueJson" @> '{"x": 1}'::jsonb)
+
+ix_submission_field_values_value_json_gin                        | valid=true | ready=true
+IX_kpi_template_assignments_ScopeType_ScopeId_EffectiveFrom_Ef~  | valid=true | ready=true

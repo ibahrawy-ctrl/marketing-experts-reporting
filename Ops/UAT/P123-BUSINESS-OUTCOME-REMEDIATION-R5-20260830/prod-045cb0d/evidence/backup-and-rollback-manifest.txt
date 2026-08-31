@@ -1,0 +1,30 @@
+# بيان النسخ الاحتياطيّة وحزمة التراجع — R5 ترقية الإنتاج 4b8902ee → 045cb0d
+# المسار على الخادم: /opt/reporting/backup-r5-prod-20260831T063127Z   (الحجم الكلّيّ 115 MB)
+# ملاحظة أمنيّة: لا تُنقَل ملفّات النسخ ولا ملفّ env إلى Git إطلاقًا.
+
+## 1) النسخة الثلاثيّة لقاعدة البيانات — db/  (مالك postgres · 0700)
+reporting_prod.custom.dump      1,503,035 B   sha256 5931e94151d4d6fed556c2bc40c8b885e67ebd24fd5115697745a124e4c39d41
+reporting_prod.schema.sql.gz       13,272 B   sha256 f9c4ff57c83a9d913f5f7a81903feb9c8dc3d20e47a0b2efc7fd6ad2a3bfaa8c
+reporting_prod.data.sql.gz      1,266,768 B   sha256 e4a77c0a8888f4a9fca1698ffae59ee278bf1b7577f8b2ea4310bf015dc31aa1
+
+### إثبات المحتوى (لا مجرّد وجود ملفّ)
+TOC_ENTRIES=520 · TOC_TABLE_DDL=84 · TOC_TABLE_DATA=84 · TOC_INDEX=199 · TOC_CONSTRAINT=134 · TOC_FKCONSTRAINT=50
+SCHEMA_GZIP_OK · SCHEMA_CREATE_TABLE=84 · SCHEMA_CREATE_INDEX=199
+DATA_GZIP_OK  · DATA_COPY_BLOCKS=84 · DATA_MIGRATION_ROWS=47
+⟹ الجداول 84 متطابقة عبر النسخ الثلاث · سجلّ الهجرات محفوظ كاملًا (47).
+
+## 2) حزمة التراجع — rollback/
+publish-4b8902ee/              86 ملفًّا · PKG_ALL = e91e655b21aabd6b
+frontend-dist-current/          7 ملفّات · FE_PKG  = 06e4bda669164a9f  (index-CJmoKVPQ.js + index-CmcRamKF.css)
+reporting-api.env.bak                      sha256(16) = afaac8b3ca9c61d0   (0600 — لا يُنشَر)
+reporting-api.service.bak                  sha256(16) = 1146b4f2e9674227
+كلّ البصمات مطابقة حرفيًّا لخطّ الأساس الملتقط في المرحلة 1 قبل أيّ كتابة.
+
+## 3) قوائم المرجع
+- سجلّ الهجرات قبل النشر (47): prod-applied.txt
+- معرّفات الهجرات داخل حزمة المرشّح (47): cand-migration-ids.txt
+- سجلّ RC (49) للمقارنة: rc-applied.txt
+- عدّادات وبصمات MD5 قبل/بعد: prod-baseline-pre.txt · prod-baseline-post.txt
+
+## 4) سياسة الاستبقاء
+النسخ محفوظة ولم تُحذف. لا يُحذف شيء منها إلّا بقرار منفصل وفق سياسة الاستبقاء الجارية.

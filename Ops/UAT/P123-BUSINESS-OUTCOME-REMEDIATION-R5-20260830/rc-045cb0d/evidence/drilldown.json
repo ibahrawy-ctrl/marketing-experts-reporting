@@ -1,0 +1,79 @@
+{
+ "periodResolved": {
+  "type": "Quarter",
+  "key": "2026-Q3",
+  "start": "2026-07-01",
+  "end": "2026-09-30",
+  "timezone": "Asia/Riyadh",
+  "isOpen": true,
+  "label": "الربع 3 — 2026"
+ },
+ "cadence": null,
+ "subjectUserId": null,
+ "recomputedValue": 96.25,
+ "rowCount": 3,
+ "rows": [
+  {
+   "evaluationId": "5e39b4ae-0ed5-4e2d-afa0-159f09ab86fa",
+   "subjectUserId": "5034a8dc-e924-4306-9797-d4c6eaf67596",
+   "subjectName": "أحمد عبدالفتاح",
+   "templateTitle": "مؤشرات Media Buyer",
+   "cadence": "WeeklyPulse",
+   "periodType": "Weekly",
+   "periodKey": "2026-W28",
+   "periodStart": "2026-07-04",
+   "periodEnd": "2026-07-10",
+   "status": "Approved",
+   "totalScore": 98.25,
+   "submittedAtUtc": "2026-07-09T08:15:15.318257Z"
+  },
+  {
+   "evaluationId": "5a1b2c3d-4e5f-4a6b-8c9d-0e1f2a3b4c5d",
+   "subjectUserId": "03b725e4-d996-432f-8771-79d67a659871",
+   "subjectName": "فاطمة محمد",
+   "templateTitle": "مؤشرات اداء admin assiatant",
+   "cadence": "WeeklyPulse",
+   "periodType": "Weekly",
+   "periodKey": "2026-W28",
+   "periodStart": "2026-07-04",
+   "periodEnd": "2026-07-10",
+   "status": "Approved",
+   "totalScore": 94.25,
+   "submittedAtUtc": "2026-07-13T09:00:00Z"
+  },
+  {
+   "evaluationId": "3d0664df-3aed-430f-b912-8277aba7633c",
+   "subjectUserId": "03b725e4-d996-432f-8771-79d67a659871",
+   "subjectName": "فاطمة محمد",
+   "templateTitle": "مؤشرات اداء admin assiatant",
+   "cadence": "WeeklyPulse",
+   "periodType": "Weekly",
+   "periodKey": "2026-W29",
+   "periodStart": "2026-07-11",
+   "periodEnd": "2026-07-17",
+   "status": "Approved",
+   "totalScore": 94.25,
+   "submittedAtUtc": "2026-07-26T21:39:08.201348Z"
+  }
+ ],
+ "calculatedAtUtc": "2026-08-31T04:57:23.2222333Z",
+ "measure": {
+  "value": null,
+  "eligibleEvaluationCount": 3,
+  "expectedEvaluationCount": 253,
+  "adjustedExpectedCount": 253,
+  "coverage": 0.01,
+  "missingCount": 250,
+  "excludedByStatusCount": 0,
+  "dataQuality": "InsufficientCoverage",
+  "previousValue": null,
+  "delta": null,
+  "trend": "Unknown",
+  "coveragePercent": 1.19,
+  "isProvisional": false,
+  "journeyState": "InProgress"
+ },
+ "sourcePeriods": null,
+ "effectiveCadence": null,
+ "cadenceSource": "notConfigured"
+}

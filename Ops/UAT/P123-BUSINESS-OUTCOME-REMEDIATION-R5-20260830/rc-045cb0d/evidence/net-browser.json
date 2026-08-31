@@ -1,0 +1,182 @@
+[
+ {
+  "m": "POST",
+  "p": "/api/auth/login",
+  "s": 200
+ },
+ {
+  "m": "POST",
+  "p": "/hubs/notifications/negotiate?negotiateVersion=1",
+  "s": 200
+ },
+ {
+  "m": "GET",
+  "p": "/api/notifications/unread-count",
+  "s": 200
+ },
+ {
+  "m": "GET",
+  "p": "/api/notifications",
+  "s": 200
+ },
+ {
+  "m": "GET",
+  "p": "/api/dashboard/me",
+  "s": 200
+ },
+ {
+  "m": "GET",
+  "p": "/api/directory/teams",
+  "s": 200
+ },
+ {
+  "m": "GET",
+  "p": "/api/directory/departments",
+  "s": 200
+ },
+ {
+  "m": "GET",
+  "p": "/api/directory/users?includeInactive=false",
+  "s": 200
+ },
+ {
+  "m": "GET",
+  "p": "/api/submissions",
+  "s": 200
+ },
+ {
+  "m": "GET",
+  "p": "/api/escalations?status=Open",
+  "s": 200
+ },
+ {
+  "m": "GET",
+  "p": "/api/decisions?status=Proposed",
+  "s": 200
+ },
+ {
+  "m": "GET",
+  "p": "/api/risks?status=Open",
+  "s": 200
+ },
+ {
+  "m": "GET",
+  "p": "/api/improvement-plans",
+  "s": 200
+ },
+ {
+  "m": "GET",
+  "p": "/api/kpi/performance?periodType=CurrentQuarter",
+  "s": 200
+ },
+ {
+  "m": "GET",
+  "p": "/api/reports/compliance-summary?weekKey=2026-W36",
+  "s": 200
+ },
+ {
+  "m": "GET",
+  "p": "/api/reports/workflow-bottlenecks/summary",
+  "s": 200
+ },
+ {
+  "m": "GET",
+  "p": "/api/auth/me",
+  "s": 200
+ },
+ {
+  "m": "GET",
+  "p": "/api/notifications/unread-count",
+  "s": 200
+ },
+ {
+  "m": "GET",
+  "p": "/api/notifications",
+  "s": 200
+ },
+ {
+  "m": "POST",
+  "p": "/hubs/notifications/negotiate?negotiateVersion=1",
+  "s": 200
+ },
+ {
+  "m": "GET",
+  "p": "/api/kpi/performance?periodType=CurrentQuarter",
+  "s": 200
+ },
+ {
+  "m": "GET",
+  "p": "/api/kpi/rankings?periodType=CurrentQuarter&take=6",
+  "s": 200
+ },
+ {
+  "m": "GET",
+  "p": "/api/auth/me",
+  "s": 200
+ },
+ {
+  "m": "GET",
+  "p": "/api/auth/me",
+  "s": 200
+ },
+ {
+  "m": "POST",
+  "p": "/hubs/notifications/negotiate?negotiateVersion=1",
+  "s": 200
+ },
+ {
+  "m": "GET",
+  "p": "/api/notifications/unread-count",
+  "s": 200
+ },
+ {
+  "m": "GET",
+  "p": "/api/notifications",
+  "s": 200
+ },
+ {
+  "m": "GET",
+  "p": "/api/directory/departments",
+  "s": 200
+ },
+ {
+  "m": "GET",
+  "p": "/api/directory/teams",
+  "s": 200
+ },
+ {
+  "m": "GET",
+  "p": "/api/directory/users?includeInactive=false",
+  "s": 200
+ },
+ {
+  "m": "GET",
+  "p": "/api/submissions/overview?page=1&pageSize=200&quickFilter=None",
+  "s": 200
+ },
+ {
+  "m": "GET",
+  "p": "/api/auth/me",
+  "s": 200
+ },
+ {
+  "m": "POST",
+  "p": "/hubs/notifications/negotiate?negotiateVersion=1",
+  "s": 200
+ },
+ {
+  "m": "GET",
+  "p": "/api/notifications",
+  "s": 200
+ },
+ {
+  "m": "GET",
+  "p": "/api/notifications/unread-count",
+  "s": 200
+ },
+ {
+  "m": "GET",
+  "p": "/api/projects?includeClosed=false",
+  "s": 200
+ }
+]

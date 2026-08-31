@@ -1,0 +1,152 @@
+[
+ {
+  "id": "S00",
+  "desc": "تسجيل دخول الحسابين الاصطناعيّين",
+  "result": "PASS",
+  "detail": "admin=True emp=True"
+ },
+ {
+  "id": "S01",
+  "desc": "وصول مجهول يُرجِع 401",
+  "result": "PASS",
+  "detail": "HTTP 401"
+ },
+ {
+  "id": "S02",
+  "desc": "فحص الصحّة",
+  "result": "PASS",
+  "detail": "{'status': 'ok', 'service': 'reporting-api'}"
+ },
+ {
+  "id": "S03",
+  "desc": "/api/kpi/performance بلا cadence (الربع الجاري)",
+  "result": "PASS",
+  "detail": "HTTP 200 keys=['periodResolved', 'previousPeriodResolved', 'cadence', 'scopeType', 'company', 'departments', 'teams', 'employees', 'calculatedAtUtc']"
+ },
+ {
+  "id": "S05",
+  "desc": "المسار الربعيّ الرسميّ cadence=Quarterly",
+  "result": "PASS",
+  "detail": "HTTP 200"
+ },
+ {
+  "id": "S06",
+  "desc": "/api/kpi/periods/resolve",
+  "result": "PASS",
+  "detail": "{\"current\": {\"type\": \"Quarter\", \"key\": \"2026-Q3\", \"start\": \"2026-07-01\", \"end\": \"2026-09-30\", \"timezone\": \"Asia/Riyadh\", \"isOpen\": true, \"label\": \"الربع 3 — 2026\"}, \"previous\": {\"type\": \"Quarter\", \"ke"
+ },
+ {
+  "id": "S07",
+  "desc": "/api/kpi/drilldown",
+  "result": "PASS",
+  "detail": "HTTP 200 type=dict"
+ },
+ {
+  "id": "S08",
+  "desc": "/api/kpi/rankings",
+  "result": "PASS",
+  "detail": "HTTP 200"
+ },
+ {
+  "id": "S10",
+  "desc": "نطاق الموظّف على /api/kpi/performance بلا 5xx",
+  "result": "PASS",
+  "detail": "HTTP 200"
+ },
+ {
+  "id": "S04",
+  "desc": "المسار الأسبوعيّ الصريح cadence=WeeklyPulse",
+  "result": "PASS",
+  "detail": "HTTP 200 cadence=WeeklyPulse"
+ },
+ {
+  "id": "S11",
+  "desc": "استقلال عدّادَي المسارَين لنفس الفترة",
+  "result": "PASS",
+  "detail": "weekly.company={\"groupType\": \"Company\", \"groupId\": null, \"groupName\": null, \"measure\": {\"value\": null, \"eligibleEvaluationCount\": 3, \"expectedEvaluationCount\": 481,  | quarterly.company={\"groupType\": \"Company\", \"groupId\": null, \"groupName\": null, \"measure\": {\"value\": null, \"eligibleEvaluationCount\": 0, \"expectedEvaluationCount\": 37, \""
+ },
+ {
+  "id": "S13",
+  "desc": "الفترة الافتراضيّة = الربع الجاري Asia/Riyadh",
+  "result": "PASS",
+  "detail": "{\"type\": \"Quarter\", \"key\": \"2026-Q3\", \"start\": \"2026-07-01\", \"end\": \"2026-09-30\", \"timezone\": \"Asia/Riyadh\", \"isOpen\": true, \"label\": \"الربع 3 — 2026\"}"
+ },
+ {
+  "id": "S15",
+  "desc": "التصدير الماليّ (قراءة فقط)",
+  "result": "PASS",
+  "detail": "HTTP 200 rows=0 keys=['year', 'quarter', 'periodLabel', 'rangeStart', 'rangeEnd', 'status', 'rowCount', 'rows']"
+ },
+ {
+  "id": "S16",
+  "desc": "التصدير الماليّ ربعيّ حصرًا (لا معامل cadence)",
+  "result": "PASS",
+  "detail": "التوقيع year/quarter/status فقط — لا معامل cadence في العقد"
+ },
+ {
+  "id": "S17",
+  "desc": "مُصادَق غير مخوَّل ⇒ 403 · مجهول ⇒ 401",
+  "result": "PASS",
+  "detail": "{'/api/email-control/status': 403, '/api/audit-logs': 403, '/api/kpi-evaluations/finance-export?year=2026&quarter=3&status=Approved': 403, 'ANON /api/email-control/status': 401}"
+ },
+ {
+  "id": "S12",
+  "desc": "بلا cadence ⇒ الخادم يحسم تواتر كلّ موظّف (لا سقوط صامت ولا خلط)",
+  "result": "PASS",
+  "detail": "default.expected=253 ≠ weekly 481 ≠ quarterly 37"
+ },
+ {
+  "id": "S14",
+  "desc": "حقول Expected/AdjustedExpected/Coverage/الحالة حاضرة داخل measure",
+  "result": "PASS",
+  "detail": "['adjustedExpectedCount', 'coverage', 'coveragePercent', 'dataQuality', 'delta', 'eligibleEvaluationCount', 'excludedByStatusCount', 'expectedEvaluationCount', 'isProvisional', 'journeyState', 'missingCount', 'previousValue', 'trend', 'value']"
+ },
+ {
+  "id": "S19",
+  "desc": "استقلال المسارَين عدديًّا لنفس الفترة 2026-Q3",
+  "result": "PASS",
+  "detail": "WeeklyPulse expected=481 eligible=3 | Quarterly expected=37 eligible=0"
+ },
+ {
+  "id": "S20",
+  "desc": "الحالة المسمّاة عند نقص التغطية",
+  "result": "PASS",
+  "detail": "weekly.dataQuality=InsufficientCoverage value=None coverage%=0.62 | quarterly.dataQuality=NoData coverage%=0"
+ },
+ {
+  "id": "S21",
+  "desc": "النبض الأسبوعيّ لا يدخل المتوسّط الرسميّ رغم وجود قيَم فرديّة",
+  "result": "PASS",
+  "detail": "قيَم مستبعَدة=[98.25, 94.25] → company.value=None"
+ },
+ {
+  "id": "S22",
+  "desc": "سُلَّم الأولويّة يُطبَّق لكلّ مسار على حدة (effectiveCadence/cadenceSource)",
+  "result": "PASS",
+  "detail": "[('أحمد عبدالفتاح', 'WeeklyPulse', 'jobRole'), ('فاطمة محمد', 'WeeklyPulse', 'jobRole')]"
+ },
+ {
+  "id": "S23",
+  "desc": "عدّادات الموظّف نفسه مستقلّة بين المسارَين",
+  "result": "PASS",
+  "detail": "أحمد عبدالفتاح: weekly expected=13/eligible=1 vs quarterly expected=1/eligible=0"
+ },
+ {
+  "id": "S24",
+  "desc": "Drill-down يعمل على المسار الأسبوعيّ",
+  "result": "PASS",
+  "detail": "HTTP 200 keys=['periodResolved', 'cadence', 'subjectUserId', 'recomputedValue', 'rowCount', 'rows', 'calculatedAtUtc', 'measure']"
+ },
+ {
+  "id": "S25",
+  "desc": "Rankings يستبعد غير المؤهّلين للترتيب",
+  "result": "PASS",
+  "detail": "HTTP 200 {\"periodResolved\": {\"type\": \"Quarter\", \"key\": \"2026-Q3\", \"start\": \"2026-07-01\", \"end\": \"2026-09-30\", \"timezone\": \"Asia/Riyadh\", \"isOpen\": true, \"label\": \"الربع 3 — 2026\"}, \"cadence"
+ },
+ {
+  "id": "S26",
+  "desc": "التصدير الماليّ لا يتأثّر بمعامل cadence (ربعيّ حصرًا)",
+  "result": "PASS",
+  "detail": "rowCount=0 identical=True"
+ }
+]
