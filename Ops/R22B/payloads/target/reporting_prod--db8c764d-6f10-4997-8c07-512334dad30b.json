@@ -1,0 +1,181 @@
+{
+  "db": "reporting_prod",
+  "title": "تقرير المديرشن الأسبوعي",
+  "templateId": "db8c764d-6f10-4997-8c07-512334dad30b",
+  "fromVersion": 8,
+  "fromVersionId": "48374cdf-9073-4ee3-ad43-09ef8ce8d126",
+  "projectSectionFieldKey": null,
+  "projectSectionFieldLabel": "تفاصيل المشروع",
+  "seededFromProduction": false,
+  "actualStaleConfig": null,
+  "before": {
+    "fields": [
+      {
+        "key": "activity_type",
+        "type": "Select",
+        "label": "نوع النشاط",
+        "columns": null,
+        "options": [
+          "Comments",
+          "Inbox",
+          "Messenger",
+          "WhatsApp",
+          "Instagram DM",
+          "TikTok Messages"
+        ],
+        "required": true,
+        "catalogDomain": "activity_type"
+      },
+      {
+        "key": "interaction_result",
+        "type": "Select",
+        "label": "نتيجة التفاعل",
+        "columns": null,
+        "options": [
+          "Inquiry",
+          "Lead",
+          "Complaint",
+          "Escalated",
+          "Closed",
+          "Follow-up"
+        ],
+        "required": true,
+        "catalogDomain": "interaction_result"
+      },
+      {
+        "key": "response_time",
+        "type": "Select",
+        "label": "زمن الاستجابة",
+        "columns": null,
+        "options": [
+          "أقل من ساعة",
+          "أقل من 4 ساعات",
+          "أقل من يوم",
+          "أكثر من يوم"
+        ],
+        "required": true,
+        "catalogDomain": "response_time"
+      },
+      {
+        "key": "count",
+        "type": "Number",
+        "label": "العدد",
+        "columns": null,
+        "options": null,
+        "required": true,
+        "catalogDomain": null
+      },
+      {
+        "key": "notes",
+        "type": "LongText",
+        "label": "ملاحظات",
+        "columns": null,
+        "options": null,
+        "required": false,
+        "catalogDomain": null
+      }
+    ],
+    "maxProjects": 0,
+    "minProjects": 1,
+    "projectRequired": true
+  },
+  "after": {
+    "maxProjects": 0,
+    "minProjects": 1,
+    "projectRequired": true,
+    "fields": [],
+    "schemaVersion": 2,
+    "workItems": {
+      "key": "workItems",
+      "label": "بنود العمل",
+      "addLabel": "+ إضافة بند عمل",
+      "itemLabel": "بند عمل",
+      "minItems": 1,
+      "maxItems": 0,
+      "uniqueBy": [],
+      "fields": [
+        {
+          "key": "activity_type",
+          "type": "Select",
+          "label": "نوع النشاط",
+          "columns": null,
+          "options": [
+            "Comments",
+            "Inbox",
+            "Messenger",
+            "WhatsApp",
+            "Instagram DM",
+            "TikTok Messages"
+          ],
+          "required": true,
+          "catalogDomain": "activity_type"
+        },
+        {
+          "key": "interaction_result",
+          "type": "Select",
+          "label": "نتيجة التفاعل",
+          "columns": null,
+          "options": [
+            "Inquiry",
+            "Lead",
+            "Complaint",
+            "Escalated",
+            "Closed",
+            "Follow-up"
+          ],
+          "required": true,
+          "catalogDomain": "interaction_result"
+        },
+        {
+          "key": "response_time",
+          "type": "Select",
+          "label": "زمن الاستجابة",
+          "columns": null,
+          "options": [
+            "أقل من ساعة",
+            "أقل من 4 ساعات",
+            "أقل من يوم",
+            "أكثر من يوم"
+          ],
+          "required": true,
+          "catalogDomain": "response_time"
+        },
+        {
+          "key": "count",
+          "type": "Number",
+          "label": "العدد",
+          "columns": null,
+          "options": null,
+          "required": true,
+          "catalogDomain": null
+        },
+        {
+          "key": "notes",
+          "type": "LongText",
+          "label": "ملاحظات",
+          "columns": null,
+          "options": null,
+          "required": false,
+          "catalogDomain": null
+        }
+      ]
+    }
+  },
+  "beforeMd5": "743ed4f7b204cfa62cde3cfc11c70197",
+  "afterMd5": "318fab71d1b5b7b2f192ac55a0a253be",
+  "projectFieldsBefore": [
+    "activity_type",
+    "interaction_result",
+    "response_time",
+    "count",
+    "notes"
+  ],
+  "projectFieldsAfter": [],
+  "workItemFieldsAfter": [
+    "activity_type",
+    "interaction_result",
+    "response_time",
+    "count",
+    "notes"
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "database": "reporting_test_uat",
+  "submissionId": "d07d6c4e-f7eb-45d4-a681-1810fdb60cfc",
+  "mode": "APPLY",
+  "runAtUtc": "2026-08-31T07:55:57.4598832Z",
+  "periodKey": "2026-W35",
+  "submitterId": "c922d4c2-957e-4d97-9b93-db91c26c99f0",
+  "status": "Draft",
+  "templateVersionId": "e36d04d3-b8c9-4c0e-b41d-0e5ff7588032",
+  "updatedAtUtcBefore": "2026-08-31T05:50:04.7440430Z",
+  "prsPayloadMd5Before": "ec8d7b9fc7e33598c109be3187ef56af",
+  "generalFieldsMd5Before": "216a6673500526d58cff137cd1d631db",
+  "generalFieldCount": 2,
+  "sections": [
+    {
+      "fieldId": "5711aab6-be17-433d-a000-d01efd090eda",
+      "label": "\u062A\u0641\u0627\u0635\u064A\u0644 \u0627\u0644\u0645\u0634\u0631\u0648\u0639",
+      "oldProjectEntries": 11,
+      "uniqueProjectIds": 4,
+      "projectEntryCountAfter": 4,
+      "uniqueProjectIdCountAfter": 4,
+      "duplicateProjectIds": 0,
+      "totalWorkItemCount": 11,
+      "workItemsPerProject": [
+        3,
+        1,
+        2,
+        5
+      ],
+      "projectIdOrder": [
+        "d13a438c-bdda-4d09-a992-284fe21cabaa",
+        "c7ea6b1d-9bcd-4cda-a103-4de88c77f9cb",
+        "9e731196-f87f-4bbf-82cd-260d06d90b56",
+        "51710a1a-386d-4cce-a8ac-0665aaee9d9b"
+      ],
+      "semanticValuePairsBefore": 53,
+      "semanticValuePairsAfter": 53,
+      "missingValues": 0,
+      "orphanValues": 0,
+      "addedValues": 0,
+      "unknownKeys": 0,
+      "unknownKeyList": [],
+      "generalSummariesMoved": 0,
+      "projectLevelPairsBefore": 0,
+      "projectLevelPairsAfter": 0,
+      "semanticMd5Before": "b58311638b95feb297710c82dde4b073",
+      "semanticMd5After": "b58311638b95feb297710c82dde4b073",
+      "payloadMd5Before": "ec8d7b9fc7e33598c109be3187ef56af",
+      "safe": true,
+      "payloadMd5After": "f921efb6ba437c799bb0fe4779ee50c4",
+      "written": true
+    }
+  ],
+  "safe": true,
+  "generalFieldsMd5After": "216a6673500526d58cff137cd1d631db",
+  "applied": true,
+  "updatedAtUtcAfter": "2026-08-31T07:55:57.8382816Z"
+}

@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>R22BWorkItemsPublisher</RootNamespace>
+    <AssemblyName>R22BWorkItemsPublisher</AssemblyName>
+    <!-- أداة صيانة تشغيليّة لمرّة واحدة، خارج Reporting.sln ولا تُنشر مع الـAPI.
+         تتبع نمط reporting-backend/tools/ModerationV6Publisher حرفيًّا:
+         Dry-Run افتراضيّ · معاملة واحدة · قفل advisory · لا هجرات · لا حذف. -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\reporting-backend\src\Reporting.Infrastructure\Reporting.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

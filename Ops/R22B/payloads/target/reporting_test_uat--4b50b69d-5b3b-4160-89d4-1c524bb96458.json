@@ -1,0 +1,193 @@
+{
+  "db": "reporting_test_uat",
+  "title": "تقرير فريق التصميم",
+  "templateId": "4b50b69d-5b3b-4160-89d4-1c524bb96458",
+  "fromVersion": 4,
+  "fromVersionId": "597d49f9-754d-42d8-b452-3112df1c912a",
+  "projectSectionFieldKey": null,
+  "projectSectionFieldLabel": "تفاصيل المشروع",
+  "seededFromProduction": false,
+  "actualStaleConfig": null,
+  "before": {
+    "fields": [
+      {
+        "key": "design_type",
+        "type": "Select",
+        "label": "نوع التصميم",
+        "columns": null,
+        "options": [
+          "Carousel",
+          "Static",
+          "Story",
+          "Infographic",
+          "Banner",
+          "Thumbnail",
+          "Presentation",
+          "Website Section",
+          "Landing Page",
+          "Logo",
+          "Brand Identity",
+          "Print",
+          "Motion Assets"
+        ],
+        "required": true,
+        "catalogDomain": "design_type"
+      },
+      {
+        "key": "design_status",
+        "type": "Select",
+        "label": "حالة التصميم",
+        "columns": null,
+        "options": [
+          "New",
+          "Revision",
+          "Final",
+          "Delivered"
+        ],
+        "required": true,
+        "catalogDomain": "design_status"
+      },
+      {
+        "key": "design_tool",
+        "type": "Select",
+        "label": "أداة التنفيذ",
+        "columns": null,
+        "options": [
+          "Photoshop",
+          "Illustrator",
+          "Canva",
+          "Figma",
+          "AI Assisted"
+        ],
+        "required": true,
+        "catalogDomain": "design_tool"
+      },
+      {
+        "key": "count",
+        "type": "Number",
+        "label": "العدد",
+        "columns": null,
+        "options": null,
+        "required": true,
+        "catalogDomain": null
+      },
+      {
+        "key": "notes",
+        "type": "LongText",
+        "label": "ملاحظات",
+        "columns": null,
+        "options": null,
+        "required": false,
+        "catalogDomain": null
+      }
+    ],
+    "maxProjects": 0,
+    "minProjects": 1,
+    "projectRequired": true
+  },
+  "after": {
+    "maxProjects": 0,
+    "minProjects": 1,
+    "projectRequired": true,
+    "fields": [],
+    "schemaVersion": 2,
+    "workItems": {
+      "key": "workItems",
+      "label": "بنود العمل",
+      "addLabel": "+ إضافة بند عمل",
+      "itemLabel": "بند عمل",
+      "minItems": 1,
+      "maxItems": 0,
+      "uniqueBy": [],
+      "fields": [
+        {
+          "key": "design_type",
+          "type": "Select",
+          "label": "نوع التصميم",
+          "columns": null,
+          "options": [
+            "Carousel",
+            "Static",
+            "Story",
+            "Infographic",
+            "Banner",
+            "Thumbnail",
+            "Presentation",
+            "Website Section",
+            "Landing Page",
+            "Logo",
+            "Brand Identity",
+            "Print",
+            "Motion Assets"
+          ],
+          "required": true,
+          "catalogDomain": "design_type"
+        },
+        {
+          "key": "design_status",
+          "type": "Select",
+          "label": "حالة التصميم",
+          "columns": null,
+          "options": [
+            "New",
+            "Revision",
+            "Final",
+            "Delivered"
+          ],
+          "required": true,
+          "catalogDomain": "design_status"
+        },
+        {
+          "key": "design_tool",
+          "type": "Select",
+          "label": "أداة التنفيذ",
+          "columns": null,
+          "options": [
+            "Photoshop",
+            "Illustrator",
+            "Canva",
+            "Figma",
+            "AI Assisted"
+          ],
+          "required": true,
+          "catalogDomain": "design_tool"
+        },
+        {
+          "key": "count",
+          "type": "Number",
+          "label": "العدد",
+          "columns": null,
+          "options": null,
+          "required": true,
+          "catalogDomain": null
+        },
+        {
+          "key": "notes",
+          "type": "LongText",
+          "label": "ملاحظات",
+          "columns": null,
+          "options": null,
+          "required": false,
+          "catalogDomain": null
+        }
+      ]
+    }
+  },
+  "beforeMd5": "1ea7260ebaf8d588806021262bfa98a1",
+  "afterMd5": "f40c53204033c9f90b5f56ba3254b899",
+  "projectFieldsBefore": [
+    "design_type",
+    "design_status",
+    "design_tool",
+    "count",
+    "notes"
+  ],
+  "projectFieldsAfter": [],
+  "workItemFieldsAfter": [
+    "design_type",
+    "design_status",
+    "design_tool",
+    "count",
+    "notes"
+  ]
+}

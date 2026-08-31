@@ -1,0 +1,1498 @@
+{
+    "totals": {
+        "fields": 1398,
+        "versions": 102,
+        "templates": 41,
+        "assignments": 24,
+        "emailOutbox": 0,
+        "fieldValues": 445,
+        "submissions": 40,
+        "emailNotifications": 135
+    },
+    "openDrafts": [
+        {
+            "status": "Draft",
+            "values": [
+            ],
+            "isEmpty": true,
+            "template": "التقرير المالي",
+            "periodKey": "2026-W28",
+            "submitter": "mohamedaboatwa2014@gmail.com",
+            "versionId": "462e386a-0275-42b4-9bbb-f158b6593d19",
+            "payloadMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "periodType": "Weekly",
+            "templateId": "5992edd9-367d-4767-a4ad-1a5a9c34d10d",
+            "valueCount": 0,
+            "submitterId": "4e0117f2-8e47-4d05-ba0e-b990b44768fb",
+            "createdAtUtc": "2026-07-09T13:09:29.92703+00:00",
+            "submissionId": "77edfa73-4e5d-479e-97c5-8e89c2fc3364",
+            "updatedAtUtc": null,
+            "versionNumber": 1
+        },
+        {
+            "status": "Draft",
+            "values": [
+                {
+                    "bool": null,
+                    "date": null,
+                    "json": null,
+                    "text": null,
+                    "number": null,
+                    "fieldId": "184ff0b2-e2d8-4897-8ed2-f9017a66af27",
+                    "fieldKey": null,
+                    "fieldType": "SectionHeader",
+                    "fieldLabel": "📁 تفاصيل المشاريع"
+                },
+                {
+                    "bool": null,
+                    "date": null,
+                    "json": [
+                        {
+                            "answers": {
+                                "issues": "لم يتم تعديل الموقع،ولم يتم التعاقد مع مدارس ",
+                                "next_week": "-",
+                                "pieces_grid": "[[\"\",\"\",\"\",\"\",\"\",\"\"]]",
+                                "return_reason": "-",
+                                "project_status": "🟡 مستقر"
+                            },
+                            "projectId": "cfcb9c13-1a0e-47c8-8a1a-5da7a06ee014"
+                        },
+                        {
+                            "answers": {
+                                "pieces_grid": "[[\"\",\"\",\"\",\"\",\"\",\"\"]]"
+                            },
+                            "projectId": "7fea3a95-d7af-472f-831f-b19696f71397"
+                        },
+                        {
+                            "answers": {
+                                "return_reason": "لمً يتم الاعاده ولكن تم اضافه",
+                                "project_status": "🟡 مستقر"
+                            },
+                            "projectId": "8b72f9f5-5bd6-4ac9-9423-cd28a11df8fb"
+                        },
+                        {
+                            "answers": {
+                            },
+                            "projectId": null
+                        }
+                    ],
+                    "text": null,
+                    "number": null,
+                    "fieldId": "b48fc0a0-3ed8-42d6-afad-f85d6dc7e414",
+                    "fieldKey": null,
+                    "fieldType": "ProjectRepeatableSection",
+                    "fieldLabel": "المشروع"
+                }
+            ],
+            "isEmpty": false,
+            "template": "تقرير كاتب المحتوى الأسبوعي",
+            "periodKey": "2026-W27",
+            "submitter": "esraahosafy@gmail.com",
+            "versionId": "3428fde8-faf7-4742-a85d-3d1db20ab1fb",
+            "payloadMd5": "15c7e42a17bd053aa70d4935189c4592",
+            "periodType": "Weekly",
+            "templateId": "5e6ad325-b26c-4fd6-b4f8-d415dae44c89",
+            "valueCount": 2,
+            "submitterId": "84d71430-d300-4578-8a9e-a0e7e8fe886e",
+            "createdAtUtc": "2026-07-08T20:45:51.860039+00:00",
+            "submissionId": "f116a7ef-93b1-4670-aebe-09334c557448",
+            "updatedAtUtc": "2026-07-08T21:01:08.491814+00:00",
+            "versionNumber": 5
+        },
+        {
+            "status": "Draft",
+            "values": [
+            ],
+            "isEmpty": true,
+            "template": "📊 تقرير مبيعات B2C — بيانات جديدة/قديمة",
+            "periodKey": "2026-07-09",
+            "submitter": "reemgaballah17@gmail.com",
+            "versionId": "69dbaf83-d95a-45b5-b89e-719a94369046",
+            "payloadMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "periodType": "Daily",
+            "templateId": "234c5a7c-c50a-43cb-b3e0-8f8199521235",
+            "valueCount": 0,
+            "submitterId": "9102630f-bbd8-4121-b8e5-34cb6ebce170",
+            "createdAtUtc": "2026-07-09T06:03:40.544909+00:00",
+            "submissionId": "fbb8c4ec-50b6-4ecb-9289-3a8f6ba61898",
+            "updatedAtUtc": null,
+            "versionNumber": 1
+        }
+    ],
+    "capturedAtUtc": "2026-08-31T02:17:39.984397",
+    "versionFingerprints": [
+        {
+            "template": "التقرير المالي",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "462e386a-0275-42b4-9bbb-f158b6593d19",
+            "fieldCount": 23,
+            "isPublished": true,
+            "versionNumber": 1
+        },
+        {
+            "template": "تقرير التيم ليدر للسوشيال ميديا",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "69134880-562d-42ad-9dc1-b9c33e5cb470",
+            "fieldCount": 23,
+            "isPublished": true,
+            "versionNumber": 1
+        },
+        {
+            "template": "تقرير التيم ليدر للسوشيال ميديا",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "a6834e5c-2cc1-4d3b-ba44-a04929edda9f",
+            "fieldCount": 20,
+            "isPublished": true,
+            "versionNumber": 2
+        },
+        {
+            "template": "تقرير الحسابات",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "96008db4-0eea-4ae3-92e1-3f7ac2c6e30f",
+            "fieldCount": 18,
+            "isPublished": true,
+            "versionNumber": 1
+        },
+        {
+            "template": "تقرير المدير العام",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "9860032f-55b5-48e9-969b-9d0eaa78f56b",
+            "fieldCount": 24,
+            "isPublished": true,
+            "versionNumber": 1
+        },
+        {
+            "template": "تقرير المديرشن الأسبوعي",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "152943c3-2778-4338-8ebb-6b881c40cbf2",
+            "fieldCount": 20,
+            "isPublished": false,
+            "versionNumber": 1
+        },
+        {
+            "template": "تقرير المديرشن الأسبوعي",
+            "fieldsMd5": "689378bd64d478f420db1eb0960ca6e3",
+            "versionId": "9b2d7c41-3e58-4a90-bf12-7d6c0a51e8f4",
+            "fieldCount": 27,
+            "isPublished": false,
+            "versionNumber": 2
+        },
+        {
+            "template": "تقرير المديرشن الأسبوعي",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "1e3a10e2-b3f7-4e75-92e6-bdfcc9327ad1",
+            "fieldCount": 18,
+            "isPublished": false,
+            "versionNumber": 3
+        },
+        {
+            "template": "تقرير المديرشن الأسبوعي",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "d2c9f1e1-9dfb-4791-85a7-058d06f9a88a",
+            "fieldCount": 13,
+            "isPublished": false,
+            "versionNumber": 4
+        },
+        {
+            "template": "تقرير المديرشن الأسبوعي",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "1638f686-65f7-460b-9754-ba50804eda16",
+            "fieldCount": 2,
+            "isPublished": false,
+            "versionNumber": 5
+        },
+        {
+            "template": "تقرير المديرشن الأسبوعي",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "b51a6176-2367-48ad-9bf3-e1ba7a159891",
+            "fieldCount": 2,
+            "isPublished": false,
+            "versionNumber": 6
+        },
+        {
+            "template": "تقرير المديرشن الأسبوعي",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "a99b4c03-d789-424a-8b8d-af7be18ec579",
+            "fieldCount": 5,
+            "isPublished": false,
+            "versionNumber": 7
+        },
+        {
+            "template": "تقرير المديرشن الأسبوعي",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "d767997b-8eea-4765-a0cd-b157ecf072a7",
+            "fieldCount": 5,
+            "isPublished": true,
+            "versionNumber": 8
+        },
+        {
+            "template": "تقرير فريق التصميم",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "1766cae0-e943-4dc4-91c7-d9ef8c788223",
+            "fieldCount": 16,
+            "isPublished": false,
+            "versionNumber": 1
+        },
+        {
+            "template": "تقرير فريق التصميم",
+            "fieldsMd5": "b58608237fab7b90413604a681e4726e",
+            "versionId": "4a30e313-b08b-4c53-a88e-d834c6c1b7a3",
+            "fieldCount": 22,
+            "isPublished": false,
+            "versionNumber": 2
+        },
+        {
+            "template": "تقرير فريق التصميم",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "64606b49-616a-4afe-8735-6ec9824375f6",
+            "fieldCount": 18,
+            "isPublished": false,
+            "versionNumber": 3
+        },
+        {
+            "template": "تقرير فريق التصميم",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "85d02a7a-6429-48e8-b1c0-a85031107e0d",
+            "fieldCount": 13,
+            "isPublished": false,
+            "versionNumber": 4
+        },
+        {
+            "template": "تقرير فريق التصميم",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "eecfd9f7-1c8f-4554-a689-51f6bf1fa08f",
+            "fieldCount": 2,
+            "isPublished": false,
+            "versionNumber": 5
+        },
+        {
+            "template": "تقرير فريق التصميم",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "f52bae4c-085e-4492-b14d-38d78357cd8d",
+            "fieldCount": 5,
+            "isPublished": false,
+            "versionNumber": 6
+        },
+        {
+            "template": "تقرير فريق التصميم",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "6c4ce613-0d41-4e00-b87b-3f48e2611cb9",
+            "fieldCount": 5,
+            "isPublished": true,
+            "versionNumber": 7
+        },
+        {
+            "template": "تقرير فريق الفيديو",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "1373d5ac-0176-4f3d-97d0-6a05384ee87c",
+            "fieldCount": 16,
+            "isPublished": false,
+            "versionNumber": 1
+        },
+        {
+            "template": "تقرير فريق الفيديو",
+            "fieldsMd5": "0ba26f7beb0ed109dc41694dd9fcb638",
+            "versionId": "9d34f561-eb10-4b84-852e-103a82f8085b",
+            "fieldCount": 24,
+            "isPublished": false,
+            "versionNumber": 2
+        },
+        {
+            "template": "تقرير فريق الفيديو",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "8c9c8692-987d-455c-84f0-a4dbdd84c9b1",
+            "fieldCount": 18,
+            "isPublished": false,
+            "versionNumber": 3
+        },
+        {
+            "template": "تقرير فريق الفيديو",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "9ce3f1b4-51d7-49e1-b574-7bb481aad6a4",
+            "fieldCount": 13,
+            "isPublished": false,
+            "versionNumber": 4
+        },
+        {
+            "template": "تقرير فريق الفيديو",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "50e0cd96-5c52-4de7-9980-731acb5cfd5d",
+            "fieldCount": 2,
+            "isPublished": false,
+            "versionNumber": 5
+        },
+        {
+            "template": "تقرير فريق الفيديو",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "e2f62ad7-285a-47bf-b70b-5da9600e54e8",
+            "fieldCount": 5,
+            "isPublished": false,
+            "versionNumber": 6
+        },
+        {
+            "template": "تقرير فريق الفيديو",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "1e1957ae-2408-4cd4-8a39-a0633e59e4a2",
+            "fieldCount": 5,
+            "isPublished": true,
+            "versionNumber": 7
+        },
+        {
+            "template": "تقرير فريق مبيعات الأكاديمية",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "79bd6b10-4c8d-4759-8b23-7f8d775f12b6",
+            "fieldCount": 9,
+            "isPublished": true,
+            "versionNumber": 1
+        },
+        {
+            "template": "تقرير قائد فريق SEO",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "5dbcb6a3-a7e8-4bf0-87df-a0c65926a5ae",
+            "fieldCount": 18,
+            "isPublished": true,
+            "versionNumber": 1
+        },
+        {
+            "template": "تقرير قائد فريق SEO",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "c44ada2c-42ff-4e18-9fe7-73922706f5b7",
+            "fieldCount": 20,
+            "isPublished": true,
+            "versionNumber": 2
+        },
+        {
+            "template": "تقرير كاتب المحتوى الأسبوعي",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "00af961a-6efd-492b-8de4-764242177552",
+            "fieldCount": 14,
+            "isPublished": false,
+            "versionNumber": 1
+        },
+        {
+            "template": "تقرير كاتب المحتوى الأسبوعي",
+            "fieldsMd5": "9e423bffb81830c19775cf8f3c564192",
+            "versionId": "2de43af0-019d-4d5a-b609-f1187d0c76f3",
+            "fieldCount": 21,
+            "isPublished": false,
+            "versionNumber": 2
+        },
+        {
+            "template": "تقرير كاتب المحتوى الأسبوعي",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "3fe17387-8e00-4028-854d-d74025b3227d",
+            "fieldCount": 16,
+            "isPublished": false,
+            "versionNumber": 3
+        },
+        {
+            "template": "تقرير كاتب المحتوى الأسبوعي",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "5a2209a4-72cc-4264-8f94-7f765a6645e1",
+            "fieldCount": 11,
+            "isPublished": false,
+            "versionNumber": 4
+        },
+        {
+            "template": "تقرير كاتب المحتوى الأسبوعي",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "3428fde8-faf7-4742-a85d-3d1db20ab1fb",
+            "fieldCount": 2,
+            "isPublished": false,
+            "versionNumber": 5
+        },
+        {
+            "template": "تقرير كاتب المحتوى الأسبوعي",
+            "fieldsMd5": "ca928e90a358019ac7d057e764b58056",
+            "versionId": "749f44cf-1bd9-4ad6-b568-37f2572a9001",
+            "fieldCount": 3,
+            "isPublished": false,
+            "versionNumber": 6
+        },
+        {
+            "template": "تقرير كاتب المحتوى الأسبوعي",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "de3c466f-cbae-4fd1-940c-6044a600630f",
+            "fieldCount": 5,
+            "isPublished": false,
+            "versionNumber": 7
+        },
+        {
+            "template": "تقرير كاتب المحتوى الأسبوعي",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "597e6895-304d-4370-b210-61062cd12f5e",
+            "fieldCount": 5,
+            "isPublished": true,
+            "versionNumber": 8
+        },
+        {
+            "template": "تقرير كاتب المحتوى الأسبوعي",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "e8bba9fc-aa72-4851-81e7-0f7ee67a9ea5",
+            "fieldCount": 5,
+            "isPublished": true,
+            "versionNumber": 9
+        },
+        {
+            "template": "تقرير مبيعات B2B",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "d56ba1ca-8e51-4719-aa6e-04618b32ed10",
+            "fieldCount": 10,
+            "isPublished": true,
+            "versionNumber": 1
+        },
+        {
+            "template": "تقرير مبيعات B2B",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "8e02f1f8-b977-4aa5-a708-b69bdb79599e",
+            "fieldCount": 21,
+            "isPublished": true,
+            "versionNumber": 2
+        },
+        {
+            "template": "تقرير متابعة مقالات SEO الأسبوعي",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "0069ec82-166f-44b9-82b9-b8803ce1a7b0",
+            "fieldCount": 14,
+            "isPublished": true,
+            "versionNumber": 1
+        },
+        {
+            "template": "تقرير متابعة مقالات SEO الأسبوعي",
+            "fieldsMd5": "f04da58ce61143e79872a970ed02f19f",
+            "versionId": "82b315a3-bc53-4425-a090-486963efa5b3",
+            "fieldCount": 15,
+            "isPublished": true,
+            "versionNumber": 2
+        },
+        {
+            "template": "تقرير متابعة مقالات SEO الأسبوعي",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "854fe473-bb23-41f7-a107-4cd0b07c6250",
+            "fieldCount": 14,
+            "isPublished": true,
+            "versionNumber": 3
+        },
+        {
+            "template": "تقرير متابعة مقالات SEO الأسبوعي",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "3629af3e-76ae-4dbe-8c91-af26a2d7bc78",
+            "fieldCount": 9,
+            "isPublished": true,
+            "versionNumber": 4
+        },
+        {
+            "template": "تقرير متابعة مقالات SEO الأسبوعي",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "e0cbce32-57a4-40d1-896c-80e7ca0eae23",
+            "fieldCount": 2,
+            "isPublished": true,
+            "versionNumber": 5
+        },
+        {
+            "template": "تقرير مدير المبيعات",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "ed06d22b-cf6c-42cc-a7a3-8eb3aad43fca",
+            "fieldCount": 24,
+            "isPublished": true,
+            "versionNumber": 1
+        },
+        {
+            "template": "تقرير مدير المبيعات",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "cc4a8c6c-5493-4cef-ad22-0d9ad9b7f096",
+            "fieldCount": 26,
+            "isPublished": true,
+            "versionNumber": 2
+        },
+        {
+            "template": "✍️ تقرير المحتوى Content Production",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "9dfe6cc0-c43d-4b96-8c22-7d1da62e9178",
+            "fieldCount": 7,
+            "isPublished": true,
+            "versionNumber": 1
+        },
+        {
+            "template": "🎨 تقرير التصميم Design Production",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "fd5eddaf-9d95-4deb-93d1-291669d8a26f",
+            "fieldCount": 7,
+            "isPublished": true,
+            "versionNumber": 1
+        },
+        {
+            "template": "🎬 تقرير الفيديو Video Production",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "0a54e376-323e-4a1d-a6bd-907f7d776a37",
+            "fieldCount": 7,
+            "isPublished": true,
+            "versionNumber": 1
+        },
+        {
+            "template": "🏫 تقرير تشغيل الأكاديمية",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "39803726-07b7-449b-b7b9-f2f593ef9cdd",
+            "fieldCount": 15,
+            "isPublished": true,
+            "versionNumber": 1
+        },
+        {
+            "template": "🏫 تقرير تشغيل الأكاديمية",
+            "fieldsMd5": "364bfaba46ebd451d6b0679b3aa3fdbe",
+            "versionId": "109dfdb0-0ed5-4bf8-a435-90f12cca5ab2",
+            "fieldCount": 22,
+            "isPublished": true,
+            "versionNumber": 2
+        },
+        {
+            "template": "🏫 تقرير تشغيل الأكاديمية",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "90656a8c-2d38-4ec7-a2fa-84bf9f9fc9a5",
+            "fieldCount": 15,
+            "isPublished": true,
+            "versionNumber": 3
+        },
+        {
+            "template": "🏫 تقرير تشغيل الأكاديمية",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "3c6e34f0-6544-479d-9090-b23d536d4245",
+            "fieldCount": 18,
+            "isPublished": true,
+            "versionNumber": 4
+        },
+        {
+            "template": "🏫 تقرير تشغيل الأكاديمية",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "4566b299-2013-4feb-83f9-4d6a74edad9b",
+            "fieldCount": 15,
+            "isPublished": true,
+            "versionNumber": 5
+        },
+        {
+            "template": "👤 تقرير الموارد البشرية",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "4a7de05d-f3bc-4543-8fa4-80a84d8f9331",
+            "fieldCount": 12,
+            "isPublished": true,
+            "versionNumber": 1
+        },
+        {
+            "template": "👥 تقرير HR والالتزام والحوكمة الأسبوعي",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "bd569dac-20b1-47e3-ba8f-07598b18ab40",
+            "fieldCount": 12,
+            "isPublished": true,
+            "versionNumber": 1
+        },
+        {
+            "template": "👥 تقرير HR والالتزام والحوكمة الأسبوعي",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "9717651c-073b-4687-ac81-db80831ec6ed",
+            "fieldCount": 32,
+            "isPublished": true,
+            "versionNumber": 2
+        },
+        {
+            "template": "💰 التقرير المالي الأسبوعي",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "0a763872-2bb9-46f2-aad3-0e4f74061dc8",
+            "fieldCount": 33,
+            "isPublished": true,
+            "versionNumber": 1
+        },
+        {
+            "template": "💻 تقرير فريق الويب",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "098a79b9-dba5-486e-a070-45f7031961ab",
+            "fieldCount": 13,
+            "isPublished": true,
+            "versionNumber": 1
+        },
+        {
+            "template": "💻 تقرير فريق الويب",
+            "fieldsMd5": "b9ffc0d8f7ff381550f004a52d94748a",
+            "versionId": "517f9245-721c-4df3-8961-f4c78d627860",
+            "fieldCount": 10,
+            "isPublished": true,
+            "versionNumber": 2
+        },
+        {
+            "template": "💻 تقرير قائد فريق الويب",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "28c3a9c6-14a5-498b-ae6f-cc7b9504ef31",
+            "fieldCount": 15,
+            "isPublished": true,
+            "versionNumber": 1
+        },
+        {
+            "template": "💻 تقرير قائد فريق الويب",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "d794cd8d-f614-4cad-97c6-c8340064874c",
+            "fieldCount": 24,
+            "isPublished": true,
+            "versionNumber": 2
+        },
+        {
+            "template": "📇 تقرير مندوب مبيعات B2C الفردي",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "ea270bfc-1493-48f3-99f2-0f37b7dcfe98",
+            "fieldCount": 12,
+            "isPublished": true,
+            "versionNumber": 1
+        },
+        {
+            "template": "📇 تقرير مندوب مبيعات B2C الفردي",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "d7128d11-f72e-4b24-8188-d367773c7b2e",
+            "fieldCount": 22,
+            "isPublished": true,
+            "versionNumber": 2
+        },
+        {
+            "template": "📈 تقرير النمو والأداء — Media Buyer",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "30dcf61e-d34e-4c7b-bf40-b63b84229cff",
+            "fieldCount": 21,
+            "isPublished": true,
+            "versionNumber": 1
+        },
+        {
+            "template": "📈 تقرير النمو والأداء — Media Buyer",
+            "fieldsMd5": "95da15589da85d84d74f6c360e20ac98",
+            "versionId": "dceb58d5-e7a3-42f4-bc00-5285008f13c4",
+            "fieldCount": 11,
+            "isPublished": true,
+            "versionNumber": 2
+        },
+        {
+            "template": "📈 تقرير النمو والأداء — Media Buyer",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "a1612321-3a04-4bc9-9a4a-46d4ebba7666",
+            "fieldCount": 23,
+            "isPublished": true,
+            "versionNumber": 3
+        },
+        {
+            "template": "📈 تقرير النمو والأداء — Media Buyer",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "243028ae-e2b0-41c7-bd7f-224d0ff5fdec",
+            "fieldCount": 11,
+            "isPublished": true,
+            "versionNumber": 4
+        },
+        {
+            "template": "📈 تقرير النمو والأداء — Media Buyer",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "8f0b04ad-550f-47a0-b953-c2edc19c0942",
+            "fieldCount": 2,
+            "isPublished": true,
+            "versionNumber": 5
+        },
+        {
+            "template": "📈 تقرير النمو والأداء — Media Buyer",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "23b5ad6b-3e4a-44ab-b794-1897560ed6c5",
+            "fieldCount": 1,
+            "isPublished": false,
+            "versionNumber": 6
+        },
+        {
+            "template": "📈 تقرير النمو والأداء — مدير الأداء",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "4068578b-1dda-4db1-896f-0b27d1c2df36",
+            "fieldCount": 16,
+            "isPublished": true,
+            "versionNumber": 1
+        },
+        {
+            "template": "📊 تقرير Media Buyer حسب العميل",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "0cddde21-5997-458d-894e-f199f42d2ff6",
+            "fieldCount": 7,
+            "isPublished": true,
+            "versionNumber": 1
+        },
+        {
+            "template": "📊 تقرير الإدارة التنفيذية — المدير العام (أسبوعي)",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "a829ddd1-38a9-45ea-91cc-bebeb7a34f66",
+            "fieldCount": 26,
+            "isPublished": true,
+            "versionNumber": 1
+        },
+        {
+            "template": "📊 تقرير مبيعات B2B حسب الخدمة",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "1f3c9ffd-74d9-4966-ac8e-8a5fe24259c7",
+            "fieldCount": 7,
+            "isPublished": true,
+            "versionNumber": 1
+        },
+        {
+            "template": "📊 تقرير مبيعات B2B — حسب مصدر البيانات",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "89d647ea-349f-44fd-aa93-556f4cbd54c3",
+            "fieldCount": 9,
+            "isPublished": true,
+            "versionNumber": 1
+        },
+        {
+            "template": "📊 تقرير مبيعات B2C حسب الدورة",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "d7c2312b-c59d-46cc-962e-4912ef2c52b5",
+            "fieldCount": 7,
+            "isPublished": true,
+            "versionNumber": 1
+        },
+        {
+            "template": "📊 تقرير مبيعات B2C — بيانات جديدة/قديمة",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "69dbaf83-d95a-45b5-b89e-719a94369046",
+            "fieldCount": 9,
+            "isPublished": true,
+            "versionNumber": 1
+        },
+        {
+            "template": "📞 تقرير قائد فريق مبيعات B2C",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "1d5a6bbb-16fd-4771-865d-9990bd3ba799",
+            "fieldCount": 15,
+            "isPublished": true,
+            "versionNumber": 1
+        },
+        {
+            "template": "📞 تقرير قائد فريق مبيعات B2C",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "ca3080b9-bdda-4316-beff-32f616cead49",
+            "fieldCount": 28,
+            "isPublished": true,
+            "versionNumber": 2
+        },
+        {
+            "template": "📣 تقرير النشر والسوشيال ميديا",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "261c42dd-451d-43a3-bbc2-aac82226e95d",
+            "fieldCount": 7,
+            "isPublished": true,
+            "versionNumber": 1
+        },
+        {
+            "template": "🔍 تقرير التخطيط والجودة",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "6c8490a6-36cc-49b5-9235-cbd3b73e379c",
+            "fieldCount": 19,
+            "isPublished": true,
+            "versionNumber": 1
+        },
+        {
+            "template": "🔍 تقرير فريق SEO",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "0222c966-171b-4352-abff-309b4835bf28",
+            "fieldCount": 17,
+            "isPublished": true,
+            "versionNumber": 1
+        },
+        {
+            "template": "🔍 تقرير فريق SEO",
+            "fieldsMd5": "22d0876cf97935861d8aefa31288ab44",
+            "versionId": "2c48aa5a-f697-486f-801b-773676700687",
+            "fieldCount": 10,
+            "isPublished": true,
+            "versionNumber": 2
+        },
+        {
+            "template": "🔍 تقرير فريق SEO",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "994646fb-f440-45d0-b7b4-f59a6143d4ca",
+            "fieldCount": 19,
+            "isPublished": true,
+            "versionNumber": 3
+        },
+        {
+            "template": "🔍 تقرير فريق SEO",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "8738ce28-e8f9-4ceb-9d5a-67bdb415f71d",
+            "fieldCount": 12,
+            "isPublished": true,
+            "versionNumber": 4
+        },
+        {
+            "template": "🔍 تقرير فريق SEO",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "5ce17028-1bd0-4942-833f-8068e47e952c",
+            "fieldCount": 2,
+            "isPublished": true,
+            "versionNumber": 5
+        },
+        {
+            "template": "🗂️ تقرير المتابعة الإدارية والتشغيلية (أسبوعي)",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "1934c2ad-a648-44ae-a8c0-4fb240c30b1d",
+            "fieldCount": 24,
+            "isPublished": true,
+            "versionNumber": 1
+        },
+        {
+            "template": "🗂️ تقرير المشاريع حسب العميل/المشروع",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "69d6470f-90d6-4afd-b1be-9dcec0dad936",
+            "fieldCount": 7,
+            "isPublished": true,
+            "versionNumber": 1
+        },
+        {
+            "template": "🤝 تقرير إدارة الحسابات",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "9df58399-1669-4ecc-8c96-6a48fa21f860",
+            "fieldCount": 16,
+            "isPublished": true,
+            "versionNumber": 1
+        },
+        {
+            "template": "🤝 تقرير إدارة الحسابات العملاء",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "a861d852-bad4-411c-b2d9-2d613f18376d",
+            "fieldCount": 16,
+            "isPublished": true,
+            "versionNumber": 1
+        },
+        {
+            "template": "🤝 تقرير إدارة الحسابات العملاء",
+            "fieldsMd5": "44c884bbb601057c51b1677a9e6991d5",
+            "versionId": "fa9569f7-54a6-4635-87b2-1403019c5528",
+            "fieldCount": 10,
+            "isPublished": true,
+            "versionNumber": 2
+        },
+        {
+            "template": "🤝 تقرير إدارة الحسابات العملاء",
+            "fieldsMd5": "3ae6c7b0a30fce2b660a67ee8b9c1e88",
+            "versionId": "7648817c-7258-4d31-9cd5-c388a637e1b1",
+            "fieldCount": 10,
+            "isPublished": true,
+            "versionNumber": 3
+        },
+        {
+            "template": "🤝 تقرير إدارة الحسابات العملاء",
+            "fieldsMd5": "bbcfcc532a7b540a4b83d6465c64fb66",
+            "versionId": "bcc7a34b-6644-471e-bbde-e9bdcfda66c7",
+            "fieldCount": 5,
+            "isPublished": true,
+            "versionNumber": 5
+        },
+        {
+            "template": "🤝 تقرير مدير الحسابات",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "b564f496-3941-43c0-8631-03e5cba92b83",
+            "fieldCount": 17,
+            "isPublished": true,
+            "versionNumber": 1
+        },
+        {
+            "template": "🤝 تقرير مدير الحسابات",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "dda5f03f-897c-4996-b160-fc14cee06c02",
+            "fieldCount": 28,
+            "isPublished": true,
+            "versionNumber": 2
+        },
+        {
+            "template": "🤝 تقرير مدير الحسابات",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "746b3ac7-407a-4b6b-8efb-dbdf2b9dbdb2",
+            "fieldCount": 10,
+            "isPublished": true,
+            "versionNumber": 3
+        },
+        {
+            "template": "🤝 تقرير مدير الحسابات",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "0f97c390-e683-4b95-b0b6-588893f20e30",
+            "fieldCount": 5,
+            "isPublished": true,
+            "versionNumber": 4
+        },
+        {
+            "template": "🤝 تقرير مدير الحسابات",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "f686a2c3-a7a9-4608-b2ae-fb20bb0b7e2b",
+            "fieldCount": 2,
+            "isPublished": true,
+            "versionNumber": 5
+        },
+        {
+            "template": "🧾 تقرير المحاسب الأسبوعي",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "5d62bf03-6f15-4e20-a56b-870519645f69",
+            "fieldCount": 18,
+            "isPublished": true,
+            "versionNumber": 1
+        },
+        {
+            "template": "🧾 تقرير المحاسب الأسبوعي",
+            "fieldsMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "versionId": "01d30e05-d361-4381-b970-2d5cae03966b",
+            "fieldCount": 32,
+            "isPublished": true,
+            "versionNumber": 2
+        }
+    ],
+    "historicalSubmissions": [
+        {
+            "status": "Submitted",
+            "clientId": null,
+            "template": "تقرير التيم ليدر للسوشيال ميديا",
+            "periodKey": "2026-W28",
+            "projectId": null,
+            "versionId": "a6834e5c-2cc1-4d3b-ba44-a04929edda9f",
+            "payloadMd5": "2bcd13b53e49329d1214640976bd85c1",
+            "valueCount": 20,
+            "closedAtUtc": null,
+            "submissionId": "75efb580-5cbe-44cb-8621-8a31171d8fd6",
+            "updatedAtUtc": "2026-07-09T14:01:26.940292+00:00",
+            "versionNumber": 2,
+            "submittedAtUtc": "2026-07-09T14:01:26.940292+00:00"
+        },
+        {
+            "status": "Submitted",
+            "clientId": null,
+            "template": "تقرير المديرشن الأسبوعي",
+            "periodKey": "2026-W28",
+            "projectId": null,
+            "versionId": "1638f686-65f7-460b-9754-ba50804eda16",
+            "payloadMd5": "7e1474bcb5c6fd7b080be4cc204b1b83",
+            "valueCount": 2,
+            "closedAtUtc": null,
+            "submissionId": "2a7a831c-fc50-4232-b86d-a93e1f6a9dd5",
+            "updatedAtUtc": "2026-07-08T23:47:25.759347+00:00",
+            "versionNumber": 5,
+            "submittedAtUtc": "2026-07-08T23:47:25.759347+00:00"
+        },
+        {
+            "status": "Closed",
+            "clientId": null,
+            "template": "تقرير فريق التصميم",
+            "periodKey": "2026-W27",
+            "projectId": null,
+            "versionId": "eecfd9f7-1c8f-4554-a689-51f6bf1fa08f",
+            "payloadMd5": "fad4c109876c5799d2e8635a62ffc48d",
+            "valueCount": 2,
+            "closedAtUtc": "2026-07-09T13:23:24.980917+00:00",
+            "submissionId": "4c5921c6-0fd7-4000-99dc-b77c089dcebb",
+            "updatedAtUtc": "2026-07-09T13:23:24.976791+00:00",
+            "versionNumber": 5,
+            "submittedAtUtc": "2026-07-09T13:20:45.130575+00:00"
+        },
+        {
+            "status": "Closed",
+            "clientId": null,
+            "template": "تقرير فريق الفيديو",
+            "periodKey": "2026-W27",
+            "projectId": null,
+            "versionId": "50e0cd96-5c52-4de7-9980-731acb5cfd5d",
+            "payloadMd5": "2f56a40a06d318056cdbd75e4001f0b4",
+            "valueCount": 2,
+            "closedAtUtc": "2026-07-09T11:04:49.466899+00:00",
+            "submissionId": "eb327416-42b0-4066-956d-6988a763b3da",
+            "updatedAtUtc": "2026-07-09T11:04:49.462423+00:00",
+            "versionNumber": 5,
+            "submittedAtUtc": "2026-07-08T18:37:36.166599+00:00"
+        },
+        {
+            "status": "Submitted",
+            "clientId": null,
+            "template": "تقرير قائد فريق SEO",
+            "periodKey": "2026-W28",
+            "projectId": null,
+            "versionId": "c44ada2c-42ff-4e18-9fe7-73922706f5b7",
+            "payloadMd5": "4d6b9e4ef2d62dcd7a981aafb56fef7a",
+            "valueCount": 20,
+            "closedAtUtc": null,
+            "submissionId": "52455d79-bb3c-42b7-8b80-668986f429c6",
+            "updatedAtUtc": "2026-07-09T18:53:55.596037+00:00",
+            "versionNumber": 2,
+            "submittedAtUtc": "2026-07-09T18:53:55.596037+00:00"
+        },
+        {
+            "status": "Submitted",
+            "clientId": null,
+            "template": "تقرير كاتب المحتوى الأسبوعي",
+            "periodKey": "2026-W28",
+            "projectId": null,
+            "versionId": "3428fde8-faf7-4742-a85d-3d1db20ab1fb",
+            "payloadMd5": "39aa7be26676be4acf517a696a3d4258",
+            "valueCount": 2,
+            "closedAtUtc": null,
+            "submissionId": "55988e6c-44c6-47a7-99b9-e3b9d0840903",
+            "updatedAtUtc": "2026-07-08T14:11:18.14808+00:00",
+            "versionNumber": 5,
+            "submittedAtUtc": "2026-07-08T14:11:18.148079+00:00"
+        },
+        {
+            "status": "Submitted",
+            "clientId": null,
+            "template": "تقرير كاتب المحتوى الأسبوعي",
+            "periodKey": "2026-W36",
+            "projectId": null,
+            "versionId": "e8bba9fc-aa72-4851-81e7-0f7ee67a9ea5",
+            "payloadMd5": "daecfb3f71fa12dd0d8dac5e3b910766",
+            "valueCount": 5,
+            "closedAtUtc": null,
+            "submissionId": "a7d51298-5461-4ac1-bc41-5d7c45dd7181",
+            "updatedAtUtc": "2026-08-30T15:56:49.483925+00:00",
+            "versionNumber": 9,
+            "submittedAtUtc": "2026-08-30T15:56:49.483861+00:00"
+        },
+        {
+            "status": "Returned",
+            "clientId": null,
+            "template": "تقرير متابعة مقالات SEO الأسبوعي",
+            "periodKey": "2026-W28",
+            "projectId": null,
+            "versionId": "e0cbce32-57a4-40d1-896c-80e7ca0eae23",
+            "payloadMd5": "8e7f46ba9942632689b584aadcb2c56a",
+            "valueCount": 2,
+            "closedAtUtc": null,
+            "submissionId": "5be77b0d-d7e3-44f2-9831-1cf0e92912f5",
+            "updatedAtUtc": "2026-07-09T18:35:47.180605+00:00",
+            "versionNumber": 5,
+            "submittedAtUtc": "2026-07-09T06:06:57.066133+00:00"
+        },
+        {
+            "status": "Submitted",
+            "clientId": null,
+            "template": "🏫 تقرير تشغيل الأكاديمية",
+            "periodKey": "2026-W27",
+            "projectId": null,
+            "versionId": "4566b299-2013-4feb-83f9-4d6a74edad9b",
+            "payloadMd5": "21934869a20ccdc4e2081be54baf7443",
+            "valueCount": 15,
+            "closedAtUtc": null,
+            "submissionId": "991462c7-0dee-42d1-bc80-daff66408bbc",
+            "updatedAtUtc": "2026-07-08T15:39:08.352843+00:00",
+            "versionNumber": 5,
+            "submittedAtUtc": "2026-07-08T15:39:08.352843+00:00"
+        },
+        {
+            "status": "Closed",
+            "clientId": null,
+            "template": "💻 تقرير فريق الويب",
+            "periodKey": "2026-W27",
+            "projectId": null,
+            "versionId": "517f9245-721c-4df3-8961-f4c78d627860",
+            "payloadMd5": "0307e06247c4fc168cbe5117986c48c8",
+            "valueCount": 10,
+            "closedAtUtc": "2026-07-08T10:21:11.47119+00:00",
+            "submissionId": "1267bcbe-af62-403e-91ea-30b8862727ef",
+            "updatedAtUtc": "2026-07-08T10:21:11.460398+00:00",
+            "versionNumber": 2,
+            "submittedAtUtc": "2026-07-08T09:28:27.378016+00:00"
+        },
+        {
+            "status": "Submitted",
+            "clientId": null,
+            "template": "💻 تقرير قائد فريق الويب",
+            "periodKey": "2026-W27",
+            "projectId": null,
+            "versionId": "d794cd8d-f614-4cad-97c6-c8340064874c",
+            "payloadMd5": "a6746ed469a0eae3541325a0d4b78c7d",
+            "valueCount": 24,
+            "closedAtUtc": null,
+            "submissionId": "4f4d1de1-6089-4595-b5a8-6840eca2bc7b",
+            "updatedAtUtc": "2026-07-08T10:42:47.298526+00:00",
+            "versionNumber": 2,
+            "submittedAtUtc": "2026-07-08T10:42:47.298525+00:00"
+        },
+        {
+            "status": "Submitted",
+            "clientId": null,
+            "template": "📇 تقرير مندوب مبيعات B2C الفردي",
+            "periodKey": "2026-07-04",
+            "projectId": null,
+            "versionId": "d7128d11-f72e-4b24-8188-d367773c7b2e",
+            "payloadMd5": "5b74242c0477fba66067f9189b21c3c7",
+            "valueCount": 22,
+            "closedAtUtc": null,
+            "submissionId": "35493fb3-ef61-4de8-bf20-2bcc78cca61a",
+            "updatedAtUtc": "2026-07-04T14:40:40.651358+00:00",
+            "versionNumber": 2,
+            "submittedAtUtc": "2026-07-04T14:40:40.651321+00:00"
+        },
+        {
+            "status": "Submitted",
+            "clientId": null,
+            "template": "📇 تقرير مندوب مبيعات B2C الفردي",
+            "periodKey": "2026-07-04",
+            "projectId": null,
+            "versionId": "d7128d11-f72e-4b24-8188-d367773c7b2e",
+            "payloadMd5": "933cb6cb5bfcb092bba44a800e26cc12",
+            "valueCount": 22,
+            "closedAtUtc": null,
+            "submissionId": "bf62832c-b840-489a-b9c7-77a78e5313c8",
+            "updatedAtUtc": "2026-07-05T06:26:43.043586+00:00",
+            "versionNumber": 2,
+            "submittedAtUtc": "2026-07-05T06:26:43.043586+00:00"
+        },
+        {
+            "status": "Submitted",
+            "clientId": null,
+            "template": "📇 تقرير مندوب مبيعات B2C الفردي",
+            "periodKey": "2026-07-04",
+            "projectId": null,
+            "versionId": "d7128d11-f72e-4b24-8188-d367773c7b2e",
+            "payloadMd5": "006efe98f0cbea479c047d1f191f3038",
+            "valueCount": 22,
+            "closedAtUtc": null,
+            "submissionId": "fffd6596-75be-4b02-81a9-c1ab205db704",
+            "updatedAtUtc": "2026-07-04T20:48:18.30919+00:00",
+            "versionNumber": 2,
+            "submittedAtUtc": "2026-07-04T20:48:18.309189+00:00"
+        },
+        {
+            "status": "Submitted",
+            "clientId": null,
+            "template": "📇 تقرير مندوب مبيعات B2C الفردي",
+            "periodKey": "2026-07-05",
+            "projectId": null,
+            "versionId": "d7128d11-f72e-4b24-8188-d367773c7b2e",
+            "payloadMd5": "3fceae7316e6f8c8966e103c7ed0b2c3",
+            "valueCount": 22,
+            "closedAtUtc": null,
+            "submissionId": "758cf5e6-8a94-415f-a2ce-69aeba88cbf9",
+            "updatedAtUtc": "2026-07-05T14:10:20.752997+00:00",
+            "versionNumber": 2,
+            "submittedAtUtc": "2026-07-05T14:10:20.752969+00:00"
+        },
+        {
+            "status": "Submitted",
+            "clientId": null,
+            "template": "📇 تقرير مندوب مبيعات B2C الفردي",
+            "periodKey": "2026-07-05",
+            "projectId": null,
+            "versionId": "d7128d11-f72e-4b24-8188-d367773c7b2e",
+            "payloadMd5": "970f337e9864b58e59417c529b006e6a",
+            "valueCount": 22,
+            "closedAtUtc": null,
+            "submissionId": "e4514734-6fee-4017-8837-44df0557b021",
+            "updatedAtUtc": "2026-07-05T13:53:06.710556+00:00",
+            "versionNumber": 2,
+            "submittedAtUtc": "2026-07-05T13:53:06.714233+00:00"
+        },
+        {
+            "status": "Submitted",
+            "clientId": null,
+            "template": "📇 تقرير مندوب مبيعات B2C الفردي",
+            "periodKey": "2026-07-06",
+            "projectId": null,
+            "versionId": "d7128d11-f72e-4b24-8188-d367773c7b2e",
+            "payloadMd5": "468ce548f281a8016338571215c4812f",
+            "valueCount": 22,
+            "closedAtUtc": null,
+            "submissionId": "1279a119-dba5-4c4c-a343-7478cf1ecc58",
+            "updatedAtUtc": "2026-07-06T20:01:28.778265+00:00",
+            "versionNumber": 2,
+            "submittedAtUtc": "2026-07-06T20:01:28.786648+00:00"
+        },
+        {
+            "status": "Submitted",
+            "clientId": null,
+            "template": "📇 تقرير مندوب مبيعات B2C الفردي",
+            "periodKey": "2026-07-07",
+            "projectId": null,
+            "versionId": "d7128d11-f72e-4b24-8188-d367773c7b2e",
+            "payloadMd5": "f329983e645ca0ce57417d7a9b61d00d",
+            "valueCount": 22,
+            "closedAtUtc": null,
+            "submissionId": "8e47c491-c84b-416b-8afe-a6fdacfda757",
+            "updatedAtUtc": "2026-07-07T18:07:44.021272+00:00",
+            "versionNumber": 2,
+            "submittedAtUtc": "2026-07-07T18:07:44.021241+00:00"
+        },
+        {
+            "status": "Submitted",
+            "clientId": null,
+            "template": "📇 تقرير مندوب مبيعات B2C الفردي",
+            "periodKey": "2026-07-07",
+            "projectId": null,
+            "versionId": "d7128d11-f72e-4b24-8188-d367773c7b2e",
+            "payloadMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "valueCount": 0,
+            "closedAtUtc": null,
+            "submissionId": "fb58dec8-9c99-4b6a-89de-f18f8cf92006",
+            "updatedAtUtc": "2026-07-07T14:19:45.884205+00:00",
+            "versionNumber": 2,
+            "submittedAtUtc": "2026-07-07T14:19:45.884205+00:00"
+        },
+        {
+            "status": "Submitted",
+            "clientId": null,
+            "template": "📇 تقرير مندوب مبيعات B2C الفردي",
+            "periodKey": "2026-07-08",
+            "projectId": null,
+            "versionId": "d7128d11-f72e-4b24-8188-d367773c7b2e",
+            "payloadMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "valueCount": 0,
+            "closedAtUtc": null,
+            "submissionId": "0322d8d0-489e-4495-98d0-45a789964802",
+            "updatedAtUtc": "2026-07-08T13:40:32.609994+00:00",
+            "versionNumber": 2,
+            "submittedAtUtc": "2026-07-08T13:40:32.609993+00:00"
+        },
+        {
+            "status": "Submitted",
+            "clientId": null,
+            "template": "📇 تقرير مندوب مبيعات B2C الفردي",
+            "periodKey": "2026-07-08",
+            "projectId": null,
+            "versionId": "d7128d11-f72e-4b24-8188-d367773c7b2e",
+            "payloadMd5": "cafc8ad7c296804a5d5d4c98c44c2a80",
+            "valueCount": 22,
+            "closedAtUtc": null,
+            "submissionId": "65bb9f5f-f8d0-4d56-bf8c-18eefd992f94",
+            "updatedAtUtc": "2026-07-08T19:34:15.162929+00:00",
+            "versionNumber": 2,
+            "submittedAtUtc": "2026-07-08T19:34:15.162929+00:00"
+        },
+        {
+            "status": "Submitted",
+            "clientId": null,
+            "template": "📇 تقرير مندوب مبيعات B2C الفردي",
+            "periodKey": "2026-07-08",
+            "projectId": null,
+            "versionId": "d7128d11-f72e-4b24-8188-d367773c7b2e",
+            "payloadMd5": "8a6522180d03cab0be241fd18631a147",
+            "valueCount": 22,
+            "closedAtUtc": null,
+            "submissionId": "a6ba36a2-d986-46fb-ae97-07a2bdf657cb",
+            "updatedAtUtc": "2026-07-08T20:14:01.246745+00:00",
+            "versionNumber": 2,
+            "submittedAtUtc": "2026-07-08T20:14:01.246745+00:00"
+        },
+        {
+            "status": "Submitted",
+            "clientId": null,
+            "template": "📇 تقرير مندوب مبيعات B2C الفردي",
+            "periodKey": "6-7-2026",
+            "projectId": null,
+            "versionId": "d7128d11-f72e-4b24-8188-d367773c7b2e",
+            "payloadMd5": "b9744f537af62dafd3f7dd42f089df42",
+            "valueCount": 22,
+            "closedAtUtc": null,
+            "submissionId": "8eadfb28-9b1c-46f8-ae70-9ef6a21b612f",
+            "updatedAtUtc": "2026-07-06T21:18:37.531191+00:00",
+            "versionNumber": 2,
+            "submittedAtUtc": "2026-07-06T21:18:37.53119+00:00"
+        },
+        {
+            "status": "Closed",
+            "clientId": null,
+            "template": "📈 تقرير النمو والأداء — Media Buyer",
+            "periodKey": "2026-W27",
+            "projectId": null,
+            "versionId": "8f0b04ad-550f-47a0-b953-c2edc19c0942",
+            "payloadMd5": "9e2bb3f349b89daf6ed0e151971385b3",
+            "valueCount": 2,
+            "closedAtUtc": "2026-07-09T08:16:05.447953+00:00",
+            "submissionId": "f5c61b7e-e17b-4488-a57c-96b4db99d76c",
+            "updatedAtUtc": "2026-07-09T08:16:05.445014+00:00",
+            "versionNumber": 5,
+            "submittedAtUtc": "2026-07-09T08:11:55.649786+00:00"
+        },
+        {
+            "status": "Submitted",
+            "clientId": null,
+            "template": "📈 تقرير النمو والأداء — مدير الأداء",
+            "periodKey": "من 1 الى 7 يوليو 2026",
+            "projectId": null,
+            "versionId": "4068578b-1dda-4db1-896f-0b27d1c2df36",
+            "payloadMd5": "3122d9f533a49d73d68c058d803a8cff",
+            "valueCount": 16,
+            "closedAtUtc": null,
+            "submissionId": "c85111db-087b-4212-8d60-fc6253fdaa60",
+            "updatedAtUtc": "2026-07-09T08:05:18.551298+00:00",
+            "versionNumber": 1,
+            "submittedAtUtc": "2026-07-09T08:05:18.551298+00:00"
+        },
+        {
+            "status": "Submitted",
+            "clientId": null,
+            "template": "📊 تقرير مبيعات B2B — حسب مصدر البيانات",
+            "periodKey": "2026-07-09",
+            "projectId": null,
+            "versionId": "89d647ea-349f-44fd-aa93-556f4cbd54c3",
+            "payloadMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "valueCount": 0,
+            "closedAtUtc": null,
+            "submissionId": "9cb5aa64-5830-4ca8-b1cb-c12d30d258c3",
+            "updatedAtUtc": "2026-07-09T12:16:45.126255+00:00",
+            "versionNumber": 1,
+            "submittedAtUtc": "2026-07-09T12:16:45.126255+00:00"
+        },
+        {
+            "status": "Submitted",
+            "clientId": null,
+            "template": "📊 تقرير مبيعات B2C — بيانات جديدة/قديمة",
+            "periodKey": "2026-07-09",
+            "projectId": null,
+            "versionId": "69dbaf83-d95a-45b5-b89e-719a94369046",
+            "payloadMd5": "623b04d506c919ce78def8244fa864e0",
+            "valueCount": 9,
+            "closedAtUtc": null,
+            "submissionId": "ae84b9d4-21b5-41e0-b89c-48e4f0131f06",
+            "updatedAtUtc": "2026-07-09T14:21:12.280067+00:00",
+            "versionNumber": 1,
+            "submittedAtUtc": "2026-07-09T14:21:12.280067+00:00"
+        },
+        {
+            "status": "Submitted",
+            "clientId": null,
+            "template": "📊 تقرير مبيعات B2C — بيانات جديدة/قديمة",
+            "periodKey": "2026-07-09",
+            "projectId": null,
+            "versionId": "69dbaf83-d95a-45b5-b89e-719a94369046",
+            "payloadMd5": "2b9302da6cda36ca2e0cfa9cc7701324",
+            "valueCount": 9,
+            "closedAtUtc": null,
+            "submissionId": "d8206e91-8abb-4c02-a3fb-c0bbeb2cbc1d",
+            "updatedAtUtc": "2026-07-09T14:30:28.773707+00:00",
+            "versionNumber": 1,
+            "submittedAtUtc": "2026-07-09T14:30:28.773707+00:00"
+        },
+        {
+            "status": "Submitted",
+            "clientId": null,
+            "template": "📊 تقرير مبيعات B2C — بيانات جديدة/قديمة",
+            "periodKey": "2026-07-9",
+            "projectId": null,
+            "versionId": "69dbaf83-d95a-45b5-b89e-719a94369046",
+            "payloadMd5": "52480de64cf9ffa590aee493643b73b0",
+            "valueCount": 9,
+            "closedAtUtc": null,
+            "submissionId": "d748fc85-89bc-40a9-bfea-7d8881e3d779",
+            "updatedAtUtc": "2026-07-09T14:16:22.39626+00:00",
+            "versionNumber": 1,
+            "submittedAtUtc": "2026-07-09T14:16:22.39626+00:00"
+        },
+        {
+            "status": "Returned",
+            "clientId": null,
+            "template": "🔍 تقرير فريق SEO",
+            "periodKey": "2026-W27",
+            "projectId": null,
+            "versionId": "5ce17028-1bd0-4942-833f-8068e47e952c",
+            "payloadMd5": "10c381c63ce788b95634614571c009bf",
+            "valueCount": 2,
+            "closedAtUtc": null,
+            "submissionId": "d6022f26-81cc-4328-8eff-9ca56701b68c",
+            "updatedAtUtc": "2026-07-09T18:34:51.721474+00:00",
+            "versionNumber": 5,
+            "submittedAtUtc": "2026-07-08T14:48:50.422614+00:00"
+        },
+        {
+            "status": "Submitted",
+            "clientId": null,
+            "template": "🗂️ تقرير المتابعة الإدارية والتشغيلية (أسبوعي)",
+            "periodKey": "2026-W28",
+            "projectId": null,
+            "versionId": "1934c2ad-a648-44ae-a8c0-4fb240c30b1d",
+            "payloadMd5": "8ac181e84f9964de91c9b396014dc33d",
+            "valueCount": 24,
+            "closedAtUtc": null,
+            "submissionId": "b127a8f9-107e-41e1-9dee-2f9b957b7782",
+            "updatedAtUtc": "2026-07-26T21:40:11.913713+00:00",
+            "versionNumber": 1,
+            "submittedAtUtc": "2026-07-09T14:10:53.129951+00:00"
+        },
+        {
+            "status": "Closed",
+            "clientId": null,
+            "template": "🗂️ تقرير المتابعة الإدارية والتشغيلية (أسبوعي)",
+            "periodKey": "2026-W29",
+            "projectId": null,
+            "versionId": "1934c2ad-a648-44ae-a8c0-4fb240c30b1d",
+            "payloadMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "valueCount": 0,
+            "closedAtUtc": null,
+            "submissionId": "232f5c72-10cf-4c5a-9539-e296365fc7d5",
+            "updatedAtUtc": "2026-07-26T21:40:11.712952+00:00",
+            "versionNumber": 1,
+            "submittedAtUtc": "2026-07-09T14:10:53.129951+00:00"
+        },
+        {
+            "status": "Closed",
+            "clientId": null,
+            "template": "🗂️ تقرير المتابعة الإدارية والتشغيلية (أسبوعي)",
+            "periodKey": "2026-W30",
+            "projectId": null,
+            "versionId": "1934c2ad-a648-44ae-a8c0-4fb240c30b1d",
+            "payloadMd5": "d41d8cd98f00b204e9800998ecf8427e",
+            "valueCount": 0,
+            "closedAtUtc": null,
+            "submissionId": "e729b926-eff3-4f81-8415-0db8568edced",
+            "updatedAtUtc": "2026-07-09T14:10:53.129951+00:00",
+            "versionNumber": 1,
+            "submittedAtUtc": "2026-07-09T14:10:53.129951+00:00"
+        },
+        {
+            "status": "Submitted",
+            "clientId": null,
+            "template": "🤝 تقرير إدارة الحسابات العملاء",
+            "periodKey": "2026-W28",
+            "projectId": null,
+            "versionId": "fa9569f7-54a6-4635-87b2-1403019c5528",
+            "payloadMd5": "5291260d56be711cf02919ad87072fbb",
+            "valueCount": 10,
+            "closedAtUtc": null,
+            "submissionId": "c28b74dd-54f3-4aef-b849-fec861b84889",
+            "updatedAtUtc": "2026-07-09T11:14:29.733355+00:00",
+            "versionNumber": 2,
+            "submittedAtUtc": "2026-07-09T11:14:29.733355+00:00"
+        },
+        {
+            "status": "Submitted",
+            "clientId": null,
+            "template": "🤝 تقرير إدارة الحسابات العملاء",
+            "periodKey": "2026-W31",
+            "projectId": null,
+            "versionId": "bcc7a34b-6644-471e-bbde-e9bdcfda66c7",
+            "payloadMd5": "df3f447f69610a4177342bfda067db90",
+            "valueCount": 3,
+            "closedAtUtc": null,
+            "submissionId": "6166994e-0390-4ec8-8dfd-efc072c75dee",
+            "updatedAtUtc": "2026-07-27T17:49:26.54856+00:00",
+            "versionNumber": 5,
+            "submittedAtUtc": "2026-07-27T15:31:52.342294+00:00"
+        },
+        {
+            "status": "Submitted",
+            "clientId": null,
+            "template": "🤝 تقرير إدارة الحسابات العملاء",
+            "periodKey": "2026-W31",
+            "projectId": null,
+            "versionId": "bcc7a34b-6644-471e-bbde-e9bdcfda66c7",
+            "payloadMd5": "cdfa4aa3abe5a10af5a897a3b9132b08",
+            "valueCount": 3,
+            "closedAtUtc": null,
+            "submissionId": "6389957d-6ce1-46b9-a61e-2093ec89535f",
+            "updatedAtUtc": "2026-07-29T10:37:13.27628+00:00",
+            "versionNumber": 5,
+            "submittedAtUtc": "2026-07-29T10:37:13.27618+00:00"
+        },
+        {
+            "status": "Submitted",
+            "clientId": null,
+            "template": "🧾 تقرير المحاسب الأسبوعي",
+            "periodKey": "2026-W27",
+            "projectId": null,
+            "versionId": "01d30e05-d361-4381-b970-2d5cae03966b",
+            "payloadMd5": "b559a9f926176d7883ddb23b610a6fed",
+            "valueCount": 32,
+            "closedAtUtc": null,
+            "submissionId": "7eec07f2-a1e2-411d-bf9b-0058c29935ee",
+            "updatedAtUtc": "2026-07-08T20:00:27.090145+00:00",
+            "versionNumber": 2,
+            "submittedAtUtc": "2026-07-08T20:00:27.090145+00:00"
+        }
+    ]
+}

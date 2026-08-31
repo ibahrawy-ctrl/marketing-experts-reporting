@@ -1,0 +1,91 @@
+{
+  "result": {
+    "afterRegroup": {
+      "cards": 4,
+      "uniquePids": 4,
+      "itemsPerProject": [
+        3,
+        1,
+        2,
+        5
+      ],
+      "totalItems": 11
+    },
+    "saveStatus": 200,
+    "afterSaveReload": {
+      "cards": 4,
+      "uniquePids": 4,
+      "itemsPerProject": [
+        3,
+        1,
+        2,
+        5
+      ],
+      "totalItems": 11
+    },
+    "saveReloadIdentical": true,
+    "edit": {
+      "card": 3,
+      "item": 1,
+      "key": "count",
+      "old": "1",
+      "new": "1 [تعديل بند مستقلّ R22B]"
+    },
+    "editSaveStatus": 200,
+    "afterEdit": {
+      "cards": 4,
+      "uniquePids": 4,
+      "itemsPerProject": [
+        3,
+        1,
+        2,
+        5
+      ],
+      "totalItems": 11
+    },
+    "changedPairCount": 1,
+    "changedPair": [
+      [
+        "51710a1a-386d-4cce-a8ac-0665aaee9d9b",
+        1,
+        "count",
+        "\"1\""
+      ],
+      [
+        "51710a1a-386d-4cce-a8ac-0665aaee9d9b",
+        1,
+        "count",
+        "\"1 [تعديل بند مستقلّ R22B]\""
+      ]
+    ],
+    "editPersisted": true,
+    "othersUntouched": true
+  },
+  "httpCodes": [
+    [
+      "GET",
+      "/api/submissions/d07d6c4e-f7eb-45d4-a681-1810fdb60cfc",
+      200
+    ],
+    [
+      "PUT",
+      "/api/submissions/d07d6c4e-f7eb-45d4-a681-1810fdb60cfc/values",
+      200
+    ],
+    [
+      "GET",
+      "/api/submissions/d07d6c4e-f7eb-45d4-a681-1810fdb60cfc",
+      200
+    ],
+    [
+      "PUT",
+      "/api/submissions/d07d6c4e-f7eb-45d4-a681-1810fdb60cfc/values",
+      200
+    ],
+    [
+      "GET",
+      "/api/submissions/d07d6c4e-f7eb-45d4-a681-1810fdb60cfc",
+      200
+    ]
+  ]
+}

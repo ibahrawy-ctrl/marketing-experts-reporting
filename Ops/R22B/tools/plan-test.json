@@ -1,0 +1,23 @@
+{
+  "database": "reporting_test_uat",
+  "note": "خريطة التحويل المعتمدة من مالك المنتج (R22B). وضع all = نقل حرفيّ كامل لحقول المشروع إلى بند العمل. وضع grid = أعمدة الشبكة تصير حقول بند عمل بالتسميات والترتيب نفسه.",
+  "templates": [
+    { "title": "تقرير فريق الفيديو", "mode": "all" },
+    { "title": "تقرير فريق التصميم", "mode": "all" },
+    { "title": "تقرير المديرشن الأسبوعي", "mode": "all" },
+    {
+      "title": "تقرير متابعة مقالات SEO الأسبوعي",
+      "mode": "grid",
+      "gridKey": "articles",
+      "itemFields": [
+        { "key": "article_title",  "type": "ShortText", "label": "عنوان المقال" },
+        { "key": "target_keyword", "type": "ShortText", "label": "الكلمة المفتاحية" },
+        { "key": "article_status", "type": "ShortText", "label": "الحالة" },
+        { "key": "reviewer",       "type": "ShortText", "label": "المراجع" },
+        { "key": "delivery_date",  "type": "ShortText", "label": "تاريخ التسليم" },
+        { "key": "notes",          "type": "LongText",  "label": "ملاحظات" }
+      ]
+    },
+    { "title": "تقرير كاتب المحتوى الأسبوعي", "mode": "all" }
+  ]
+}

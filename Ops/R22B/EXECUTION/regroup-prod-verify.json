@@ -1,0 +1,58 @@
+{
+  "database": "reporting_prod",
+  "submissionId": "bba208cd-9fb1-4c70-881e-abd91c8c57fe",
+  "mode": "DRY_RUN",
+  "runAtUtc": "2026-08-31T08:11:08.4664190Z",
+  "periodKey": "2026-W35",
+  "submitterId": "d352528f-72dd-44b7-a213-8c82153ae350",
+  "status": "Draft",
+  "templateVersionId": "ed4796e4-9d21-4443-8c3f-091efe6ffcb8",
+  "updatedAtUtcBefore": "2026-08-31T08:08:24.4502670Z",
+  "prsPayloadMd5Before": "25686d0c3642234c202c02e9a440b749",
+  "generalFieldsMd5Before": "4cbe42ac9e7a94e6ed8cd22114bef71a",
+  "generalFieldCount": 4,
+  "sections": [
+    {
+      "fieldId": "8d756e33-6188-4ccf-9416-72d2b4b7ac5a",
+      "label": "\u062A\u0641\u0627\u0635\u064A\u0644 \u0627\u0644\u0645\u0634\u0631\u0648\u0639",
+      "oldProjectEntries": 4,
+      "uniqueProjectIds": 4,
+      "projectEntryCountAfter": 4,
+      "uniqueProjectIdCountAfter": 4,
+      "duplicateProjectIds": 0,
+      "totalWorkItemCount": 11,
+      "workItemsPerProject": [
+        3,
+        1,
+        2,
+        5
+      ],
+      "projectIdOrder": [
+        "a151fd07-413a-4cc5-8e67-f1dd27cfe689",
+        "3258848e-a4e5-4dc3-a860-ea38efeec28a",
+        "2c1e6a2f-a9d9-40d1-b81e-7bed55a08157",
+        "7c0531a3-dcc6-4e44-8dab-391be009e3cd"
+      ],
+      "semanticValuePairsBefore": 53,
+      "semanticValuePairsAfter": 53,
+      "missingValues": 0,
+      "orphanValues": 0,
+      "addedValues": 0,
+      "unknownKeys": 0,
+      "unknownKeyList": [],
+      "generalSummariesMoved": 0,
+      "projectLevelPairsBefore": 0,
+      "projectLevelPairsAfter": 0,
+      "semanticMd5Before": "97aecf6d2a3c0651dff5e812a8cd2ad9",
+      "semanticMd5After": "97aecf6d2a3c0651dff5e812a8cd2ad9",
+      "payloadMd5Before": "25686d0c3642234c202c02e9a440b749",
+      "safe": true,
+      "payloadMd5After": "b24a194add14ff53c3b0ed44fcfa36e5",
+      "written": false
+    }
+  ],
+  "safe": true,
+  "generalFieldsMd5After": "4cbe42ac9e7a94e6ed8cd22114bef71a",
+  "applied": false,
+  "updatedAtUtcAfter": "2026-08-31T08:08:24.4502670Z"
+}

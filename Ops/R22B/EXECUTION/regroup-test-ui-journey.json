@@ -1,0 +1,43 @@
+{
+  "opened": {
+    "heads": [
+      "بند عمل 1",
+      "بند عمل 2",
+      "بند عمل 3",
+      "بند عمل 1",
+      "بند عمل 1",
+      "بند عمل 2",
+      "بند عمل 1",
+      "بند عمل 2",
+      "بند عمل 3",
+      "بند عمل 4",
+      "بند عمل 5"
+    ],
+    "headCount": 11,
+    "addBtns": 4,
+    "projectSelects": 4
+  },
+  "afterReload": {
+    "heads": [
+      "بند عمل 1",
+      "بند عمل 2",
+      "بند عمل 3",
+      "بند عمل 1",
+      "بند عمل 1",
+      "بند عمل 2",
+      "بند عمل 1",
+      "بند عمل 2",
+      "بند عمل 3",
+      "بند عمل 4",
+      "بند عمل 5"
+    ],
+    "headCount": 11,
+    "addBtns": 4,
+    "projectSelects": 4
+  },
+  "submitButtonVisible": true,
+  "pageTextHasSubmitted": true,
+  "pageTextHasDuplicateError": false,
+  "consoleErrors": [],
+  "serverErrors5xx": []
+}

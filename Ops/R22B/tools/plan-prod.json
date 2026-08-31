@@ -1,0 +1,23 @@
+{
+  "database": "reporting_prod",
+  "note": "R22B — خطّة الإنتاج. نفس خريطة §1/§2 المعتمدة، ومفتاح الشبكة articles_grid. «كاتب المحتوى» مُدرَج رغم كونه ALREADY_COMPLIANT (v9 sv2) لأنّ إدراجه هو المسار الرسميّ لإعادة ربط مسودّته العالقة على v8 وترحيل answers ⇒ workItems[0]؛ ولا يُنشأ له إصدار جديد.",
+  "templates": [
+    { "title": "تقرير فريق الفيديو", "mode": "all" },
+    { "title": "تقرير فريق التصميم", "mode": "all" },
+    { "title": "تقرير المديرشن الأسبوعي", "mode": "all" },
+    {
+      "title": "تقرير متابعة مقالات SEO الأسبوعي",
+      "mode": "grid",
+      "gridKey": "articles_grid",
+      "itemFields": [
+        { "key": "article_title",  "type": "ShortText", "label": "عنوان المقال" },
+        { "key": "target_keyword", "type": "ShortText", "label": "الكلمة المفتاحية" },
+        { "key": "article_status", "type": "ShortText", "label": "الحالة" },
+        { "key": "reviewer",       "type": "ShortText", "label": "المراجع" },
+        { "key": "delivery_date",  "type": "ShortText", "label": "تاريخ التسليم" },
+        { "key": "notes",          "type": "LongText",  "label": "ملاحظات" }
+      ]
+    },
+    { "title": "تقرير كاتب المحتوى الأسبوعي", "mode": "all" }
+  ]
+}

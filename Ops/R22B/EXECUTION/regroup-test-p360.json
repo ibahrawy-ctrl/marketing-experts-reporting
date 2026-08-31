@@ -1,0 +1,30 @@
+{
+  "slices": {
+    "P1": {
+      "projectId": "44388186-3e2a-4825-8b92-a8307abdc941",
+      "expected": 3,
+      "rendered": 3,
+      "ok": true
+    },
+    "P2": {
+      "projectId": "1d3ae941-05a2-43c9-a37d-8e32fbac5796",
+      "expected": 1,
+      "rendered": 1,
+      "ok": true
+    },
+    "P3": {
+      "projectId": "9e731196-f87f-4bbf-82cd-260d06d90b56",
+      "expected": 2,
+      "rendered": 2,
+      "ok": true
+    },
+    "P4": {
+      "projectId": "51710a1a-386d-4cce-a8ac-0665aaee9d9b",
+      "expected": 5,
+      "rendered": 5,
+      "ok": true
+    }
+  },
+  "consoleErrors": [],
+  "serverErrors5xx": []
+}

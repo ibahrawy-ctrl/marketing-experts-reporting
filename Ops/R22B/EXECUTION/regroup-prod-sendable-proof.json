@@ -1,0 +1,92 @@
+{
+  "testSubmissionStatus": "Submitted|2026-08-31 08:02:01.196631+00",
+  "prod": {
+    "projectEntryCount": 4,
+    "uniqueProjectIdCount": 4,
+    "workItemsPerProject": [
+      3,
+      1,
+      2,
+      5
+    ],
+    "totalWorkItemCount": 11,
+    "cardLevelAnswerKeys": []
+  },
+  "test": {
+    "projectEntryCount": 4,
+    "uniqueProjectIdCount": 4,
+    "workItemsPerProject": [
+      3,
+      1,
+      2,
+      5
+    ],
+    "totalWorkItemCount": 11
+  },
+  "duplicateGuardReplay": {
+    "prodErrors": [],
+    "prodResult": "PASS",
+    "testErrors": [],
+    "testResult": "PASS"
+  },
+  "workItemGuardReplay": {
+    "prodConfig": {
+      "minItems": 1,
+      "maxItemsRaw": 0,
+      "maxItemsEnforced": false,
+      "requiredItemKeys": [
+        "content_type",
+        "content_goal",
+        "work_status",
+        "count"
+      ],
+      "numericItemKeys": [
+        "count"
+      ],
+      "uniqueBy": []
+    },
+    "prodErrors": [],
+    "prodResult": "PASS",
+    "testConfig": {
+      "minItems": 1,
+      "maxItemsRaw": 0,
+      "maxItemsEnforced": false,
+      "requiredItemKeys": [
+        "content_type",
+        "content_goal",
+        "work_status",
+        "count"
+      ],
+      "numericItemKeys": [
+        "count"
+      ],
+      "uniqueBy": []
+    },
+    "testErrors": [],
+    "testResult": "PASS"
+  },
+  "structuralEquivalence": {
+    "prodEntryShape": [
+      "answers:dict",
+      "projectId:str",
+      "workItems:list"
+    ],
+    "testEntryShape": [
+      "answers:dict",
+      "projectId:str",
+      "workItems:list"
+    ],
+    "entryShapeIdentical": true,
+    "prodItemShape": [
+      "answers:dict"
+    ],
+    "testItemShape": [
+      "answers:dict"
+    ],
+    "itemShapeIdentical": true,
+    "prodSchemaVersion": 2,
+    "testSchemaVersion": 2
+  },
+  "DUPLICATE_PROJECT_VALIDATION": "PASS",
+  "SUBMISSION_STRUCTURALLY_SENDABLE": "YES"
+}

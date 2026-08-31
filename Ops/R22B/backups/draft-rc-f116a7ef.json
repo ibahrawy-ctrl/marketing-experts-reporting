@@ -1,0 +1,78 @@
+{
+    "values": [
+        {
+            "Id": "129ff43f-10af-4fd5-bc5d-d39b919190ae",
+            "Key": null,
+            "Label": "📁 تفاصيل المشاريع",
+            "Order": 0,
+            "FieldType": "SectionHeader",
+            "ValueBool": null,
+            "ValueDate": null,
+            "ValueJson": null,
+            "ValueText": null,
+            "ValueNumber": null,
+            "TemplateFieldId": "184ff0b2-e2d8-4897-8ed2-f9017a66af27"
+        },
+        {
+            "Id": "e52c606a-6d33-48fa-9647-5d0ed09c7eb1",
+            "Key": null,
+            "Label": "المشروع",
+            "Order": 1,
+            "FieldType": "ProjectRepeatableSection",
+            "ValueBool": null,
+            "ValueDate": null,
+            "ValueJson": [
+                {
+                    "answers": {
+                        "issues": "لم يتم تعديل الموقع،ولم يتم التعاقد مع مدارس ",
+                        "next_week": "-",
+                        "pieces_grid": "[[\"\",\"\",\"\",\"\",\"\",\"\"]]",
+                        "return_reason": "-",
+                        "project_status": "🟡 مستقر"
+                    },
+                    "projectId": "cfcb9c13-1a0e-47c8-8a1a-5da7a06ee014"
+                },
+                {
+                    "answers": {
+                        "pieces_grid": "[[\"\",\"\",\"\",\"\",\"\",\"\"]]"
+                    },
+                    "projectId": "7fea3a95-d7af-472f-831f-b19696f71397"
+                },
+                {
+                    "answers": {
+                        "return_reason": "لمً يتم الاعاده ولكن تم اضافه",
+                        "project_status": "🟡 مستقر"
+                    },
+                    "projectId": "8b72f9f5-5bd6-4ac9-9423-cd28a11df8fb"
+                },
+                {
+                    "answers": {
+                    },
+                    "projectId": null
+                }
+            ],
+            "ValueText": null,
+            "ValueNumber": null,
+            "TemplateFieldId": "b48fc0a0-3ed8-42d6-afad-f85d6dc7e414"
+        }
+    ],
+    "database": "reporting_rc",
+    "submission": {
+        "Id": "f116a7ef-93b1-4670-aebe-09334c557448",
+        "Status": "Draft",
+        "IsDeleted": false,
+        "PeriodKey": "2026-W27",
+        "ProjectId": null,
+        "TemplateId": "5e6ad325-b26c-4fd6-b4f8-d415dae44c89",
+        "ClosedAtUtc": null,
+        "SubmitterId": "84d71430-d300-4578-8a9e-a0e7e8fe886e",
+        "CreatedAtUtc": "2026-07-08T20:45:51.860039+00:00",
+        "UpdatedAtUtc": "2026-07-08T21:01:08.491814+00:00",
+        "TemplateTitle": "تقرير كاتب المحتوى الأسبوعي",
+        "VersionNumber": 5,
+        "SubmittedAtUtc": null,
+        "ReportTemplateVersionId": "3428fde8-faf7-4742-a85d-3d1db20ab1fb"
+    },
+    "approvalSteps": 0,
+    "capturedAtUtc": "2026-08-31T05:20:49Z"
+}

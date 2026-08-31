@@ -1,0 +1,2074 @@
+[
+    {
+        "key": null,
+        "label": "تفاصيل المشروع",
+        "order": 4,
+        "title": "تقرير المديرشن الأسبوعي",
+        "config": {
+            "fields": [
+                {
+                    "key": "activity_type",
+                    "type": "Select",
+                    "label": "نوع النشاط",
+                    "columns": null,
+                    "options": [
+                        "Comments",
+                        "Inbox",
+                        "Messenger",
+                        "WhatsApp",
+                        "Instagram DM",
+                        "TikTok Messages"
+                    ],
+                    "required": true,
+                    "catalogDomain": "activity_type"
+                },
+                {
+                    "key": "interaction_result",
+                    "type": "Select",
+                    "label": "نتيجة التفاعل",
+                    "columns": null,
+                    "options": [
+                        "Inquiry",
+                        "Lead",
+                        "Complaint",
+                        "Escalated",
+                        "Closed",
+                        "Follow-up"
+                    ],
+                    "required": true,
+                    "catalogDomain": "interaction_result"
+                },
+                {
+                    "key": "response_time",
+                    "type": "Select",
+                    "label": "زمن الاستجابة",
+                    "columns": null,
+                    "options": [
+                        "أقل من ساعة",
+                        "أقل من 4 ساعات",
+                        "أقل من يوم",
+                        "أكثر من يوم"
+                    ],
+                    "required": true,
+                    "catalogDomain": "response_time"
+                },
+                {
+                    "key": "count",
+                    "type": "Number",
+                    "label": "العدد",
+                    "columns": null,
+                    "options": null,
+                    "required": true,
+                    "catalogDomain": null
+                },
+                {
+                    "key": "notes",
+                    "type": "LongText",
+                    "label": "ملاحظات",
+                    "columns": null,
+                    "options": null,
+                    "required": false,
+                    "catalogDomain": null
+                }
+            ],
+            "maxProjects": 0,
+            "minProjects": 1,
+            "projectRequired": true
+        },
+        "fieldId": "76dafaf6-1eaf-44b4-9f51-75bf1ea4fa13",
+        "helpText": "أضف قسمًا لكل مشروع.",
+        "jobRoleId": "6b638c2c-c77d-4858-96ac-9362b1f312d3",
+        "versionId": "48374cdf-9073-4ee3-ad43-09ef8ce8d126",
+        "isRequired": false,
+        "templateId": "db8c764d-6f10-4997-8c07-512334dad30b",
+        "versionNumber": 8
+    },
+    {
+        "key": null,
+        "label": "تفاصيل المشروع",
+        "order": 4,
+        "title": "تقرير فريق التصميم",
+        "config": {
+            "fields": [
+                {
+                    "key": "design_type",
+                    "type": "Select",
+                    "label": "نوع التصميم",
+                    "columns": null,
+                    "options": [
+                        "Carousel",
+                        "Static",
+                        "Story",
+                        "Infographic",
+                        "Banner",
+                        "Thumbnail",
+                        "Presentation",
+                        "Website Section",
+                        "Landing Page",
+                        "Logo",
+                        "Brand Identity",
+                        "Print",
+                        "Motion Assets"
+                    ],
+                    "required": true,
+                    "catalogDomain": "design_type"
+                },
+                {
+                    "key": "design_status",
+                    "type": "Select",
+                    "label": "حالة التصميم",
+                    "columns": null,
+                    "options": [
+                        "New",
+                        "Revision",
+                        "Final",
+                        "Delivered"
+                    ],
+                    "required": true,
+                    "catalogDomain": "design_status"
+                },
+                {
+                    "key": "design_tool",
+                    "type": "Select",
+                    "label": "أداة التنفيذ",
+                    "columns": null,
+                    "options": [
+                        "Photoshop",
+                        "Illustrator",
+                        "Canva",
+                        "Figma",
+                        "AI Assisted"
+                    ],
+                    "required": true,
+                    "catalogDomain": "design_tool"
+                },
+                {
+                    "key": "count",
+                    "type": "Number",
+                    "label": "العدد",
+                    "columns": null,
+                    "options": null,
+                    "required": true,
+                    "catalogDomain": null
+                },
+                {
+                    "key": "notes",
+                    "type": "LongText",
+                    "label": "ملاحظات",
+                    "columns": null,
+                    "options": null,
+                    "required": false,
+                    "catalogDomain": null
+                }
+            ],
+            "maxProjects": 0,
+            "minProjects": 1,
+            "projectRequired": true
+        },
+        "fieldId": "9eb63453-09f3-4c86-bb78-33046c265bf8",
+        "helpText": "أضف قسمًا لكل مشروع.",
+        "jobRoleId": "7cfc05c6-fbbf-4d5e-abb0-fe18616c00c3",
+        "versionId": "edb54ab6-a441-452f-82de-96268780a86d",
+        "isRequired": false,
+        "templateId": "e9734e7f-490e-4380-9424-5354865a3153",
+        "versionNumber": 7
+    },
+    {
+        "key": null,
+        "label": "تفاصيل المشروع",
+        "order": 4,
+        "title": "تقرير فريق الفيديو",
+        "config": {
+            "fields": [
+                {
+                    "key": "video_type",
+                    "type": "Select",
+                    "label": "نوع الفيديو",
+                    "columns": null,
+                    "options": [
+                        "Reel",
+                        "TikTok",
+                        "Short",
+                        "Long Video",
+                        "Podcast",
+                        "Motion Graphic",
+                        "Animation",
+                        "Interview",
+                        "Testimonial",
+                        "Ad"
+                    ],
+                    "required": true,
+                    "catalogDomain": "video_type"
+                },
+                {
+                    "key": "edit_type",
+                    "type": "Select",
+                    "label": "نوع التنفيذ",
+                    "columns": null,
+                    "options": [
+                        "Full Editing",
+                        "AI Generated",
+                        "AI Assisted",
+                        "Light Edit",
+                        "Subtitle Only",
+                        "Motion Only",
+                        "Color Correction"
+                    ],
+                    "required": true,
+                    "catalogDomain": "edit_type"
+                },
+                {
+                    "key": "video_duration",
+                    "type": "Select",
+                    "label": "مدة الفيديو",
+                    "columns": null,
+                    "options": [
+                        "أقل من دقيقة",
+                        "1–3 دقائق",
+                        "3–10 دقائق",
+                        "أكثر من 10 دقائق"
+                    ],
+                    "required": true,
+                    "catalogDomain": "video_duration"
+                },
+                {
+                    "key": "video_status",
+                    "type": "Select",
+                    "label": "حالة الفيديو",
+                    "columns": null,
+                    "options": [
+                        "Draft",
+                        "Revision",
+                        "Final",
+                        "Published"
+                    ],
+                    "required": true,
+                    "catalogDomain": "video_status"
+                },
+                {
+                    "key": "count",
+                    "type": "Number",
+                    "label": "العدد",
+                    "columns": null,
+                    "options": null,
+                    "required": true,
+                    "catalogDomain": null
+                },
+                {
+                    "key": "notes",
+                    "type": "LongText",
+                    "label": "ملاحظات",
+                    "columns": null,
+                    "options": null,
+                    "required": false,
+                    "catalogDomain": null
+                }
+            ],
+            "maxProjects": 0,
+            "minProjects": 1,
+            "projectRequired": true
+        },
+        "fieldId": "ddacda6a-d5f0-44d2-a686-91829f38fb7c",
+        "helpText": "أضف قسمًا لكل مشروع.",
+        "jobRoleId": "ca9b0821-757d-4eae-9e14-0a94c1b7184e",
+        "versionId": "30d18be2-db0a-4050-b121-59bc733883bd",
+        "isRequired": false,
+        "templateId": "32f263b9-d715-47b3-9bc9-8cd80f2f8ce5",
+        "versionNumber": 7
+    },
+    {
+        "key": null,
+        "label": "تفاصيل المشروع",
+        "order": 4,
+        "title": "تقرير كاتب المحتوى الأسبوعي",
+        "config": {
+            "fields": [
+            ],
+            "workItems": {
+                "key": "workItems",
+                "label": "بنود العمل",
+                "fields": [
+                    {
+                        "key": "content_type",
+                        "type": "Select",
+                        "label": "نوع المحتوى",
+                        "columns": null,
+                        "options": [
+                            "Carousel",
+                            "Static Post",
+                            "Reel Script",
+                            "Story",
+                            "Blog",
+                            "Landing Page Copy",
+                            "Email",
+                            "WhatsApp Copy",
+                            "Product Description",
+                            "Case Study",
+                            "Company Profile",
+                            "أخرى"
+                        ],
+                        "required": true,
+                        "catalogDomain": "content_type"
+                    },
+                    {
+                        "key": "content_goal",
+                        "type": "Select",
+                        "label": "هدف المحتوى",
+                        "columns": null,
+                        "options": [
+                            "Sales",
+                            "Educational",
+                            "Awareness",
+                            "Engagement",
+                            "Branding",
+                            "Offer",
+                            "Recruitment",
+                            "Event",
+                            "Announcement"
+                        ],
+                        "required": true,
+                        "catalogDomain": "content_goal"
+                    },
+                    {
+                        "key": "work_status",
+                        "type": "Select",
+                        "label": "حالة العمل",
+                        "columns": null,
+                        "options": [
+                            "Draft",
+                            "Revision",
+                            "Approved",
+                            "Published"
+                        ],
+                        "required": true,
+                        "catalogDomain": "work_status"
+                    },
+                    {
+                        "key": "count",
+                        "type": "Number",
+                        "label": "العدد",
+                        "columns": null,
+                        "options": null,
+                        "required": true,
+                        "catalogDomain": null
+                    },
+                    {
+                        "key": "notes",
+                        "type": "LongText",
+                        "label": "ملاحظات",
+                        "columns": null,
+                        "options": null,
+                        "required": false,
+                        "catalogDomain": null
+                    }
+                ],
+                "addLabel": "+ إضافة بند عمل",
+                "maxItems": 0,
+                "minItems": 1,
+                "uniqueBy": [
+                ],
+                "itemLabel": "بند عمل"
+            },
+            "maxProjects": 0,
+            "minProjects": 1,
+            "schemaVersion": 2,
+            "projectRequired": true
+        },
+        "fieldId": "8d756e33-6188-4ccf-9416-72d2b4b7ac5a",
+        "helpText": "أضف قسمًا لكل مشروع.",
+        "jobRoleId": "3ddd7c4b-0756-4179-9dca-931bf4fed43b",
+        "versionId": "ed4796e4-9d21-4443-8c3f-091efe6ffcb8",
+        "isRequired": false,
+        "templateId": "5e6ad325-b26c-4fd6-b4f8-d415dae44c89",
+        "versionNumber": 9
+    },
+    {
+        "key": null,
+        "label": "المشروع",
+        "order": 1,
+        "title": "تقرير متابعة مقالات SEO الأسبوعي",
+        "config": {
+            "fields": [
+                {
+                    "key": "project_status",
+                    "type": "Select",
+                    "label": "الحالة العامة للمشروع",
+                    "columns": null,
+                    "options": [
+                        "🟢 ممتاز",
+                        "🟡 مستقر",
+                        "🔴 يحتاج تدخل"
+                    ],
+                    "required": false
+                },
+                {
+                    "key": "time_consumption",
+                    "type": "Percentage",
+                    "label": "نسبة استهلاك المشروع من وقتك هذا الأسبوع (%)",
+                    "columns": null,
+                    "options": null,
+                    "required": false
+                },
+                {
+                    "key": "articles_planned",
+                    "type": "Number",
+                    "label": "عدد المقالات المخطط لها",
+                    "columns": null,
+                    "options": null,
+                    "required": false
+                },
+                {
+                    "key": "articles_published",
+                    "type": "Number",
+                    "label": "عدد المقالات المنشورة",
+                    "columns": null,
+                    "options": null,
+                    "required": false
+                },
+                {
+                    "key": "articles_late",
+                    "type": "Number",
+                    "label": "عدد المقالات المتأخرة",
+                    "columns": null,
+                    "options": null,
+                    "required": false
+                },
+                {
+                    "key": "articles_grid",
+                    "type": "Grid",
+                    "label": "المقالات",
+                    "columns": [
+                        "عنوان المقال",
+                        "الكلمة المفتاحية",
+                        "الحالة",
+                        "المراجع",
+                        "تاريخ التسليم",
+                        "ملاحظات"
+                    ],
+                    "options": null,
+                    "required": false
+                },
+                {
+                    "key": "done",
+                    "type": "LongText",
+                    "label": "ما تم إنجازه",
+                    "columns": null,
+                    "options": null,
+                    "required": false
+                },
+                {
+                    "key": "issues",
+                    "type": "LongText",
+                    "label": "أهم مشاكل المشروع",
+                    "columns": null,
+                    "options": null,
+                    "required": false
+                },
+                {
+                    "key": "next_week",
+                    "type": "LongText",
+                    "label": "المطلوب الأسبوع القادم",
+                    "columns": null,
+                    "options": null,
+                    "required": false
+                },
+                {
+                    "key": "decisions_needed",
+                    "type": "LongText",
+                    "label": "قرارات مطلوبة",
+                    "columns": null,
+                    "options": null,
+                    "required": false
+                },
+                {
+                    "key": "recommendations",
+                    "type": "LongText",
+                    "label": "اقتراحات / توصيات",
+                    "columns": null,
+                    "options": null,
+                    "required": false
+                }
+            ],
+            "maxProjects": 0,
+            "minProjects": 1,
+            "projectRequired": true
+        },
+        "fieldId": "474a44d7-1155-485d-9895-2c7cbcb3d056",
+        "helpText": "أضف قسمًا لكل مشروع/عميل — كل شيء يُملأ داخل المشروع.",
+        "jobRoleId": "13fb4b32-b1e0-4772-9d14-2f8f87fa2cdb",
+        "versionId": "e0cbce32-57a4-40d1-896c-80e7ca0eae23",
+        "isRequired": false,
+        "templateId": "46e100e3-b3ea-4b38-8447-3105d38b7bc7",
+        "versionNumber": 5
+    },
+    {
+        "key": null,
+        "label": "تفاصيل العميل / المشروع",
+        "order": 14,
+        "title": "🏫 تقرير تشغيل الأكاديمية",
+        "config": {
+            "fields": [
+                {
+                    "key": "account_status",
+                    "type": "ShortText",
+                    "label": "حالة الحساب",
+                    "columns": null,
+                    "options": null,
+                    "required": false
+                },
+                {
+                    "key": "done",
+                    "type": "LongText",
+                    "label": "ما تم إنجازه",
+                    "columns": null,
+                    "options": null,
+                    "required": false
+                },
+                {
+                    "key": "issues",
+                    "type": "LongText",
+                    "label": "عوائق / مشاكل",
+                    "columns": null,
+                    "options": null,
+                    "required": false
+                },
+                {
+                    "key": "next_week",
+                    "type": "LongText",
+                    "label": "المطلوب الأسبوع القادم",
+                    "columns": null,
+                    "options": null,
+                    "required": false
+                },
+                {
+                    "key": "client_notes",
+                    "type": "LongText",
+                    "label": "ملاحظات العميل",
+                    "columns": null,
+                    "options": null,
+                    "required": false
+                },
+                {
+                    "key": "actions",
+                    "type": "Grid",
+                    "label": "الإجراءات المطلوبة",
+                    "columns": [
+                        "الإجراء",
+                        "المسؤول"
+                    ],
+                    "options": null,
+                    "required": false
+                },
+                {
+                    "key": "decisions",
+                    "type": "LongText",
+                    "label": "قرارات أو موافقات مطلوبة",
+                    "columns": null,
+                    "options": null,
+                    "required": false
+                }
+            ],
+            "maxProjects": 0,
+            "minProjects": 1,
+            "projectRequired": true
+        },
+        "fieldId": "ef8136e1-6918-439e-99b3-43e1bba13fe1",
+        "helpText": "أضف قسمًا لكل مشروع/عميل — كل شيء يُملأ داخل المشروع.",
+        "jobRoleId": null,
+        "versionId": "4566b299-2013-4feb-83f9-4d6a74edad9b",
+        "isRequired": false,
+        "templateId": "c1056fbf-48d4-4111-b563-7e8cd1f57e82",
+        "versionNumber": 5
+    },
+    {
+        "key": "web_projects",
+        "label": "حالة مشاريع الويب",
+        "order": 6,
+        "title": "💻 تقرير فريق الويب",
+        "config": {
+            "fields": [
+                {
+                    "key": "status",
+                    "type": "ShortText",
+                    "label": "حالة المشروع",
+                    "required": true
+                },
+                {
+                    "key": "done",
+                    "type": "LongText",
+                    "label": "ما تم تنفيذه هذا الأسبوع",
+                    "required": false
+                },
+                {
+                    "key": "remaining",
+                    "type": "LongText",
+                    "label": "المهام المتبقية",
+                    "required": false
+                },
+                {
+                    "key": "techBlockers",
+                    "type": "LongText",
+                    "label": "العوائق الفنية",
+                    "required": false
+                },
+                {
+                    "key": "needsClient",
+                    "type": "LongText",
+                    "label": "المطلوب من العميل",
+                    "required": false
+                },
+                {
+                    "key": "needsTeam",
+                    "type": "LongText",
+                    "label": "المطلوب من الفريق الداخلي",
+                    "required": false
+                },
+                {
+                    "key": "priority",
+                    "type": "ShortText",
+                    "label": "مستوى الأولوية",
+                    "required": false
+                },
+                {
+                    "key": "needsEscalation",
+                    "type": "ShortText",
+                    "label": "هل يحتاج تصعيد؟",
+                    "required": false
+                },
+                {
+                    "key": "notes",
+                    "type": "LongText",
+                    "label": "ملاحظات إضافية",
+                    "required": false
+                }
+            ],
+            "maxProjects": 10,
+            "minProjects": 0,
+            "projectRequired": false
+        },
+        "fieldId": "a29572a8-d671-4237-afe4-63f78cd966d7",
+        "helpText": "اختر مشاريع الويب التي عملت عليها هذا الأسبوع (اختياري)، واملأ حالة كل مشروع.",
+        "jobRoleId": "02b8a319-e3dd-4917-8334-b697b4bfc930",
+        "versionId": "517f9245-721c-4df3-8961-f4c78d627860",
+        "isRequired": false,
+        "templateId": "839ae6cf-8645-48d3-a1e1-332d271b4204",
+        "versionNumber": 2
+    },
+    {
+        "key": null,
+        "label": "تفاصيل المشروع",
+        "order": 0,
+        "title": "📈 تقرير النمو والأداء — Media Buyer",
+        "config": {
+            "fields": [
+                {
+                    "key": "mb_prj_status",
+                    "type": "Select",
+                    "label": "حالة المشروع",
+                    "columns": null,
+                    "options": [
+                        "🟢 ممتاز",
+                        "🟡 مستقر",
+                        "🔴 يحتاج تدخل"
+                    ],
+                    "required": true,
+                    "columnDefs": null
+                },
+                {
+                    "key": "mb_prj_spend_status",
+                    "type": "Select",
+                    "label": "حالة الصرف",
+                    "columns": null,
+                    "options": [
+                        "منتظم",
+                        "أقل من المخطط",
+                        "أعلى من المخطط"
+                    ],
+                    "required": true,
+                    "columnDefs": null
+                },
+                {
+                    "key": "mb_prj_results_status",
+                    "type": "Select",
+                    "label": "حالة النتائج",
+                    "columns": null,
+                    "options": [
+                        "🟢 جيدة",
+                        "🟡 مقبولة",
+                        "🔴 ضعيفة"
+                    ],
+                    "required": true,
+                    "columnDefs": null
+                },
+                {
+                    "key": "mb_prj_outputs_met",
+                    "type": "Boolean",
+                    "label": "تم تحقيق المخرجات؟",
+                    "columns": null,
+                    "options": null,
+                    "required": true,
+                    "columnDefs": null
+                },
+                {
+                    "key": "mb_prj_time_consumption",
+                    "type": "Percentage",
+                    "label": "نسبة استهلاك الوقت",
+                    "columns": null,
+                    "options": null,
+                    "required": false,
+                    "columnDefs": null
+                },
+                {
+                    "key": "mb_prj_has_escalation",
+                    "type": "Boolean",
+                    "label": "هل يوجد تصعيد؟",
+                    "columns": null,
+                    "options": null,
+                    "required": true,
+                    "columnDefs": null
+                },
+                {
+                    "key": "mb_activity_state",
+                    "type": "Select",
+                    "label": "نشاط الإعلان هذه الفترة",
+                    "columns": null,
+                    "options": [
+                        "HasCampaigns",
+                        "NoCampaignsThisPeriod"
+                    ],
+                    "required": true,
+                    "columnDefs": null
+                },
+                {
+                    "key": "mb_activity_no_reason",
+                    "type": "LongText",
+                    "label": "سبب عدم وجود حملات",
+                    "columns": null,
+                    "options": null,
+                    "required": false,
+                    "columnDefs": null
+                },
+                {
+                    "key": "mb_campaigns_grid",
+                    "type": "Grid",
+                    "label": "شبكة الحملات",
+                    "columns": [
+                        "اسم الحملة",
+                        "المنصّة",
+                        "هدف الحملة",
+                        "دورة حياة الحملة",
+                        "حالة النتائج",
+                        "نوع النتيجة",
+                        "قيمة النتيجة",
+                        "الإنفاق",
+                        "تكلفة النتيجة (CPR)",
+                        "CTR",
+                        "معدّل التحويل",
+                        "ROAS",
+                        "الإجراء التالي",
+                        "ملاحظة"
+                    ],
+                    "options": null,
+                    "required": false,
+                    "columnDefs": [
+                        {
+                            "key": "camp_name",
+                            "type": "Text",
+                            "label": "اسم الحملة",
+                            "formula": null,
+                            "options": null
+                        },
+                        {
+                            "key": "camp_platform",
+                            "type": "Select",
+                            "label": "المنصّة",
+                            "formula": null,
+                            "options": [
+                                "Meta",
+                                "Google",
+                                "TikTok",
+                                "Snapchat",
+                                "X",
+                                "LinkedIn",
+                                "Other"
+                            ]
+                        },
+                        {
+                            "key": "camp_objective",
+                            "type": "Select",
+                            "label": "هدف الحملة",
+                            "formula": null,
+                            "options": [
+                                "Reach",
+                                "Traffic",
+                                "Leads",
+                                "Messages",
+                                "Engagement",
+                                "Sales",
+                                "AppInstalls",
+                                "VideoViews"
+                            ]
+                        },
+                        {
+                            "key": "camp_lifecycle",
+                            "type": "Select",
+                            "label": "دورة حياة الحملة",
+                            "formula": null,
+                            "options": [
+                                "Draft",
+                                "AwaitingAssets",
+                                "UnderPreparation",
+                                "UnderReview",
+                                "WaitingClientApproval",
+                                "ReadyToLaunch",
+                                "Scheduled",
+                                "Live",
+                                "Optimizing",
+                                "Paused",
+                                "Completed",
+                                "Blocked",
+                                "Cancelled"
+                            ]
+                        },
+                        {
+                            "key": "camp_result_state",
+                            "type": "Select",
+                            "label": "حالة النتائج",
+                            "formula": null,
+                            "options": [
+                                "HasResults",
+                                "NoResultsYet",
+                                "TrackingUnavailable"
+                            ]
+                        },
+                        {
+                            "key": "camp_result_metric",
+                            "type": "Select",
+                            "label": "نوع النتيجة",
+                            "formula": null,
+                            "options": [
+                                "Reach",
+                                "LinkClicks",
+                                "Leads",
+                                "Conversations",
+                                "Engagements",
+                                "Purchases",
+                                "Installs",
+                                "ThruPlays"
+                            ]
+                        },
+                        {
+                            "key": "camp_result_value",
+                            "type": "Number",
+                            "label": "قيمة النتيجة",
+                            "formula": null,
+                            "options": null
+                        },
+                        {
+                            "key": "camp_spend",
+                            "type": "Currency",
+                            "label": "الإنفاق",
+                            "formula": null,
+                            "options": null
+                        },
+                        {
+                            "key": "camp_cpr",
+                            "type": "Computed",
+                            "label": "تكلفة النتيجة (CPR)",
+                            "formula": "camp_spend / camp_result_value",
+                            "options": null
+                        },
+                        {
+                            "key": "camp_ctr",
+                            "type": "Percentage",
+                            "label": "CTR",
+                            "formula": null,
+                            "options": null
+                        },
+                        {
+                            "key": "camp_conv_rate",
+                            "type": "Percentage",
+                            "label": "معدّل التحويل",
+                            "formula": null,
+                            "options": null
+                        },
+                        {
+                            "key": "camp_roas",
+                            "type": "Number",
+                            "label": "ROAS",
+                            "formula": null,
+                            "options": null
+                        },
+                        {
+                            "key": "camp_next_action",
+                            "type": "Select",
+                            "label": "الإجراء التالي",
+                            "formula": null,
+                            "options": [
+                                "استمرار",
+                                "تحسين",
+                                "إيقاف",
+                                "زيادة ميزانية",
+                                "تخفيض ميزانية",
+                                "إنهاء"
+                            ]
+                        },
+                        {
+                            "key": "camp_note",
+                            "type": "Text",
+                            "label": "ملاحظة",
+                            "formula": null,
+                            "options": null
+                        }
+                    ]
+                },
+                {
+                    "key": "mb_best_campaign_ref",
+                    "type": "ShortText",
+                    "label": "أفضل حملة (اسمها من الشبكة)",
+                    "columns": null,
+                    "options": null,
+                    "required": false,
+                    "columnDefs": null
+                },
+                {
+                    "key": "mb_best_reason",
+                    "type": "Select",
+                    "label": "سبب اختيار الأفضل",
+                    "columns": null,
+                    "options": [
+                        "أقل CPR",
+                        "أعلى نتائج",
+                        "أعلى جودة ليدز",
+                        "أعلى ROAS"
+                    ],
+                    "required": false,
+                    "columnDefs": null
+                },
+                {
+                    "key": "mb_best_key_metric",
+                    "type": "Select",
+                    "label": "المؤشّر الأساسي (الأفضل)",
+                    "columns": null,
+                    "options": [
+                        "CPR",
+                        "CTR",
+                        "ConvRate",
+                        "ROAS"
+                    ],
+                    "required": false,
+                    "columnDefs": null
+                },
+                {
+                    "key": "mb_best_next_action",
+                    "type": "LongText",
+                    "label": "التوصية التالية (الأفضل)",
+                    "columns": null,
+                    "options": null,
+                    "required": false,
+                    "columnDefs": null
+                },
+                {
+                    "key": "mb_weak_campaign_ref",
+                    "type": "ShortText",
+                    "label": "أضعف حملة (اسمها من الشبكة)",
+                    "columns": null,
+                    "options": null,
+                    "required": false,
+                    "columnDefs": null
+                },
+                {
+                    "key": "mb_weak_reason",
+                    "type": "Select",
+                    "label": "سبب اختيار الأضعف",
+                    "columns": null,
+                    "options": [
+                        "أعلى CPR",
+                        "أدنى نتائج",
+                        "أدنى جودة ليدز",
+                        "أدنى ROAS"
+                    ],
+                    "required": false,
+                    "columnDefs": null
+                },
+                {
+                    "key": "mb_weak_key_metric",
+                    "type": "Select",
+                    "label": "المؤشّر الأساسي (الأضعف)",
+                    "columns": null,
+                    "options": [
+                        "CPR",
+                        "CTR",
+                        "ConvRate",
+                        "ROAS"
+                    ],
+                    "required": false,
+                    "columnDefs": null
+                },
+                {
+                    "key": "mb_weak_next_action",
+                    "type": "LongText",
+                    "label": "التوصية التالية (الأضعف)",
+                    "columns": null,
+                    "options": null,
+                    "required": false,
+                    "columnDefs": null
+                },
+                {
+                    "key": "mb_creative_best_title",
+                    "type": "ShortText",
+                    "label": "أفضل كريتف — العنوان",
+                    "columns": null,
+                    "options": null,
+                    "required": false,
+                    "columnDefs": null
+                },
+                {
+                    "key": "mb_creative_best_type",
+                    "type": "Select",
+                    "label": "أفضل كريتف — النوع",
+                    "columns": null,
+                    "options": [
+                        "فيديو",
+                        "صورة",
+                        "كاروسيل",
+                        "UGC",
+                        "بانر",
+                        "نص"
+                    ],
+                    "required": false,
+                    "columnDefs": null
+                },
+                {
+                    "key": "mb_creative_best_url",
+                    "type": "ShortText",
+                    "label": "أفضل كريتف — الرابط",
+                    "columns": null,
+                    "options": null,
+                    "required": false,
+                    "columnDefs": null
+                },
+                {
+                    "key": "mb_creative_best_linked_campaign",
+                    "type": "ShortText",
+                    "label": "أفضل كريتف — الحملة المرتبطة",
+                    "columns": null,
+                    "options": null,
+                    "required": false,
+                    "columnDefs": null
+                },
+                {
+                    "key": "mb_creative_best_rating",
+                    "type": "Select",
+                    "label": "أفضل كريتف — التقييم",
+                    "columns": null,
+                    "options": [
+                        "ممتاز",
+                        "جيد",
+                        "ضعيف"
+                    ],
+                    "required": false,
+                    "columnDefs": null
+                },
+                {
+                    "key": "mb_creative_best_reason",
+                    "type": "LongText",
+                    "label": "أفضل كريتف — السبب",
+                    "columns": null,
+                    "options": null,
+                    "required": false,
+                    "columnDefs": null
+                },
+                {
+                    "key": "mb_creative_best_key_metric",
+                    "type": "Select",
+                    "label": "أفضل كريتف — المؤشّر الأساسي",
+                    "columns": null,
+                    "options": [
+                        "CPR",
+                        "CTR",
+                        "ThruPlayRate",
+                        "EngagementRate"
+                    ],
+                    "required": false,
+                    "columnDefs": null
+                },
+                {
+                    "key": "mb_creative_best_metric_value",
+                    "type": "Number",
+                    "label": "أفضل كريتف — قيمة المؤشّر",
+                    "columns": null,
+                    "options": null,
+                    "required": false,
+                    "columnDefs": null
+                },
+                {
+                    "key": "mb_creative_weak_title",
+                    "type": "ShortText",
+                    "label": "أضعف كريتف — العنوان",
+                    "columns": null,
+                    "options": null,
+                    "required": false,
+                    "columnDefs": null
+                },
+                {
+                    "key": "mb_creative_weak_type",
+                    "type": "Select",
+                    "label": "أضعف كريتف — النوع",
+                    "columns": null,
+                    "options": [
+                        "فيديو",
+                        "صورة",
+                        "كاروسيل",
+                        "UGC",
+                        "بانر",
+                        "نص"
+                    ],
+                    "required": false,
+                    "columnDefs": null
+                },
+                {
+                    "key": "mb_creative_weak_url",
+                    "type": "ShortText",
+                    "label": "أضعف كريتف — الرابط",
+                    "columns": null,
+                    "options": null,
+                    "required": false,
+                    "columnDefs": null
+                },
+                {
+                    "key": "mb_creative_weak_linked_campaign",
+                    "type": "ShortText",
+                    "label": "أضعف كريتف — الحملة المرتبطة",
+                    "columns": null,
+                    "options": null,
+                    "required": false,
+                    "columnDefs": null
+                },
+                {
+                    "key": "mb_creative_weak_rating",
+                    "type": "Select",
+                    "label": "أضعف كريتف — التقييم",
+                    "columns": null,
+                    "options": [
+                        "ممتاز",
+                        "جيد",
+                        "ضعيف"
+                    ],
+                    "required": false,
+                    "columnDefs": null
+                },
+                {
+                    "key": "mb_creative_weak_reason",
+                    "type": "LongText",
+                    "label": "أضعف كريتف — السبب",
+                    "columns": null,
+                    "options": null,
+                    "required": false,
+                    "columnDefs": null
+                },
+                {
+                    "key": "mb_creative_weak_key_metric",
+                    "type": "Select",
+                    "label": "أضعف كريتف — المؤشّر الأساسي",
+                    "columns": null,
+                    "options": [
+                        "CPR",
+                        "CTR",
+                        "ThruPlayRate",
+                        "EngagementRate"
+                    ],
+                    "required": false,
+                    "columnDefs": null
+                },
+                {
+                    "key": "mb_creative_weak_metric_value",
+                    "type": "Number",
+                    "label": "أضعف كريتف — قيمة المؤشّر",
+                    "columns": null,
+                    "options": null,
+                    "required": false,
+                    "columnDefs": null
+                },
+                {
+                    "key": "mb_creative_promotion",
+                    "type": "Grid",
+                    "label": "فرص ترقية الكريتف",
+                    "columns": [
+                        "التوصية",
+                        "تقييم Media Buyer",
+                        "القرار",
+                        "الحملة المرتبطة",
+                        "الحالة الحالية"
+                    ],
+                    "options": null,
+                    "required": false,
+                    "columnDefs": [
+                        {
+                            "key": "promo_recommendation",
+                            "type": "Text",
+                            "label": "التوصية",
+                            "formula": null,
+                            "options": null
+                        },
+                        {
+                            "key": "promo_assessment",
+                            "type": "Select",
+                            "label": "تقييم Media Buyer",
+                            "formula": null,
+                            "options": [
+                                "مقبول للاختبار",
+                                "يحتاج تعديل",
+                                "مرفوض"
+                            ]
+                        },
+                        {
+                            "key": "promo_decision",
+                            "type": "Select",
+                            "label": "القرار",
+                            "formula": null,
+                            "options": [
+                                "اعتماد",
+                                "تأجيل",
+                                "رفض"
+                            ]
+                        },
+                        {
+                            "key": "promo_linked_campaign",
+                            "type": "Text",
+                            "label": "الحملة المرتبطة",
+                            "formula": null,
+                            "options": null
+                        },
+                        {
+                            "key": "promo_status",
+                            "type": "Select",
+                            "label": "الحالة الحالية",
+                            "formula": null,
+                            "options": [
+                                "مقترح",
+                                "قيد التنفيذ",
+                                "مطبّق",
+                                "ملغى"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "key": "mb_funnel",
+                    "type": "Grid",
+                    "label": "تشخيص الفانل",
+                    "columns": [
+                        "مرحلة التسرّب",
+                        "السبب الجذريّ",
+                        "نوع السبب",
+                        "الفريق المسؤول",
+                        "الإجراء التصحيحيّ",
+                        "الأولوية",
+                        "تاريخ الاستحقاق",
+                        "الحالة"
+                    ],
+                    "options": null,
+                    "required": false,
+                    "columnDefs": [
+                        {
+                            "key": "funnel_stage",
+                            "type": "Select",
+                            "label": "مرحلة التسرّب",
+                            "formula": null,
+                            "options": [
+                                "Impression",
+                                "ClickOrEngagement",
+                                "LandingPage",
+                                "LeadOrConversation",
+                                "Contacted",
+                                "Qualified",
+                                "FollowUp",
+                                "SaleOrEnrollment"
+                            ]
+                        },
+                        {
+                            "key": "funnel_root_cause",
+                            "type": "Select",
+                            "label": "السبب الجذريّ",
+                            "formula": null,
+                            "options": [
+                                "Creative",
+                                "Message",
+                                "Targeting",
+                                "Offer",
+                                "LandingPage",
+                                "Tracking",
+                                "LeadQuality",
+                                "SalesFollowup",
+                                "Budget",
+                                "Platform",
+                                "SalesCapacity",
+                                "Other"
+                            ]
+                        },
+                        {
+                            "key": "funnel_cause_type",
+                            "type": "Select",
+                            "label": "نوع السبب",
+                            "formula": null,
+                            "options": [
+                                "Confirmed",
+                                "Suspected"
+                            ]
+                        },
+                        {
+                            "key": "funnel_owner_team",
+                            "type": "Select",
+                            "label": "الفريق المسؤول",
+                            "formula": null,
+                            "options": [
+                                "Design",
+                                "Content",
+                                "Video",
+                                "Web",
+                                "AccountManager",
+                                "Sales",
+                                "MediaBuyer"
+                            ]
+                        },
+                        {
+                            "key": "funnel_corrective_action",
+                            "type": "Text",
+                            "label": "الإجراء التصحيحيّ",
+                            "formula": null,
+                            "options": null
+                        },
+                        {
+                            "key": "funnel_priority",
+                            "type": "Select",
+                            "label": "الأولوية",
+                            "formula": null,
+                            "options": [
+                                "عاجل",
+                                "هذا الأسبوع",
+                                "الأسبوع القادم"
+                            ]
+                        },
+                        {
+                            "key": "funnel_due_date",
+                            "type": "Text",
+                            "label": "تاريخ الاستحقاق",
+                            "formula": null,
+                            "options": null
+                        },
+                        {
+                            "key": "funnel_status",
+                            "type": "Select",
+                            "label": "الحالة",
+                            "formula": null,
+                            "options": [
+                                "مفتوح",
+                                "قيد المعالجة",
+                                "مغلق"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "key": "mb_experiments",
+                    "type": "Grid",
+                    "label": "الاختبارات والتجارب",
+                    "columns": [
+                        "فرضية/عنوان الاختبار",
+                        "النوع",
+                        "الحالة",
+                        "الحملة المرتبطة",
+                        "النتيجة/التعلّم"
+                    ],
+                    "options": null,
+                    "required": false,
+                    "columnDefs": [
+                        {
+                            "key": "exp_title",
+                            "type": "Text",
+                            "label": "فرضية/عنوان الاختبار",
+                            "formula": null,
+                            "options": null
+                        },
+                        {
+                            "key": "exp_type",
+                            "type": "Select",
+                            "label": "النوع",
+                            "formula": null,
+                            "options": [
+                                "Creative",
+                                "Audience",
+                                "Offer",
+                                "LandingPage",
+                                "Bidding",
+                                "Copy",
+                                "Other"
+                            ]
+                        },
+                        {
+                            "key": "exp_status",
+                            "type": "Select",
+                            "label": "الحالة",
+                            "formula": null,
+                            "options": [
+                                "مخطّط",
+                                "جارٍ",
+                                "مكتمل",
+                                "موقوف"
+                            ]
+                        },
+                        {
+                            "key": "exp_linked_campaign",
+                            "type": "Text",
+                            "label": "الحملة المرتبطة",
+                            "formula": null,
+                            "options": null
+                        },
+                        {
+                            "key": "exp_outcome",
+                            "type": "Text",
+                            "label": "النتيجة/التعلّم",
+                            "formula": null,
+                            "options": null
+                        }
+                    ]
+                },
+                {
+                    "key": "mb_team_requests",
+                    "type": "Grid",
+                    "label": "طلبات الفرق",
+                    "columns": [
+                        "الفريق",
+                        "الطلب",
+                        "الأولوية",
+                        "الحالة",
+                        "الحملة/المشروع المرتبط"
+                    ],
+                    "options": null,
+                    "required": false,
+                    "columnDefs": [
+                        {
+                            "key": "req_team",
+                            "type": "Select",
+                            "label": "الفريق",
+                            "formula": null,
+                            "options": [
+                                "Design",
+                                "Content",
+                                "Video",
+                                "Web",
+                                "AccountManager",
+                                "Sales"
+                            ]
+                        },
+                        {
+                            "key": "req_detail",
+                            "type": "Text",
+                            "label": "الطلب",
+                            "formula": null,
+                            "options": null
+                        },
+                        {
+                            "key": "req_priority",
+                            "type": "Select",
+                            "label": "الأولوية",
+                            "formula": null,
+                            "options": [
+                                "عاجل",
+                                "هذا الأسبوع",
+                                "الأسبوع القادم"
+                            ]
+                        },
+                        {
+                            "key": "req_status",
+                            "type": "Select",
+                            "label": "الحالة",
+                            "formula": null,
+                            "options": [
+                                "مطلوب",
+                                "قيد التنفيذ",
+                                "مكتمل",
+                                "مرفوض"
+                            ]
+                        },
+                        {
+                            "key": "req_linked_campaign",
+                            "type": "Text",
+                            "label": "الحملة/المشروع المرتبط",
+                            "formula": null,
+                            "options": null
+                        }
+                    ]
+                },
+                {
+                    "key": "mb_escalations",
+                    "type": "Grid",
+                    "label": "التصعيدات",
+                    "columns": [
+                        "موضوع التصعيد",
+                        "التفاصيل",
+                        "الخطورة",
+                        "المُصعَّد إليه",
+                        "الحالة"
+                    ],
+                    "options": null,
+                    "required": false,
+                    "columnDefs": [
+                        {
+                            "key": "esc_subject",
+                            "type": "Text",
+                            "label": "موضوع التصعيد",
+                            "formula": null,
+                            "options": null
+                        },
+                        {
+                            "key": "esc_detail",
+                            "type": "Text",
+                            "label": "التفاصيل",
+                            "formula": null,
+                            "options": null
+                        },
+                        {
+                            "key": "esc_severity",
+                            "type": "Select",
+                            "label": "الخطورة",
+                            "formula": null,
+                            "options": [
+                                "مرتفعة",
+                                "متوسطة",
+                                "منخفضة"
+                            ]
+                        },
+                        {
+                            "key": "esc_to",
+                            "type": "Select",
+                            "label": "المُصعَّد إليه",
+                            "formula": null,
+                            "options": [
+                                "TeamLeader",
+                                "Manager",
+                                "GM",
+                                "AccountManager"
+                            ]
+                        },
+                        {
+                            "key": "esc_status",
+                            "type": "Select",
+                            "label": "الحالة",
+                            "formula": null,
+                            "options": [
+                                "مفتوح",
+                                "قيد المعالجة",
+                                "مغلق"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "key": "mb_decisions",
+                    "type": "Grid",
+                    "label": "قرارات الإدارة المطلوبة",
+                    "columns": [
+                        "القرار المطلوب",
+                        "الأولوية",
+                        "الجهة المقرِّرة",
+                        "الحالة"
+                    ],
+                    "options": null,
+                    "required": false,
+                    "columnDefs": [
+                        {
+                            "key": "dec_detail",
+                            "type": "Text",
+                            "label": "القرار المطلوب",
+                            "formula": null,
+                            "options": null
+                        },
+                        {
+                            "key": "dec_priority",
+                            "type": "Select",
+                            "label": "الأولوية",
+                            "formula": null,
+                            "options": [
+                                "عاجل",
+                                "هذا الأسبوع",
+                                "الأسبوع القادم"
+                            ]
+                        },
+                        {
+                            "key": "dec_owner",
+                            "type": "Select",
+                            "label": "الجهة المقرِّرة",
+                            "formula": null,
+                            "options": [
+                                "GM",
+                                "Manager",
+                                "AccountManager",
+                                "Client"
+                            ]
+                        },
+                        {
+                            "key": "dec_status",
+                            "type": "Select",
+                            "label": "الحالة",
+                            "formula": null,
+                            "options": [
+                                "مطلوب",
+                                "قيد النظر",
+                                "مُعتمَد",
+                                "مرفوض"
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "maxProjects": 0,
+            "minProjects": 1,
+            "projectRequired": true
+        },
+        "fieldId": "bee9e88d-3f71-4907-bcaa-d11943232fcc",
+        "helpText": "أضف قسمًا لكل مشروع.",
+        "jobRoleId": "f6f12207-c686-4b9f-bee1-1db4ebb466fb",
+        "versionId": "e2d53a0c-ce3d-4e4f-9c2f-999b2748db1d",
+        "isRequired": false,
+        "templateId": "16d07519-c17b-4e7e-a273-2c4d977e9602",
+        "versionNumber": 6
+    },
+    {
+        "key": null,
+        "label": "المشروع",
+        "order": 1,
+        "title": "🔍 تقرير فريق SEO",
+        "config": {
+            "fields": [
+                {
+                    "key": "project_status",
+                    "type": "Select",
+                    "label": "الحالة العامة للمشروع",
+                    "columns": null,
+                    "options": [
+                        "🟢 ممتاز",
+                        "🟡 مستقر",
+                        "🔴 يحتاج تدخل"
+                    ],
+                    "required": false
+                },
+                {
+                    "key": "time_consumption",
+                    "type": "Percentage",
+                    "label": "نسبة استهلاك المشروع من وقتك هذا الأسبوع (%)",
+                    "columns": null,
+                    "options": null,
+                    "required": false
+                },
+                {
+                    "key": "kw_improved",
+                    "type": "Number",
+                    "label": "كلمات تحسّنت",
+                    "columns": null,
+                    "options": null,
+                    "required": false
+                },
+                {
+                    "key": "kw_declined",
+                    "type": "Number",
+                    "label": "كلمات تراجعت",
+                    "columns": null,
+                    "options": null,
+                    "required": false
+                },
+                {
+                    "key": "organic_traffic",
+                    "type": "Number",
+                    "label": "Organic Traffic",
+                    "columns": null,
+                    "options": null,
+                    "required": false
+                },
+                {
+                    "key": "indexed_pages",
+                    "type": "Number",
+                    "label": "الصفحات المفهرسة",
+                    "columns": null,
+                    "options": null,
+                    "required": false
+                },
+                {
+                    "key": "tasks_done",
+                    "type": "Number",
+                    "label": "المهام المنفّذة",
+                    "columns": null,
+                    "options": null,
+                    "required": false
+                },
+                {
+                    "key": "tech_issues",
+                    "type": "Number",
+                    "label": "المشاكل التقنية",
+                    "columns": null,
+                    "options": null,
+                    "required": false
+                },
+                {
+                    "key": "keywords_grid",
+                    "type": "Grid",
+                    "label": "الكلمات المفتاحية",
+                    "columns": [
+                        "الكلمة المفتاحية",
+                        "الصفحة",
+                        "Position",
+                        "Impressions",
+                        "Clicks",
+                        "CTR",
+                        "التغيّر",
+                        "ملاحظات"
+                    ],
+                    "options": null,
+                    "required": false
+                },
+                {
+                    "key": "done",
+                    "type": "LongText",
+                    "label": "ما تم إنجازه",
+                    "columns": null,
+                    "options": null,
+                    "required": false
+                },
+                {
+                    "key": "issues",
+                    "type": "LongText",
+                    "label": "أهم مشاكل المشروع",
+                    "columns": null,
+                    "options": null,
+                    "required": false
+                },
+                {
+                    "key": "next_week",
+                    "type": "LongText",
+                    "label": "المطلوب الأسبوع القادم",
+                    "columns": null,
+                    "options": null,
+                    "required": false
+                },
+                {
+                    "key": "decisions_needed",
+                    "type": "LongText",
+                    "label": "قرارات مطلوبة",
+                    "columns": null,
+                    "options": null,
+                    "required": false
+                },
+                {
+                    "key": "recommendations",
+                    "type": "LongText",
+                    "label": "اقتراحات / توصيات",
+                    "columns": null,
+                    "options": null,
+                    "required": false
+                }
+            ],
+            "maxProjects": 0,
+            "minProjects": 1,
+            "projectRequired": true
+        },
+        "fieldId": "a53a5088-d8e2-465d-9baa-c6acaee87bdd",
+        "helpText": "أضف قسمًا لكل مشروع/عميل — كل شيء يُملأ داخل المشروع.",
+        "jobRoleId": "92cdcba4-0687-490e-a727-8c74d968e292",
+        "versionId": "5ce17028-1bd0-4942-833f-8068e47e952c",
+        "isRequired": false,
+        "templateId": "13aa9a20-e0c6-439e-b504-149fd84d4431",
+        "versionNumber": 5
+    },
+    {
+        "key": "projects",
+        "label": "أداء العملاء والمشاريع",
+        "order": 4,
+        "title": "🤝 تقرير إدارة الحسابات العملاء",
+        "config": {
+            "fields": [
+                {
+                    "key": "project_status",
+                    "type": "Select",
+                    "label": "حالة المشروع",
+                    "options": [
+                        "على المسار",
+                        "متأخر",
+                        "متعثّر",
+                        "معلّق",
+                        "مكتمل"
+                    ],
+                    "required": true
+                },
+                {
+                    "key": "current_phase",
+                    "type": "ShortText",
+                    "label": "المرحلة الحالية",
+                    "required": false
+                },
+                {
+                    "key": "achievements",
+                    "type": "LongText",
+                    "label": "ما تم إنجازه",
+                    "required": true
+                },
+                {
+                    "key": "deliverables_sent",
+                    "type": "Number",
+                    "label": "التسليمات المرسلة",
+                    "required": false
+                },
+                {
+                    "key": "deliverables_approved",
+                    "type": "Number",
+                    "label": "التسليمات المعتمدة",
+                    "required": false
+                },
+                {
+                    "key": "deliverables_pending",
+                    "type": "Number",
+                    "label": "التسليمات المنتظرة",
+                    "required": false
+                },
+                {
+                    "key": "client_requests",
+                    "type": "LongText",
+                    "label": "طلبات العميل",
+                    "required": false
+                },
+                {
+                    "key": "scope_changes",
+                    "type": "LongText",
+                    "label": "تغييرات النطاق",
+                    "required": false
+                },
+                {
+                    "key": "internal_dependencies",
+                    "type": "LongText",
+                    "label": "الاعتماديات الداخلية",
+                    "required": false
+                },
+                {
+                    "key": "delays",
+                    "type": "LongText",
+                    "label": "التأخير",
+                    "required": false
+                },
+                {
+                    "key": "risk_severity",
+                    "type": "Select",
+                    "label": "المخاطر",
+                    "options": [
+                        "لا يوجد",
+                        "منخفض",
+                        "متوسط",
+                        "مرتفع",
+                        "حرج"
+                    ],
+                    "required": false
+                },
+                {
+                    "key": "open_issues",
+                    "type": "LongText",
+                    "label": "القضايا المفتوحة",
+                    "required": false
+                },
+                {
+                    "key": "decisions_required",
+                    "type": "LongText",
+                    "label": "القرارات المطلوبة",
+                    "required": false
+                },
+                {
+                    "key": "client_relationship",
+                    "type": "Select",
+                    "label": "حالة العلاقة مع العميل",
+                    "options": [
+                        "ممتازة",
+                        "جيدة",
+                        "محايدة",
+                        "متوترة",
+                        "حرجة"
+                    ],
+                    "required": false
+                },
+                {
+                    "key": "commercial_opportunities",
+                    "type": "LongText",
+                    "label": "الفرص التجارية",
+                    "required": false
+                },
+                {
+                    "key": "next_steps",
+                    "type": "LongText",
+                    "label": "الخطوات القادمة",
+                    "required": false
+                },
+                {
+                    "key": "evidence_link",
+                    "type": "ShortText",
+                    "label": "رابط الدليل",
+                    "required": false
+                },
+                {
+                    "key": "notes",
+                    "type": "LongText",
+                    "label": "ملاحظات",
+                    "required": false
+                }
+            ],
+            "maxProjects": 0,
+            "minProjects": 1,
+            "projectRequired": true
+        },
+        "fieldId": "ae31a41c-3dce-4af8-87bc-154d16ad2322",
+        "helpText": "أضِف صفًّا لكل عميل/مشروع. لا يجوز تكرار نفس المشروع في التقرير الواحد.",
+        "jobRoleId": "e13cb95f-f57a-41c4-a5ef-0c960cd5a895",
+        "versionId": "c1769e01-4a6e-4327-9988-4c6f54e28253",
+        "isRequired": true,
+        "templateId": "25082123-f4a6-41b9-abdc-b26b2dfdea6c",
+        "versionNumber": 4
+    },
+    {
+        "key": null,
+        "label": "العميل",
+        "order": 1,
+        "title": "🤝 تقرير مدير الحسابات",
+        "config": {
+            "fields": [
+                {
+                    "key": "project_status",
+                    "type": "Select",
+                    "label": "الحالة العامة للمشروع",
+                    "columns": null,
+                    "options": [
+                        "🟢 ممتاز",
+                        "🟡 مستقر",
+                        "🔴 يحتاج تدخل"
+                    ],
+                    "required": false
+                },
+                {
+                    "key": "time_consumption",
+                    "type": "Percentage",
+                    "label": "نسبة استهلاك المشروع من وقتك هذا الأسبوع (%)",
+                    "columns": null,
+                    "options": null,
+                    "required": false
+                },
+                {
+                    "key": "priority",
+                    "type": "Select",
+                    "label": "أولوية المتابعة",
+                    "columns": null,
+                    "options": [
+                        "عاجل",
+                        "هذا الأسبوع",
+                        "الأسبوع القادم"
+                    ],
+                    "required": false
+                },
+                {
+                    "key": "communications",
+                    "type": "Grid",
+                    "label": "التواصلات",
+                    "columns": [
+                        "التاريخ",
+                        "نوع التواصل",
+                        "الموضوع",
+                        "النتيجة"
+                    ],
+                    "options": null,
+                    "required": false
+                },
+                {
+                    "key": "requests",
+                    "type": "Grid",
+                    "label": "طلبات العميل",
+                    "columns": [
+                        "طلب العميل",
+                        "الحالة",
+                        "الأولوية",
+                        "تاريخ الطلب"
+                    ],
+                    "options": null,
+                    "required": false
+                },
+                {
+                    "key": "risks",
+                    "type": "Grid",
+                    "label": "المخاطر",
+                    "columns": [
+                        "المخاطرة",
+                        "الأثر",
+                        "الإجراء"
+                    ],
+                    "options": null,
+                    "required": false
+                },
+                {
+                    "key": "approvals",
+                    "type": "Grid",
+                    "label": "الموافقات",
+                    "columns": [
+                        "الموافقة المطلوبة",
+                        "الحالة",
+                        "المسؤول"
+                    ],
+                    "options": null,
+                    "required": false
+                },
+                {
+                    "key": "relationship",
+                    "type": "ShortText",
+                    "label": "حالة العلاقة",
+                    "columns": null,
+                    "options": null,
+                    "required": false
+                },
+                {
+                    "key": "done",
+                    "type": "LongText",
+                    "label": "ما تم إنجازه",
+                    "columns": null,
+                    "options": null,
+                    "required": false
+                },
+                {
+                    "key": "next_week",
+                    "type": "LongText",
+                    "label": "المطلوب للأسبوع القادم",
+                    "columns": null,
+                    "options": null,
+                    "required": false
+                },
+                {
+                    "key": "client_notes",
+                    "type": "LongText",
+                    "label": "ملاحظات العميل",
+                    "columns": null,
+                    "options": null,
+                    "required": false
+                },
+                {
+                    "key": "decisions",
+                    "type": "LongText",
+                    "label": "قرارات مطلوبة",
+                    "columns": null,
+                    "options": null,
+                    "required": false
+                }
+            ],
+            "maxProjects": 0,
+            "minProjects": 1,
+            "projectRequired": true
+        },
+        "fieldId": "7875e832-bb4e-49f5-89dd-05886a9f1417",
+        "helpText": "أضف قسمًا لكل مشروع/عميل — كل شيء يُملأ داخل المشروع.",
+        "jobRoleId": null,
+        "versionId": "f686a2c3-a7a9-4608-b2ae-fb20bb0b7e2b",
+        "isRequired": false,
+        "templateId": "24b0fc84-39a1-4d5d-9694-a9fa0cf9c27b",
+        "versionNumber": 5
+    }
+]

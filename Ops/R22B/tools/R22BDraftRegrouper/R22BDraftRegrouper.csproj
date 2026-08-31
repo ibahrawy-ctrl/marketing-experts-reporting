@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>R22BDraftRegrouper</RootNamespace>
+    <AssemblyName>R22BDraftRegrouper</AssemblyName>
+    <!-- R22B — أداة تجميع مدخلات قسم المشاريع في مسودّة واحدة حسب projectId.
+         بطاقة واحدة لكلّ مشروع، وكلّ مدخل قديم يصير بند عمل مستقلًّا داخلها.
+         Dry-Run افتراضيّ · معاملة واحدة · قفل advisory · لا هجرات · لا حذف · مسودّات فقط. -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\reporting-backend\src\Reporting.Infrastructure\Reporting.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

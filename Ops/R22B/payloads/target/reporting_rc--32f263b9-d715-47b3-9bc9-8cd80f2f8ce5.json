@@ -1,0 +1,221 @@
+{
+  "db": "reporting_rc",
+  "title": "تقرير فريق الفيديو",
+  "templateId": "32f263b9-d715-47b3-9bc9-8cd80f2f8ce5",
+  "fromVersion": 7,
+  "fromVersionId": "1e1957ae-2408-4cd4-8a39-a0633e59e4a2",
+  "projectSectionFieldKey": null,
+  "projectSectionFieldLabel": "تفاصيل المشروع",
+  "seededFromProduction": false,
+  "actualStaleConfig": null,
+  "before": {
+    "fields": [
+      {
+        "key": "video_type",
+        "type": "Select",
+        "label": "نوع الفيديو",
+        "columns": null,
+        "options": [
+          "Reel",
+          "TikTok",
+          "Short",
+          "Long Video",
+          "Podcast",
+          "Motion Graphic",
+          "Animation",
+          "Interview",
+          "Testimonial",
+          "Ad"
+        ],
+        "required": true,
+        "catalogDomain": "video_type"
+      },
+      {
+        "key": "edit_type",
+        "type": "Select",
+        "label": "نوع التنفيذ",
+        "columns": null,
+        "options": [
+          "Full Editing",
+          "AI Generated",
+          "AI Assisted",
+          "Light Edit",
+          "Subtitle Only",
+          "Motion Only",
+          "Color Correction"
+        ],
+        "required": true,
+        "catalogDomain": "edit_type"
+      },
+      {
+        "key": "video_duration",
+        "type": "Select",
+        "label": "مدة الفيديو",
+        "columns": null,
+        "options": [
+          "أقل من دقيقة",
+          "1–3 دقائق",
+          "3–10 دقائق",
+          "أكثر من 10 دقائق"
+        ],
+        "required": true,
+        "catalogDomain": "video_duration"
+      },
+      {
+        "key": "video_status",
+        "type": "Select",
+        "label": "حالة الفيديو",
+        "columns": null,
+        "options": [
+          "Draft",
+          "Revision",
+          "Final",
+          "Published"
+        ],
+        "required": true,
+        "catalogDomain": "video_status"
+      },
+      {
+        "key": "count",
+        "type": "Number",
+        "label": "العدد",
+        "columns": null,
+        "options": null,
+        "required": true,
+        "catalogDomain": null
+      },
+      {
+        "key": "notes",
+        "type": "LongText",
+        "label": "ملاحظات",
+        "columns": null,
+        "options": null,
+        "required": false,
+        "catalogDomain": null
+      }
+    ],
+    "maxProjects": 0,
+    "minProjects": 1,
+    "projectRequired": true
+  },
+  "after": {
+    "maxProjects": 0,
+    "minProjects": 1,
+    "projectRequired": true,
+    "fields": [],
+    "schemaVersion": 2,
+    "workItems": {
+      "key": "workItems",
+      "label": "بنود العمل",
+      "addLabel": "+ إضافة بند عمل",
+      "itemLabel": "بند عمل",
+      "minItems": 1,
+      "maxItems": 0,
+      "uniqueBy": [],
+      "fields": [
+        {
+          "key": "video_type",
+          "type": "Select",
+          "label": "نوع الفيديو",
+          "columns": null,
+          "options": [
+            "Reel",
+            "TikTok",
+            "Short",
+            "Long Video",
+            "Podcast",
+            "Motion Graphic",
+            "Animation",
+            "Interview",
+            "Testimonial",
+            "Ad"
+          ],
+          "required": true,
+          "catalogDomain": "video_type"
+        },
+        {
+          "key": "edit_type",
+          "type": "Select",
+          "label": "نوع التنفيذ",
+          "columns": null,
+          "options": [
+            "Full Editing",
+            "AI Generated",
+            "AI Assisted",
+            "Light Edit",
+            "Subtitle Only",
+            "Motion Only",
+            "Color Correction"
+          ],
+          "required": true,
+          "catalogDomain": "edit_type"
+        },
+        {
+          "key": "video_duration",
+          "type": "Select",
+          "label": "مدة الفيديو",
+          "columns": null,
+          "options": [
+            "أقل من دقيقة",
+            "1–3 دقائق",
+            "3–10 دقائق",
+            "أكثر من 10 دقائق"
+          ],
+          "required": true,
+          "catalogDomain": "video_duration"
+        },
+        {
+          "key": "video_status",
+          "type": "Select",
+          "label": "حالة الفيديو",
+          "columns": null,
+          "options": [
+            "Draft",
+            "Revision",
+            "Final",
+            "Published"
+          ],
+          "required": true,
+          "catalogDomain": "video_status"
+        },
+        {
+          "key": "count",
+          "type": "Number",
+          "label": "العدد",
+          "columns": null,
+          "options": null,
+          "required": true,
+          "catalogDomain": null
+        },
+        {
+          "key": "notes",
+          "type": "LongText",
+          "label": "ملاحظات",
+          "columns": null,
+          "options": null,
+          "required": false,
+          "catalogDomain": null
+        }
+      ]
+    }
+  },
+  "beforeMd5": "81737313db2220a90e5a8a9871d95b07",
+  "afterMd5": "7098985b23c9f2aecaf612ed09ba0127",
+  "projectFieldsBefore": [
+    "video_type",
+    "edit_type",
+    "video_duration",
+    "video_status",
+    "count",
+    "notes"
+  ],
+  "projectFieldsAfter": [],
+  "workItemFieldsAfter": [
+    "video_type",
+    "edit_type",
+    "video_duration",
+    "video_status",
+    "count",
+    "notes"
+  ]
+}

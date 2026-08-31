@@ -1,0 +1,23 @@
+{
+    "values": [
+    ],
+    "database": "reporting_prod",
+    "submission": {
+        "Id": "739c42fb-aad1-435c-a009-3cc26c5963a8",
+        "Status": "Draft",
+        "IsDeleted": false,
+        "PeriodKey": "2026-W35",
+        "ProjectId": null,
+        "TemplateId": "e9734e7f-490e-4380-9424-5354865a3153",
+        "ClosedAtUtc": null,
+        "SubmitterId": "50a2fa2c-2abc-4b84-a328-7735470f56d7",
+        "CreatedAtUtc": "2026-08-30T08:56:48.0459+00:00",
+        "UpdatedAtUtc": null,
+        "TemplateTitle": "تقرير فريق التصميم",
+        "VersionNumber": 7,
+        "SubmittedAtUtc": null,
+        "ReportTemplateVersionId": "edb54ab6-a441-452f-82de-96268780a86d"
+    },
+    "approvalSteps": 0,
+    "capturedAtUtc": "2026-08-31T05:20:49Z"
+}

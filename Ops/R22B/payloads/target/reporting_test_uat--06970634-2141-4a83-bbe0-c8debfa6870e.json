@@ -1,0 +1,347 @@
+{
+  "db": "reporting_test_uat",
+  "title": "تقرير متابعة مقالات SEO الأسبوعي",
+  "templateId": "06970634-2141-4a83-bbe0-c8debfa6870e",
+  "fromVersion": 1,
+  "fromVersionId": "da54652b-10a0-4c3b-aa7f-cd764d95fb65",
+  "projectSectionFieldKey": null,
+  "projectSectionFieldLabel": "تفاصيل المشروع",
+  "seededFromProduction": true,
+  "actualStaleConfig": {
+    "fields": [
+      {
+        "key": "articles",
+        "type": "Grid",
+        "label": "مقالات المشروع",
+        "columns": [
+          "عنوان المقال",
+          "الكلمة المفتاحية",
+          "الحالة",
+          "المراجع",
+          "تاريخ التسليم",
+          "ملاحظات"
+        ],
+        "options": null,
+        "required": false,
+        "catalogDomain": null
+      },
+      {
+        "key": "published",
+        "type": "Grid",
+        "label": "تفاصيل المنشورة",
+        "columns": [
+          "المقال",
+          "الرابط",
+          "عدد الكلمات"
+        ],
+        "options": null,
+        "required": false,
+        "catalogDomain": null
+      },
+      {
+        "key": "project_notes",
+        "type": "LongText",
+        "label": "ملاحظات المشروع",
+        "columns": null,
+        "options": null,
+        "required": false,
+        "catalogDomain": null
+      }
+    ],
+    "maxProjects": 0,
+    "minProjects": 1,
+    "projectRequired": true
+  },
+  "before": {
+    "fields": [
+      {
+        "key": "project_status",
+        "type": "Select",
+        "label": "الحالة العامة للمشروع",
+        "columns": null,
+        "options": [
+          "🟢 ممتاز",
+          "🟡 مستقر",
+          "🔴 يحتاج تدخل"
+        ],
+        "required": false
+      },
+      {
+        "key": "time_consumption",
+        "type": "Percentage",
+        "label": "نسبة استهلاك المشروع من وقتك هذا الأسبوع (%)",
+        "columns": null,
+        "options": null,
+        "required": false
+      },
+      {
+        "key": "articles_planned",
+        "type": "Number",
+        "label": "عدد المقالات المخطط لها",
+        "columns": null,
+        "options": null,
+        "required": false
+      },
+      {
+        "key": "articles_published",
+        "type": "Number",
+        "label": "عدد المقالات المنشورة",
+        "columns": null,
+        "options": null,
+        "required": false
+      },
+      {
+        "key": "articles_late",
+        "type": "Number",
+        "label": "عدد المقالات المتأخرة",
+        "columns": null,
+        "options": null,
+        "required": false
+      },
+      {
+        "key": "articles_grid",
+        "type": "Grid",
+        "label": "المقالات",
+        "columns": [
+          "عنوان المقال",
+          "الكلمة المفتاحية",
+          "الحالة",
+          "المراجع",
+          "تاريخ التسليم",
+          "ملاحظات"
+        ],
+        "options": null,
+        "required": false
+      },
+      {
+        "key": "done",
+        "type": "LongText",
+        "label": "ما تم إنجازه",
+        "columns": null,
+        "options": null,
+        "required": false
+      },
+      {
+        "key": "issues",
+        "type": "LongText",
+        "label": "أهم مشاكل المشروع",
+        "columns": null,
+        "options": null,
+        "required": false
+      },
+      {
+        "key": "next_week",
+        "type": "LongText",
+        "label": "المطلوب الأسبوع القادم",
+        "columns": null,
+        "options": null,
+        "required": false
+      },
+      {
+        "key": "decisions_needed",
+        "type": "LongText",
+        "label": "قرارات مطلوبة",
+        "columns": null,
+        "options": null,
+        "required": false
+      },
+      {
+        "key": "recommendations",
+        "type": "LongText",
+        "label": "اقتراحات / توصيات",
+        "columns": null,
+        "options": null,
+        "required": false
+      }
+    ],
+    "maxProjects": 0,
+    "minProjects": 1,
+    "projectRequired": true
+  },
+  "after": {
+    "maxProjects": 0,
+    "minProjects": 1,
+    "projectRequired": true,
+    "fields": [
+      {
+        "key": "project_status",
+        "type": "Select",
+        "label": "الحالة العامة للمشروع",
+        "columns": null,
+        "options": [
+          "🟢 ممتاز",
+          "🟡 مستقر",
+          "🔴 يحتاج تدخل"
+        ],
+        "required": false
+      },
+      {
+        "key": "time_consumption",
+        "type": "Percentage",
+        "label": "نسبة استهلاك المشروع من وقتك هذا الأسبوع (%)",
+        "columns": null,
+        "options": null,
+        "required": false
+      },
+      {
+        "key": "articles_planned",
+        "type": "Number",
+        "label": "عدد المقالات المخطط لها",
+        "columns": null,
+        "options": null,
+        "required": false
+      },
+      {
+        "key": "articles_published",
+        "type": "Number",
+        "label": "عدد المقالات المنشورة",
+        "columns": null,
+        "options": null,
+        "required": false
+      },
+      {
+        "key": "articles_late",
+        "type": "Number",
+        "label": "عدد المقالات المتأخرة",
+        "columns": null,
+        "options": null,
+        "required": false
+      },
+      {
+        "key": "done",
+        "type": "LongText",
+        "label": "ما تم إنجازه",
+        "columns": null,
+        "options": null,
+        "required": false
+      },
+      {
+        "key": "issues",
+        "type": "LongText",
+        "label": "أهم مشاكل المشروع",
+        "columns": null,
+        "options": null,
+        "required": false
+      },
+      {
+        "key": "next_week",
+        "type": "LongText",
+        "label": "المطلوب الأسبوع القادم",
+        "columns": null,
+        "options": null,
+        "required": false
+      },
+      {
+        "key": "decisions_needed",
+        "type": "LongText",
+        "label": "قرارات مطلوبة",
+        "columns": null,
+        "options": null,
+        "required": false
+      },
+      {
+        "key": "recommendations",
+        "type": "LongText",
+        "label": "اقتراحات / توصيات",
+        "columns": null,
+        "options": null,
+        "required": false
+      }
+    ],
+    "schemaVersion": 2,
+    "workItems": {
+      "key": "workItems",
+      "label": "بنود العمل",
+      "addLabel": "+ إضافة بند عمل",
+      "itemLabel": "بند عمل",
+      "minItems": 1,
+      "maxItems": 0,
+      "uniqueBy": [],
+      "fields": [
+        {
+          "key": "article_title",
+          "type": "ShortText",
+          "label": "عنوان المقال",
+          "columns": null,
+          "options": null,
+          "required": false
+        },
+        {
+          "key": "target_keyword",
+          "type": "ShortText",
+          "label": "الكلمة المفتاحية",
+          "columns": null,
+          "options": null,
+          "required": false
+        },
+        {
+          "key": "article_status",
+          "type": "ShortText",
+          "label": "الحالة",
+          "columns": null,
+          "options": null,
+          "required": false
+        },
+        {
+          "key": "reviewer",
+          "type": "ShortText",
+          "label": "المراجع",
+          "columns": null,
+          "options": null,
+          "required": false
+        },
+        {
+          "key": "delivery_date",
+          "type": "ShortText",
+          "label": "تاريخ التسليم",
+          "columns": null,
+          "options": null,
+          "required": false
+        },
+        {
+          "key": "notes",
+          "type": "LongText",
+          "label": "ملاحظات",
+          "columns": null,
+          "options": null,
+          "required": false
+        }
+      ]
+    }
+  },
+  "beforeMd5": "5ca5d6260d80fec162a9722368cc83e8",
+  "afterMd5": "53b09c05f99ba4b6b2f145ee4d9da903",
+  "projectFieldsBefore": [
+    "project_status",
+    "time_consumption",
+    "articles_planned",
+    "articles_published",
+    "articles_late",
+    "articles_grid",
+    "done",
+    "issues",
+    "next_week",
+    "decisions_needed",
+    "recommendations"
+  ],
+  "projectFieldsAfter": [
+    "project_status",
+    "time_consumption",
+    "articles_planned",
+    "articles_published",
+    "articles_late",
+    "done",
+    "issues",
+    "next_week",
+    "decisions_needed",
+    "recommendations"
+  ],
+  "workItemFieldsAfter": [
+    "article_title",
+    "target_keyword",
+    "article_status",
+    "reviewer",
+    "delivery_date",
+    "notes"
+  ]
+}
