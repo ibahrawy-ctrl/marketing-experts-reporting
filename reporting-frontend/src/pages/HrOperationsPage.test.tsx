@@ -128,6 +128,12 @@ beforeEach(() => {
       if (dashboardError) return Promise.reject(dashboardError) as never;
       return Promise.resolve({ data: dashboard } as never);
     }
+    // P123-R4 — مرشِّح الموظّف صار اختيارًا بالاسم من دليل النطاق لا معرّفًا مكتوبًا.
+    if (url === '/directory/users') {
+      return Promise.resolve({
+        data: [{ id: USER_ID, fullName: 'سارة العتيبي', email: 'sara@x.local' }],
+      } as never);
+    }
     return Promise.resolve({ data: queuePage } as never);
   });
 });
@@ -193,7 +199,7 @@ describe('P2-HR-009 — المرشِّح يُفرَض خادميًّا لا في
     renderPage();
     await waitFor(() => expect(screen.getByTestId('hr-ops-filter')).toBeInTheDocument());
 
-    fireEvent.change(screen.getByLabelText('معرّف الموظّف'), { target: { value: USER_ID } });
+    fireEvent.change(await screen.findByLabelText('الموظّف'), { target: { value: USER_ID } });
     fireEvent.change(screen.getByLabelText('المهلة'), { target: { value: 'overdue' } });
     fireEvent.click(screen.getByText('تطبيق المرشِّحات'));
 

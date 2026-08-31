@@ -1,0 +1,30 @@
+[
+ {
+  "id": "U19",
+  "desc": "التصدير المالي يستهلك المسار الربعيّ وحده ولا يستهلك النبض",
+  "result": "FAIL",
+  "detail": "نبض معتمَد داخل الربع=0 () · ربعيّ معتمَد=0 () · صفوف التصدير=0 كلّها Quarterly=false · صفوف نبض في الاستجابة=false · ظهور مفتاح أسبوعيّ في الشاشة=false",
+  "shot": "/tmp/r5uat/shots/U19-financial-export.png"
+ },
+ {
+  "id": "U19b",
+  "desc": "ملفّ CSV المُصدَّر ذاته خالٍ من مفاتيح الأسابيع",
+  "result": "FAIL",
+  "detail": "HTTP=200 · يحمل 2026-Q3=false · يحمل مفتاحًا أسبوعيًّا=false · أسطر=1",
+  "shot": "/tmp/r5uat/shots/U19-financial-export.png"
+ },
+ {
+  "id": "U19c",
+  "desc": "نصّ الشاشة يطابق مصدر البيانات ولا يناقضه",
+  "result": "PASS",
+  "detail": "يعلن «المسار الربعيّ الرسميّ وحده»=true · نصّ متناقض قديم موجود=false",
+  "shot": "/tmp/r5uat/shots/U19-financial-export.png"
+ },
+ {
+  "id": "U19d",
+  "desc": "المتوسّط الرسميّ لا يستهلك درجة النبض",
+  "result": "FAIL",
+  "detail": "متوسّط النبض=undefined (من 4 نبضات: 85/45/65/65) · المتوسّط الربعيّ الرسميّ=undefined (من التقييم الربعيّ وحده) · رقمان مختلفان=false",
+  "shot": "/tmp/r5uat/shots/U19d-two-averages.png"
+ }
+]

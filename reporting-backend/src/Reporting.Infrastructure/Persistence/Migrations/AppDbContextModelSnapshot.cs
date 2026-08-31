@@ -2657,6 +2657,12 @@ namespace Reporting.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("CreatedById")
                         .HasColumnType("uuid");
 
+                    b.Property<DateOnly?>("EffectiveFrom")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly?>("EffectiveTo")
+                        .HasColumnType("date");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
@@ -2692,6 +2698,8 @@ namespace Reporting.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("KpiTemplateId", "ScopeType", "ScopeId", "Kind")
                         .IsUnique();
+
+                    b.HasIndex("ScopeType", "ScopeId", "EffectiveFrom", "EffectiveTo");
 
                     b.ToTable("kpi_template_assignments", (string)null);
                 });
@@ -4650,9 +4658,15 @@ namespace Reporting.Infrastructure.Persistence.Migrations
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("boolean");
 
+                    b.Property<DateOnly?>("ExitDate")
+                        .HasColumnType("date");
+
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<DateOnly?>("HireDate")
+                        .HasColumnType("date");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");

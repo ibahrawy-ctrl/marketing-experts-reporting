@@ -8,7 +8,9 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Badge, Card, EmptyState, StatCard } from './ui';
-import { CardsSkeleton, QueryError } from './states';
+import { CardsSkeleton, FeatureDisabledState, ForbiddenState, QueryError } from './states';
+import { classifySurfaceState, useFeatureEnabled } from '../lib/surfaceState';
+import { FEATURES } from '../lib/navConfig';
 import { formatDate, formatDateTime } from '../lib/format';
 import { useEmployeeChecklist, useUpdateChecklistItem } from '../lib/useEmployeeChecklist';
 import {
@@ -159,9 +161,17 @@ function ItemCard({
 
 /** `subject` = معرّف الموظّف أو السلسلة `me`؛ لا يُشتقّ المعرّف في المتصفّح في وضع الذات. */
 export function EmployeeChecklistPanel({ subject }: { subject: string }) {
-  const { data, isLoading, isError, refetch } = useEmployeeChecklist(subject);
+  // P123-R1 — الميزة مفتاح مستقلّ عن Employee360: القائمة قد تكون مغلقة بينما الملفّ الشامل مفتوح.
+  const featureEnabled = useFeatureEnabled(FEATURES.employeeChecklist);
+  const { data, isLoading, error, refetch } = useEmployeeChecklist(subject, featureEnabled);
 
-  if (isLoading) {
+  const state = classifySurfaceState({ featureEnabled, isLoading, error, isEmpty: !data });
+
+  if (state === 'FeatureDisabled') {
+    return <FeatureDisabledState title="قائمة الالتزام غير مفعّلة حاليًّا" description="لم تُفعَّل قائمة الالتزام في النظام بعد. ليس هذا خطأً، ولا يلزمك فعل شيء." />;
+  }
+
+  if (state === 'Loading') {
     return (
       <div role="status" aria-label="جارٍ تحميل قائمة الالتزام">
         <CardsSkeleton count={3} />
@@ -169,12 +179,21 @@ export function EmployeeChecklistPanel({ subject }: { subject: string }) {
     );
   }
 
-  if (isError || !data) {
+  if (state === 'Forbidden') {
+    return (
+      <ForbiddenState
+        title="لا يمكن عرض قائمة الالتزام"
+        description="هذه القائمة خارج نطاق صلاحيّتك، أو غير موجودة. راجع مديرك المباشر إن كنت تحتاج الاطّلاع عليها."
+      />
+    );
+  }
+
+  if (state === 'Failed' || !data) {
     return (
       <QueryError
         onRetry={() => refetch()}
         title="تعذّر تحميل قائمة الالتزام"
-        description="قد تكون القائمة خارج نطاق صلاحيتك، أو حدث خطأ مؤقّت. أعد المحاولة."
+        description="حدث خطأ مؤقّت أثناء جلب القائمة. أعد المحاولة."
       />
     );
   }

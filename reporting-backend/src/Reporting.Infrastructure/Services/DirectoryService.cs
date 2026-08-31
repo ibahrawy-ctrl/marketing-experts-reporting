@@ -211,7 +211,7 @@ public class DirectoryService : IDirectoryService
             return new HrDirectoryUserDto(
                 u.Id, u.FullName, u.Email ?? string.Empty, u.IsActive,
                 u.DepartmentId, u.TeamId, u.ManagerId, u.JobRoleId,
-                isSensitive, canEdit);
+                isSensitive, canEdit, u.HireDate, u.ExitDate);
         }).ToList();
     }
 
@@ -701,6 +701,55 @@ public class DirectoryService : IDirectoryService
         var notes = string.IsNullOrWhiteSpace(req.Notes) ? null : req.Notes!.Trim();
         await _audit.LogAsync(actingUserId, "user.basic.updated", "User", userId,
             JsonSerializer.Serialize(new { targetEmail = user.Email, oldName, newName = fullName, notes }), null, ct);
+
+        var roles = (await _users.GetRolesAsync(user)).ToList();
+        return Result<DirectoryUserDto>.Success(new DirectoryUserDto(
+            user.Id, user.FullName, user.Email ?? string.Empty, user.IsActive,
+            roles, user.DepartmentId, user.TeamId, user.ManagerId, user.JobRoleId));
+    }
+
+    // DEF-R5-002 — نافذة خدمة الموظّف (الالتحاق/انتهاء الخدمة) على سطح إدارة الموظّف نفسه، بلا شاشة مستقلّة.
+    // مصدر بيانات مُعلَن ومحكوم بصلاحيّة وتدقيق بدل رقم يُخصَم بلا سند. لا يُعيد كتابة تقييم واحد.
+    public async Task<Result<DirectoryUserDto>> UpdateUserEmploymentWindowAsync(
+        Guid userId, UpdateUserEmploymentWindowRequest req, Guid actingUserId, bool actingIsAdmin, CancellationToken ct = default)
+    {
+        var user = await _users.FindByIdAsync(userId.ToString());
+        if (user is null)
+            return Result<DirectoryUserDto>.Failure("المستخدم غير موجود.", "user.not_found");
+
+        // الحاجز نفسه المطبَّق على بقيّة أسطح إدارة الموظّف: HR/CeoSupport ممنوعون من الحسابات الحسّاسة.
+        if (!actingIsAdmin && await IsSensitiveAccountAsync(user))
+            return Result<DirectoryUserDto>.Failure("لا يمكن تعديل بيانات حساب إداري/تنفيذي حسّاس من هذا السطح.", "auth.forbidden");
+
+        // خروجٌ بلا التحاق نافذةٌ بلا بداية — ترفض صراحةً بدل أن تُستكمل بتخمين (CreatedAtUtc أو غيره).
+        if (req.ExitDate is not null && req.HireDate is null)
+            return Result<DirectoryUserDto>.Failure(
+                "لا يمكن تسجيل تاريخ انتهاء الخدمة بلا تاريخ التحاق.", "user.employment.hire_required");
+        if (req.HireDate is DateOnly h && req.ExitDate is DateOnly x && x < h)
+            return Result<DirectoryUserDto>.Failure(
+                "تاريخ انتهاء الخدمة لا يسبق تاريخ الالتحاق.", "user.employment.range_invalid");
+
+        var oldHire = user.HireDate;
+        var oldExit = user.ExitDate;
+        if (oldHire == req.HireDate && oldExit == req.ExitDate)
+            return Result<DirectoryUserDto>.Failure(
+                "نافذة الخدمة الحالية مطابقة للمطلوب — لا تغيير.", "user.employment.unchanged.conflict");
+
+        user.HireDate = req.HireDate;
+        user.ExitDate = req.ExitDate;
+        var upd = await _users.UpdateAsync(user);
+        if (!upd.Succeeded)
+            return Result<DirectoryUserDto>.Failure(string.Join("; ", upd.Errors.Select(e => e.Description)), "user.update_failed.conflict");
+
+        var notes = string.IsNullOrWhiteSpace(req.Notes) ? null : req.Notes!.Trim();
+        await _audit.LogAsync(actingUserId, "user.employment_window.updated", "User", userId,
+            JsonSerializer.Serialize(new
+            {
+                targetEmail = user.Email,
+                oldHireDate = oldHire, newHireDate = req.HireDate,
+                oldExitDate = oldExit, newExitDate = req.ExitDate,
+                notes
+            }), null, ct);
 
         var roles = (await _users.GetRolesAsync(user)).ToList();
         return Result<DirectoryUserDto>.Success(new DirectoryUserDto(

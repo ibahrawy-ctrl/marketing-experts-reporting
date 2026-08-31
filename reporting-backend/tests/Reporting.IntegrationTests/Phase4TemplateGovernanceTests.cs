@@ -12,7 +12,8 @@ namespace Reporting.IntegrationTests;
 /// UAT Fix Pack — Phase 4 (حوكمة القوالب وKPI داخل الإدارة/الحوكمة):
 /// • §2 الصلاحيات: إدارة القوالب/الـKPI متاحة للمستوى الإداري الأعلى (Admin/CEO/GM) فقط،
 ///   وممنوعة (403) على المدير الأدنى من العام/قائد الفريق/الموظّف — مفروضة خادميًّا.
-/// • §9 دورية KPI: تقييم KPI أسبوعي فقط — لا يُنشَر قالب KPI بدورية غير أسبوعية.
+/// • §9 دورية KPI (مُحدَّثة بـR5/DEC-01/3): المسار الأسبوعيّ والمسار الربعيّ الرسميّ كلاهما مُشغَّل،
+///   والحارس صار حارسَ تطابق: نوع فترة التقييم يجب أن يطابق تواتر قالبه، والخلط مرفوض.
 /// • §4 منع ازدواج التقرير الأساسي: لا تقريران أساسيّان مطلوبان لنفس الفترة؛
 ///   التكميلي/الاختياري لا يُحتسب تقريرًا أساسيًا ثانيًا.
 /// </summary>
@@ -90,10 +91,15 @@ public class Phase4TemplateGovernanceTests
         Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
     }
 
-    // ===== §9 دورية KPI أسبوعية فقط =====
+    // ===== §9 دورية KPI — أُعيد تعريفها بـR5/DEC-01/3 =====
+    // المقصد الأصليّ لهذا الاختبار: «لا يُنشَر قالب لا يستطيع النظام تشغيله». وقتَ كتابته كان
+    // الربعيّ غير مُشغَّل فعلًا فكان المنع صحيحًا. بعد R5 صار المسار الربعيّ الرسميّ مُشغَّلًا كاملًا
+    // (نشر → إنشاء بمفتاح YYYY-Qn → اعتماد → نافذة التزام ربعيّة في محرّك الحساب)، فأصبح المنع
+    // نفسه مناقضًا للعقد. المقصد محفوظ لا مُضعَّف: النشر يُقبَل لأنّ التشغيل صار حقيقيًّا،
+    // ويبقى الخلط بين المسارَين مرفوضًا صراحةً — وهو الحارس الذي حلّ محلّ المنع الشامل.
 
     [Fact]
-    public async Task PublishNonWeeklyKpiTemplate_IsRejected()
+    public async Task PublishQuarterlyKpiTemplate_IsAccepted_ButWeeklyPulseCannotBeFiledAgainstIt()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var created = await (await admin.PostAsJsonAsync("/api/kpi-templates",
@@ -101,12 +107,28 @@ public class Phase4TemplateGovernanceTests
             .ReadAsync<KpiTemplateDetailDto>();
         var versionId = created!.Versions.Single().Id;
 
-        // وزن صحيح 100% — لكن الدورية ربع سنوية ⇒ يُرفَض النشر بسبب الدورية.
         await admin.PostAsJsonAsync($"/api/kpi-templates/versions/{versionId}/metrics",
             new UpsertKpiMetricRequest("مؤشر", null, 100m, null, null, KpiCalcMethod.Manual, null));
 
         var publishRes = await admin.PostAsync($"/api/kpi-templates/versions/{versionId}/publish", null);
-        Assert.Equal(HttpStatusCode.Conflict, publishRes.StatusCode);
+        publishRes.EnsureSuccessStatusCode();
+
+        var (_, employee) = await TestAuth.CreateUserAsync(_factory, "Employee");
+
+        // نبض أسبوع على قالب ربعيّ = خلط المسارَين ⇒ رفض معلَّل.
+        using var doc = System.Text.Json.JsonDocument.Parse(await (await admin.GetAsync(
+            "/api/kpi/periods/resolve?type=CurrentQuarter")).Content.ReadAsStringAsync());
+        var firstWeek = doc.RootElement.GetProperty("weekKeys").EnumerateArray().First().GetString()!;
+
+        var mixed = await admin.PostAsJsonAsync("/api/kpi-evaluations",
+            new CreateKpiEvaluationRequest(created.Id, employee, PeriodType.Weekly, firstWeek));
+        Assert.Equal(HttpStatusCode.BadRequest, mixed.StatusCode);
+
+        // وبالمفتاح الربعيّ الصحيح يُقبَل — إثبات أنّ المسار مُشغَّل لا مجرّد مسموح.
+        var ok = await admin.PostAsJsonAsync("/api/kpi-evaluations",
+            new CreateKpiEvaluationRequest(created.Id, employee, PeriodType.Quarterly,
+                doc.RootElement.GetProperty("current").GetProperty("key").GetString()!));
+        ok.EnsureSuccessStatusCode();
     }
 
     [Fact]

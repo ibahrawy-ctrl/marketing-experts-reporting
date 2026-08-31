@@ -3,16 +3,21 @@
 // إلى الخادم ويعرض ما يعيده محلولًا بتوقيت الرياض.
 import type { KpiCadence, KpiFilter, KpiPeriodResolved } from '../lib/useKpi';
 
+// DEC-01/1 — الربع الجاري أوّلًا لأنّه الافتراضيّ؛ وبقيّة الأنواع للتنقّل التاريخيّ (ربع سابق مثلًا).
 const PERIOD_TYPES: { value: string; label: string }[] = [
+  { value: 'CurrentQuarter', label: 'الربع الجاري' },
+  { value: 'Quarter', label: 'ربع محدَّد' },
   { value: 'LastCompletedWeek', label: 'آخر أسبوع مكتمل' },
   { value: 'Week', label: 'أسبوع محدَّد' },
   { value: 'Month', label: 'شهر' },
-  { value: 'Quarter', label: 'ربع' },
   { value: 'Year', label: 'سنة' },
   { value: 'Custom', label: 'مدى مخصّص' },
 ];
 
-const CADENCES: { value: KpiCadence; label: string }[] = [
+// DEC-01/2 — «تلقائي» هو الافتراضيّ: الخادم يحسم تواتر كلّ موظّف من قالبه الفعّال.
+// DEC-01/3 — التحديد الصريح يفصل مسار النبض الأسبوعيّ عن مسار التقييم الربعيّ الرسميّ.
+const CADENCES: { value: KpiCadence | ''; label: string }[] = [
+  { value: '', label: 'تلقائي — حسب تواتر كلّ موظّف' },
   { value: 'WeeklyPulse', label: 'نبض أسبوعيّ' },
   { value: 'Quarterly', label: 'تقييم ربعيّ رسميّ' },
 ];
@@ -29,7 +34,10 @@ export function KpiFilterBar({
   onChange: (next: KpiFilter) => void;
   resolved?: KpiPeriodResolved;
 }) {
-  const needsKey = filter.periodType !== 'LastCompletedWeek' && filter.periodType !== 'Custom';
+  const needsKey =
+    filter.periodType !== 'CurrentQuarter' &&
+    filter.periodType !== 'LastCompletedWeek' &&
+    filter.periodType !== 'Custom';
   const needsRange = filter.periodType === 'Custom';
 
   return (
@@ -88,17 +96,18 @@ export function KpiFilterBar({
         </>
       )}
 
-      {/* B-3: الكادنس اختيار صريح دائمًا — لا خلط بين نبض الأسبوع والتقييم الربعيّ الرسميّ. */}
+      {/* DEC-01/2+3: لا إلزام باختيار نوع التقييم؛ «تلقائي» يترك الحسم للخادم لكلّ موظّف،
+          والتحديد الصريح يفصل المسارين بلا خلط. لا سقوط صامت في أيّ من الحالتين. */}
       <label className="flex flex-col gap-1 text-xs text-ink-2">
         نوع التقييم
         <select
           aria-label="الكادنس"
           className={selectClass}
-          value={filter.cadence}
-          onChange={(e) => onChange({ ...filter, cadence: e.target.value as KpiCadence })}
+          value={filter.cadence ?? ''}
+          onChange={(e) => onChange({ ...filter, cadence: (e.target.value || null) as KpiCadence | null })}
         >
           {CADENCES.map((c) => (
-            <option key={c.value} value={c.value}>
+            <option key={c.value || 'auto'} value={c.value}>
               {c.label}
             </option>
           ))}

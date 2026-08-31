@@ -16,6 +16,7 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { AxiosError, AxiosHeaders } from 'axios';
 import { api } from '../lib/api';
 import type { AttendanceIncidentDetail, AttendanceListItem } from '../types/attendance';
 import AttendancePage from './AttendancePage';
@@ -27,6 +28,7 @@ let getCalls: { url: string; params: unknown }[] = [];
 let postCalls: { url: string; body: unknown; config: unknown }[] = [];
 let detail: AttendanceIncidentDetail;
 let items: AttendanceListItem[];
+let directoryUsers: { id: string; fullName: string; email: string }[];
 
 function listItem(): AttendanceListItem {
   return {
@@ -105,6 +107,10 @@ beforeEach(() => {
   postCalls = [];
   detail = detailFixture();
   items = [listItem()];
+  directoryUsers = [
+    { id: 'u-1', fullName: 'سارة العتيبي', email: 'sara@x.local' },
+    { id: 'u-3', fullName: 'خالد الشمري', email: 'khalid@x.local' },
+  ];
 
   vi.spyOn(api, 'get').mockImplementation((url: string, config?: { params?: unknown }) => {
     getCalls.push({ url, params: config?.params });
@@ -125,6 +131,9 @@ beforeEach(() => {
     }
     if (url === `/attendance/${INCIDENT_ID}`) {
       return Promise.resolve({ data: detail } as never);
+    }
+    if (url === '/directory/users') {
+      return Promise.resolve({ data: directoryUsers } as never);
     }
     return Promise.resolve({
       data: { items, totalCount: items.length, page: 1, pageSize: 25 },
@@ -180,7 +189,8 @@ describe('AttendancePage — القائمة والنطاق', () => {
   it('يعرض حالة فارغة مستقلّة حين لا وقائع', async () => {
     items = [];
     renderPage();
-    expect(await screen.findByText('لا توجد وقائع')).toBeInTheDocument();
+    // التبويب الافتراضيّ مُصفّى، فالفراغ عن الطابور لا عن السجلّ.
+    expect(await screen.findByText('لا شيء ينتظر إجراءك الآن')).toBeInTheDocument();
     expect(screen.queryByTestId('attendance-list')).toBeNull();
   });
 
@@ -190,6 +200,99 @@ describe('AttendancePage — القائمة والنطاق', () => {
     expect(await screen.findByText('تعذّر تحميل البيانات')).toBeInTheDocument();
     // الترويسة تبقى قائمة: فشل القائمة ليس فشل السطح.
     expect(screen.getByRole('heading', { name: 'الحضور والالتزام' })).toBeInTheDocument();
+  });
+});
+
+// ======================================================================
+// P123-R3 — «افتح الحضور فتصل إلى بيانات أو إلى فراغ **مفهوم**».
+//
+// العيب المُعالَج ليس تجميليًّا: التبويب الافتراضيّ مُصفّى على ما ينتظر إجراء المستخدم، فكانت
+// رسالة «لا توجد وقائع» تُخبِر مديرًا له عشرات الوقائع أنّ السجلّ خالٍ. ويُقاس هنا كذلك أنّ
+// المنع الدائم (403/404) لا يلبس ثوب العطل المؤقّت بزرّ إعادة محاولة لن يغيّر شيئًا.
+// ======================================================================
+
+function httpError(status: number) {
+  const err = new AxiosError('denied');
+  err.response = {
+    status,
+    statusText: '',
+    data: {},
+    headers: {},
+    config: { headers: new AxiosHeaders() },
+  };
+  return err;
+}
+
+describe('P123-R3 — الفراغات الثلاثة لا تُخلط', () => {
+  it('فراغ التبويب الافتراضيّ يقول «لا شيء ينتظرك» ويعرض مخرجًا إلى كلّ الوقائع', async () => {
+    items = [];
+    renderPage();
+
+    expect(await screen.findByText('لا شيء ينتظر إجراءك الآن')).toBeInTheDocument();
+    expect(screen.queryByText('لا توجد وقائع ضمن نطاقك')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'عرض كلّ الوقائع ضمن نطاقي' }));
+
+    // المخرج ليس نصًّا: يُلغي التصفية الخادميّة فعلًا ثمّ يُبدِّل الرسالة إلى حقيقة السجلّ.
+    await waitFor(() => {
+      const calls = getCalls.filter((c) => c.url === '/attendance');
+      expect(calls[calls.length - 1].params).not.toHaveProperty('needsMyAction');
+    });
+    expect(await screen.findByText('لا توجد وقائع ضمن نطاقك')).toBeInTheDocument();
+  });
+
+  it('فراغ طابور المراجعة يقول ذلك لا «لا وقائع»', async () => {
+    items = [];
+    renderPage();
+    await screen.findByText('لا شيء ينتظر إجراءك الآن');
+
+    fireEvent.click(screen.getByRole('tab', { name: 'طابور المراجعة' }));
+
+    expect(await screen.findByText('طابور المراجعة فارغ')).toBeInTheDocument();
+  });
+
+  it('فراغ ناتج عن مرشِّح صريح يُنسَب إلى المرشِّح لا إلى النطاق', async () => {
+    items = [];
+    renderPage();
+    await screen.findByText('لا شيء ينتظر إجراءك الآن');
+
+    fireEvent.click(screen.getByRole('tab', { name: 'كلّ الوقائع' }));
+    expect(await screen.findByText('لا توجد وقائع ضمن نطاقك')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('من تاريخ'), { target: { value: '2026-01-01' } });
+
+    expect(await screen.findByText('لا واقعة مطابقة لمرشِّحاتك')).toBeInTheDocument();
+    expect(screen.queryByText('لا توجد وقائع ضمن نطاقك')).toBeNull();
+  });
+});
+
+describe('P123-R3 — المنع الدائم لا يلبس ثوب العطل المؤقّت', () => {
+  it('403 على القائمة: منع بلا زرّ إعادة محاولة', async () => {
+    vi.spyOn(api, 'get').mockRejectedValue(httpError(403));
+    renderPage();
+
+    expect(await screen.findByText('لا يمكن عرض وقائع الحضور')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'إعادة المحاولة' })).toBeNull();
+  });
+
+  it('500 على القائمة يبقى عطلًا قابلًا لإعادة المحاولة', async () => {
+    vi.spyOn(api, 'get').mockRejectedValue(httpError(500));
+    renderPage();
+
+    expect(await screen.findByText('تعذّر تحميل البيانات')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'إعادة المحاولة' })).toBeInTheDocument();
+  });
+
+  it('واقعة خارج النطاق (404) تُعلَن غير موجودة بلا وعد بإعادة المحاولة', async () => {
+    vi.spyOn(api, 'get').mockImplementation((url: string) => {
+      if (url === `/attendance/${INCIDENT_ID}`) return Promise.reject(httpError(404)) as never;
+      if (url === '/attendance/types') return Promise.resolve({ data: [] }) as never;
+      return Promise.resolve({ data: { items, totalCount: 1, page: 1, pageSize: 25 } }) as never;
+    });
+    renderPage(`/app/attendance?incident=${INCIDENT_ID}`);
+
+    expect(await screen.findByText('لا توجد واقعة مطابقة')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'إعادة المحاولة' })).toBeNull();
   });
 
   it('الصفحة كلّها بالاتّجاه من اليمين إلى اليسار', async () => {
@@ -355,7 +458,7 @@ describe('AttendancePage — تسجيل بلاغ', () => {
     await screen.findByTestId('attendance-list');
     fireEvent.click(screen.getByRole('button', { name: 'تسجيل بلاغ' }));
 
-    fireEvent.change(await screen.findByLabelText('معرّف الموظّف'), { target: { value: 'u-1' } });
+    fireEvent.change(await screen.findByLabelText('الموظّف'), { target: { value: 'u-1' } });
     fireEvent.change(screen.getByLabelText('نوع الواقعة'), { target: { value: TYPE_ID } });
     fireEvent.change(screen.getByLabelText('تاريخ الواقعة'), { target: { value: '2026-08-18' } });
     fireEvent.change(await screen.findByLabelText('وقت البداية'), { target: { value: '08:45' } });
@@ -373,10 +476,69 @@ describe('AttendancePage — تسجيل بلاغ', () => {
     renderPage();
     await screen.findByTestId('attendance-list');
     fireEvent.click(screen.getByRole('button', { name: 'تسجيل بلاغ' }));
-    await screen.findByLabelText('معرّف الموظّف');
+    await screen.findByLabelText('الموظّف');
     // قبل اختيار النوع لا وقت مطلوب.
     expect(screen.queryByLabelText('وقت البداية')).toBeNull();
     fireEvent.change(screen.getByLabelText('نوع الواقعة'), { target: { value: TYPE_ID } });
     expect(await screen.findByLabelText('وقت البداية')).toBeInTheDocument();
+  });
+});
+
+// ======================================================================
+// P123-R4 — «سجِّل بلاغًا باختيار اسم، لا بكتابة معرّف».
+//
+// الحقل السابق كان نصًّا حرًّا اسمه «معرّف الموظّف»، ولا مصدر لقيمته في أيّ سطح من سطوح النظام:
+// القدرة كانت قائمة في الشيفرة وغائبة عن المستخدم. ويُقاس هنا الادّعاء كاملًا — لا وجود لحقل
+// معرّف، والاسم المختار يتحوّل إلى المعرّف الصحيح في الحمولة، والقائمة مصدرها نطاق الخادم.
+// ======================================================================
+
+describe('P123-R4 — من الاسم إلى البلاغ بلا معرّف مكتوب', () => {
+  async function openForm() {
+    renderPage();
+    await screen.findByTestId('attendance-list');
+    fireEvent.click(screen.getByRole('button', { name: 'تسجيل بلاغ' }));
+    await screen.findByTestId('attendance-report-form');
+  }
+
+  it('لا حقل معرّف إطلاقًا، والاختيار من أسماء نطاق الخادم', async () => {
+    await openForm();
+    const picker = await screen.findByLabelText('الموظّف');
+
+    expect(screen.queryByLabelText('معرّف الموظّف')).toBeNull();
+    expect(getCalls.some((c) => c.url === '/directory/users')).toBe(true);
+    expect(
+      within(picker as HTMLElement)
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual([
+      '— اختر موظّفًا —',
+      'سارة العتيبي — sara@x.local',
+      'خالد الشمري — khalid@x.local',
+    ]);
+  });
+
+  it('الاسم المختار يصل الخادمَ معرّفًا صحيحًا في حمولة الإنشاء', async () => {
+    await openForm();
+
+    fireEvent.change(await screen.findByLabelText('الموظّف'), { target: { value: 'u-3' } });
+    fireEvent.change(screen.getByLabelText('نوع الواقعة'), { target: { value: TYPE_ID } });
+    fireEvent.change(screen.getByLabelText('تاريخ الواقعة'), { target: { value: '2026-08-18' } });
+    fireEvent.change(await screen.findByLabelText('وقت البداية'), { target: { value: '08:45' } });
+    fireEvent.change(screen.getByLabelText('وقت العودة'), { target: { value: '09:30' } });
+    fireEvent.change(screen.getByLabelText('الوصف'), { target: { value: 'تأخّر بلا إشعار.' } });
+    fireEvent.submit(screen.getByTestId('attendance-report-form'));
+
+    await waitFor(() => expect(postCalls).toHaveLength(1));
+    expect(postCalls[0].body).toMatchObject({ subjectUserId: 'u-3' });
+  });
+
+  it('نطاق بلا أحد: يُعلَن العجز صراحةً ولا يُعرَض صندوق اختيار فارغ', async () => {
+    directoryUsers = [];
+    await openForm();
+
+    expect(
+      await screen.findByText('لا يوجد ضمن نطاقك موظّف يمكن تسجيل بلاغ عليه.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText('الموظّف')).toBeNull();
   });
 });

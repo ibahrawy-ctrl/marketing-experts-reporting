@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Reporting.Application.Common;
 using Reporting.Domain.Entities.Kpi;
+using Reporting.Domain.Entities.System;
 using Reporting.Domain.Entities.Templates;
 using Reporting.Domain.Enums;
 using Reporting.Infrastructure.Identity;
@@ -472,6 +473,19 @@ public static class TemplateSeeder
         await db.SaveChangesAsync();
     }
 
+    /// <summary>
+    /// حوكمة بذر قوالب KPI (OBS-R5-01/6). البذر لم يعد يكتب <c>IsPublished = true</c> على الكيان
+    /// مباشرةً متجاوزًا حارس النشر، بل:
+    /// <list type="number">
+    /// <item><b>لا يتجاوز الحارس:</b> يُطبَّق نفس شرطَي <c>PublishVersionAsync</c> حرفيًّا (مؤشّرات
+    /// غير فارغة + مجموع أوزان = 100). ما لا يجتازهما يُبذَر <b>مسودّةً</b> لا منشورًا — فلا تدخل
+    /// قاعدة البيانات حالةٌ منشورة ما كان الحارس ليسمح بها.</item>
+    /// <item><b>Idempotent وبلا تكرار:</b> المفتاح هو العنوان؛ الموجود يُتخطّى ولا يُنشأ ثانيةً
+    /// ولا تُغيَّر حالته صمتًا.</item>
+    /// <item><b>بأثر مسجَّل:</b> كلّ إنشاء يُقيَّد في <c>AuditLogs</c> بالحالة الناتجة وسببها،
+    /// فلا تغيير حالة بلا سجلّ.</item>
+    /// </list>
+    /// </summary>
     private static async Task SeedKpiTemplatesAsync(AppDbContext db, Guid ownerId)
     {
         var existingTitles = await db.KpiTemplates.Select(t => t.Title).ToListAsync();
@@ -480,21 +494,27 @@ public static class TemplateSeeder
         foreach (var def in KpiDefs)
         {
             if (existing.Contains(def.Title)) continue;
+            existing.Add(def.Title);
+
+            // نفس حارس النشر في KpiTemplateService.PublishVersionAsync — لا نسخة مخفّفة منه.
+            var totalWeight = def.Metrics.Sum(m => m.Weight);
+            var publishable = def.Metrics.Length > 0 && totalWeight == 100m;
+
             var template = new KpiTemplate
             {
                 Title = def.Title,
                 Description = def.Description,
                 Cadence = def.Cadence,
-                Status = TemplateStatus.Published,
+                Status = publishable ? TemplateStatus.Published : TemplateStatus.Draft,
                 OwnerId = ownerId,
                 IsActive = true
             };
             var version = new KpiTemplateVersion
             {
                 VersionNumber = 1,
-                IsPublished = true,
-                PublishedAtUtc = DateTime.UtcNow,
-                PublishedById = ownerId
+                IsPublished = publishable,
+                PublishedAtUtc = publishable ? DateTime.UtcNow : null,
+                PublishedById = publishable ? ownerId : null
             };
             var order = 0;
             foreach (var m in def.Metrics)
@@ -511,6 +531,24 @@ public static class TemplateSeeder
             }
             template.Versions.Add(version);
             db.KpiTemplates.Add(template);
+
+            db.AuditLogs.Add(new AuditLog
+            {
+                ActorId = ownerId,
+                Action = publishable ? "KpiTemplateSeeded.Published" : "KpiTemplateSeeded.DraftGuardNotMet",
+                EntityType = nameof(KpiTemplate),
+                EntityId = template.Id,
+                DataJson = JsonSerializer.Serialize(new
+                {
+                    title = def.Title,
+                    cadence = def.Cadence.ToString(),
+                    metricCount = def.Metrics.Length,
+                    totalWeight,
+                    status = template.Status.ToString(),
+                    isPublished = version.IsPublished,
+                    guard = publishable ? "passed" : "metricsEmptyOrWeightsNot100"
+                })
+            });
         }
 
         await db.SaveChangesAsync();

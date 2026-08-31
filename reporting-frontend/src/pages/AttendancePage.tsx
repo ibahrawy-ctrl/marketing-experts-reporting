@@ -7,7 +7,8 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { formatDate, formatDateTime } from '../lib/format';
 import { Alert, Badge, Button, Card, EmptyState, Field, Input, Select } from '../components/ui';
-import { QueryError, TableSkeleton } from '../components/states';
+import { ForbiddenState, QueryError, TableSkeleton } from '../components/states';
+import { classifySurfaceState } from '../lib/surfaceState';
 import {
   useAttendanceIncident,
   useAttendanceIncidents,
@@ -18,6 +19,7 @@ import {
   useUploadAttendanceAttachment,
   type HrDecision,
 } from '../lib/useAttendance';
+import { UserPicker } from '../components/UserPicker';
 import {
   ATTENDANCE_ACTIONS_REQUIRING_REASON,
   ATTENDANCE_ACTION_LABEL,
@@ -54,6 +56,7 @@ function errorMessage(err: unknown): string {
 }
 
 // ═══════════════════════════════ نموذج تسجيل بلاغ ═══════════════════════════════
+
 
 function ReportForm({ onDone }: { onDone: (id: string) => void }) {
   const types = useAttendanceTypes();
@@ -98,12 +101,16 @@ function ReportForm({ onDone }: { onDone: (id: string) => void }) {
       </p>
 
       <form onSubmit={submit} className="grid gap-3 md:grid-cols-2" data-testid="attendance-report-form">
-        <Field label="معرّف الموظّف">
-          <Input
+        {/* P123-R4 — البلاغ يُكتَب على **اسم** لا على GUID يُنسَخ من شريط العنوان: الحقل السابق
+            كان نصًّا حرًّا اسمه «معرّف الموظّف» ولا مصدر لقيمته في أيّ سطح، فكانت القدرة قائمة
+            في الشيفرة وغائبة عن المستخدم. والخادم يعيد التحقّق من النطاق عند الإنشاء أيًّا كان. */}
+        <Field label="الموظّف">
+          <UserPicker
             required
             value={form.subjectUserId}
-            aria-label="معرّف الموظّف"
-            onChange={(e) => setForm({ ...form, subjectUserId: e.target.value })}
+            onChange={(id) => setForm({ ...form, subjectUserId: id })}
+            placeholder="— اختر موظّفًا —"
+            emptyMessage="لا يوجد ضمن نطاقك موظّف يمكن تسجيل بلاغ عليه."
           />
         </Field>
 
@@ -221,8 +228,25 @@ function DetailPanel({ id, onClose }: { id: string; onClose: () => void }) {
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  if (detail.isLoading) return <TableSkeleton rows={5} cols={2} />;
-  if (detail.isError) return <QueryError onRetry={() => detail.refetch()} />;
+  // P123-R3 — الواقعة خارج النطاق يردّها الخادم 404 (اصطلاح عدم الإفشاء)، وهي حالة **دائمة**:
+  // عرضها «تعذّر التحميل… أعد المحاولة» كان يدفع المستخدم إلى تكرار طلب لن يتغيّر جوابه أبدًا،
+  // ويقرأ منعًا متعمَّدًا عطلًا في النظام. العطل المؤقّت (5xx) وحده هو ما يستحقّ إعادة المحاولة.
+  const detailState = classifySurfaceState({
+    isLoading: detail.isLoading,
+    error: detail.error,
+    isEmpty: !detail.data,
+  });
+
+  if (detailState === 'Loading') return <TableSkeleton rows={5} cols={2} />;
+  if (detailState === 'Forbidden') {
+    return (
+      <ForbiddenState
+        title="لا توجد واقعة مطابقة"
+        description="إمّا أنّ الواقعة غير موجودة أو أنّها خارج نطاق اطّلاعك. إعادة المحاولة لن تفتحها."
+      />
+    );
+  }
+  if (detailState === 'Failed') return <QueryError onRetry={() => detail.refetch()} />;
 
   const d = detail.data;
   if (!d) return <EmptyState title="لا توجد واقعة مطابقة." />;
@@ -433,6 +457,25 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'all', label: 'كلّ الوقائع' },
 ];
 
+// P123-R3 — فراغُ قائمة ضيّقها المستخدم بنفسه ليس فراغ السجلّ. التبويب الافتراضيّ مُصفّى على
+// «ما ينتظر إجرائي»، فرسالة «لا توجد وقائع» كانت تُخبِر مَن له وقائع كثيرة ضمن نطاقه أنّ السجلّ
+// خالٍ — وهو ادّعاء كاذب عن النظام سببه اختيارٌ افتراضيّ لم يتّخذه المستخدم أصلًا.
+const EMPTY_NARROWED: Record<TabId, { title: string; description: string }> = {
+  mine: {
+    title: 'لا شيء ينتظر إجراءك الآن',
+    description:
+      'هذه القائمة مُصفّاة على ما يتطلّب ردًّا أو قرارًا منك. قد توجد وقائع أخرى ضمن نطاقك لا تنتظر إجراءك.',
+  },
+  queue: {
+    title: 'طابور المراجعة فارغ',
+    description: 'لا توجد واقعة بانتظار قرار الموارد البشريّة ضمن نطاقك الآن.',
+  },
+  all: {
+    title: 'لا واقعة مطابقة لمرشِّحاتك',
+    description: 'المرشِّحات التي اخترتها لم تُطابِق أيّ واقعة. أزِلها لترى كلّ ما ضمن نطاقك.',
+  },
+};
+
 export default function AttendancePage() {
   const [params, setParams] = useSearchParams();
   const [tab, setTab] = useState<TabId>('mine');
@@ -449,6 +492,27 @@ export default function AttendancePage() {
   };
 
   const list = useAttendanceIncidents(effective);
+
+  // هل ضيّق المستخدمُ (أو الافتراضُ نيابةً عنه) القائمةَ؟ من هذا وحده يُعرَف أيّ فراغٍ هو الواقع.
+  const narrowed =
+    tab !== 'all' ||
+    !!filters.incidentTypeId ||
+    !!filters.fromDate ||
+    !!filters.toDate ||
+    !!filters.overdueOnly;
+
+  // الحالات الستّ (§8). عَلَم الميزة ليس هنا عمدًا: `FeatureGate` على المسار يحسمه قبل تركيب
+  // الصفحة أصلًا، فتكراره داخلها بوّابة ثانية بلا أثر.
+  const state = classifySurfaceState({
+    isLoading: list.isLoading,
+    error: list.error,
+    isEmpty: (list.data?.items.length ?? 0) === 0,
+  });
+
+  function showEverything() {
+    setTab('all');
+    setFilters({ page: 1, pageSize: 25 });
+  }
 
   function select(id: string | null) {
     const next = new URLSearchParams(params);
@@ -543,17 +607,36 @@ export default function AttendancePage() {
         </div>
       </Card>
 
-      {list.isLoading && <TableSkeleton rows={6} cols={6} />}
-      {list.isError && <QueryError onRetry={() => list.refetch()} />}
+      {state === 'Loading' && <TableSkeleton rows={6} cols={6} />}
 
-      {list.data && list.data.items.length === 0 && (
-        <EmptyState
-          title="لا توجد وقائع"
-          description="لا توجد وقائع مطابقة لهذه المرشِّحات ضمن نطاق رؤيتك."
+      {state === 'Forbidden' && (
+        <ForbiddenState
+          title="لا يمكن عرض وقائع الحضور"
+          description="لا يتيح لك نطاق صلاحيّتك الاطّلاع على هذه الوقائع. راجع الموارد البشريّة إن كنت تحتاج ذلك."
         />
       )}
 
-      {list.data && list.data.items.length > 0 && (
+      {state === 'Failed' && <QueryError onRetry={() => list.refetch()} />}
+
+      {state === 'Empty' &&
+        (narrowed ? (
+          <EmptyState
+            title={EMPTY_NARROWED[tab].title}
+            description={EMPTY_NARROWED[tab].description}
+            action={
+              <Button variant="ghost" onClick={showEverything}>
+                عرض كلّ الوقائع ضمن نطاقي
+              </Button>
+            }
+          />
+        ) : (
+          <EmptyState
+            title="لا توجد وقائع ضمن نطاقك"
+            description="لم تُسجَّل أيّ واقعة حضور تخصّ مَن تراهم. هذا سجلّ خالٍ فعلًا، لا عطلٌ ولا تصفية."
+          />
+        ))}
+
+      {state === 'Available' && list.data && (
         <Card className="overflow-x-auto p-0">
           <table className="w-full text-right text-sm" data-testid="attendance-list">
             <thead className="bg-navy-50 text-navy">

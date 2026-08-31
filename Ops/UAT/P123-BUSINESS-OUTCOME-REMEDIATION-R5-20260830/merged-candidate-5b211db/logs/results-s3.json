@@ -1,0 +1,30 @@
+[
+ {
+  "id": "U18",
+  "desc": "العدّادات تختلف باختلاف المسار — لا خلط",
+  "result": "PASS",
+  "detail": "النبض: مؤهّلون=0/35 متوسّط=— · الربعيّ: مؤهّلون=0/35 متوسّط=— · تلقائي: مؤهّلون=0/35",
+  "shot": "/tmp/r5uat/shots/U18-quarterly.png"
+ },
+ {
+  "id": "U18b",
+  "desc": "نداء التحليلات يحمل المسار المطلوب صراحةً",
+  "result": "PASS",
+  "detail": "ربعيّ: /api/kpi/performance?periodType=CurrentQuarter&cadence=Quarterly · أسبوعيّ: /api/kpi/performance?periodType=CurrentQuarter&cadence=WeeklyPulse",
+  "shot": "/tmp/r5uat/shots/U18-quarterly.png"
+ },
+ {
+  "id": "U19",
+  "desc": "المتوسّط الرسميّ لا يستهلك درجة النبض",
+  "result": "FAIL",
+  "detail": "متوسّط مسار النبض=— · متوسّط المسار الربعيّ=— — رقمان مستقلّان لا رقم واحد مختلط",
+  "shot": "/tmp/r5uat/shots/U18-quarterly.png"
+ },
+ {
+  "id": "U13",
+  "desc": "التغطية والأهليّة معلنتان",
+  "result": "PASS",
+  "detail": "نصّ التغطية/الأهليّة حاضر=true · مؤهّلون=0/35",
+  "shot": "/tmp/r5uat/shots/U18-quarterly.png"
+ }
+]

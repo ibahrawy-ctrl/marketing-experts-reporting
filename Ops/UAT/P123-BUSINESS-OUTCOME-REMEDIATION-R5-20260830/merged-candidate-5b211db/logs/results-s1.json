@@ -1,0 +1,37 @@
+[
+ {
+  "id": "U1",
+  "desc": "فتح /app/kpi بلا نقرة",
+  "result": "PASS",
+  "detail": "نصّ الصفحة يحوي الربع الجاري=false · عدد القوائم المنسدلة=2",
+  "shot": "/tmp/r5uat/shots/U1-kpi-landing.png"
+ },
+ {
+  "id": "U1b",
+  "desc": "مرشّح القراءة للمسارين في لوحة النظرة الشاملة",
+  "result": "PASS",
+  "detail": "«تلقائي/نبض أسبوعيّ/تقييم ربعيّ رسميّ» متاحة للقراءة المستقلّة لكلّ مسار = true",
+  "shot": "/tmp/r5uat/shots/U1b-overview-track-filter.png"
+ },
+ {
+  "id": "U15",
+  "desc": "المساران معًا ظاهران لنفس الموظّف",
+  "result": "PASS",
+  "detail": "نبض الأسبوع=true · التقييم الربعيّ الرسميّ=true · عدد select=2",
+  "shot": "/tmp/r5uat/shots/U15-dual-track.png"
+ },
+ {
+  "id": "U2",
+  "desc": "مصدر الحسم معروض شرحًا لا خيارًا",
+  "result": "PASS",
+  "detail": "لا منتقي تواتر=true · نصّ «يحدّده النظام»=true",
+  "shot": "/tmp/r5uat/shots/U15-dual-track.png"
+ },
+ {
+  "id": "U3",
+  "desc": "الإجراءان المستحقّان معروضان ومتاحان معًا",
+  "result": "PASS",
+  "detail": "زرّ النبض متاح=true · زرّ الربعيّ متاح=true",
+  "shot": "/tmp/r5uat/shots/U15-dual-track.png"
+ }
+]

@@ -213,13 +213,11 @@ public class KpiTemplateService : IKpiTemplateService
 
         var template = await _db.KpiTemplates.FirstAsync(t => t.Id == version.KpiTemplateId, ct);
 
-        // حارس الدورية (Phase 4): تقييم KPI الحالي أسبوعي فقط. يُسمح بأي دورية في المسودّة،
-        // لكن لا يُنشَر/يُفعَّل قالب KPI غير أسبوعي. التجميع الشهري/الربع سنوي/السنوي يأتي في Phase 5.
-        if (template.Cadence != KpiCadence.WeeklyPulse)
-            return Result<KpiTemplateVersionDto>.Failure(
-                "تقييم KPI الحالي أسبوعي فقط. التجميع الشهري والربع سنوي والسنوي سيتم في Phase 5؛ لا يمكن نشر قالب KPI بدورية غير أسبوعية.",
-                "kpi_version.cadence_not_weekly.conflict");
-
+        // R5/DEC-01/3+4 — رُفِع حارس «أسبوعيّ فقط» (Phase 4) لأنّه كان يناقض العقد المعتمد نفسه:
+        // البند 3 يُقرّ «التقييم الربعيّ الرسميّ» مسارًا قائمًا بذاته، والبند 5 يوجب حسم تواتر الموظّف
+        // من إعداده الفعّال — وكلاهما مستحيل ما دام لا يُنشَر إلّا قالب أسبوعيّ. الرفع ليس التفافًا على
+        // الحارس بل إزالة تعارض: محرّك الحساب صار يبني نوافذ الالتزام الربعيّة ويقرأ مفاتيح YYYY-Qn،
+        // وإنشاء التقييم صار يُلزم تطابق نوع الفترة مع تواتر القالب (KpiEvaluationService).
         version.IsPublished = true;
         version.PublishedAtUtc = DateTime.UtcNow;
         version.PublishedById = publishedById;
@@ -279,7 +277,13 @@ public class KpiTemplateService : IKpiTemplateService
     // ===== محرّك أولوية إسناد قوالب KPI (Phase T1) — يحاكي محرّك إسناد التقارير =====
 
     // مستوى أخصّية الإسناد (تنازليًّا): الأصغر رقمًا = الأخصّ.
-    private enum MatchTier { Employee = 1, JobRole = 2, Team = 3, Department = 4, General = 5 }
+    //
+    // OBS-R5-01/2 — سلّم KPI المعتمَد نصًّا هو: موظّف ← **فريق** ← مسمّى ← إدارة ← عامّ. كان هذا
+    // السلّم يخالف <see cref="CadencePriority"/> (الذي يطبّق العقد) في موضع الفريق والمسمّى، فينتج
+    // تناقض مقيس: الخادم يُسند المسار إلى «إسناد الفريق» ويحسب تغطيته بقالب الفريق، بينما منتقي
+    // القوالب يعرض للمُقيّم قالب المسمّى ⟹ يُنشأ التقييم بقالب غير الذي تُحسب به التغطية.
+    // التوحيد هنا يخصّ KPI وحده؛ سلّم قوالب التقارير في `ReportTemplateService` خارج هذا العقد ولم يُمسّ.
+    private enum MatchTier { Employee = 1, Team = 2, JobRole = 3, Department = 4, General = 5 }
 
     private sealed record KpiMeta(Guid Id, Guid? JobRoleId, KpiCadence Cadence);
     private sealed record UserScopes(Guid UserId, Guid? JobRoleId, Guid? TeamId, Guid? DepartmentId);
@@ -287,9 +291,12 @@ public class KpiTemplateService : IKpiTemplateService
 
     /// <summary>
     /// حلّ قالب KPI واحد لمستخدم واحد بترتيب الأولوية المعتمَد (الأخصّ أولًا، والاستثناء يتفوّق في
-    /// مستواه وما دونه): ① استثناء موظّف ② إسناد موظّف ③ استثناء مسمّى ④ إسناد مسمّى (الصريح أو
-    /// <see cref="KpiTemplate.JobRoleId"/>) ⑤ استثناء فريق ⑥ إسناد فريق ⑦ استثناء إدارة ⑧ إسناد إدارة
+    /// مستواه وما دونه): ① استثناء موظّف ② إسناد موظّف ③ استثناء فريق ④ إسناد فريق ⑤ استثناء مسمّى
+    /// ⑥ إسناد مسمّى (الصريح أو <see cref="KpiTemplate.JobRoleId"/>) ⑦ استثناء إدارة ⑧ إسناد إدارة
     /// ⑨ عام (قالب بلا مسمّى). تُرجِع null إذا كان القالب متخصصًا ولم يطابق المستخدم بأيّ مستوى.
+    ///
+    /// OBS-R5-01/2 — الفريق قبل المسمّى وفق نصّ العقد، وهو ترتيب الفحص نفسه المستعمَل في
+    /// <see cref="CadencePriority"/> ⟹ منتقي القوالب وحاسم المسار يقرآن السلّم ذاته لا سلّمين.
     /// </summary>
     private static ResolveResult? ResolveOne(
         KpiMeta t, UserScopes u,
@@ -303,16 +310,16 @@ public class KpiTemplateService : IKpiTemplateService
         if (Has(TemplateAssignmentScope.Employee, u.UserId, TemplateAssignmentKind.Include))
             return new(true, MatchTier.Employee, "matchedByUser");
 
+        if (Has(TemplateAssignmentScope.Team, u.TeamId, TemplateAssignmentKind.Exclude))
+            return new(false, MatchTier.Team, "excludedManually");
+        if (Has(TemplateAssignmentScope.Team, u.TeamId, TemplateAssignmentKind.Include))
+            return new(true, MatchTier.Team, "matchedByTeam");
+
         if (Has(TemplateAssignmentScope.JobRole, u.JobRoleId, TemplateAssignmentKind.Exclude))
             return new(false, MatchTier.JobRole, "excludedManually");
         if ((u.JobRoleId is Guid jr && t.JobRoleId == jr)
             || Has(TemplateAssignmentScope.JobRole, u.JobRoleId, TemplateAssignmentKind.Include))
             return new(true, MatchTier.JobRole, "matchedByJobRole");
-
-        if (Has(TemplateAssignmentScope.Team, u.TeamId, TemplateAssignmentKind.Exclude))
-            return new(false, MatchTier.Team, "excludedManually");
-        if (Has(TemplateAssignmentScope.Team, u.TeamId, TemplateAssignmentKind.Include))
-            return new(true, MatchTier.Team, "matchedByTeam");
 
         if (Has(TemplateAssignmentScope.Department, u.DepartmentId, TemplateAssignmentKind.Exclude))
             return new(false, MatchTier.Department, "excludedManually");
@@ -372,15 +379,102 @@ public class KpiTemplateService : IKpiTemplateService
     }
 
     private async Task<HashSet<(Guid, TemplateAssignmentScope, Guid, TemplateAssignmentKind)>> LoadActiveAssignmentsAsync(
-        IReadOnlyCollection<Guid> templateIds, CancellationToken ct)
+        IReadOnlyCollection<Guid> templateIds, CancellationToken ct, DateOnly? asOf = null)
     {
         if (templateIds.Count == 0)
             return new HashSet<(Guid, TemplateAssignmentScope, Guid, TemplateAssignmentKind)>();
-        var rows = await _db.KpiTemplateAssignments.AsNoTracking()
-            .Where(a => a.IsActive && templateIds.Contains(a.KpiTemplateId))
-            .Select(a => new { a.KpiTemplateId, a.ScopeType, a.ScopeId, a.Kind })
-            .ToListAsync(ct);
+        var q = _db.KpiTemplateAssignments.AsNoTracking()
+            .Where(a => a.IsActive && templateIds.Contains(a.KpiTemplateId));
+
+        // DEC-01/6 — سريان الإسناد: صفّ بحدود فارغة يبقى ساريًا دائمًا، فالسلوك بلا asOf مطابق حرفيًّا
+        // للسابق، والأرباع التاريخيّة لا يُعاد تفسيرها بإعداد أُنشئ بعدها.
+        if (asOf is DateOnly at)
+            q = q.Where(a => (a.EffectiveFrom == null || a.EffectiveFrom <= at)
+                             && (a.EffectiveTo == null || a.EffectiveTo >= at));
+
+        var rows = await q.Select(a => new { a.KpiTemplateId, a.ScopeType, a.ScopeId, a.Kind }).ToListAsync(ct);
         return rows.Select(r => (r.KpiTemplateId, r.ScopeType, r.ScopeId, r.Kind)).ToHashSet();
+    }
+
+    /// <summary>
+    /// ترتيب حسم مصدر المسار وفق DEC-01/5 — الأصغر يفوز، ويُقارَن <b>داخل المسار الواحد فقط</b>
+    /// (OBS-R5-01). يقرأ سلّم <see cref="KpiCadenceSources.Specificity"/> نفسه الذي يقرؤه منتقي
+    /// المسار الأوّليّ، فلا يوجد سلّم ثانٍ قابل للتباعد عنه.
+    /// </summary>
+    private static int CadencePriority(string reason) =>
+        KpiCadenceSources.Specificity(CadenceSourceOf(reason));
+
+    private static string CadenceSourceOf(string reason) => reason switch
+    {
+        "matchedByUser" => KpiCadenceSources.EmployeeAssignment,
+        "matchedByTeam" => KpiCadenceSources.TeamAssignment,
+        "matchedByJobRole" => KpiCadenceSources.JobRole,
+        "matchedByDepartment" => KpiCadenceSources.DepartmentAssignment,
+        _ => KpiCadenceSources.GeneralTemplate
+    };
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyDictionary<Guid, KpiEffectiveTracks>> ResolveEffectiveTracksAsync(
+        IReadOnlyCollection<Guid> userIds, DateOnly asOf, CancellationToken ct = default)
+    {
+        var result = new Dictionary<Guid, KpiEffectiveTracks>();
+        var ids = userIds.Distinct().ToList();
+        if (ids.Count == 0) return result;
+
+        var users = await _db.Users.AsNoTracking()
+            .Where(x => ids.Contains(x.Id))
+            .Select(x => new { x.Id, x.JobRoleId, x.TeamId, x.DepartmentId })
+            .ToListAsync(ct);
+
+        var metas = await _db.KpiTemplates.AsNoTracking()
+            .Where(t => t.Status == TemplateStatus.Published && t.IsActive)
+            .Select(t => new KpiMeta(t.Id, t.JobRoleId, t.Cadence))
+            .ToListAsync(ct);
+
+        var assignments = await LoadActiveAssignmentsAsync(metas.Select(m => m.Id).ToList(), ct, asOf);
+
+        foreach (var id in ids) result[id] = KpiEffectiveTracks.NotConfigured(id);
+
+        foreach (var u in users)
+        {
+            var scopes = new UserScopes(u.Id, u.JobRoleId, u.TeamId, u.DepartmentId);
+
+            // نفس ResolveOne المستعمَل في اختيار القالب — لا محرّك موازٍ ولا نسخة ثانية من المنطق.
+            var matched = new List<(KpiMeta Meta, string Reason)>();
+            foreach (var m in metas)
+            {
+                var r = ResolveOne(m, scopes, assignments);
+                if (r is { Included: true }) matched.Add((m, r.Reason));
+            }
+
+            if (matched.Count == 0) continue;
+
+            // OBS-R5-01 — التجميع حسب التواتر **أوّلًا**، ثمّ أدنى أولويّة **داخل كلّ مسار**.
+            // لا Min عبر التواترات مجتمعةً ولا فاصل تعادل إلى الربعيّ: كلاهما كان يُخفي المسار الآخر كلّيًّا.
+            result[u.Id] = new KpiEffectiveTracks(
+                u.Id,
+                TrackOf(u.Id, KpiCadence.WeeklyPulse, matched),
+                TrackOf(u.Id, KpiCadence.Quarterly, matched));
+        }
+
+        return result;
+
+        static KpiEffectiveCadence TrackOf(
+            Guid userId, KpiCadence cadence, List<(KpiMeta Meta, string Reason)> matched)
+        {
+            var inTrack = matched.Where(x => x.Meta.Cadence == cadence).ToList();
+            if (inTrack.Count == 0)
+                return new KpiEffectiveCadence(userId, null, KpiCadenceSources.NotConfigured, Array.Empty<Guid>());
+
+            var winningPriority = inTrack.Min(x => CadencePriority(x.Reason));
+            var winners = inTrack.Where(x => CadencePriority(x.Reason) == winningPriority).ToList();
+
+            return new KpiEffectiveCadence(
+                userId,
+                cadence,
+                CadenceSourceOf(winners[0].Reason),
+                winners.Select(w => w.Meta.Id).Distinct().ToList());
+        }
     }
 
     /// <summary>
@@ -508,7 +602,7 @@ public class KpiTemplateService : IKpiTemplateService
         var rawRows = await _db.KpiTemplateAssignments.AsNoTracking()
             .Where(x => x.KpiTemplateId == id)
             .OrderBy(x => x.ScopeType).ThenByDescending(x => x.Kind).ThenBy(x => x.CreatedAtUtc)
-            .Select(x => new { x.Id, x.ScopeType, x.ScopeId, x.Kind, x.Notes, x.IsActive, x.CreatedAtUtc })
+            .Select(x => new { x.Id, x.ScopeType, x.ScopeId, x.Kind, x.Notes, x.IsActive, x.CreatedAtUtc, x.EffectiveFrom, x.EffectiveTo })
             .ToListAsync(ct);
 
         string? ScopeName(TemplateAssignmentScope s, Guid sid) => s switch
@@ -521,7 +615,8 @@ public class KpiTemplateService : IKpiTemplateService
         };
 
         var assignmentRows = rawRows.Select(x => new KpiTemplateAssignmentRowDto(
-            x.Id, x.ScopeType, x.ScopeId, ScopeName(x.ScopeType, x.ScopeId), x.Kind, x.Notes, x.IsActive, x.CreatedAtUtc))
+            x.Id, x.ScopeType, x.ScopeId, ScopeName(x.ScopeType, x.ScopeId), x.Kind, x.Notes, x.IsActive, x.CreatedAtUtc,
+            x.EffectiveFrom, x.EffectiveTo))
             .ToList();
 
         return Result<KpiTemplateAssignmentsDto>.Success(new KpiTemplateAssignmentsDto(
@@ -544,6 +639,11 @@ public class KpiTemplateService : IKpiTemplateService
 
         var notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim();
 
+        // DEC-01/6 — مدى سريان مقلوب لا معنى له تجاريًّا؛ يُرفَض صراحةً بدل أن يُخزَّن ويُنتج نافذة خالية صامتة.
+        if (request.EffectiveFrom is DateOnly f && request.EffectiveTo is DateOnly t && f > t)
+            return Result<KpiTemplateAssignmentRowDto>.Failure(
+                "تاريخ بداية السريان يجب ألّا يتجاوز تاريخ نهايته.", "kpi_assignment.effective_range.invalid");
+
         // منع التكرار لنفس (القالب/المستوى/المعرّف/النوع)؛ إن وُجد صفّ معطّل أعِد تفعيله بدل إنشاء جديد.
         var dup = await _db.KpiTemplateAssignments.FirstOrDefaultAsync(a =>
             a.KpiTemplateId == templateId && a.ScopeType == request.ScopeType &&
@@ -555,6 +655,8 @@ public class KpiTemplateService : IKpiTemplateService
                     "هذا الإسناد/الاستثناء موجود بالفعل لنفس الكيان.", "kpi_assignment.duplicate.conflict");
             dup.IsActive = true;
             dup.Notes = notes;
+            dup.EffectiveFrom = request.EffectiveFrom;
+            dup.EffectiveTo = request.EffectiveTo;
             dup.UpdatedById = _currentUser.UserId;
             dup.UpdatedAtUtc = DateTime.UtcNow;
             await _db.SaveChangesAsync(ct);
@@ -570,6 +672,8 @@ public class KpiTemplateService : IKpiTemplateService
             Kind = request.Kind,
             Notes = notes,
             IsActive = true,
+            EffectiveFrom = request.EffectiveFrom,
+            EffectiveTo = request.EffectiveTo,
             CreatedById = _currentUser.UserId
         };
         _db.KpiTemplateAssignments.Add(row);
@@ -631,8 +735,11 @@ public class KpiTemplateService : IKpiTemplateService
             $"{{\"templateId\":\"{templateId}\",\"scopeType\":\"{row.ScopeType}\",\"scopeId\":\"{row.ScopeId}\",\"kind\":\"{row.Kind}\",\"isActive\":{row.IsActive.ToString().ToLowerInvariant()}}}",
             ct: ct);
 
+    // DEC-01/6 — تاريخا السريان جزءٌ من العقد لا تفصيل تخزينيّ: بدونهما في الاستجابة
+    // لا يستطيع المستخدم التحقّق من أنّ الربع التاريخيّ لم يُعَد تفسيره بإعداد جديد.
     private static KpiTemplateAssignmentRowDto MapAssignment(KpiTemplateAssignment a, string? name)
-        => new(a.Id, a.ScopeType, a.ScopeId, name, a.Kind, a.Notes, a.IsActive, a.CreatedAtUtc);
+        => new(a.Id, a.ScopeType, a.ScopeId, name, a.Kind, a.Notes, a.IsActive, a.CreatedAtUtc,
+            a.EffectiveFrom, a.EffectiveTo);
 
     private async Task<KpiTemplateDetailDto> BuildDetailAsync(Guid id, CancellationToken ct)
     {

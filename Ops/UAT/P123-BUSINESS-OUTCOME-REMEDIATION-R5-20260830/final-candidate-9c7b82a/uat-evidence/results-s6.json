@@ -1,0 +1,44 @@
+[
+ {
+  "id": "U9",
+  "desc": "تحرير نافذة الخدمة من داخل الصفّ",
+  "result": "PASS",
+  "detail": "المحرّر في مكانه (بلا انتقال)=true · التحذير معروض=true · PATCH /api/directory/users/aa016f5e-1cf9-4cfb-898a-cac2ccf96cdf/employment-window=200 · القيمة تُقرأ محدَّثة=true",
+  "shot": "/tmp/r5uat/shots/U9-saved.png"
+ },
+ {
+  "id": "U9b",
+  "desc": "نافذة الخدمة تقصّ المقام فعلًا ولا تُخفي نقصًا",
+  "result": "PASS",
+  "detail": "مقام النبض قبل=13 ← بعد=7 · مقام الربعيّ قبل=1 ← بعد=1 (لم يتأثّر)",
+  "shot": "/tmp/r5uat/shots/U9-saved.png"
+ },
+ {
+  "id": "U11",
+  "desc": "سجلّ تدقيق بالقيمة قبل/بعد والفاعل والوقت",
+  "result": "PASS",
+  "detail": "HTTP=200 · يحمل الحدث=true · يحمل القيمة الجديدة=true · طول السجلّ=1408",
+  "shot": "/tmp/r5uat/shots/U11-audit.png"
+ },
+ {
+  "id": "U12",
+  "desc": "التقييمات السابقة لم تُعَد كتابتها",
+  "result": "PASS",
+  "detail": "توقيع (المعرّف|النوع|المفتاح|الحالة|الدرجة) لكلّ التقييمات متطابق قبل/بعد = true · عدد الأسطر=7",
+  "shot": "/tmp/r5uat/shots/U12-no-history-rewrite.png"
+ },
+ {
+  "id": "U10",
+  "desc": "الخادم هو سلطة المنع لا إخفاء الزرّ",
+  "result": "PASS",
+  "detail": "PATCH بلا هويّة ⇒ HTTP=401 (لا نجاح صامت) · إخفاء الزرّ في الواجهة مشروط بـcanEditBasic (Admin/CeoSupport/HR)",
+  "shot": "/tmp/r5uat/shots/U9-saved.png"
+ },
+ {
+  "id": "U9c",
+  "desc": "إرجاع نافذة الخدمة إلى حالتها الأصليّة",
+  "result": "PASS",
+  "detail": "HTTP=200 · مقام النبض عاد إلى 13 (الأصل 13)",
+  "shot": "/tmp/r5uat/shots/U9-saved.png"
+ }
+]

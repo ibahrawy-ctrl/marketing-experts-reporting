@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { it, expect, vi, beforeEach } from 'vitest';
+import { FEATURES } from '../lib/navConfig';
 import type { Role } from '../types/api';
 
 // ===== RC4-Task4C / UI-NAV-RESTRUCTURE-R2 — ظهور تبويب «لوحة تنفيذ الفريق» ضمن وحدة «التقارير» =====
@@ -25,6 +26,9 @@ vi.mock('../lib/auth', () => ({
     isSalesB2cTeamLeader: authState.roles.includes('TeamLeader') && authState.jobRoleCode === 'SALES_B2C_TL',
     permissions: new Set<string>(),
     scopeType: null,
+    // P123-R1: كلّ الميزات مفتوحة عمدًا — الادّعاءات هنا عن الأدوار والمسمّيات والقدرات،
+    // وبوّابة الميزة بُعد مستقلّ يُقاس في `navConfig.test.ts` فلا تُلوَّث به هذه القياسات.
+    features: new Set<string>(Object.values(FEATURES)),
   }),
 }));
 vi.mock('../lib/useNotifications', () => ({ useNotificationRealtime: () => undefined }));

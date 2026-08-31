@@ -8,6 +8,7 @@ using Reporting.Application.Audit;
 using Reporting.Application.Common;
 using Reporting.Application.Kpi;
 using Reporting.Application.Notifications;
+using Reporting.Application.Periods;
 using Reporting.Domain.Entities.Kpi;
 using Reporting.Domain.Enums;
 using Reporting.Infrastructure.Persistence;
@@ -21,13 +22,19 @@ public class KpiEvaluationService : IKpiEvaluationService
     private readonly INotificationService _notifications;
     private readonly IAuditService _audit;
     private readonly IScopeResolver _scope;
+    private readonly IKpiTemplateService _templates;
+    private readonly IPeriodService _periods;
     private readonly KpiFeatureOptions _kpiOptions;
 
     // صيغة مفتاح الفترة الأسبوعية المعتمدة: YYYY-Www (مثال 2026-W25) — تمنع إدخال قيَم حرّة غير مفهومة.
     private static readonly Regex WeeklyPeriodKeyPattern = new(@"^\d{4}-W\d{2}$", RegexOptions.Compiled);
 
+    // R5/DEC-01/3 — صيغة مفتاح الربع الرسميّ: YYYY-Qn حيث n ∈ 1..4 (مثال 2026-Q3).
+    private static readonly Regex QuarterlyPeriodKeyPattern = new(@"^\d{4}-Q[1-4]$", RegexOptions.Compiled);
+
     public KpiEvaluationService(AppDbContext db, ICurrentUser currentUser,
         INotificationService notifications, IAuditService audit, IScopeResolver scope,
+        IKpiTemplateService templates, IPeriodService periods,
         IOptions<KpiFeatureOptions> kpiOptions)
     {
         _db = db;
@@ -35,6 +42,8 @@ public class KpiEvaluationService : IKpiEvaluationService
         _notifications = notifications;
         _audit = audit;
         _scope = scope;
+        _templates = templates;
+        _periods = periods;
         _kpiOptions = kpiOptions.Value;
     }
 
@@ -47,25 +56,56 @@ public class KpiEvaluationService : IKpiEvaluationService
         if (request.SubjectUserId == Guid.Empty)
             return Result<KpiEvaluationDto>.Failure("الموظف المُقيَّم مطلوب.", "kpi_eval.subject_required");
 
-        // حارس الدورية (المرحلة الحالية): تقييم KPI أسبوعي فقط. التجميع الشهري/الربع سنوي/السنوي يُدعم لاحقًا.
-        if (request.PeriodType != PeriodType.Weekly)
+        // R5/DEC-01/3 — «نبض الأسبوع» و«التقييم الربعيّ الرسميّ» مساران منفصلان، والتواتر خاصّية القالب
+        // لا خيار للمُقيِّم. لذلك حلّ الحارس القديم («أسبوعيّ فقط») حارسُ تطابق: نوع فترة التقييم يجب أن
+        // يطابق تواتر قالبه. Monthly/Yearly/AdHoc تبقى مرفوضة بالرمز نفسه لأنّ لا تواتر يقابلها.
+        var templateCadence = await _db.KpiTemplates.AsNoTracking()
+            .Where(t => t.Id == request.KpiTemplateId)
+            .Select(t => (KpiCadence?)t.Cadence)
+            .FirstOrDefaultAsync(ct);
+        if (templateCadence is null)
+            return Result<KpiEvaluationDto>.Failure("القالب غير موجود.", "kpi_template.not_found");
+
+        var expectedPeriodType = templateCadence == KpiCadence.Quarterly
+            ? PeriodType.Quarterly
+            : PeriodType.Weekly;
+        if (request.PeriodType != expectedPeriodType)
             return Result<KpiEvaluationDto>.Failure(
-                "تقييم KPI الحالي أسبوعي فقط. الدوريات الأخرى (شهري/ربع سنوي/سنوي) ستُدعم لاحقًا.",
+                expectedPeriodType == PeriodType.Weekly
+                    ? "هذا القالب أسبوعيّ (نبض الأسبوع)؛ نوع الفترة يجب أن يكون Weekly."
+                    : "هذا القالب ربعيّ (التقييم الرسميّ)؛ نوع الفترة يجب أن يكون Quarterly.",
                 "kpi_eval.period_type_not_supported");
 
-        // صيغة الفترة الأسبوعية يجب أن تكون YYYY-Www (مثال 2026-W25) — يمنع القيَم الحرّة غير المفهومة.
-        if (!WeeklyPeriodKeyPattern.IsMatch(request.PeriodKey.Trim()))
-            return Result<KpiEvaluationDto>.Failure(
-                "صيغة الفترة غير صحيحة؛ استخدم صيغة الأسبوع YYYY-Www مثل 2026-W25.",
-                "kpi_eval.period_format_invalid");
+        if (expectedPeriodType == PeriodType.Weekly)
+        {
+            // صيغة الفترة الأسبوعية يجب أن تكون YYYY-Www (مثال 2026-W25) — يمنع القيَم الحرّة غير المفهومة.
+            if (!WeeklyPeriodKeyPattern.IsMatch(request.PeriodKey.Trim()))
+                return Result<KpiEvaluationDto>.Failure(
+                    "صيغة الفترة غير صحيحة؛ استخدم صيغة الأسبوع YYYY-Www مثل 2026-W25.",
+                    "kpi_eval.period_format_invalid");
 
-        // ROLE-AWARE-REPORTING-CALENDAR — التحقّق الخادميّ من مفتاح الدورة (Phase 2.4):
-        // فوق فحص الصيغة، يجب أن يكون المفتاح دورةً صالحة بنيويًّا وقابلة للعكس (Sat→Fri عبر
-        // ReportingCalendarPolicy) وألّا يكون دورةً مستقبلية لم تبدأ بعد. لا تصحيح بيانات ولا تغيير مفتاح مخزَّن.
-        if (!ReportingCalendarPolicy.IsValidCycleKey(request.PeriodKey.Trim()))
-            return Result<KpiEvaluationDto>.Failure("مفتاح الدورة غير صالح.", "kpi.cycle_key_invalid");
-        if (ReportingCalendarPolicy.CycleRange(request.PeriodKey.Trim()).Start > ReportingCalendarPolicy.RiyadhToday())
-            return Result<KpiEvaluationDto>.Failure("لا يمكن إنشاء تقييم لدورة لم تبدأ بعد.", "calendar.cycle_not_open");
+            // ROLE-AWARE-REPORTING-CALENDAR — التحقّق الخادميّ من مفتاح الدورة (Phase 2.4):
+            // فوق فحص الصيغة، يجب أن يكون المفتاح دورةً صالحة بنيويًّا وقابلة للعكس (Sat→Fri عبر
+            // ReportingCalendarPolicy) وألّا يكون دورةً مستقبلية لم تبدأ بعد. لا تصحيح بيانات ولا تغيير مفتاح مخزَّن.
+            if (!ReportingCalendarPolicy.IsValidCycleKey(request.PeriodKey.Trim()))
+                return Result<KpiEvaluationDto>.Failure("مفتاح الدورة غير صالح.", "kpi.cycle_key_invalid");
+            if (ReportingCalendarPolicy.CycleRange(request.PeriodKey.Trim()).Start > ReportingCalendarPolicy.RiyadhToday())
+                return Result<KpiEvaluationDto>.Failure("لا يمكن إنشاء تقييم لدورة لم تبدأ بعد.", "calendar.cycle_not_open");
+        }
+        else
+        {
+            // مفتاح الربع YYYY-Qn بالنمط نفسه الذي يبنيه محرّك الحساب لنوافذ الالتزام الربعيّة،
+            // وبالقيد الزمنيّ نفسه: لا تقييم لربع لم يبدأ بعد بتوقيت الرياض.
+            if (!QuarterlyPeriodKeyPattern.IsMatch(request.PeriodKey.Trim()))
+                return Result<KpiEvaluationDto>.Failure(
+                    "صيغة الفترة غير صحيحة؛ استخدم صيغة الربع YYYY-Qn مثل 2026-Q3.",
+                    "kpi_eval.period_format_invalid");
+            var qk = request.PeriodKey.Trim();
+            var qYear = int.Parse(qk[..4], CultureInfo.InvariantCulture);
+            var qNo = int.Parse(qk[6..], CultureInfo.InvariantCulture);
+            if (ReportingCalendarPolicy.QuarterRange(qYear, qNo).Start > ReportingCalendarPolicy.RiyadhToday())
+                return Result<KpiEvaluationDto>.Failure("لا يمكن إنشاء تقييم لربع لم يبدأ بعد.", "calendar.cycle_not_open");
+        }
 
         // نطاق إنشاء التقييم أضيق من نطاق العرض: المرؤوسون المباشرون فقط (أو كل الموظّفين للأدمن).
         // لا يكفي أن يكون الموظّف ضمن نطاق رؤية المدير الواسع (القسم) — يجب أن يكون مرؤوسًا مباشرًا.
@@ -73,6 +113,17 @@ public class KpiEvaluationService : IKpiEvaluationService
         if (!isAdmin && !evaluatableIds.Contains(request.SubjectUserId))
             return Result<KpiEvaluationDto>.Failure(
                 "لا يمكنك إنشاء تقييم لهذا الموظّف؛ التقييم متاح لمرؤوسيك المباشرين فقط.", "auth.forbidden");
+
+        // DEF-R5-001 — الخادم هو الحاسم النهائيّ لا الواجهة: القالب المطلوب يجب أن يكون ضمن القوالب
+        // الفعّالة لهذا الموظّف داخل مسار تواتره نفسه، بسلّم الأخصّية عينه المستعمَل في العرض
+        // (لا محرّك موازٍ). فتعديل طلب الواجهة — قالب موظّف آخر، أو قالب مسمّى ليس مسمّاه، أو قالب
+        // عامّ رغم وجود إسناد أخصّ، أو قالب موقوف — يُرفَض برمز مسمّى بدل أن يُنشئ تقييمًا لا يخصّه.
+        var eligible = await _templates.ListAsync(new KpiTemplateFilter(
+            null, templateCadence.Value, TemplateStatus.Published, true, request.SubjectUserId), ct);
+        if (!eligible.Succeeded || eligible.Value!.All(t => t.Id != request.KpiTemplateId))
+            return Result<KpiEvaluationDto>.Failure(
+                "القالب المطلوب ليس ضمن القوالب الفعّالة لهذا الموظّف.",
+                "kpi_eval.template_not_assigned");
 
         var version = await _db.KpiTemplateVersions
             .Where(v => v.KpiTemplateId == request.KpiTemplateId && v.IsPublished)
@@ -122,6 +173,99 @@ public class KpiEvaluationService : IKpiEvaluationService
             .ToListAsync(ct);
 
         return Result<EvaluatableSubjectsDto>.Success(new EvaluatableSubjectsDto(isAdmin, subjects));
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<KpiEvaluationSetupDto>> GetEvaluationSetupAsync(Guid subjectUserId, CancellationToken ct = default)
+    {
+        if (_currentUser.UserId is not Guid evaluatorId)
+            return Result<KpiEvaluationSetupDto>.Failure("غير مصرّح.", "auth.unauthenticated");
+        if (subjectUserId == Guid.Empty)
+            return Result<KpiEvaluationSetupDto>.Failure("الموظف المُقيَّم مطلوب.", "kpi_eval.subject_required");
+
+        // النطاق نفسه المفروض عند الإنشاء — لا تُكشف حالة إعداد موظّف خارج نطاق التقييم المباشر.
+        var (isAdmin, evaluatableIds) = await EvaluatableSubjectScopeAsync(evaluatorId, ct);
+        if (!isAdmin && !evaluatableIds.Contains(subjectUserId))
+            return Result<KpiEvaluationSetupDto>.Failure(
+                "لا يمكنك إنشاء تقييم لهذا الموظّف؛ التقييم متاح لمرؤوسيك المباشرين فقط.", "auth.forbidden");
+
+        var subject = await _db.Users.AsNoTracking()
+            .Where(u => u.Id == subjectUserId)
+            .Select(u => new { u.Id, u.FullName })
+            .FirstOrDefaultAsync(ct);
+        if (subject is null)
+            return Result<KpiEvaluationSetupDto>.Failure("الموظف المُقيَّم غير موجود.", "kpi_eval.subject_not_found");
+
+        var asOf = ReportingCalendarPolicy.RiyadhToday();
+        var map = await _templates.ResolveEffectiveTracksAsync(new[] { subjectUserId }, asOf, ct);
+        var tracks = map.TryGetValue(subjectUserId, out var t) ? t : KpiEffectiveTracks.NotConfigured(subjectUserId);
+
+        var rows = new List<KpiEvaluationTrackDto>
+        {
+            await BuildTrackAsync(subjectUserId, tracks.WeeklyPulse, KpiCadence.WeeklyPulse, ct),
+            await BuildTrackAsync(subjectUserId, tracks.Quarterly, KpiCadence.Quarterly, ct)
+        };
+
+        var anyConfigured = rows.Any(r => r.IsConfigured);
+        return Result<KpiEvaluationSetupDto>.Success(new KpiEvaluationSetupDto(
+            subjectUserId,
+            subject.FullName,
+            rows,
+            anyConfigured,
+            anyConfigured
+                ? null
+                : "لا يوجد إعداد KPI فعّال لهذا الموظّف على أيّ مسار: لا قالب نبض أسبوعيّ ولا قالب ربعيّ رسميّ مُسنَد له. اربط قالبًا بمسمّاه أو فريقه أو إدارته قبل إنشاء التقييم."));
+    }
+
+    /// <summary>
+    /// المصدر الخادميّ الوحيد لمسار واحد من «الإعداد الفعّال»: المسار يُحسم بمنتقي DEC-01/5 نفسه
+    /// المستعمَل في التجميع (وبسلّم الأولويّة <b>داخل المسار وحده</b> — OBS-R5-01)، والقوالب تُجلب
+    /// بسلّم الأخصّية نفسه المستعمَل في حارس الإنشاء (<c>ListAsync</c> بمرشّح تواتر هذا المسار)
+    /// — فلا ينفصل ما تراه الواجهة عمّا يقبله الخادم. يبقى منها ما له إصدار منشور فعلًا،
+    /// لأنّ الإنشاء يتطلّب إصدارًا منشورًا.
+    /// </summary>
+    private async Task<KpiEvaluationTrackDto> BuildTrackAsync(
+        Guid subjectUserId, KpiEffectiveCadence effective, KpiCadence cadence, CancellationToken ct)
+    {
+        var isQuarterly = cadence == KpiCadence.Quarterly;
+        // DEC-01/1 — الفترة الجارية تُحسم خادميًّا بتوقيت Asia/Riyadh؛ المستخدم لا يُسأل عنها.
+        var periodKey = isQuarterly
+            ? _periods.CurrentQuarter().Key
+            : ReportingCalendarPolicy.CycleKeyFor(ReportingCalendarPolicy.RiyadhToday());
+        var periodType = isQuarterly ? PeriodType.Quarterly : PeriodType.Weekly;
+
+        KpiEvaluationTrackDto Blocked(string reason) => new(
+            cadence, effective.Source, periodType, periodKey,
+            Array.Empty<KpiEvaluationSetupTemplateDto>(), false, reason);
+
+        if (effective.Cadence is null)
+            return Blocked(isQuarterly
+                ? "المسار الربعيّ الرسميّ غير مُهيّأ لهذا الموظّف: لا قالب ربعيّ فعّال مُسنَد له. هذا لا يمسّ مسار نبض الأسبوع."
+                : "مسار نبض الأسبوع غير مُهيّأ لهذا الموظّف: لا قالب أسبوعيّ فعّال مُسنَد له. هذا لا يمسّ المسار الربعيّ الرسميّ.");
+
+        var eligible = await _templates.ListAsync(new KpiTemplateFilter(
+            null, cadence, TemplateStatus.Published, true, subjectUserId), ct);
+
+        var titles = new List<KpiEvaluationSetupTemplateDto>();
+        if (eligible.Succeeded && eligible.Value!.Count > 0)
+        {
+            var ids = eligible.Value!.Select(x => x.Id).ToList();
+            titles = (await _db.KpiTemplates.AsNoTracking()
+                    .Where(x => ids.Contains(x.Id) && x.Versions.Any(v => v.IsPublished))
+                    .OrderBy(x => x.Title)
+                    .Select(x => new { x.Id, x.Title })
+                    .ToListAsync(ct))
+                .Select(x => new KpiEvaluationSetupTemplateDto(x.Id, x.Title))
+                .ToList();
+        }
+
+        if (titles.Count == 0)
+            return Blocked(isQuarterly
+                ? "المسار الربعيّ الرسميّ مُهيّأ لهذا الموظّف، لكن لا يوجد قالب ربعيّ له إصدار منشور. انشر إصدارًا من القالب الربعيّ قبل إنشاء التقييم."
+                : "مسار نبض الأسبوع مُهيّأ لهذا الموظّف، لكن لا يوجد قالب أسبوعيّ له إصدار منشور. انشر إصدارًا من قالب النبض الأسبوعيّ قبل إنشاء التقييم.");
+
+        return new KpiEvaluationTrackDto(
+            cadence, effective.Source, periodType, periodKey, titles, true, null);
     }
 
     /// <summary>
@@ -842,9 +986,20 @@ public class KpiEvaluationService : IKpiEvaluationService
         var (from, to) = ReportCalendarPolicy.QuarterRange(filter.Year, filter.Quarter);
         var label = $"الربع {filter.Quarter} — {filter.Year}";
 
-        // عرض على مستوى الشركة (بلا ScopeResolver؛ النطاق مفروض بالسياسة). تقييمات أسبوعية بالحالة المختارة فقط.
-        var q = _db.KpiEvaluations.AsNoTracking()
-            .Where(e => e.PeriodType == PeriodType.Weekly && e.Status == status);
+        // DEC-01 §5 — التصدير المالي يستهلك **المسار الربعيّ الرسميّ وحده**: نبض الأسبوع مؤشّر تشغيليّ
+        // غير رسميّ ولا يجوز أن يكون مصدرًا ماليًّا.
+        // تمييز المسار هنا بتواتر القالب (Cadence) لا بـPeriodType، مطابقةً لما تفعله
+        // KpiCalculationService.BaseEvaluationsQuery. ولو ميّزناه بمفتاح ربعيّ تامّ وحده لاختلف ما
+        // يراه «المتوسّط الرسميّ» عمّا يراه «التصدير المالي» على البيانات نفسها — وهو خلط من نوع
+        // آخر يخالف العقد ذاته، إذ يوجب أن يستهلك الرقمان المجموعة نفسها.
+        var quarterKey = $"{filter.Year}-Q{filter.Quarter}";
+
+        // عرض على مستوى الشركة (بلا ScopeResolver؛ النطاق مفروض بالسياسة). المسار الربعيّ بالحالة المختارة فقط.
+        var q = from e in _db.KpiEvaluations.AsNoTracking()
+                join v in _db.KpiTemplateVersions.AsNoTracking() on e.KpiTemplateVersionId equals v.Id
+                join tpl in _db.KpiTemplates.AsNoTracking() on v.KpiTemplateId equals tpl.Id
+                where tpl.Cadence == KpiCadence.Quarterly && e.Status == status
+                select e;
         if (filter.DepartmentId is Guid d) q = q.Where(e => e.DepartmentId == d);
         if (filter.TeamId is Guid t) q = q.Where(e => e.TeamId == t);
 
@@ -863,8 +1018,12 @@ public class KpiEvaluationService : IKpiEvaluationService
             e.CreatedAtUtc
         }).ToListAsync(ct);
 
-        // فلترة الأسابيع الواقعة داخل مدى الربع (بحسب خميس بداية الأسبوع).
-        var inRange = raw.Where(r => ReportCalendarPolicy.WeekInRange(r.PeriodKey, from, to)).ToList();
+        // عضويّة الفترة بنفس قاعدة التجميع: مفتاح الربع نفسه، أو مفتاح دورة واقع داخل مدى الربع
+        // (سجلّات ربعيّة قديمة أُنشئت بمفتاح دورة قبل DEC-01 تبقى مرئيّة للمالية كما تراها المتوسّطات).
+        var inRange = raw
+            .Where(r => string.Equals(r.PeriodKey, quarterKey, StringComparison.Ordinal)
+                        || ReportCalendarPolicy.WeekInRange(r.PeriodKey, from, to))
+            .ToList();
 
         // حلّ الأسماء على دفعات: الموظّفون (الاسم/المسمّى/الإدارة/الفريق الحاليّ)، الإدارات، الفِرق، عناوين القوالب.
         var subjectIds = inRange.Select(r => r.SubjectUserId).Distinct().ToList();

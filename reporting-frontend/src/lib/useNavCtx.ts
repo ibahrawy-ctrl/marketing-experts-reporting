@@ -9,18 +9,19 @@ import { useAuth } from './auth';
 import type { NavCtx } from './navConfig';
 
 export function useNavCtx(): NavCtx {
-  const { user, hasAnyRole, permissions, scopeType, isSalesRep, isSalesB2cTeamLeader } = useAuth();
+  const { user, hasAnyRole, permissions, scopeType, features, isSalesRep, isSalesB2cTeamLeader } = useAuth();
   const jobRoleCode = user?.jobRoleCode ?? null;
   return useMemo<NavCtx>(
     () => ({
       authenticated: !!user,
       hasAnyRole,
       permissions,
+      features,
       scopeType,
       isSalesRep,
       isSalesB2cTeamLeader,
       jobRoleCode,
     }),
-    [user, hasAnyRole, permissions, scopeType, isSalesRep, isSalesB2cTeamLeader, jobRoleCode],
+    [user, hasAnyRole, permissions, features, scopeType, isSalesRep, isSalesB2cTeamLeader, jobRoleCode],
   );
 }

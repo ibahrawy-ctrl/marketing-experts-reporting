@@ -14,6 +14,12 @@ public static class PeriodKinds
 
     /// <summary>اسم رمزيّ يُحلّ خادميًّا إلى آخر أسبوع **مكتمل** (الافتراضيّ للبطاقات التنظيميّة).</summary>
     public const string LastCompletedWeek = "LastCompletedWeek";
+
+    /// <summary>
+    /// DEC-01/1 — اسم رمزيّ يُحلّ خادميًّا إلى الربع الميلاديّ **الجاري** بتوقيت <c>Asia/Riyadh</c>
+    /// (في أغسطس 2026 ⇒ <c>2026-Q3</c>). الافتراضيّ لصفحة KPI: لا يختار المستخدم الفترة الجارية.
+    /// </summary>
+    public const string CurrentQuarter = "CurrentQuarter";
 }
 
 /// <summary>

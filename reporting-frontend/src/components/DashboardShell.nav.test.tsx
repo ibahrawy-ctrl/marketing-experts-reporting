@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { it, expect, vi, beforeEach } from 'vitest';
+import { FEATURES } from '../lib/navConfig';
 import type { Role } from '../types/api';
 
 // ===== UI-NAV-RESTRUCTURE-R2 — ظهور تبويبات المبيعات الثلاثة داخل وحدة «التقارير» =====
@@ -29,6 +30,9 @@ vi.mock('../lib/auth', () => ({
     // P3-NAV-001: قدرات الخادم كما تصل للواجهة — لا قدرة ولا نطاق في هذه الحالات.
     permissions: new Set<string>(),
     scopeType: null,
+    // P123-R1: كلّ الميزات مفتوحة عمدًا — الادّعاءات هنا عن الأدوار والمسمّيات والقدرات،
+    // وبوّابة الميزة بُعد مستقلّ يُقاس في `navConfig.test.ts` فلا تُلوَّث به هذه القياسات.
+    features: new Set<string>(Object.values(FEATURES)),
   }),
 }));
 

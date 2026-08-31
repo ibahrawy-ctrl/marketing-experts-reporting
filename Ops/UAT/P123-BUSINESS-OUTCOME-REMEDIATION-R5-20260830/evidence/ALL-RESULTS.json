@@ -1,0 +1,258 @@
+[
+ {
+  "id": "U1",
+  "desc": "فتح /app/kpi بلا نقرة",
+  "result": "PASS",
+  "detail": "نصّ الصفحة يحوي الربع الجاري=false · عدد القوائم المنسدلة=2",
+  "shot": "/tmp/r5uat/shots/U1-kpi-landing.png",
+  "src": "results-s1.json"
+ },
+ {
+  "id": "U1b",
+  "desc": "مرشّح القراءة للمسارين في لوحة النظرة الشاملة",
+  "result": "PASS",
+  "detail": "«تلقائي/نبض أسبوعيّ/تقييم ربعيّ رسميّ» متاحة للقراءة المستقلّة لكلّ مسار = true",
+  "shot": "/tmp/r5uat/shots/U1b-overview-track-filter.png",
+  "src": "results-s1.json"
+ },
+ {
+  "id": "U2",
+  "desc": "مصدر الحسم معروض شرحًا لا خيارًا",
+  "result": "PASS",
+  "detail": "لا منتقي تواتر=true · نصّ «يحدّده النظام»=true",
+  "shot": "/tmp/r5uat/shots/U15-dual-track.png",
+  "src": "results-s1.json"
+ },
+ {
+  "id": "U3",
+  "desc": "الإجراءان المستحقّان معروضان ومتاحان معًا",
+  "result": "PASS",
+  "detail": "زرّ النبض متاح=true · زرّ الربعيّ متاح=true",
+  "shot": "/tmp/r5uat/shots/U15-dual-track.png",
+  "src": "results-s1.json"
+ },
+ {
+  "id": "U4/U5",
+  "desc": "التقييمان قائمان معًا لنفس الموظّف",
+  "result": "PASS",
+  "detail": "الأسبوع 36 في القائمة=true · الربع الجاري في القائمة=true",
+  "shot": "/tmp/r5uat/shots/U4U5-both-listed.png",
+  "src": "results-s2.json"
+ },
+ {
+  "id": "U6",
+  "desc": "موظّف بلا إسناد قالب فعّال: حالة «غير مُهيّأ» معلَنة لكلّ مسار، وحجب صريح، وصفر طلب إنشاء",
+  "result": "PASS",
+  "detail": "«قبل» (نفس الحساب بلا استثناء): نبض=«الأسبوع 36 — 2026» وربعيّ=«2026-Q3» بلا أيّ «غير مُهيّأ» ⇒ true · «بعد» (استثناء Employee/Exclude على قوالب المسارين التسعة): مسارات الخادم=WeeklyPulse:0 · Quarterly:0 · نصّ الشاشة يعلن «غير مُهيّأ» للنبض=true وللربعيّ=true، ويؤكّد استقلال المسارين=true، ورسالة الحجب=true · محاولات الإجراء: «تسجيل نبض الأسبوع الحالي» موجود=1 معطَّل=true ⇒ «إنشاء تقييم» معطَّل=true · «إجراء التقييم الربعي الرسمي» موجود=1 معطَّل=true ⇒ «إنشاء تقييم» معطَّل=true · POST /api/kpi-evaluations خلال المحاولتين=0 · الموظّف المرجعيّ الآخر ما زال WeeklyPulse:7 · Quarterly:2 ⇒ الحالة لم تُخفِ موظّفًا حقيقيًّا · جرد القوالب=9 منها منشورة=9 ⇒ لم يُعطَّل أيّ قالب عامّ لصناعة السيناريو",
+  "shot": "/tmp/r5uat/shots/U6-after-no-active-setup.png",
+  "src": "results-s11c.json"
+ },
+ {
+  "id": "U6b",
+  "desc": "لقطة «قبل» على نفس الحساب: المساران مُهيّآن فعلًا ⇒ الفرق ناتج عن الاستثناء لا عن عطل عرض",
+  "result": "PASS",
+  "detail": "نفس الحساب الاصطناعيّ قبل إسناد الاستثناء وعلى نفس المسار الملاحيّ: بطاقة «نبض الأسبوع» تعرض «الأسبوع 36 — 2026» وبطاقة «التقييم الربعيّ الرسميّ» تعرض «2026-Q3»، ولا ترد كلمة «غير مُهيّأ» في الشاشة إطلاقًا. مسارات الخادم آنذاك = WeeklyPulse:7 · Quarterly:2.",
+  "shot": "/tmp/r5uat/shots/U6-before-active-setup.png",
+  "src": "results-s11.json"
+ },
+ {
+  "id": "U7",
+  "desc": "التلاعب من خارج الواجهة يُرفض برمز مسمًّى لا بنجاح صامت",
+  "result": "PASS",
+  "detail": "«قالب أسبوعيّ + PeriodType=Quarterly» ⇒ HTTP=400 رمز=kpi_eval.period_type_not_supported · «قالب ربعيّ + PeriodType=Weekly» ⇒ HTTP=400 رمز=kpi_eval.period_type_not_supported · «قالب ربعيّ + مفتاح أسبوعيّ داخل نوع ربعيّ» ⇒ HTTP=400 رمز=kpi_eval.period_format_invalid · «قالب أسبوعيّ + PeriodType=Monthly» ⇒ HTTP=400 رمز=kpi_eval.period_type_not_supported · «قالب ربعيّ + ربع لم يبدأ بعد» ⇒ HTTP=400 رمز=calendar.cycle_not_open",
+  "shot": "/tmp/r5uat/shots/U7-server-authority.png",
+  "src": "results-s9.json"
+ },
+ {
+  "id": "U8",
+  "desc": "نافذة الخدمة معلَنة نصًّا لا فراغًا",
+  "result": "PASS",
+  "detail": "«التحاق:»=true · «انتهاء الخدمة:»=true · حالة معلَنة («غير مسجَّل»/«على رأس العمل»)=true",
+  "shot": "/tmp/r5uat/shots/U8-employment-window.png",
+  "src": "results-s5.json"
+ },
+ {
+  "id": "U9",
+  "desc": "تحرير نافذة الخدمة من داخل الصفّ",
+  "result": "PASS",
+  "detail": "المحرّر في مكانه (بلا انتقال)=true · التحذير معروض=true · PATCH /api/directory/users/aa016f5e-1cf9-4cfb-898a-cac2ccf96cdf/employment-window=200 · القيمة تُقرأ محدَّثة=true",
+  "shot": "/tmp/r5uat/shots/U9-saved.png",
+  "src": "results-s6.json"
+ },
+ {
+  "id": "U9b",
+  "desc": "نافذة الخدمة تقصّ المقام فعلًا ولا تُخفي نقصًا",
+  "result": "PASS",
+  "detail": "مقام النبض قبل=13 ← بعد=7 · مقام الربعيّ قبل=1 ← بعد=1 (لم يتأثّر)",
+  "shot": "/tmp/r5uat/shots/U9-saved.png",
+  "src": "results-s6.json"
+ },
+ {
+  "id": "U9c",
+  "desc": "إرجاع نافذة الخدمة إلى حالتها الأصليّة",
+  "result": "PASS",
+  "detail": "HTTP=200 · مقام النبض عاد إلى 13 (الأصل 13)",
+  "shot": "/tmp/r5uat/shots/U9-saved.png",
+  "src": "results-s6.json"
+ },
+ {
+  "id": "U10",
+  "desc": "مستخدم مسجَّل بدور Employee لا يستطيع تعديل نافذة الخدمة: 403 لا 401 ولا نجاح صامت",
+  "result": "PASS",
+  "detail": "تسجيل دخول حقيقيّ بالحساب الاصطناعيّ: الأدوار=[\"Employee\"] وperm=[] · من داخل جلسة المتصفّح نفسها (برمز الجلسة، hadToken=true): PATCH employment-window ⇒ HTTP 403 · ومن خارج الواجهة على ستّة أسطح إداريّة: «نافذة الخدمة (الالتحاق/انتهاء الخدمة) — الهدف: نفسه»=403 · «البيانات الأساسيّة (الاسم)»=403 · «المسمّى الوظيفيّ»=403 · «الانتماء التنظيميّ»=403 · «إعادة تعيين كلمة المرور»=403 · «إنشاء مستخدم جديد»=403 · المقارنة الحاسمة: نفس النداء بلا هويّة = 401 (منع مجهول) بينما بدور Employee مسجَّل = 403 (منع مخوَّل غير مصرّح) · عناصر القائمة الجانبيّة المرئيّة = [\"الرئيسية\",\"الموظفون\",\"التقارير\",\"الأداء وKPI\",\"الحوكمة\",\"الرئيسية\"]",
+  "shot": "/tmp/r5uat/shots/U10-employee-session.png",
+  "src": "results-s12.json"
+ },
+ {
+  "id": "U10b",
+  "desc": "القيم لم تتغيّر في القاعدة بعد كلّ المحاولات، ولا سطح تعديل في ملفّ الموظّف نفسه",
+  "result": "PASS",
+  "detail": "نافذة الخدمة المرجعيّة التي ضبطتها الإدارة = HireDate 2026-01-04 · ExitDate 2026-06-30 · المحاولات استهدفت 2001-01-01/2001-12-31 · القراءة المباشرة من قاعدة TEST بعد المحاولات = «synthetic.uat@p123.r5.uat.test|2026-01-04|2026-06-30» ⇒ لا كتابة جزئيّة ولا نجاح صامت · ضوابط تعديل نافذة الخدمة الظاهرة في ملفّه من جلسته = [] (حقول تاريخ أو أزرار خاصّة بالالتحاق/انتهاء الخدمة) · دليل الموظّفين من جلسته يعرض صفًّا واحدًا هو نفسه (نطاق الخادم) ⇒ لا كشف لموظّف حقيقيّ",
+  "shot": "/tmp/r5uat/shots/U10-own-profile-readonly.png",
+  "src": "results-s12.json"
+ },
+ {
+  "id": "U11",
+  "desc": "سجلّ تدقيق بالقيمة قبل/بعد والفاعل والوقت",
+  "result": "PASS",
+  "detail": "HTTP=200 · يحمل الحدث=true · يحمل القيمة الجديدة=true · طول السجلّ=470",
+  "shot": "/tmp/r5uat/shots/U11-audit.png",
+  "src": "results-s6.json"
+ },
+ {
+  "id": "U12",
+  "desc": "التقييمات السابقة لم تُعَد كتابتها",
+  "result": "PASS",
+  "detail": "توقيع (المعرّف|النوع|المفتاح|الحالة|الدرجة) لكلّ التقييمات متطابق قبل/بعد = true · عدد الأسطر=7",
+  "shot": "/tmp/r5uat/shots/U12-no-history-rewrite.png",
+  "src": "results-s6.json"
+ },
+ {
+  "id": "U13",
+  "desc": "التغطية والأهليّة معلنتان",
+  "result": "PASS",
+  "detail": "نصّ التغطية/الأهليّة حاضر=true · مؤهّلون=0/35",
+  "shot": "/tmp/r5uat/shots/U18-quarterly.png",
+  "src": "results-s3.json"
+ },
+ {
+  "id": "U14",
+  "desc": "التنقيب يعرض الفترات المصدريّة بمفاتيحها ومآلها",
+  "result": "PASS",
+  "detail": "مفاتيح الأسابيع الظاهرة=28,29,30,31,32,33,34,35,36,37,38,39,40 · عددها=13",
+  "shot": "/tmp/r5uat/shots/U14-drilldown.png",
+  "src": "results-s4.json"
+ },
+ {
+  "id": "U15",
+  "desc": "المساران معًا ظاهران لنفس الموظّف",
+  "result": "PASS",
+  "detail": "نبض الأسبوع=true · التقييم الربعيّ الرسميّ=true · عدد select=2",
+  "shot": "/tmp/r5uat/shots/U15-dual-track.png",
+  "src": "results-s1.json"
+ },
+ {
+  "id": "U16",
+  "desc": "تسجيل نبض الأسبوع لنفس الموظّف",
+  "result": "PASS",
+  "detail": "HTTP=200 · periodType=Weekly · periodKey=2026-W36 · قوالب المسار=7",
+  "shot": "/tmp/r5uat/shots/U16-weekly-after.png",
+  "src": "results-s2.json"
+ },
+ {
+  "id": "U16b",
+  "desc": "قوالب النبض وحدها معروضة في مسار النبض",
+  "result": "PASS",
+  "detail": "القوالب: النبض الأسبوعي العام · مؤشرات أداء SEO · مؤشرات أداء الفيديو · مؤشرات أداء المصمم · مؤشرات أداء المودريشن · مؤشرات أداء كاتب المحتوى · مؤشرات مندوب مبيعات B2C",
+  "shot": "/tmp/r5uat/shots/U16-weekly-before.png",
+  "src": "results-s2.json"
+ },
+ {
+  "id": "U17",
+  "desc": "التقييم الربعيّ الرسميّ لنفس الموظّف",
+  "result": "PASS",
+  "detail": "HTTP=200 · periodType=Quarterly · periodKey=2026-Q3 · قوالب المسار=2",
+  "shot": "/tmp/r5uat/shots/U17-quarterly-after.png",
+  "src": "results-s2.json"
+ },
+ {
+  "id": "U17b",
+  "desc": "قوالب المسار الربعيّ وحدها معروضة",
+  "result": "PASS",
+  "detail": "القوالب: مؤشرات مشتري الإعلانات · مؤشرات مندوب المبيعات",
+  "shot": "/tmp/r5uat/shots/U17-quarterly-before.png",
+  "src": "results-s2.json"
+ },
+ {
+  "id": "U18",
+  "desc": "العدّادات تختلف باختلاف المسار — لا خلط",
+  "result": "PASS",
+  "detail": "النبض: مؤهّلون=0/35 متوسّط=— · الربعيّ: مؤهّلون=0/35 متوسّط=— · تلقائي: مؤهّلون=0/35",
+  "shot": "/tmp/r5uat/shots/U18-quarterly.png",
+  "src": "results-s3.json"
+ },
+ {
+  "id": "U18b",
+  "desc": "نداء التحليلات يحمل المسار المطلوب صراحةً",
+  "result": "PASS",
+  "detail": "ربعيّ: /api/kpi/performance?periodType=CurrentQuarter&cadence=Quarterly · أسبوعيّ: /api/kpi/performance?periodType=CurrentQuarter&cadence=WeeklyPulse",
+  "shot": "/tmp/r5uat/shots/U18-quarterly.png",
+  "src": "results-s3.json"
+ },
+ {
+  "id": "U18v",
+  "desc": "لقطتان لنفس الموظّف بعدّادات مختلفة لكلّ مسار",
+  "result": "PASS",
+  "detail": "نصّ مسار النبض ≠ نصّ المسار الربعيّ = true · اسم الموظّف حاضر في كلتيهما",
+  "shot": "/tmp/r5uat/shots/U18v-quarterly.png",
+  "src": "results-s4.json"
+ },
+ {
+  "id": "U19",
+  "desc": "النبض المعتمَد داخل الربع لا يدخل التصدير المالي",
+  "result": "PASS",
+  "detail": "نبض معتمَد داخل الربع 3 = 4 (2026-W34:65 · 2026-W33:65 · 2026-W32:45 · 2026-W31:85) · صفوف التصدير = 0 · ظهور أيّ مفتاح أسبوعيّ في الشاشة = false · قبل الإصلاح (SHA d8666f5) كانت الشاشة نفسها تعرض صفّ «2026-W29 · النبض الأسبوعي العام · ٨٧٫٥ · معتمد»",
+  "shot": "/tmp/r5uat/shots/U19-q3-pulse-excluded.png",
+  "src": "results-s8.json"
+ },
+ {
+  "id": "U19b",
+  "desc": "تقييم المسار الربعيّ المعتمَد يظهر في التصدير",
+  "result": "PASS",
+  "detail": "صفوف التصدير للربع 2 = 2 · القوالب = مؤشرات مندوب المبيعات · المفاتيح = 2026-W20 · 2026-W21 · الدرجات = 77 · 33",
+  "shot": "/tmp/r5uat/shots/U19-q2-quarterly-included.png",
+  "src": "results-s8.json"
+ },
+ {
+  "id": "U19c",
+  "desc": "الملفّ المُصدَّر ذاته يطابق الشاشة",
+  "result": "PASS",
+  "detail": "CSV الربع 3: 1 سطر (ترويسة فقط) · CSV الربع 2: 3 سطر (ترويسة + 2 صفّ) · «Weekly» في CSV الربع 2 = false",
+  "shot": "/tmp/r5uat/shots/U19-q2-quarterly-included.png",
+  "src": "results-s8.json"
+ },
+ {
+  "id": "U19d",
+  "desc": "نصّ الشاشة يطابق مصدر البيانات ولا يناقضه",
+  "result": "PASS",
+  "detail": "يعلن «المسار الربعيّ الرسميّ وحده» = true · بقايا نصّ «لا توجد تقييمات أسبوعية معتمَدة» = false",
+  "shot": "/tmp/r5uat/shots/U19-q3-pulse-excluded.png",
+  "src": "results-s8.json"
+ },
+ {
+  "id": "U19e",
+  "desc": "عدّادا المسارين مستقلّان لنفس الموظّف والفترة",
+  "result": "PASS",
+  "detail": "النبض: منجَز=4 من مقام=13 تغطية=30.77% حالة=\"InsufficientCoverage\" رحلة=\"InProgress\" · الربعيّ الرسميّ: منجَز=0 من مقام=1 تغطية=0% حالة=\"NoData\" رحلة=\"NotStarted\" · النبضات الأربع المعتمَدة لم تُضِف شيئًا إلى بسط المسار الربعيّ",
+  "shot": "/tmp/r5uat/shots/U19e-two-independent-counters.png",
+  "src": "results-s8.json"
+ },
+ {
+  "id": "U20",
+  "desc": "جرد القوالب المبذورة: لا تكرار ولا فقد والمساران قائمان",
+  "result": "PASS",
+  "detail": "إجمالي القوالب=9 · ربعيّ=2 (مؤشرات مندوب المبيعات · مؤشرات مشتري الإعلانات) · نبض=7 · عناوين مكرَّرة=0 · مطابق تمامًا لخطّ الأساس قبل التدخّل (9 قوالب بالتوزيع نفسه) ⇒ لم تلزم أيّ كتابة مصالحة على TEST",
+  "shot": "/tmp/r5uat/shots/U20-templates-inventory.png",
+  "src": "results-s9.json"
+ }
+]

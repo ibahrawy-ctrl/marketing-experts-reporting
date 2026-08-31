@@ -1,0 +1,28 @@
+=== الدليل الحاسم: حالة أعلام Phase2 في البيئات الثلاث (قراءة فقط) ===
+التاريخ (UTC): 2026-08-26T22:08:12Z
+ملاحظة: تُطبع أسماء المفاتيح وقيم الأعلام المنطقيّة فقط — لا أسرار.
+
+--- [أ] الإنتاج: /etc/reporting-api.env ---
+0
+عدد مفاتيح Phase2__* أعلاه (0 = غائبة تمامًا)
+
+--- [ب] الإنتاج: كلّ ملفّات appsettings في مجلّد النشر ---
+/opt/reporting/publish/appsettings.json
+---
+0
+
+--- [ج] TEST: /etc/khubara-reporting-test.env ---
+Phase2__Employee360Enabled=true
+Phase2__AttendanceEnabled=true
+Phase2__HrOperationsEnabled=true
+Phase2__EmployeeChecklistEnabled=true
+
+--- [د] RC: /etc/khubara-reporting-rc.env ---
+Phase2__Employee360Enabled=true
+Phase2__AttendanceEnabled=true
+Phase2__HrOperationsEnabled=true
+Phase2__EmployeeChecklistEnabled=true
+
+=== الاستنتاج المقيس ===
+الأعلام الأربعة غائبة عن الإنتاج (env + appsettings) ⇒ تأخذ القيمة الافتراضيّة في Phase2FeatureOptions.cs وهي false (لا مُهيّئ لأيّ خاصّيّة bool).
+TEST وRC: الأعلام الأربعة =true ⇒ رحلات UAT التي مرّت على TEST غير قابلة لإعادة الإنتاج على الإنتاج.

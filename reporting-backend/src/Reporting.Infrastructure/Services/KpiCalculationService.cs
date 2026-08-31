@@ -29,6 +29,7 @@ public class KpiCalculationService : IKpiCalculationService
     private readonly ICurrentUser _currentUser;
     private readonly IPeriodService _periods;
     private readonly ISystemClock _clock;
+    private readonly IKpiTemplateService _templates;
     private readonly KpiFeatureOptions _options;
 
     public KpiCalculationService(
@@ -37,6 +38,7 @@ public class KpiCalculationService : IKpiCalculationService
         ICurrentUser currentUser,
         IPeriodService periods,
         ISystemClock clock,
+        IKpiTemplateService templates,
         IOptions<KpiFeatureOptions> options)
     {
         _db = db;
@@ -44,6 +46,7 @@ public class KpiCalculationService : IKpiCalculationService
         _currentUser = currentUser;
         _periods = periods;
         _clock = clock;
+        _templates = templates;
         _options = options.Value;
     }
 
@@ -86,7 +89,7 @@ public class KpiCalculationService : IKpiCalculationService
         return Result<KpiPerformanceDto>.Success(new KpiPerformanceDto(
             KpiPeriodResolvedDto.From(ctx.Period),
             KpiPeriodResolvedDto.From(ctx.PreviousPeriod),
-            ctx.Cadence,
+            ctx.RequestedCadence,
             ctx.Scope.ScopeType,
             company,
             departments,
@@ -110,13 +113,22 @@ public class KpiCalculationService : IKpiCalculationService
         var previous = await BuildEmployeeAggregatesAsync(ctx, ctx.PreviousPeriod, ct);
 
         // صفّ واحد لكلّ موظّف (الحبيبيّة مضمونة بالبناء: الفهرس مفتاحه UserId).
-        var scored = ctx.Roster
-            .Select(u => BuildEmployeeDto(ctx, u, current, previous))
-            .Where(e => e.Measure.Value is not null)
-            .ToList();
+        var all = ctx.Roster.Select(u => BuildEmployeeDto(ctx, u, current, previous)).ToList();
+        var scored = all.Where(e => e.Measure.Value is not null).ToList();
 
         var eligible = scored.Where(e => e.EligibleForRanking).ToList();
-        var excluded = scored.Count - eligible.Count;
+
+        // DEC-01/17 — المستبعَدون لضعف التغطية بأسمائهم وحالتهم، لا بعددهم وحده.
+        var excludedRows = scored
+            .Where(e => !e.EligibleForRanking)
+            .OrderBy(e => e.FullName, StringComparer.Ordinal)
+            .ToList();
+
+        // DEC-01/5+18 — «لا يوجد تواتر أو قالب فعّال» حالة مستقلّة: لا تُخلَط بضعف التغطية.
+        var notConfigured = all
+            .Where(e => e.Measure.JourneyState == KpiJourneyState.CadenceNotConfigured)
+            .OrderBy(e => e.FullName, StringComparer.Ordinal)
+            .ToList();
 
         // كسر التعادل المستقرّ: الدرجة، ثمّ التغطية الأعلى، ثمّ الاسم، ثمّ المعرّف (§5.7).
         var top = eligible
@@ -137,13 +149,15 @@ public class KpiCalculationService : IKpiCalculationService
 
         return Result<KpiRankingsDto>.Success(new KpiRankingsDto(
             KpiPeriodResolvedDto.From(ctx.Period),
-            ctx.Cadence,
+            ctx.RequestedCadence,
             ctx.Scope.ScopeType,
             top,
             needs,
-            excluded,
-            _options.MinimumCoverageForRanking,
-            _clock.UtcNow.UtcDateTime));
+            excludedRows.Count,
+            ctx.MinimumCoverage,
+            _clock.UtcNow.UtcDateTime,
+            excludedRows,
+            notConfigured));
     }
 
     // ===================== التفصيل (Drill-down) =====================
@@ -184,14 +198,59 @@ public class KpiCalculationService : IKpiCalculationService
                 .GroupBy(r => r.SubjectUserId)
                 .Select(g => g.Average(x => x.TotalScore!.Value)));
 
+        // DEC-01/18 — التفصيل يعرض المقاس الكامل، لا الصفوف وحدها: Expected · AdjustedExpected ·
+        // Completed · Missing · Coverage + الفترات المصدريّة (بما فيها الناقصة والمُعفاة).
+        var aggregates = await BuildEmployeeAggregatesAsync(ctx, ctx.Period, ct);
+        var previous = await BuildEmployeeAggregatesAsync(ctx, ctx.PreviousPeriod, ct);
+        var commitments = await BuildCommitmentsAsync(ctx, ctx.Period, ct);
+
+        KpiMeasureDto? measure = null;
+        List<KpiSourcePeriodDto>? sourcePeriods = null;
+        KpiCadence? effectiveCadence = null;
+        var cadenceSource = KpiCadenceSources.NotConfigured;
+
+        if (query.SubjectUserId is Guid subject && ctx.Roster.Any(u => u.UserId == subject))
+        {
+            effectiveCadence = ctx.CadenceOf(subject);
+            cadenceSource = ctx.CadenceSourceOf(subject);
+            measure = BuildMeasure(
+                ctx,
+                aggregates.GetValueOrDefault(subject, EmptyAggregate),
+                previous.GetValueOrDefault(subject, EmptyAggregate),
+                effectiveCadence is not null);
+
+            var completedKeys = dtoRows.Where(r => r.SubjectUserId == subject)
+                .Select(r => r.PeriodKey).ToHashSet(StringComparer.Ordinal);
+            var scoreByKey = dtoRows.Where(r => r.SubjectUserId == subject && r.TotalScore is not null)
+                .GroupBy(r => r.PeriodKey, StringComparer.Ordinal)
+                .ToDictionary(g => g.Key, g => (decimal?)g.Average(r => r.TotalScore!.Value), StringComparer.Ordinal);
+
+            sourcePeriods = commitments.GetValueOrDefault(subject, new List<Commitment>())
+                .Select(c => new KpiSourcePeriodDto(
+                    c.Key, c.Start, c.End, c.Label,
+                    completedKeys.Contains(c.Key), c.ExemptReason is not null, c.ExemptReason,
+                    scoreByKey.GetValueOrDefault(c.Key)))
+                .ToList();
+        }
+        else
+        {
+            var members = ctx.Roster;
+            measure = BuildMeasure(
+                ctx, AggregateGroup(ctx, members, aggregates), AggregateGroup(ctx, members, previous), true);
+        }
+
         return Result<KpiDrilldownDto>.Success(new KpiDrilldownDto(
             KpiPeriodResolvedDto.From(ctx.Period),
-            ctx.Cadence,
+            ctx.RequestedCadence,
             query.SubjectUserId,
             KpiScorePolicy.Round(recomputed),
             dtoRows.Count,
             dtoRows,
-            _clock.UtcNow.UtcDateTime));
+            _clock.UtcNow.UtcDateTime,
+            measure,
+            sourcePeriods,
+            effectiveCadence,
+            cadenceSource));
     }
 
     // ===================== التحضير المشترك (نطاق + فترة + كادنس + قائمة الموظّفين) =====================
@@ -200,30 +259,59 @@ public class KpiCalculationService : IKpiCalculationService
 
     private sealed record Prepared(CalculationContext? Context, Failure? Error);
 
-    private sealed record RosterUser(Guid UserId, string FullName, Guid? TeamId, Guid? DepartmentId);
+    private sealed record RosterUser(
+        Guid UserId, string FullName, Guid? TeamId, Guid? DepartmentId, DateOnly? HireDate, DateOnly? ExitDate);
 
     private sealed class CalculationContext
     {
         public required ScopeContext Scope { get; init; }
         public required ResolvedPeriod Period { get; init; }
         public required ResolvedPeriod PreviousPeriod { get; init; }
-        public required KpiCadence Cadence { get; init; }
+
+        /// <summary>
+        /// OBS-R5-01 — المسار المطلوب حسابه: نبض الأسبوع أو التقييم الربعيّ الرسميّ.
+        /// معناه «احسب <b>هذا المسار</b> بتهيئة كلّ موظّف فيه» لا «افرض هذا التواتر على الجميع»:
+        /// من لا تهيئة له في المسار يخرج من مقامه ويُسمّى «غير مُهيّأ» <b>لهذا المسار وحده</b>.
+        /// <c>null</c> ⇒ المسار الأوّليّ لكلّ موظّف (<see cref="KpiEffectiveTracks.Primary"/>).
+        /// </summary>
+        public required KpiCadence? RequestedCadence { get; init; }
+
+        /// <summary>DEC-01/5 + OBS-R5-01 — مسارا كلّ موظّف الفعّالان معًا، كلٌّ بمصدر حسمه وقوالبه.</summary>
+        public required IReadOnlyDictionary<Guid, KpiEffectiveTracks> Tracks { get; init; }
+
         public required IReadOnlyList<RosterUser> Roster { get; init; }
         public required IReadOnlyDictionary<Guid, string> TeamNames { get; init; }
         public required IReadOnlyDictionary<Guid, string> DepartmentNames { get; init; }
-        public required decimal BelowTargetThreshold { get; init; }
-        public required string ThresholdSource { get; init; }
+
+        /// <summary>العتبة ومصدرها لكلّ كادنس (B-6) — تُنتقى بحسب تواتر الموظّف لا بقيمة عامّة واحدة.</summary>
+        public required IReadOnlyDictionary<KpiCadence, (decimal Threshold, string Source)> Thresholds { get; init; }
+
+        public decimal MinimumCoverage { get; init; }
+
+        /// <summary>
+        /// المسار الفعّال لهذا الموظّف داخل الحساب الجاري. <c>null</c> ⇒ «غير مُهيّأ» على المسار المطلوب:
+        /// لا التزام ولا مقام ولا تغطية — لا افتراض تواتر ولا مقام كاذب (OBS-R5-01/3).
+        /// </summary>
+        public KpiCadence? CadenceOf(Guid userId) => TrackOf(userId)?.Cadence;
+
+        public string CadenceSourceOf(Guid userId) => TrackOf(userId)?.Source ?? KpiCadenceSources.NotConfigured;
+
+        private KpiEffectiveCadence? TrackOf(Guid userId)
+        {
+            if (!Tracks.TryGetValue(userId, out var t)) return null;
+            return RequestedCadence is KpiCadence requested ? t.For(requested) : t.Primary;
+        }
+
+        public (decimal Threshold, string Source) ThresholdOf(Guid userId) =>
+            CadenceOf(userId) is KpiCadence c && Thresholds.TryGetValue(c, out var t)
+                ? t
+                : Thresholds.Values.FirstOrDefault();
     }
 
     private async Task<Prepared> PrepareAsync(KpiAnalyticsQuery query, CancellationToken ct)
     {
         if (!_currentUser.IsAuthenticated)
             return new Prepared(null, new Failure("غير مصرّح.", "auth.unauthenticated"));
-
-        // B-3 — الكادنس إلزاميّ صراحةً: لا افتراض ولا سقوط صامت بين النبض الأسبوعيّ والربع سنويّ.
-        if (query.Cadence is not KpiCadence cadence)
-            return new Prepared(null, new Failure(
-                "يجب تحديد دوريّة التقييم صراحةً (WeeklyPulse أو Quarterly).", "kpi.cadence_required"));
 
         var resolved = _periods.Resolve(new PeriodRequest(query.PeriodType, query.PeriodKey, query.From, query.To));
         if (!resolved.Succeeded) return new Prepared(null, new Failure(resolved.Error!, resolved.ErrorCode!));
@@ -237,6 +325,15 @@ public class KpiCalculationService : IKpiCalculationService
 
         var roster = await BuildRosterAsync(scope, query, ct);
 
+        // DEC-01/2 — لا يُطلَب من المستخدم اختيار «نوع التقييم». الكادنس يُحسَم خادميًّا لكلّ موظّف من
+        // القالب الذي يُقيَّم عليه فعلًا (DEC-01/5). B-3 محفوظ: ما زال لا يوجد سقوط صامت — غياب الإعداد
+        // يُنتج حالة «التواتر غير مُهيّأ» الصريحة لا افتراضًا للنبض الأسبوعيّ.
+        // DEC-01/6 — مرساة السريان هي نهاية الفترة: الأرباع التاريخيّة تُقرأ بإعدادها الساري حينها.
+        // OBS-R5-01 — المسارات تُحسم دائمًا (حتّى مع مسار مطلوب صراحةً): المسار الصريح يعني «احسب هذا
+        // المسار بتهيئة كلّ موظّف فيه»، فمن لا تهيئة له عليه لا يُصنَع له مقام ولا تُلفَّق له تغطية.
+        var tracks = await _templates.ResolveEffectiveTracksAsync(
+            roster.Select(u => u.UserId).ToList(), period.End, ct);
+
         var teamIds = roster.Where(u => u.TeamId is not null).Select(u => u.TeamId!.Value).Distinct().ToList();
         var deptIds = roster.Where(u => u.DepartmentId is not null).Select(u => u.DepartmentId!.Value).Distinct().ToList();
 
@@ -249,19 +346,22 @@ public class KpiCalculationService : IKpiCalculationService
             : await _db.Departments.AsNoTracking().Where(d => deptIds.Contains(d.Id))
                 .ToDictionaryAsync(d => d.Id, d => d.NameAr, ct);
 
-        var (threshold, source) = await ResolveBelowTargetThresholdAsync(cadence, ct);
+        var thresholds = new Dictionary<KpiCadence, (decimal, string)>();
+        foreach (var c in new[] { KpiCadence.WeeklyPulse, KpiCadence.Quarterly })
+            thresholds[c] = await ResolveBelowTargetThresholdAsync(c, ct);
 
         return new Prepared(new CalculationContext
         {
             Scope = scope,
             Period = period,
             PreviousPeriod = _periods.PreviousComparable(period),
-            Cadence = cadence,
+            RequestedCadence = query.Cadence,
+            Tracks = tracks,
             Roster = roster,
             TeamNames = teamNames,
             DepartmentNames = deptNames,
-            BelowTargetThreshold = threshold,
-            ThresholdSource = source
+            Thresholds = thresholds,
+            MinimumCoverage = _options.MinimumCoverageForRanking
         }, null);
     }
 
@@ -283,7 +383,7 @@ public class KpiCalculationService : IKpiCalculationService
         if (query.DepartmentId is Guid d) q = q.Where(u => u.DepartmentId == d);
 
         return await q
-            .Select(u => new RosterUser(u.Id, u.FullName, u.TeamId, u.DepartmentId))
+            .Select(u => new RosterUser(u.Id, u.FullName, u.TeamId, u.DepartmentId, u.HireDate, u.ExitDate))
             .ToListAsync(ct);
     }
 
@@ -297,26 +397,40 @@ public class KpiCalculationService : IKpiCalculationService
         decimal? Score, int EligibleCount, int ExcludedByStatusCount, int Expected, int AdjustedExpected);
 
     /// <summary>
-    /// استعلام التقييمات **المؤهّلة** لفترة وكادنس ونطاق: Approved + درجة غير فارغة + الكادنس المطلوب
-    /// + مفتاح الدورة داخل الفترة. المحذوف مستبعَد تلقائيًّا بالمرشّح العامّ في <see cref="AppDbContext"/>.
+    /// استعلام التقييمات **المكتمِلة** لفترة ونطاق: حالة اكتمال معتمَدة (DEC-01/9 — Approved أو Closed)
+    /// + درجة غير فارغة + كادنس الموظّف الفعّال + مفتاح الدورة داخل الفترة.
+    /// المحذوف مستبعَد تلقائيًّا بالمرشّح العامّ في <see cref="AppDbContext"/>.
     /// </summary>
     private IQueryable<EvaluationJoin> EligibleEvaluationsQuery(CalculationContext ctx, ResolvedPeriod period)
         => BaseEvaluationsQuery(ctx, period)
-            .Where(x => x.e.Status == KpiEvaluationStatus.Approved && x.e.TotalScore != null);
+            .Where(x => KpiScorePolicy.CompletedStatuses.Contains(x.e.Status) && x.e.TotalScore != null);
 
     private IQueryable<EvaluationJoin> BaseEvaluationsQuery(CalculationContext ctx, ResolvedPeriod period)
     {
+        // DEC-01/3+4 — مساران منفصلان داخل نافذة عرض واحدة (الربع): نبض الأسبوع مفاتيحه YYYY-Www،
+        // والتقييم الربعيّ الرسميّ مفتاحه YYYY-Qn. قصر الاستعلام على مفاتيح الأسابيع وحدها كان يجعل
+        // بسط المسار الربعيّ صفرًا أبدًا مقابل مقام غير صفريّ ⟹ «لم يبدأ» دائمة وتغطية 0% كاذبة.
         var weekKeys = _periods.WeekKeysWithin(period);
-        var userIds = ctx.Roster.Select(u => u.UserId).ToList();
-        var cadence = ctx.Cadence;
+        var quarterKeys = QuarterWindowsWithin(period).Select(w => w.Key).ToList();
+        var periodKeys = weekKeys.Concat(quarterKeys).ToList();
 
-        return from e in _db.KpiEvaluations.AsNoTracking()
-               join v in _db.KpiTemplateVersions.AsNoTracking() on e.KpiTemplateVersionId equals v.Id
-               join t in _db.KpiTemplates.AsNoTracking() on v.KpiTemplateId equals t.Id
-               where t.Cadence == cadence
-                     && userIds.Contains(e.SubjectUserId)
-                     && weekKeys.Contains(e.PeriodKey)
-               select new EvaluationJoin { e = e, t = t };
+        var q = from e in _db.KpiEvaluations.AsNoTracking()
+                join v in _db.KpiTemplateVersions.AsNoTracking() on e.KpiTemplateVersionId equals v.Id
+                join t in _db.KpiTemplates.AsNoTracking() on v.KpiTemplateId equals t.Id
+                where periodKeys.Contains(e.PeriodKey)
+                select new EvaluationJoin { e = e, t = t };
+
+        // OBS-R5-01/5 — لا خلط بين المسارين مطلقًا: البسط لا يضمّ إلّا تقييمات القوالب التي تواترها
+        // هو مسار الموظّف الفعّال في هذا الحساب. فنتيجة نبض أسبوعيّ لا تدخل الربعيّ الرسميّ أبدًا،
+        // والتقييم الربعيّ لا يُعدّ أسبوعًا إضافيًّا داخل النبض. قائمتان فقط ⇒ استعلام واحد بلا N+1.
+        var weeklyIds = ctx.Roster.Where(u => ctx.CadenceOf(u.UserId) == KpiCadence.WeeklyPulse)
+            .Select(u => u.UserId).ToList();
+        var quarterlyIds = ctx.Roster.Where(u => ctx.CadenceOf(u.UserId) == KpiCadence.Quarterly)
+            .Select(u => u.UserId).ToList();
+
+        return q.Where(x =>
+            (x.t.Cadence == KpiCadence.WeeklyPulse && weeklyIds.Contains(x.e.SubjectUserId))
+            || (x.t.Cadence == KpiCadence.Quarterly && quarterlyIds.Contains(x.e.SubjectUserId)));
     }
 
     private sealed class EvaluationJoin
@@ -329,19 +443,20 @@ public class KpiCalculationService : IKpiCalculationService
         CalculationContext ctx, ResolvedPeriod period, CancellationToken ct)
     {
         // التجميع يُترجَم إلى GROUP BY في SQL: صفّ واحد لكلّ موظّف بدل جلب كل التقييمات إلى الذاكرة.
+        var completed = KpiScorePolicy.CompletedStatuses;
         var approved = await BaseEvaluationsQuery(ctx, period)
             .GroupBy(x => x.e.SubjectUserId)
             .Select(g => new
             {
                 UserId = g.Key,
-                Sum = g.Where(x => x.e.Status == KpiEvaluationStatus.Approved && x.e.TotalScore != null)
+                Sum = g.Where(x => completed.Contains(x.e.Status) && x.e.TotalScore != null)
                        .Sum(x => (decimal?)x.e.TotalScore) ?? 0m,
-                EligibleCount = g.Count(x => x.e.Status == KpiEvaluationStatus.Approved && x.e.TotalScore != null),
-                ExcludedByStatus = g.Count(x => x.e.Status != KpiEvaluationStatus.Approved)
+                EligibleCount = g.Count(x => completed.Contains(x.e.Status) && x.e.TotalScore != null),
+                ExcludedByStatus = g.Count(x => !completed.Contains(x.e.Status))
             })
             .ToListAsync(ct);
 
-        var (baseExpected, adjustedExpected) = await BuildAdjustedExpectedAsync(ctx, period, ct);
+        var commitments = await BuildCommitmentsAsync(ctx, period, ct);
 
         var result = new Dictionary<Guid, EmployeeAggregate>(ctx.Roster.Count);
         var byUser = approved.ToDictionary(a => a.UserId);
@@ -350,64 +465,114 @@ public class KpiCalculationService : IKpiCalculationService
         {
             byUser.TryGetValue(u.UserId, out var a);
             var eligibleCount = a?.EligibleCount ?? 0;
+            var c = commitments.GetValueOrDefault(u.UserId);
             result[u.UserId] = new EmployeeAggregate(
                 KpiScorePolicy.EmployeePeriodScore(a?.Sum ?? 0m, eligibleCount),
                 eligibleCount,
                 a?.ExcludedByStatus ?? 0,
-                baseExpected,
-                adjustedExpected.GetValueOrDefault(u.UserId, 0));
+                c?.Count ?? 0,
+                c?.Count(w => w.ExemptReason is null) ?? 0);
         }
 
         return result;
     }
 
+    /// <summary>التزام متوقَّع واحد داخل نافذة التحليل، مع سبب إعفائه إن وُجد (<c>null</c> ⇒ يدخل المقام).</summary>
+    private sealed record Commitment(string Key, DateOnly Start, DateOnly End, string Label, string? ExemptReason);
+
+    private const string ExemptApprovedLeave = "approvedLeave";
+    private const string ExemptAdministrative = "administrativeExemption";
+    private const string ExemptBeforeHire = "beforeHireDate";
+    private const string ExemptAfterExit = "afterExitDate";
+
     /// <summary>
-    /// المتوقَّع المعدَّل لكلّ موظّف (B-5): عدد الالتزامات داخل الفترة ناقصًا الالتزامات التي **تغطّيها بالكامل**
-    /// إجازة معتمَدة نهائيًّا (<c>HrApproved</c>). التغطية الجزئيّة لا تُسقِط الالتزام كي لا يُلغى أسبوع كامل
-    /// بسبب يوم إجازة واحد. الإجازة المعتمَدة تخفض المقام ⇒ لا تعاقب الموظّف على غياب مأذون.
+    /// DEC-01/7+8 — الالتزامات المتوقَّعة لكلّ موظّف داخل الفترة، وأسباب إعفاء كلّ التزام.
+    /// <list type="number">
+    /// <item>العدد يُشتقّ من <b>تواتر الموظّف الفعّال</b> لا من قيمة عامّة واحدة (DEC-01/7).</item>
+    /// <item>الإعفاء لا يُطبَّق إلّا إذا غطّى الالتزام <b>بالكامل</b>؛ التغطية الجزئيّة لا تُسقِط أسبوعًا كاملًا.</item>
+    /// <item><c>HireDate</c>/<c>ExitDate</c> الفارغان ⇒ القيد غير مطبَّق إطلاقًا (لا بديل مُستنتَج).</item>
+    /// <item>الإعفاء الإداريّ = استثناء موظّف صريح <b>محدَّد بتاريخَي سريان</b> (DEC-01/6+8)؛ الاستثناء
+    /// غير المؤقَّت يبقى استثناء قالب كما كان ولا يمسّ المقام.</item>
+    /// </list>
+    /// الفرق بين <c>Expected</c> و<c>AdjustedExpected</c> هو نفسه الدليل على أنّ الإعفاء خفّض المقام ولم يعاقب.
     /// </summary>
-    private async Task<(int BaseExpected, IReadOnlyDictionary<Guid, int> Adjusted)> BuildAdjustedExpectedAsync(
+    private async Task<IReadOnlyDictionary<Guid, List<Commitment>>> BuildCommitmentsAsync(
         CalculationContext ctx, ResolvedPeriod period, CancellationToken ct)
     {
-        // النبض الأسبوعيّ: التزام لكلّ دورة داخل الفترة. الربع سنويّ: التزام واحد لكلّ ربع تغطّيه الفترة.
-        var commitments = ctx.Cadence == KpiCadence.WeeklyPulse
-            ? _periods.WeekKeysWithin(period)
-                .Select(k => ReportingCalendarPolicy.CycleRange(k))
-                .ToList()
-            : QuarterWindowsWithin(period);
+        var weekly = _periods.WeekKeysWithin(period)
+            .Select(k =>
+            {
+                var (s, e) = ReportingCalendarPolicy.CycleRange(k);
+                return new Commitment(k, s, e, ReportingCalendarPolicy.CycleLabel(k), null);
+            })
+            .ToList();
+        var quarterly = QuarterWindowsWithin(period);
 
-        var baseExpected = commitments.Count;
         var userIds = ctx.Roster.Select(u => u.UserId).ToList();
 
         var leaves = await _db.LeaveRequests.AsNoTracking()
             .Where(l => l.Status == LeaveRequestStatus.HrApproved
+                        && l.Type == LeaveRequestType.Leave
                         && userIds.Contains(l.RequesterUserId)
                         && l.StartDate <= period.End
                         && l.EndDate >= period.Start)
             .Select(l => new { l.RequesterUserId, l.StartDate, l.EndDate })
             .ToListAsync(ct);
+        var leavesByUser = leaves.GroupBy(l => l.RequesterUserId)
+            .ToDictionary(g => g.Key, g => g.Select(l => (l.StartDate, l.EndDate)).ToList());
 
-        var result = new Dictionary<Guid, int>(ctx.Roster.Count);
-        foreach (var u in ctx.Roster) result[u.UserId] = baseExpected;
+        var exemptions = await _db.KpiTemplateAssignments.AsNoTracking()
+            .Where(a => a.IsActive
+                        && a.ScopeType == TemplateAssignmentScope.Employee
+                        && a.Kind == TemplateAssignmentKind.Exclude
+                        && a.EffectiveFrom != null && a.EffectiveTo != null
+                        && userIds.Contains(a.ScopeId)
+                        && a.EffectiveFrom <= period.End
+                        && a.EffectiveTo >= period.Start)
+            .Select(a => new { a.ScopeId, a.EffectiveFrom, a.EffectiveTo })
+            .ToListAsync(ct);
+        var exemptionsByUser = exemptions.GroupBy(a => a.ScopeId)
+            .ToDictionary(g => g.Key, g => g.Select(a => (From: a.EffectiveFrom!.Value, To: a.EffectiveTo!.Value)).ToList());
 
-        foreach (var g in leaves.GroupBy(l => l.RequesterUserId))
+        var result = new Dictionary<Guid, List<Commitment>>(ctx.Roster.Count);
+        foreach (var u in ctx.Roster)
         {
-            var exempt = commitments.Count(w => g.Any(l => l.StartDate <= w.Start && l.EndDate >= w.End));
-            result[g.Key] = Math.Max(0, baseExpected - exempt);
+            var cadence = ctx.CadenceOf(u.UserId);
+            if (cadence is null)
+            {
+                // DEC-01/5 — لا تواتر مُهيّأ ⇒ لا التزام مفترَض. لا يُخترَع مقام ولا تُلفَّق تغطية.
+                result[u.UserId] = new List<Commitment>();
+                continue;
+            }
+
+            var windows = cadence == KpiCadence.WeeklyPulse ? weekly : quarterly;
+            result[u.UserId] = windows.Select(w => w with { ExemptReason = ExemptReasonFor(w, u) }).ToList();
         }
 
-        return (baseExpected, result);
+        return result;
+
+        string? ExemptReasonFor(Commitment w, RosterUser u)
+        {
+            if (u.HireDate is DateOnly hire && w.End < hire) return ExemptBeforeHire;
+            if (u.ExitDate is DateOnly exit && w.Start > exit) return ExemptAfterExit;
+            if (exemptionsByUser.TryGetValue(u.UserId, out var ex)
+                && ex.Any(a => a.From <= w.Start && a.To >= w.End)) return ExemptAdministrative;
+            if (leavesByUser.TryGetValue(u.UserId, out var lv)
+                && lv.Any(l => l.StartDate <= w.Start && l.EndDate >= w.End)) return ExemptApprovedLeave;
+            return null;
+        }
     }
 
-    private static List<(DateOnly Start, DateOnly End)> QuarterWindowsWithin(ResolvedPeriod period)
+    private static List<Commitment> QuarterWindowsWithin(ResolvedPeriod period)
     {
-        var windows = new List<(DateOnly, DateOnly)>();
+        var windows = new List<Commitment>();
         var cursor = new DateOnly(period.Start.Year, (period.Start.Month - 1) / 3 * 3 + 1, 1);
         while (cursor <= period.End)
         {
             var q = (cursor.Month - 1) / 3 + 1;
             var (s, e) = ReportingCalendarPolicy.QuarterRange(cursor.Year, q);
-            if (s <= period.End && e >= period.Start) windows.Add((s, e));
+            if (s <= period.End && e >= period.Start)
+                windows.Add(new Commitment($"{cursor.Year}-Q{q}", s, e, $"الربع {q} — {cursor.Year}", null));
             cursor = cursor.AddMonths(3);
         }
         return windows;
@@ -424,12 +589,16 @@ public class KpiCalculationService : IKpiCalculationService
         var now = current.GetValueOrDefault(user.UserId, EmptyAggregate);
         var before = previous.GetValueOrDefault(user.UserId, EmptyAggregate);
 
-        var measure = BuildMeasure(ctx, now, before);
-        var eligible = KpiScorePolicy.EligibleForRanking(
-            now.EligibleCount, now.AdjustedExpected, _options.MinimumCoverageForRanking);
+        var cadence = ctx.CadenceOf(user.UserId);
+        var (threshold, thresholdSource) = ctx.ThresholdOf(user.UserId);
+        var measure = BuildMeasure(ctx, now, before, cadence is not null);
+
+        // DEC-01/13+14 — الأهليّة للمتوسّط الرسميّ: تواتر مُهيّأ **و** تغطية ≥ 80% من AdjustedExpected.
+        var eligible = cadence is not null
+            && KpiScorePolicy.EligibleForRanking(now.EligibleCount, now.AdjustedExpected, ctx.MinimumCoverage);
 
         // Missing لا يُفترَض دون العتبة ولا فوقها: القيمة null ⇒ الحكم null (لا تلوين ولا إنذار كاذب).
-        bool? belowTarget = now.Score is null ? null : now.Score.Value < ctx.BelowTargetThreshold;
+        bool? belowTarget = now.Score is null ? null : now.Score.Value < threshold;
 
         return new KpiEmployeeScoreDto(
             user.UserId,
@@ -441,8 +610,10 @@ public class KpiCalculationService : IKpiCalculationService
             measure,
             eligible,
             belowTarget,
-            ctx.BelowTargetThreshold,
-            ctx.ThresholdSource);
+            threshold,
+            thresholdSource,
+            cadence,
+            ctx.CadenceSourceOf(user.UserId));
     }
 
     private KpiGroupScoreDto BuildGroup(
@@ -454,35 +625,56 @@ public class KpiCalculationService : IKpiCalculationService
         IReadOnlyDictionary<Guid, EmployeeAggregate> current,
         IReadOnlyDictionary<Guid, EmployeeAggregate> previous)
     {
-        var now = AggregateGroup(members, current);
-        var before = AggregateGroup(members, previous);
+        var now = AggregateGroup(ctx, members, current);
+        var before = AggregateGroup(ctx, members, previous);
+
+        var rows = members.Select(m => BuildEmployeeDto(ctx, m, current, previous)).ToList();
+
+        // DEC-01/17 — غير المؤهّلين لا يختفون: تُعرَض أسماؤهم وحالة نقصهم **منفصلةً** عن المتوسّط الرسميّ.
+        var excluded = rows
+            .Where(r => !r.EligibleForRanking && r.Measure.Value is not null)
+            .OrderBy(r => r.FullName, StringComparer.Ordinal)
+            .ToList();
 
         return new KpiGroupScoreDto(
             groupType,
             groupId,
             groupName,
-            BuildMeasure(ctx, now, before),
+            BuildMeasure(ctx, now, before, true),
             members.Count(m => current.GetValueOrDefault(m.UserId, EmptyAggregate).Score is not null),
-            members.Count);
+            members.Count,
+            rows.Count(r => r.EligibleForRanking),
+            excluded);
     }
 
     /// <summary>
-    /// المرحلة الثانية من التوسيط: متوسّط **متوسّطات** الأعضاء ذوي الدرجة، على قيم **غير مقرَّبة**
-    /// منعًا للتقريب المزدوج. العدّادات تُجمَع للشفافيّة لا لتوليد المتوسّط.
+    /// المرحلة الثانية من التوسيط (DEC-01/16): متوسّط **متوسّطات** الأعضاء، على قيم **غير مقرَّبة**
+    /// منعًا للتقريب المزدوج. لا يدخل المتوسّطَ إلّا العضو <b>المؤهّل</b> (تواتر مُهيّأ + تغطية ≥ 80%)
+    /// — DEC-01/14: نتيجة دون العتبة «مؤقّتة» ولا تدخل المتوسّط الرسميّ ولا التصدير المالي النهائي.
+    /// العدّادات تُجمَع للشفافيّة على **كلّ** الأعضاء لا على المؤهّلين وحدهم.
     /// </summary>
     private static EmployeeAggregate AggregateGroup(
-        IReadOnlyList<RosterUser> members, IReadOnlyDictionary<Guid, EmployeeAggregate> byUser)
+        CalculationContext ctx, IReadOnlyList<RosterUser> members, IReadOnlyDictionary<Guid, EmployeeAggregate> byUser)
     {
-        var rows = members.Select(m => byUser.GetValueOrDefault(m.UserId, EmptyAggregate)).ToList();
+        var rows = members.Select(m => (User: m, Agg: byUser.GetValueOrDefault(m.UserId, EmptyAggregate))).ToList();
+
+        var qualified = rows
+            .Where(r => r.Agg.Score is not null
+                        && ctx.CadenceOf(r.User.UserId) is not null
+                        && KpiScorePolicy.EligibleForRanking(
+                            r.Agg.EligibleCount, r.Agg.AdjustedExpected, ctx.MinimumCoverage))
+            .Select(r => r.Agg.Score!.Value);
+
         return new EmployeeAggregate(
-            KpiScorePolicy.GroupScore(rows.Where(r => r.Score is not null).Select(r => r.Score!.Value)),
-            rows.Sum(r => r.EligibleCount),
-            rows.Sum(r => r.ExcludedByStatusCount),
-            rows.Sum(r => r.Expected),
-            rows.Sum(r => r.AdjustedExpected));
+            KpiScorePolicy.GroupScore(qualified),
+            rows.Sum(r => r.Agg.EligibleCount),
+            rows.Sum(r => r.Agg.ExcludedByStatusCount),
+            rows.Sum(r => r.Agg.Expected),
+            rows.Sum(r => r.Agg.AdjustedExpected));
     }
 
-    private KpiMeasureDto BuildMeasure(CalculationContext ctx, EmployeeAggregate now, EmployeeAggregate before)
+    private KpiMeasureDto BuildMeasure(
+        CalculationContext ctx, EmployeeAggregate now, EmployeeAggregate before, bool cadenceConfigured)
     {
         var (delta, trend) = KpiScorePolicy.Trend(
             now.Score, before.Score, ctx.Period.IsOpen, _options.TrendDeltaThreshold);
@@ -495,10 +687,16 @@ public class KpiCalculationService : IKpiCalculationService
             KpiScorePolicy.Round(KpiScorePolicy.Coverage(now.EligibleCount, now.AdjustedExpected)),
             KpiScorePolicy.MissingCount(now.EligibleCount, now.AdjustedExpected),
             now.ExcludedByStatusCount,
-            KpiScorePolicy.DataQuality(now.EligibleCount, now.AdjustedExpected, _options.MinimumCoverageForRanking),
+            KpiScorePolicy.DataQuality(now.EligibleCount, now.AdjustedExpected, ctx.MinimumCoverage),
             KpiScorePolicy.Round(before.Score),
             KpiScorePolicy.Round(delta),
-            trend);
+            trend,
+            KpiScorePolicy.CoveragePercent(now.EligibleCount, now.AdjustedExpected),
+            cadenceConfigured
+                && KpiScorePolicy.IsProvisional(now.Score, now.EligibleCount, now.AdjustedExpected, ctx.MinimumCoverage),
+            KpiScorePolicy.JourneyState(
+                cadenceConfigured, now.Expected, now.AdjustedExpected, now.EligibleCount,
+                ctx.Period.IsOpen, ctx.MinimumCoverage));
     }
 
     private static readonly EmployeeAggregate EmptyAggregate = new(null, 0, 0, 0, 0);

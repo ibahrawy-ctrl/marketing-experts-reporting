@@ -1,0 +1,11 @@
+
+ RUN  v4.1.8 /Users/ibrahimelbahrawi/p123-remediation-r5/reporting-frontend
+
+Not implemented: navigation to another Document
+
+ Test Files  71 passed (71)
+      Tests  826 passed (826)
+   Start at  04:58:51
+   Duration  11.84s (transform 4.99s, setup 3.58s, import 13.64s, tests 33.19s, environment 35.34s)
+
+FE_EXIT=0

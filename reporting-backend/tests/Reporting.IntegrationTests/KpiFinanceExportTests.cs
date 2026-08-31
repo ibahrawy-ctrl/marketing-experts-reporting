@@ -14,7 +14,8 @@ using Xunit;
 namespace Reporting.IntegrationTests;
 
 /// <summary>
-/// تصدير KPI للمالية (KPI-FIN1). يغطّي: RBAC (قراءة/تصدير Admin/CEO/GM/HR/CeoSupport = 200؛
+/// تصدير KPI للمالية (KPI-FIN1، مُحاذًى إلى DEC-01 §5: المصدر هو **المسار الربعيّ الرسميّ وحده**
+/// ونبض الأسبوع لا يدخله). يغطّي: RBAC (قراءة/تصدير Admin/CEO/GM/HR/CeoSupport = 200؛
 /// Manager/TL/Employee/Viewer = 403؛ Anonymous = 401)، الحالة المسموحة (Approved افتراضيًّا، Closed مدعوم،
 /// Draft/InProgress/Submitted تُرفض 400)، احترام الفلاتر (السنة/الربع/الإدارة/الفريق)، الربع الفارغ
 /// (معاينة فارغة + CSV ترويسة فقط)، الـCSV (BOM + ترويسات عربية)، عدم تغيير أيّ تقييم، والتدقيق على
@@ -77,10 +78,11 @@ public class KpiFinanceExportTests
         return doc.TryGetProperty("type", out var t) ? t.GetString() : null;
     }
 
-    private static async Task<(Guid TemplateId, Guid ManualMetricId, Guid AutoMetricId)> PublishKpiAsync(HttpClient admin)
+    private static async Task<(Guid TemplateId, Guid ManualMetricId, Guid AutoMetricId)> PublishKpiAsync(
+        HttpClient admin, KpiCadence cadence = KpiCadence.Quarterly)
     {
         var created = await (await admin.PostAsJsonAsync("/api/kpi-templates",
-            new CreateKpiTemplateRequest($"مؤشرات مالية {Guid.NewGuid():N}", null, null, KpiCadence.WeeklyPulse)))
+            new CreateKpiTemplateRequest($"مؤشرات مالية {Guid.NewGuid():N}", null, null, cadence)))
             .ReadAsync<KpiTemplateDetailDto>();
         var versionId = created!.Versions.Single().Id;
 
@@ -96,21 +98,23 @@ public class KpiFinanceExportTests
     }
 
     /// <summary>
-    /// ينشئ تقييمًا أسبوعيًّا (manual=auto=score)، يحفظ، يُرسل (⇒ UnderReview + إسناد مُراجِع)،
+    /// ينشئ تقييمًا بالمسار المطلوب (manual=auto=score)، يحفظ، يُرسل (⇒ UnderReview + إسناد مُراجِع)،
     /// ثم يعتمد عبر مُراجِع مُصعَّد (CEO؛ Admin/CEO/GM) ليس المُدخِل ولا الموضوع ⇒ Status=Approved.
     /// </summary>
-    private async Task<Guid> ApproveWeeklyAsync(
-        HttpClient evaluator, Guid templateId, Guid subjectId, Guid manualId, Guid autoId, string weekKey, decimal score)
+    private async Task<Guid> ApproveAsync(
+        HttpClient evaluator, Guid templateId, Guid subjectId, Guid manualId, Guid autoId, string periodKey, decimal score,
+        PeriodType periodType = PeriodType.Quarterly)
     {
         var (approver, _) = await TestAuth.CreateUserAsync(_factory, Roles.Ceo);
-        return await ApproveWeeklyAsync(evaluator, approver, templateId, subjectId, manualId, autoId, weekKey, score);
+        return await ApproveAsync(evaluator, approver, templateId, subjectId, manualId, autoId, periodKey, score, periodType);
     }
 
-    private static async Task<Guid> ApproveWeeklyAsync(
-        HttpClient evaluator, HttpClient approver, Guid templateId, Guid subjectId, Guid manualId, Guid autoId, string weekKey, decimal score)
+    private static async Task<Guid> ApproveAsync(
+        HttpClient evaluator, HttpClient approver, Guid templateId, Guid subjectId, Guid manualId, Guid autoId,
+        string periodKey, decimal score, PeriodType periodType = PeriodType.Quarterly)
     {
         var ev = await (await evaluator.PostAsJsonAsync("/api/kpi-evaluations",
-            new CreateKpiEvaluationRequest(templateId, subjectId, PeriodType.Weekly, weekKey)))
+            new CreateKpiEvaluationRequest(templateId, subjectId, periodType, periodKey)))
             .ReadAsync<KpiEvaluationDto>();
         await evaluator.PutAsJsonAsync($"/api/kpi-evaluations/{ev!.Id}/results",
             new SaveKpiResultsRequest(new[]
@@ -125,12 +129,12 @@ public class KpiFinanceExportTests
         return ev.Id;
     }
 
-    /// <summary>ينشئ تقييمًا أسبوعيًّا ويُرسله فقط (بلا اعتماد) ⇒ Status=Submitted.</summary>
-    private static async Task<Guid> SubmitWeeklyAsync(
-        HttpClient evaluator, Guid templateId, Guid subjectId, Guid manualId, Guid autoId, string weekKey, decimal score)
+    /// <summary>ينشئ تقييمًا ربعيًّا ويُرسله فقط (بلا اعتماد) ⇒ Status=Submitted.</summary>
+    private static async Task<Guid> SubmitQuarterlyAsync(
+        HttpClient evaluator, Guid templateId, Guid subjectId, Guid manualId, Guid autoId, string quarterKey, decimal score)
     {
         var ev = await (await evaluator.PostAsJsonAsync("/api/kpi-evaluations",
-            new CreateKpiEvaluationRequest(templateId, subjectId, PeriodType.Weekly, weekKey)))
+            new CreateKpiEvaluationRequest(templateId, subjectId, PeriodType.Quarterly, quarterKey)))
             .ReadAsync<KpiEvaluationDto>();
         await evaluator.PutAsJsonAsync($"/api/kpi-evaluations/{ev!.Id}/results",
             new SaveKpiResultsRequest(new[]
@@ -257,8 +261,8 @@ public class KpiFinanceExportTests
         var (_, approvedSubject) = await TestAuth.CreateUserAsync(_factory, Roles.Employee);
         var (_, submittedSubject) = await TestAuth.CreateUserAsync(_factory, Roles.Employee);
 
-        var approvedId = await ApproveWeeklyAsync(org.Admin, templateId, approvedSubject, manualId, autoId, "2026-W25", 80m);
-        var submittedId = await SubmitWeeklyAsync(org.Admin, templateId, submittedSubject, manualId, autoId, "2026-W25", 70m);
+        var approvedId = await ApproveAsync(org.Admin, templateId, approvedSubject, manualId, autoId, "2026-Q2", 80m);
+        var submittedId = await SubmitQuarterlyAsync(org.Admin, templateId, submittedSubject, manualId, autoId, "2026-Q2", 70m);
 
         var dto = await PreviewAsync(org.Admin, "?year=2026&quarter=2");
         Assert.Equal(KpiEvaluationStatus.Approved, dto.Status);
@@ -274,7 +278,7 @@ public class KpiFinanceExportTests
         var (templateId, manualId, autoId) = await PublishKpiAsync(org.Admin);
         var (_, subject) = await TestAuth.CreateUserAsync(_factory, Roles.Employee);
 
-        var id = await ApproveWeeklyAsync(org.Admin, templateId, subject, manualId, autoId, "2026-W25", 90m);
+        var id = await ApproveAsync(org.Admin, templateId, subject, manualId, autoId, "2026-Q2", 90m);
         await SetClosedAsync(id);
 
         var closed = await PreviewAsync(org.Admin, "?year=2026&quarter=2&status=Closed");
@@ -305,7 +309,7 @@ public class KpiFinanceExportTests
         var org = await BuildOrgAsync();
         var (templateId, manualId, autoId) = await PublishKpiAsync(org.Admin);
         var (_, subject) = await TestAuth.CreateUserAsync(_factory, Roles.Employee);
-        var id = await ApproveWeeklyAsync(org.Admin, templateId, subject, manualId, autoId, "2026-W25", 65m); // يونيو = Q2
+        var id = await ApproveAsync(org.Admin, templateId, subject, manualId, autoId, "2026-Q2", 65m);
 
         Assert.Contains((await PreviewAsync(org.Admin, "?year=2026&quarter=2")).Rows, r => r.EvaluationId == id);
         Assert.DoesNotContain((await PreviewAsync(org.Admin, "?year=2026&quarter=1")).Rows, r => r.EvaluationId == id);
@@ -318,7 +322,7 @@ public class KpiFinanceExportTests
         var org = await BuildOrgAsync();
         var (templateId, manualId, autoId) = await PublishKpiAsync(org.Admin);
         var (_, subject) = await TestAuth.CreateUserAsync(_factory, Roles.Employee);
-        var id = await ApproveWeeklyAsync(org.Admin, templateId, subject, manualId, autoId, "2026-W25", 55m);
+        var id = await ApproveAsync(org.Admin, templateId, subject, manualId, autoId, "2026-Q2", 55m);
 
         Assert.Contains((await PreviewAsync(org.Admin, "?year=2026&quarter=2")).Rows, r => r.EvaluationId == id);
         Assert.DoesNotContain((await PreviewAsync(org.Admin, "?year=2099&quarter=2")).Rows, r => r.EvaluationId == id);
@@ -332,7 +336,7 @@ public class KpiFinanceExportTests
         var (templateId, manualId, autoId) = await PublishKpiAsync(org.Admin);
         var (_, subject) = await TestAuth.CreateUserAsync(_factory, Roles.Employee);
         var (deptId, _) = await AssignSubjectOrgAsync(subject);
-        var id = await ApproveWeeklyAsync(org.Admin, templateId, subject, manualId, autoId, "2026-W25", 75m);
+        var id = await ApproveAsync(org.Admin, templateId, subject, manualId, autoId, "2026-Q2", 75m);
 
         Assert.Contains((await PreviewAsync(org.Admin, $"?year=2026&quarter=2&departmentId={deptId}")).Rows, r => r.EvaluationId == id);
         Assert.DoesNotContain((await PreviewAsync(org.Admin, $"?year=2026&quarter=2&departmentId={Guid.NewGuid()}")).Rows, r => r.EvaluationId == id);
@@ -346,7 +350,7 @@ public class KpiFinanceExportTests
         var (templateId, manualId, autoId) = await PublishKpiAsync(org.Admin);
         var (_, subject) = await TestAuth.CreateUserAsync(_factory, Roles.Employee);
         var (_, teamId) = await AssignSubjectOrgAsync(subject);
-        var id = await ApproveWeeklyAsync(org.Admin, templateId, subject, manualId, autoId, "2026-W25", 85m);
+        var id = await ApproveAsync(org.Admin, templateId, subject, manualId, autoId, "2026-Q2", 85m);
 
         Assert.Contains((await PreviewAsync(org.Admin, $"?year=2026&quarter=2&teamId={teamId}")).Rows, r => r.EvaluationId == id);
         Assert.DoesNotContain((await PreviewAsync(org.Admin, $"?year=2026&quarter=2&teamId={Guid.NewGuid()}")).Rows, r => r.EvaluationId == id);
@@ -402,14 +406,14 @@ public class KpiFinanceExportTests
         var (templateId, manualId, autoId) = await PublishKpiAsync(org.Admin);
         var (_, subject) = await TestAuth.CreateUserAsync(_factory, Roles.Employee);
         var (deptId, _) = await AssignSubjectOrgAsync(subject);
-        await ApproveWeeklyAsync(org.Admin, templateId, subject, manualId, autoId, "2026-W25", 80m);
+        await ApproveAsync(org.Admin, templateId, subject, manualId, autoId, "2026-Q2", 80m);
 
         var (_, text) = await CsvAsync(org.Admin, $"?year=2026&quarter=2&departmentId={deptId}");
         var lines = text.Split('\n', StringSplitOptions.RemoveEmptyEntries);
         Assert.Equal(2, lines.Length); // ترويسة + صفّ واحد
         Assert.Contains("مستخدم Employee", lines[1]);
         Assert.Contains("80", lines[1]);
-        Assert.Contains("2026-W25", lines[1]);
+        Assert.Contains("2026-Q2", lines[1]);
         Assert.Contains("Approved", lines[1]);
     }
 
@@ -420,7 +424,7 @@ public class KpiFinanceExportTests
         var org = await BuildOrgAsync();
         var (templateId, manualId, autoId) = await PublishKpiAsync(org.Admin);
         var (_, subject) = await TestAuth.CreateUserAsync(_factory, Roles.Employee);
-        var id = await ApproveWeeklyAsync(org.Admin, templateId, subject, manualId, autoId, "2026-W25", 88m);
+        var id = await ApproveAsync(org.Admin, templateId, subject, manualId, autoId, "2026-Q2", 88m);
 
         var before = (await (await org.Admin.GetAsync($"/api/kpi-evaluations/{id}")).ReadAsync<KpiEvaluationDto>())!;
 
@@ -478,5 +482,67 @@ public class KpiFinanceExportTests
         var org = await BuildOrgAsync();
         var res = await org.Admin.GetAsync($"{PreviewUrl}?{query}");
         Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode);
+    }
+
+    // ===== 22) DEC-01 §5 (DEF-R5-003) — التصدير المالي لا يستهلك نبض الأسبوع =====
+    // نبض أسبوعيّ **معتمَد** داخل نفس الربع ولنفس الموظّف لا يظهر في التصدير ولا في الـCSV،
+    // بينما تقييمه الربعيّ الرسميّ يظهر — والعمود «نوع الفترة» لا يحمل Weekly في أيّ صفّ.
+    [Fact]
+    public async Task DecOne_FinanceExport_ConsumesQuarterlyTrackOnly_NotWeeklyPulse()
+    {
+        var org = await BuildOrgAsync();
+        var (_, subject) = await TestAuth.CreateUserAsync(_factory, Roles.Employee);
+        var (deptId, _) = await AssignSubjectOrgAsync(subject);
+
+        var (quarterlyTemplate, qManual, qAuto) = await PublishKpiAsync(org.Admin, KpiCadence.Quarterly);
+        var (weeklyTemplate, wManual, wAuto) = await PublishKpiAsync(org.Admin, KpiCadence.WeeklyPulse);
+
+        var quarterlyId = await ApproveAsync(org.Admin, quarterlyTemplate, subject, qManual, qAuto, "2026-Q2", 90m);
+        var pulseId = await ApproveAsync(org.Admin, weeklyTemplate, subject, wManual, wAuto, "2026-W25", 60m,
+            PeriodType.Weekly);
+
+        var dto = await PreviewAsync(org.Admin, $"?year=2026&quarter=2&departmentId={deptId}");
+        Assert.Contains(dto.Rows, r => r.EvaluationId == quarterlyId);
+        Assert.DoesNotContain(dto.Rows, r => r.EvaluationId == pulseId);
+        Assert.All(dto.Rows, r => Assert.Equal(PeriodType.Quarterly, r.PeriodType));
+
+        var (_, text) = await CsvAsync(org.Admin, $"?year=2026&quarter=2&departmentId={deptId}");
+        Assert.Contains("2026-Q2", text);
+        Assert.DoesNotContain("2026-W25", text);
+    }
+
+    // ===== 23) DEC-01 §5 (OBS-R5-02) — التصدير يرى ما يراه المتوسّط الرسميّ، لا أقلّ =====
+    // سجلّ **من المسار الربعيّ** (قالبه Quarterly) أُنشئ بمفتاح دورة داخل الربع — كما تفعل السجلّات
+    // السابقة لـDEC-01 — يجب أن يظهر في التصدير: تمييز المسار بتواتر القالب لا بشكل المفتاح.
+    // ولولا ذلك لَاختلف الرقم الرسميّ عن الرقم المالي على البيانات نفسها، وهو خلط من نوع آخر.
+    [Fact]
+    public async Task DecOne_FinanceExport_IncludesQuarterlyTrackRow_EvenWhenKeyedByCycle()
+    {
+        var org = await BuildOrgAsync();
+        var (_, subject) = await TestAuth.CreateUserAsync(_factory, Roles.Employee);
+        var (deptId, _) = await AssignSubjectOrgAsync(subject);
+
+        var (quarterlyTemplate, qManual, qAuto) = await PublishKpiAsync(org.Admin, KpiCadence.Quarterly);
+        var (weeklyTemplate, wManual, wAuto) = await PublishKpiAsync(org.Admin, KpiCadence.WeeklyPulse);
+
+        var legacyQuarterlyId = await ApproveAsync(
+            org.Admin, quarterlyTemplate, subject, qManual, qAuto, "2026-Q2", 77m, PeriodType.Quarterly);
+        // ونبض أسبوعيّ معتمَد داخل الربع نفسه — يبقى خارج التصدير رغم تطابق المدى.
+        var pulseId = await ApproveAsync(
+            org.Admin, weeklyTemplate, subject, wManual, wAuto, "2026-W21", 60m, PeriodType.Weekly);
+
+        // محاكاة السجلّ القديم: بعد DEC-01 لم يعد الـAPI يقبل إنشاء ربعيّ بمفتاح دورة، فالشكل
+        // القديم لا يوجد إلّا في بيانات سابقة. نُنزِله مباشرة إلى القاعدة كما هو في الواقع.
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var legacy = await db.KpiEvaluations.FirstAsync(e => e.Id == legacyQuarterlyId);
+            legacy.PeriodKey = "2026-W20";
+            await db.SaveChangesAsync();
+        }
+
+        var dto = await PreviewAsync(org.Admin, $"?year=2026&quarter=2&departmentId={deptId}");
+        Assert.Contains(dto.Rows, r => r.EvaluationId == legacyQuarterlyId);
+        Assert.DoesNotContain(dto.Rows, r => r.EvaluationId == pulseId);
     }
 }

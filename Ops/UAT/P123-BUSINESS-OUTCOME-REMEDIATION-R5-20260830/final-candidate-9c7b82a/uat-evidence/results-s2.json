@@ -1,0 +1,37 @@
+[
+ {
+  "id": "U16",
+  "desc": "تسجيل نبض الأسبوع لنفس الموظّف",
+  "result": "PASS",
+  "detail": "HTTP=200 · periodType=Weekly · periodKey=2026-W36 · قوالب المسار=7",
+  "shot": "/tmp/r5uat/shots/U16-weekly-after.png"
+ },
+ {
+  "id": "U16b",
+  "desc": "قوالب النبض وحدها معروضة في مسار النبض",
+  "result": "PASS",
+  "detail": "القوالب: النبض الأسبوعي العام · مؤشرات أداء SEO · مؤشرات أداء الفيديو · مؤشرات أداء المصمم · مؤشرات أداء المودريشن · مؤشرات أداء كاتب المحتوى · مؤشرات مندوب مبيعات B2C",
+  "shot": "/tmp/r5uat/shots/U16-weekly-before.png"
+ },
+ {
+  "id": "U17",
+  "desc": "التقييم الربعيّ الرسميّ لنفس الموظّف",
+  "result": "PASS",
+  "detail": "HTTP=200 · periodType=Quarterly · periodKey=2026-Q3 · قوالب المسار=2",
+  "shot": "/tmp/r5uat/shots/U17-quarterly-after.png"
+ },
+ {
+  "id": "U17b",
+  "desc": "قوالب المسار الربعيّ وحدها معروضة",
+  "result": "PASS",
+  "detail": "القوالب: مؤشرات مشتري الإعلانات · مؤشرات مندوب المبيعات",
+  "shot": "/tmp/r5uat/shots/U17-quarterly-before.png"
+ },
+ {
+  "id": "U4/U5",
+  "desc": "التقييمان قائمان معًا لنفس الموظّف",
+  "result": "PASS",
+  "detail": "الأسبوع 36 في القائمة=true · الربع الجاري في القائمة=true",
+  "shot": "/tmp/r5uat/shots/U4U5-both-listed.png"
+ }
+]

@@ -1,0 +1,14 @@
+ASSIGN_MD5|d41d8cd98f00b204e9800998ecf8427e
+EVAL_MD5|ad458e767b9e0e87ef7c277569a66feb
+TEMPLATE_MD5|870383b4ec6bd6096b408b38889929a2
+USERS_MD5|e4e8e25f3f358fad550319deb0582f4b
+kpi_evaluations|21
+kpi_results|17
+kpi_review_events|7
+kpi_template_assignments|0
+kpi_template_versions|9
+kpi_templates|9
+uat_domain_users|0
+userclaims|0
+userroles|52
+users|48

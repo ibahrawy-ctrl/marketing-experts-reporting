@@ -1,0 +1,16 @@
+[
+ {
+  "id": "U19",
+  "desc": "التصدير المالي يعلن مصدره الربعيّ ولا يستهلك النبض",
+  "result": "FAIL",
+  "detail": "ذكر «ربع»=true · ذكر «نبض» في شاشة التصدير=true · نداءات=200 /api/kpi-evaluations/finance-export?year=2026&quarter=3&status=Approved",
+  "shot": "/tmp/r5uat/shots/U19-financial-export.png"
+ },
+ {
+  "id": "U8",
+  "desc": "نافذة الخدمة معلَنة نصًّا لا فراغًا",
+  "result": "PASS",
+  "detail": "«التحاق:»=true · «انتهاء الخدمة:»=true · حالة معلَنة («غير مسجَّل»/«على رأس العمل»)=true",
+  "shot": "/tmp/r5uat/shots/U8-employment-window.png"
+ }
+]

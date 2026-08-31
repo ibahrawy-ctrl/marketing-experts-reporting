@@ -112,6 +112,9 @@ public class KpiTemplateAssignmentConfiguration : IEntityTypeConfiguration<KpiTe
         b.Property(x => x.Notes).HasMaxLength(1000);
         b.HasIndex(x => x.KpiTemplateId);
         b.HasIndex(x => new { x.KpiTemplateId, x.ScopeType, x.ScopeId, x.Kind }).IsUnique();
+
+        // DEC-01/6 — فهرس السريان لقراءة «الإسناد الساري في تاريخ كذا» بلا مسح كامل للجدول.
+        b.HasIndex(x => new { x.ScopeType, x.ScopeId, x.EffectiveFrom, x.EffectiveTo });
         b.HasOne(x => x.KpiTemplate).WithMany()
             .HasForeignKey(x => x.KpiTemplateId).OnDelete(DeleteBehavior.Cascade);
     }

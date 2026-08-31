@@ -144,6 +144,13 @@ public class DirectoryController : ApiControllerBase
     public async Task<IActionResult> UpdateUserBasic(Guid id, [FromBody] UpdateUserBasicRequest req, CancellationToken ct)
         => FromResult(await _service.UpdateUserBasicAsync(id, req, CurrentUserId, User.IsInRole(Roles.Admin), ct));
 
+    // DEF-R5-002 — نافذة خدمة الموظّف (الالتحاق/انتهاء الخدمة) على سطح إدارة الموظّف نفسه — Admin/CeoSupport/HR.
+    // الطلب يعلن الحالة النهائيّة للحقلين معًا؛ null = غير مسجَّل. التحقّق والتدقيق داخل طبقة الخدمة.
+    [HttpPatch("users/{id:guid}/employment-window")]
+    [Authorize(Policy = Policies.UserBasicManagement)]
+    public async Task<IActionResult> UpdateUserEmploymentWindow(Guid id, [FromBody] UpdateUserEmploymentWindowRequest req, CancellationToken ct)
+        => FromResult(await _service.UpdateUserEmploymentWindowAsync(id, req, CurrentUserId, User.IsInRole(Roles.Admin), ct));
+
     // تعديل الانتماء التنظيمي للموظف (الإدارة/الفريق/المدير) — Admin/CeoSupport/HR/GM/CEO. القيود الأمنية في طبقة الخدمة.
     [HttpPatch("users/{id:guid}/org-assignment")]
     [Authorize(Policy = Policies.UserOrgAssignment)]

@@ -46,6 +46,13 @@ public class KpiEvaluationsController : ApiControllerBase
     public async Task<IActionResult> EvaluatableSubjects(CancellationToken ct)
         => FromResult(await _service.GetEvaluatableSubjectsAsync(ct));
 
+    // DEF-R5-001 — «الإعداد الفعّال» لموظّف: التواتر ومصدره ونوع الفترة ومفتاح الفترة الجارية
+    // والقوالب المؤهَّلة، محسومةً خادميًّا. الواجهة تعرض ولا تختار، ولا ترسل طلبًا غير صالح.
+    [HttpGet("effective-setup")]
+    [Authorize(Policy = Policies.ManagementOnly)]
+    public async Task<IActionResult> EffectiveSetup([FromQuery] Guid subjectUserId, CancellationToken ct)
+        => FromResult(await _service.GetEvaluationSetupAsync(subjectUserId, ct));
+
     // KPI-REVIEWER-OVERRIDE-R1 — بحث قرائيّ صرف عن تقييم قائم (بلا أيّ إنشاء أو تعديل).
     [HttpGet("lookup")]
     [Authorize(Policy = Policies.ManagementOnly)]

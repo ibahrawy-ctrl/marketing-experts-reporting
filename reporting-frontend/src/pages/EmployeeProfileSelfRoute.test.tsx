@@ -15,7 +15,15 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { api } from '../lib/api';
+import { FEATURES } from '../lib/navConfig';
 import EmployeeProfilePage from './EmployeeProfilePage';
+
+// P123-R1 — الميزة مفتوحة عمدًا: الادّعاء هنا عن مطابقة المسار وحلّ معرّف الذات خادميًّا،
+// وبوّابة الميزة بُعد مستقلّ يُقاس في مكانه.
+vi.mock('../lib/auth', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/auth')>()),
+  useAuth: () => ({ features: new Set<string>(Object.values(FEATURES)) }),
+}));
 
 const SUBJECT = '33333333-3333-3333-3333-333333333333';
 

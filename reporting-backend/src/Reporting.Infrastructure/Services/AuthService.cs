@@ -15,17 +15,20 @@ public class AuthService : IAuthService
     private readonly ITokenService _tokens;
     private readonly AppDbContext _db;
     private readonly JwtOptions _opt;
+    private readonly Phase2FeatureOptions _flags;
 
     public AuthService(
         UserManager<ApplicationUser> users,
         ITokenService tokens,
         AppDbContext db,
-        IOptions<JwtOptions> opt)
+        IOptions<JwtOptions> opt,
+        IOptions<Phase2FeatureOptions> flags)
     {
         _users = users;
         _tokens = tokens;
         _db = db;
         _opt = opt.Value;
+        _flags = flags.Value;
     }
 
     public async Task<Result<AuthResponse>> LoginAsync(LoginRequest request, CancellationToken ct = default)
@@ -91,7 +94,8 @@ public class AuthService : IAuthService
         var scopeType = RoleAccess.ScopeTypeFor(RoleAccess.PrimaryRole(roles));
         return Result<MeResponse>.Success(new MeResponse(
             user.Id, user.FullName, user.Email ?? string.Empty, user.IsActive, roles.ToArray(), cadence, jobRoleCode,
-            permissions, scopeType));
+            // P123-R1 — الميزات المفتوحة في هذه البيئة، مقروءة من إعداد الخادم نفسه لا من قائمة ثابتة.
+            permissions, scopeType, AppFeatures.EnabledFrom(_flags)));
     }
 
     public async Task<Result> ChangePasswordAsync(Guid userId, ChangePasswordRequest request, CancellationToken ct = default)
@@ -184,6 +188,8 @@ public class AuthService : IAuthService
             access.Token, refresh.Token, access.ExpiresUtc,
             user.Id, user.FullName, user.Email ?? string.Empty, roles.ToArray(), cadence, jobRoleCode,
             // P3-NAV-001 — نفس المفاتيح المحقونة في الرمز أعلاه، معادةً كقدرات للواجهة (قراءة فقط).
-            permissions, RoleAccess.ScopeTypeFor(RoleAccess.PrimaryRole(roles)));
+            permissions, RoleAccess.ScopeTypeFor(RoleAccess.PrimaryRole(roles)),
+            // P123-R1 — نفس مصدر الأعلام الذي تقرأه GetMeAsync ⇒ لا تباعد بين الدخول والإقلاع.
+            AppFeatures.EnabledFrom(_flags));
     }
 }

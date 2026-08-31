@@ -8,6 +8,7 @@ import { useSearchParams } from 'react-router-dom';
 import { formatDate, formatDateTime } from '../lib/format';
 import { Alert, Badge, Button, Card, EmptyState, Field, Input, Select } from '../components/ui';
 import { CardsSkeleton, QueryError, TableSkeleton } from '../components/states';
+import { UserPicker } from '../components/UserPicker';
 import {
   useExportHrOperationsQueue,
   useHrOperationsDashboard,
@@ -207,11 +208,14 @@ export default function HrOperationsPage() {
 
       <Card className="p-4">
         <form onSubmit={applyFilter} className="grid gap-3 md:grid-cols-4" data-testid="hr-ops-filter">
-          <Field label="معرّف الموظّف">
-            <Input
+          {/* P123-R4 — التصفية بموظّف تُختار بالاسم: المعرّف المكتوب لم يكن له مصدر في أيّ سطح،
+              فكان المرشِّح عمليًّا غير قابل للاستعمال ولو بدا حاضرًا. */}
+          <Field label="الموظّف">
+            <UserPicker
               value={draft.userId}
-              aria-label="معرّف الموظّف"
-              onChange={(e) => setDraft({ ...draft, userId: e.target.value })}
+              onChange={(id) => setDraft({ ...draft, userId: id })}
+              placeholder="كلّ الموظّفين ضمن نطاقك"
+              emptyMessage="لا يوجد موظّف ضمن نطاقك لتصفية الطابور به."
             />
           </Field>
           <Field label="النوع">

@@ -39,6 +39,9 @@ public sealed class CanonicalPeriodService : IPeriodService
             case PeriodKinds.LastCompletedWeek:
                 return Result<ResolvedPeriod>.Success(LastCompletedWeek());
 
+            case PeriodKinds.CurrentQuarter:
+                return Result<ResolvedPeriod>.Success(CurrentQuarter());
+
             case PeriodKinds.Week:
                 if (!ReportingCalendarPolicy.IsValidCycleKey(key))
                     return Fail("صيغة الأسبوع غير صحيحة؛ استخدم YYYY-Www مثل 2026-W27.", "period.week_key_invalid");
@@ -84,6 +87,15 @@ public sealed class CanonicalPeriodService : IPeriodService
         var key = ReportingCalendarPolicy.CycleKeyFor(previousStart);
         return Ok(PeriodKinds.Week, key, previousStart, previousStart.AddDays(6),
             ReportingCalendarPolicy.CycleLabel(key)).Value!;
+    }
+
+    public ResolvedPeriod CurrentQuarter()
+    {
+        // «اليوم» بتوقيت الرياض هو المرجع الوحيد — لا UTC ولا توقيت المتصفّح (B-1).
+        var today = RiyadhToday();
+        var q = (today.Month - 1) / 3 + 1;
+        var (s, e) = ReportingCalendarPolicy.QuarterRange(today.Year, q);
+        return Ok(PeriodKinds.Quarter, QuarterKey(today.Year, q), s, e, $"الربع {q} — {today.Year}").Value!;
     }
 
     public ResolvedPeriod PreviousComparable(ResolvedPeriod current)

@@ -14,7 +14,15 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { api } from '../lib/api';
 import type { ChecklistItem, EmployeeChecklist } from '../types/checklist';
+import { FEATURES } from '../lib/navConfig';
 import { EmployeeChecklistPanel } from './EmployeeChecklistPanel';
+
+// P123-R1 — الميزة مفتوحة في هذه الكتلة عمدًا: الادّعاءات هنا عن العقد لا عن بوّابة الميزة،
+// وهذه الأخيرة تُقاس مستقلّةً في `surfaceState.test.ts` و`navSecurity.test.ts`.
+vi.mock('../lib/auth', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/auth')>()),
+  useAuth: () => ({ features: new Set<string>(Object.values(FEATURES)) }),
+}));
 
 const SUBJECT = '33333333-3333-3333-3333-333333333333';
 

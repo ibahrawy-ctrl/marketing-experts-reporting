@@ -1,0 +1,16 @@
+=== P123-BUSINESS-OUTCOME-DIAGNOSTIC — خطّ الأساس المقيس (قراءة فقط) ===
+التاريخ (UTC): 2026-08-26T22:07:46Z
+
+--- [1] حالة الخدمة على الإنتاج ---
+MainPID=1603719
+NRestarts=0
+ExecMainStartTimestamp=Wed 2026-08-26 19:26:00 UTC
+ActiveState=active
+SubState=running
+
+--- [2] بصمة الحزمة المنشورة ---
+46e0a3a169c9ef2285aef3b8e9d7fe13  /opt/reporting/publish/Reporting.Api.dll
+ls: cannot access '/opt/reporting/dist/assets/index-*.js': No such file or directory
+
+--- [3] /health من داخل الخادم ---
+HTTP=200 TIME=0.001705s

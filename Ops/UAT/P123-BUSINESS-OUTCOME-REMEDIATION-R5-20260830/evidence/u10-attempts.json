@@ -1,0 +1,44 @@
+[
+ {
+  "label": "نافذة الخدمة (الالتحاق/انتهاء الخدمة) — الهدف: نفسه",
+  "status": 403,
+  "type": null,
+  "detail": ""
+ },
+ {
+  "label": "البيانات الأساسيّة (الاسم)",
+  "status": 403,
+  "type": null,
+  "detail": ""
+ },
+ {
+  "label": "المسمّى الوظيفيّ",
+  "status": 403,
+  "type": null,
+  "detail": ""
+ },
+ {
+  "label": "الانتماء التنظيميّ",
+  "status": 403,
+  "type": null,
+  "detail": ""
+ },
+ {
+  "label": "إعادة تعيين كلمة المرور",
+  "status": 403,
+  "type": null,
+  "detail": ""
+ },
+ {
+  "label": "إنشاء مستخدم جديد",
+  "status": 403,
+  "type": null,
+  "detail": ""
+ },
+ {
+  "label": "نفس النداء بلا هويّة (للمقارنة)",
+  "status": 401,
+  "type": null,
+  "detail": ""
+ }
+]

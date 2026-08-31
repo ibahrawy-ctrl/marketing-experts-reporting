@@ -1,0 +1,314 @@
+[
+ {
+  "t": 1788144403426,
+  "method": "POST",
+  "path": "/api/auth/login",
+  "status": 200,
+  "body": "{\"email\":\"synthetic.uat@p123.r5.uat.test\",\"password\":\"UatbVFMdNXRmIAYm6rr!7Aa\"}",
+  "resp": "{\"accessToken\":\"<REDACTED-JWT>\",\"refreshToken\":\"WOkqUhtE9FFVO++bv6iwOrzgaqgBXPK9XvYVxngxKrP4TiLR1t6oEXfIs76tgqAb\",\"accessTokenExpiresUtc\":\"2026-08-31T03:16:43.4236158Z\",\"userId\":\"11f07eba-10c4-488b-9a29-88b3781f8cc7\",\"fullName\":\"حساب ا"
+ },
+ {
+  "t": 1788144403686,
+  "method": "POST",
+  "path": "/hubs/notifications/negotiate?negotiateVersion=1",
+  "status": 200,
+  "body": null,
+  "resp": "{\"negotiateVersion\":1,\"connectionId\":\"zUNFX0PFQRTEVjT16k0z5w\",\"connectionToken\":\"nhC5OSyxiv4qPjD0HVgpIg\",\"availableTransports\":[{\"transport\":\"WebSockets\",\"transferFormats\":[\"Text\",\"Binary\"]},{\"transport\":\"ServerSentEvents\",\"transferFormats\":[\"Text\"]},{\"transport\":\"LongPolling\",\"transferFormats\":[\"Text\",\"Binary\"]}]}"
+ },
+ {
+  "t": 1788144403774,
+  "method": "GET",
+  "path": "/api/notifications/unread-count",
+  "status": 200,
+  "body": null,
+  "resp": "{\"count\":0}"
+ },
+ {
+  "t": 1788144403804,
+  "method": "GET",
+  "path": "/api/notifications",
+  "status": 200,
+  "body": null,
+  "resp": "[]"
+ },
+ {
+  "t": 1788144403868,
+  "method": "GET",
+  "path": "/api/dashboard/me",
+  "status": 200,
+  "body": null,
+  "resp": "{\"dashboardType\":\"Employee\",\"period\":{\"periodKey\":\"2026-W36\",\"label\":\"الأسبوع الحالي\"},\"user\":{\"id\":\"11f07eba-10c4-488b-9a29-88b3781f8cc7\",\"name\":\"حساب اختبار اصطناعي R5\",\"role\":\"Employee\"},\"scope\":{\"type\":\"own\",\"ids\":[\"11f07eba-10c4-488b-9a29-88b3781f8cc7\"]},\"permissions\":[\"ViewOwn\"],\"summaryCards\":[{\"key\":\"totalReports\",\"title\":\"التقارير المطلوبة\",\"value\":0,\"status\":\"neutral\",\"drilldownKey\":\"report-status\"},{\"key\":\"completedReports\",\"title\":\"التقارير المكتملة\",\"value\":0,\"status\":\"neutral\",\"drilldownKey\":\"report-status\"},{\"key\":\"pendingApproval\",\"title\":\"في انتظار الاعتماد\",\"value\":0,\"status\":\"green\",\"drilldownKey\":\"report-status\"},{\"key\":\"needsAction\",\"title\":\"تحتاج إجراء\",\"value\":0,\"status\":\"green\",\"drilldownKey\":\"report-status\"},{\"key\":\"kpiAverage\",\"title\":\"متوسط KPI\",\"value\":null,\"status\":\"neutral\",\"drilldownKey\":\"kpi-summary\"}],\"widgets\":[{\"key\":\"kpiTrend\",\"type\":\"lineChart\",\"title"
+ },
+ {
+  "t": 1788144403993,
+  "method": "GET",
+  "path": "/api/reports/due/my-status",
+  "status": 200,
+  "body": null,
+  "resp": "{\"weekKey\":\"2026-W36\",\"weekLabel\":\"الأسبوع 36 — 2026 (السبت 29 أغسطس — الجمعة 4 سبتمبر)\",\"weekStart\":\"2026-08-29\",\"weekEnd\":\"2026-09-04\",\"employeeDueDate\":\"2026-09-04\",\"expected\":false,\"submitted\":false,\"isOverdue\":false,\"delayType\":\"NoDelay\",\"statusLabel\":\"لا يُتوقَّع منك تقرير أسبوعي ضمن هذا المسار.\",\"submissionId\":null}"
+ },
+ {
+  "t": 1788144403995,
+  "method": "GET",
+  "path": "/api/reports/b2c-rollup?periodType=Weekly&periodKey=2026-W36",
+  "status": 200,
+  "body": null,
+  "resp": "{\"periodKey\":\"2026-W36\",\"reporters\":0,\"totalLeads\":0,\"totalCalls\":0,\"totalFollowUps\":0,\"totalRegistrations\":0,\"totalClosedDeals\":0,\"totalTarget\":0,\"overallConversionRate\":0,\"overallTargetAchievement\":0,\"best\":null,\"worst\":null,\"rows\":[],\"commonLostReasons\":[],\"viewLevel\":\"self\",\"canViewRows\":true}"
+ },
+ {
+  "t": 1788144403995,
+  "method": "GET",
+  "path": "/api/reports/media-buyer-rollup?periodType=Weekly&periodKey=2026-W36",
+  "status": 200,
+  "body": null,
+  "resp": "{\"periodKey\":\"2026-W36\",\"reporters\":0,\"totalSpend\":0,\"totalLeads\":0,\"overallCpl\":0,\"averageCtr\":0,\"averageConversionRate\":0,\"best\":null,\"worst\":null,\"rows\":[],\"commonIssueCauses\":[],\"decisionsNeeded\":[],\"viewLevel\":\"self\",\"canViewRows\":true}"
+ },
+ {
+  "t": 1788144404071,
+  "method": "GET",
+  "path": "/api/reports/seo-rollup?periodType=Weekly&periodKey=2026-W36",
+  "status": 200,
+  "body": null,
+  "resp": "{\"periodKey\":\"2026-W36\",\"reporters\":0,\"totalImprovedKeywords\":0,\"totalDeclinedKeywords\":0,\"netKeywordMovement\":0,\"totalTasksDone\":0,\"totalTechnicalIssues\":0,\"totalIndexedPages\":0,\"totalOrganicTraffic\":0,\"totalArticlesPlanned\":0,\"totalArticlesPublished\":0,\"totalArticlesLate\":0,\"contentDeliveryRate\":0,\"best\":null,\"worst\":null,\"rows\":[],\"decisionsNeeded\":[],\"recommendations\":[],\"viewLevel\":\"self\",\"canViewRows\":true}"
+ },
+ {
+  "t": 1788144404108,
+  "method": "GET",
+  "path": "/api/reports/content-writer-rollup?periodType=Weekly&periodKey=2026-W36",
+  "status": 200,
+  "body": null,
+  "resp": "{\"periodKey\":\"2026-W36\",\"reporters\":0,\"totalRequired\":0,\"totalDelivered\":0,\"totalApprovedFirstTime\":0,\"totalLate\":0,\"totalRevised\":0,\"contentDeliveryRate\":0,\"firstApprovalRate\":0,\"revisionRate\":0,\"avgPlanAdherence\":0,\"best\":null,\"worst\":null,\"rows\":[],\"delayReasons\":[],\"decisionsNeeded\":[],\"viewLevel\":\"self\",\"canViewRows\":true}"
+ },
+ {
+  "t": 1788144404109,
+  "method": "GET",
+  "path": "/api/reports/designer-rollup?periodType=Weekly&periodKey=2026-W36",
+  "status": 200,
+  "body": null,
+  "resp": "{\"periodKey\":\"2026-W36\",\"reporters\":0,\"totalRequested\":0,\"totalDelivered\":0,\"totalApprovedFirstTime\":0,\"totalLate\":0,\"totalPendingReview\":0,\"totalRevised\":0,\"deliveryRate\":0,\"firstApprovalRate\":0,\"revisionRate\":0,\"onTimeRate\":0,\"avgPlanAdherence\":0,\"best\":null,\"worst\":null,\"rows\":[],\"delayReasons\":[],\"decisionsNeeded\":[],\"viewLevel\":\"self\",\"canViewRows\":true}"
+ },
+ {
+  "t": 1788144404112,
+  "method": "GET",
+  "path": "/api/reports/moderation-rollup?periodType=Weekly&periodKey=2026-W36",
+  "status": 200,
+  "body": null,
+  "resp": "{\"periodKey\":\"2026-W36\",\"reporters\":0,\"totalIncoming\":0,\"totalAnswered\":0,\"totalUnhandled\":0,\"totalProblematic\":0,\"totalEscalations\":0,\"totalComplaints\":0,\"totalConverted\":0,\"responseRate\":0,\"avgResponseMinutes\":0,\"best\":null,\"worst\":null,\"rows\":[],\"recurringIssues\":[],\"decisionsNeeded\":[],\"viewLevel\":\"self\",\"canViewRows\":true}"
+ },
+ {
+  "t": 1788144404113,
+  "method": "GET",
+  "path": "/api/submissions/mine",
+  "status": 200,
+  "body": null,
+  "resp": "[]"
+ },
+ {
+  "t": 1788144404113,
+  "method": "GET",
+  "path": "/api/improvement-plans",
+  "status": 200,
+  "body": null,
+  "resp": "[]"
+ },
+ {
+  "t": 1788144404206,
+  "method": "GET",
+  "path": "/api/reports/video-rollup?periodType=Weekly&periodKey=2026-W36",
+  "status": 200,
+  "body": null,
+  "resp": "{\"periodKey\":\"2026-W36\",\"reporters\":0,\"totalRequested\":0,\"totalDelivered\":0,\"totalApprovedFirstTime\":0,\"totalLate\":0,\"totalPendingReview\":0,\"totalRevised\":0,\"deliveryRate\":0,\"firstApprovalRate\":0,\"revisionRate\":0,\"onTimeRate\":0,\"avgPlanAdherence\":0,\"best\":null,\"worst\":null,\"rows\":[],\"delayReasons\":[],\"decisionsNeeded\":[],\"viewLevel\":\"self\",\"canViewRows\":true}"
+ },
+ {
+  "t": 1788144404207,
+  "method": "GET",
+  "path": "/api/training-needs",
+  "status": 200,
+  "body": null,
+  "resp": "[]"
+ },
+ {
+  "t": 1788144404208,
+  "method": "GET",
+  "path": "/api/reporting-calendar/my-cycles?context=Report&past=8&future=1",
+  "status": 200,
+  "body": null,
+  "resp": "{\"context\":\"Report\",\"templateId\":null,\"role\":\"Employee\",\"roleLabel\":\"موظف\",\"currentCycleKey\":\"2026-W36\",\"today\":\"2026-08-31\",\"cycles\":[{\"cycleKey\":\"2026-W28\",\"cycleNumber\":28,\"cycleYear\":2026,\"cycleStart\":\"2026-07-04\",\"cycleEnd\":\"2026-07-10\",\"tuesdayReference\":\"2026-07-07\",\"cycleLabel\":\"الأسبوع 28 — 2026 (السبت 4 يوليو — الجمعة 10 يوليو)\",\"shortLabel\":\"الأسبوع 28 — 2026\",\"dataCoverageStart\":\"2026-07-04\",\"dataCoverageEnd\":\"2026-07-10\",\"role\":\"Employee\",\"roleLabel\":\"موظف\",\"roleDueOffset\":4,\"roleDueDate\":\"2026-07-08\",\"roleDueDateLabel\":\"الأربعاء 8 يوليو\",\"offset\":-8,\"isCurrent\":false,\"isPast\":true,\"isFuture\":false,\"status\":\"past\",\"isOpen\":true,\"isLocked\":false,\"lockReason\":null,\"isOverdue\":true,\"requiresReason\":true,\"today\":\"2026-08-31\",\"context\":\"Report\",\"unified\":{\"templateId\":null,\"templateVersionId\":null,\"templateName\":\"—\",\"periodType\":\"Weekly\",\"periodKey\":\"2026-W28\",\"cycleLabel\":\"الأسب"
+ },
+ {
+  "t": 1788144406424,
+  "method": "GET",
+  "path": "/api/auth/me",
+  "status": 200,
+  "body": null,
+  "resp": "{\"userId\":\"11f07eba-10c4-488b-9a29-88b3781f8cc7\",\"fullName\":\"حساب اختبار اصطناعي R5\",\"email\":\"synthetic.uat@p123.r5.uat.test\",\"isActive\":true,\"roles\":[\"Employee\"],\"expectedReportCadence\":\"Weekly\",\"jobRoleCode\":null,\"permissions\":[],\"scopeType\":\"own\",\"features\":[\"Employee360\",\"Attendance\",\"HrOperations\",\"EmployeeChecklist\"]}"
+ },
+ {
+  "t": 1788144406535,
+  "method": "POST",
+  "path": "/hubs/notifications/negotiate?negotiateVersion=1",
+  "status": 200,
+  "body": null,
+  "resp": "{\"negotiateVersion\":1,\"connectionId\":\"Wtdu37IdRNc5pF27Zom0ww\",\"connectionToken\":\"ypZ6wpiJnTrIlPKzv3j5hg\",\"availableTransports\":[{\"transport\":\"WebSockets\",\"transferFormats\":[\"Text\",\"Binary\"]},{\"transport\":\"ServerSentEvents\",\"transferFormats\":[\"Text\"]},{\"transport\":\"LongPolling\",\"transferFormats\":[\"Text\",\"Binary\"]}]}"
+ },
+ {
+  "t": 1788144406544,
+  "method": "GET",
+  "path": "/api/notifications/unread-count",
+  "status": 200,
+  "body": null,
+  "resp": "{\"count\":0}"
+ },
+ {
+  "t": 1788144406544,
+  "method": "GET",
+  "path": "/api/directory/job-roles",
+  "status": 200,
+  "body": null,
+  "resp": "[{\"id\":\"f9f36b46-18f1-4bfc-8b5c-4926016059b1\",\"nameAr\":\"أخصائي موارد بشرية UAT\",\"nameEn\":\"HR Specialist\",\"code\":\"HR_SPECIALIST\",\"departmentId\":\"c2ec010a-ad60-405d-a091-bad96800fc2a\",\"isActive\":true},{\"id\":\"d5e926ec-37c9-49b4-bebc-d1ca00288890\",\"nameAr\":\"الرئيس التنفيذي UAT\",\"nameEn\":\"Chief Executive Officer\",\"code\":\"CEO\",\"departmentId\":\"3f1d02af-059d-4700-8c63-2a9de9358412\",\"isActive\":true},{\"id\":\"9796546d-2430-45d1-95b1-a0b9483f20d0\",\"nameAr\":\"المدير العام UAT\",\"nameEn\":\"General Manager\",\"code\":\"GENERAL_MANAGER\",\"departmentId\":\"3f1d02af-059d-4700-8c63-2a9de9358412\",\"isActive\":true},{\"id\":\"5e1718d3-d530-4737-9d72-53a40806f28d\",\"nameAr\":\"المدير المالي UAT\",\"nameEn\":\"Finance Manager\",\"code\":\"FINANCE_MANAGER\",\"departmentId\":\"981e26a8-1fb9-4a01-bbca-c5ab7a3212c4\",\"isActive\":true},{\"id\":\"a1292af4-def5-4a3c-a0c8-a09ae888e002\",\"nameAr\":\"قائد فريق UAT\",\"nameEn\":\"Team Leader\",\"code\":\"TEAM_LEADER\""
+ },
+ {
+  "t": 1788144406566,
+  "method": "GET",
+  "path": "/api/notifications",
+  "status": 200,
+  "body": null,
+  "resp": "[]"
+ },
+ {
+  "t": 1788144406567,
+  "method": "GET",
+  "path": "/api/directory/users?includeInactive=false",
+  "status": 200,
+  "body": null,
+  "resp": "[{\"id\":\"11f07eba-10c4-488b-9a29-88b3781f8cc7\",\"fullName\":\"حساب اختبار اصطناعي R5\",\"email\":\"synthetic.uat@p123.r5.uat.test\",\"isActive\":true,\"roles\":[\"Employee\"],\"departmentId\":null,\"teamId\":null,\"managerId\":null,\"jobRoleId\":null}]"
+ },
+ {
+  "t": 1788144406567,
+  "method": "GET",
+  "path": "/api/directory/teams",
+  "status": 200,
+  "body": null,
+  "resp": "[]"
+ },
+ {
+  "t": 1788144406625,
+  "method": "GET",
+  "path": "/api/directory/departments",
+  "status": 200,
+  "body": null,
+  "resp": "[]"
+ },
+ {
+  "t": 1788144410068,
+  "method": "PATCH",
+  "path": "/api/directory/users/11f07eba-10c4-488b-9a29-88b3781f8cc7/employment-window",
+  "status": 403,
+  "body": "{\"hireDate\":\"2001-01-01\",\"exitDate\":\"2001-12-31\"}",
+  "resp": ""
+ },
+ {
+  "t": 1788144410373,
+  "method": "GET",
+  "path": "/api/auth/me",
+  "status": 200,
+  "body": null,
+  "resp": "{\"userId\":\"11f07eba-10c4-488b-9a29-88b3781f8cc7\",\"fullName\":\"حساب اختبار اصطناعي R5\",\"email\":\"synthetic.uat@p123.r5.uat.test\",\"isActive\":true,\"roles\":[\"Employee\"],\"expectedReportCadence\":\"Weekly\",\"jobRoleCode\":null,\"permissions\":[],\"scopeType\":\"own\",\"features\":[\"Employee360\",\"Attendance\",\"HrOperations\",\"EmployeeChecklist\"]}"
+ },
+ {
+  "t": 1788144410497,
+  "method": "GET",
+  "path": "/api/notifications/unread-count",
+  "status": 200,
+  "body": null,
+  "resp": "{\"count\":0}"
+ },
+ {
+  "t": 1788144410501,
+  "method": "GET",
+  "path": "/api/notifications",
+  "status": 200,
+  "body": null,
+  "resp": "[]"
+ },
+ {
+  "t": 1788144410503,
+  "method": "POST",
+  "path": "/hubs/notifications/negotiate?negotiateVersion=1",
+  "status": 200,
+  "body": null,
+  "resp": "{\"negotiateVersion\":1,\"connectionId\":\"O10RQQlRD3_lC3QzixEi0Q\",\"connectionToken\":\"nKTduZntu3sjcGq9eTuBnQ\",\"availableTransports\":[{\"transport\":\"WebSockets\",\"transferFormats\":[\"Text\",\"Binary\"]},{\"transport\":\"ServerSentEvents\",\"transferFormats\":[\"Text\"]},{\"transport\":\"LongPolling\",\"transferFormats\":[\"Text\",\"Binary\"]}]}"
+ },
+ {
+  "t": 1788144410504,
+  "method": "GET",
+  "path": "/api/directory/departments",
+  "status": 200,
+  "body": null,
+  "resp": "[]"
+ },
+ {
+  "t": 1788144410504,
+  "method": "GET",
+  "path": "/api/directory/teams",
+  "status": 200,
+  "body": null,
+  "resp": "[]"
+ },
+ {
+  "t": 1788144410505,
+  "method": "GET",
+  "path": "/api/directory/job-roles",
+  "status": 200,
+  "body": null,
+  "resp": "[{\"id\":\"f9f36b46-18f1-4bfc-8b5c-4926016059b1\",\"nameAr\":\"أخصائي موارد بشرية UAT\",\"nameEn\":\"HR Specialist\",\"code\":\"HR_SPECIALIST\",\"departmentId\":\"c2ec010a-ad60-405d-a091-bad96800fc2a\",\"isActive\":true},{\"id\":\"d5e926ec-37c9-49b4-bebc-d1ca00288890\",\"nameAr\":\"الرئيس التنفيذي UAT\",\"nameEn\":\"Chief Executive Officer\",\"code\":\"CEO\",\"departmentId\":\"3f1d02af-059d-4700-8c63-2a9de9358412\",\"isActive\":true},{\"id\":\"9796546d-2430-45d1-95b1-a0b9483f20d0\",\"nameAr\":\"المدير العام UAT\",\"nameEn\":\"General Manager\",\"code\":\"GENERAL_MANAGER\",\"departmentId\":\"3f1d02af-059d-4700-8c63-2a9de9358412\",\"isActive\":true},{\"id\":\"5e1718d3-d530-4737-9d72-53a40806f28d\",\"nameAr\":\"المدير المالي UAT\",\"nameEn\":\"Finance Manager\",\"code\":\"FINANCE_MANAGER\",\"departmentId\":\"981e26a8-1fb9-4a01-bbca-c5ab7a3212c4\",\"isActive\":true},{\"id\":\"a1292af4-def5-4a3c-a0c8-a09ae888e002\",\"nameAr\":\"قائد فريق UAT\",\"nameEn\":\"Team Leader\",\"code\":\"TEAM_LEADER\""
+ },
+ {
+  "t": 1788144410587,
+  "method": "GET",
+  "path": "/api/directory/users?includeInactive=false",
+  "status": 200,
+  "body": null,
+  "resp": "[{\"id\":\"11f07eba-10c4-488b-9a29-88b3781f8cc7\",\"fullName\":\"حساب اختبار اصطناعي R5\",\"email\":\"synthetic.uat@p123.r5.uat.test\",\"isActive\":true,\"roles\":[\"Employee\"],\"departmentId\":null,\"teamId\":null,\"managerId\":null,\"jobRoleId\":null}]"
+ },
+ {
+  "t": 1788144412951,
+  "method": "GET",
+  "path": "/api/dashboard/employee-profile/11f07eba-10c4-488b-9a29-88b3781f8cc7",
+  "status": 200,
+  "body": null,
+  "resp": "{\"header\":{\"userId\":\"11f07eba-10c4-488b-9a29-88b3781f8cc7\",\"fullName\":\"حساب اختبار اصطناعي R5\",\"email\":\"synthetic.uat@p123.r5.uat.test\",\"jobRoleName\":null,\"teamName\":null,\"departmentName\":null,\"directManagerName\":null,\"isActive\":true,\"statusKey\":\"insufficient\",\"statusLabel\":\"لا توجد بيانات كافية\"},\"summary\":{\"lastKpiScore\":null,\"lastKpiPeriod\":null,\"lastKpiTrend\":\"Unknown\",\"averageKpi\":null,\"kpiCount\":0,\"reportsSubmitted\":0,\"reportsReturned\":0,\"reportsNeedsAction\":0,\"openNotesRequiringAction\":0},\"reports\":[],\"kpiEvaluations\":[],\"governanceItems\":[],\"timeline\":[],\"leaveRequests\":[]}"
+ },
+ {
+  "t": 1788144413125,
+  "method": "GET",
+  "path": "/api/kpi-evaluations/aggregate?granularity=Monthly&periodKey=2026-08&subjectUserId=11f07eba-10c4-488b-9a29-88b3781f8cc7",
+  "status": 200,
+  "body": null,
+  "resp": "{\"granularity\":\"Monthly\",\"periodLabel\":\"أغسطس 2026\",\"rangeStart\":\"2026-08-01\",\"rangeEnd\":\"2026-08-31\",\"average\":null,\"weeksCount\":0,\"evaluationsCount\":0,\"scopeType\":\"own\",\"canViewRows\":true,\"weeks\":[],\"appliedCadence\":\"WeeklyPulse\",\"employeesCount\":0,\"appliedBelowTargetThreshold\":60}"
+ },
+ {
+  "t": 1788144413125,
+  "method": "GET",
+  "path": "/api/management-notes?entityType=User&entityId=11f07eba-10c4-488b-9a29-88b3781f8cc7",
+  "status": 200,
+  "body": null,
+  "resp": "[]"
+ },
+ {
+  "t": 1788144413218,
+  "method": "GET",
+  "path": "/api/employees/11f07eba-10c4-488b-9a29-88b3781f8cc7/profile-360",
+  "status": 200,
+  "body": null,
+  "resp": "{\"subjectUserId\":\"11f07eba-10c4-488b-9a29-88b3781f8cc7\",\"isSelf\":true,\"viewerRelation\":\"Self\",\"periodKey\":\"2026-W35\",\"sections\":{\"identity\":{\"key\":\"identity\",\"titleAr\":\"الهويّة وحالة التوظيف\",\"status\":\"Ready\",\"dataQuality\":\"Complete\",\"lastUpdatedAtUtc\":\"2026-08-31T02:44:35.32243Z\",\"summary\":{\"userId\":\"11f07eba-10c4-488b-9a29-88b3781f8cc7\",\"fullName\":\"حساب اختبار اصطناعي R5\",\"email\":\"synthetic.uat@p123.r5.uat.test\",\"jobRoleName\":null,\"teamName\":null,\"departmentName\":null,\"directManagerName\":null,\"isActive\":true,\"joinedAtUtc\":\"2026-08-31T02:44:35.32243Z\"},\"items\":[],\"reason\":null},\"operationalSummary\":{\"key\":\"operationalSummary\",\"titleAr\":\"الملخّص التشغيليّ\",\"status\":\"Ready\",\"dataQuality\":\"Complete\",\"lastUpdatedAtUtc\":null,\"summary\":{\"reportsSubmitted\":0,\"reportsReturned\":0,\"reportsNeedsAction\":0,\"kpiEvaluationCount\":0,\"lastKpiScore\":null,\"lastKpiPeriodKey\":null,\"openLeaveRequests\":0,\"open"
+ },
+ {
+  "t": 1788144413383,
+  "method": "GET",
+  "path": "/api/employees/11f07eba-10c4-488b-9a29-88b3781f8cc7/checklist",
+  "status": 200,
+  "body": null,
+  "resp": "{\"subjectUserId\":\"11f07eba-10c4-488b-9a29-88b3781f8cc7\",\"isSelf\":true,\"viewerRelation\":\"Self\",\"summary\":{\"applicable\":8,\"completed\":4,\"open\":4,\"notApplicable\":2,\"requiresMyAction\":0,\"completionRatio\":0.5},\"items\":[{\"key\":\"equipment-handover\",\"titleAr\":\"تسليم العهدة والأجهزة\",\"groupAr\":\"التهيئة\",\"source\":\"Manual\",\"status\":\"NotStarted\",\"statusLabelAr\":\"لم يبدأ\",\"openCount\":1,\"ownerUserId\":null,\"ownerFullName\":null,\"dueDate\":null,\"lastActionAtUtc\":null,\"evidenceReference\":null,\"sourceKind\":null,\"sourceLink\":null,\"requiresMyAction\":false},{\"key\":\"onboarding-orientation\",\"titleAr\":\"إتمام التهيئة التعريفيّة\",\"groupAr\":\"التهيئة\",\"source\":\"Manual\",\"status\":\"NotStarted\",\"statusLabelAr\":\"لم يبدأ\",\"openCount\":1,\"ownerUserId\":null,\"ownerFullName\":null,\"dueDate\":null,\"lastActionAtUtc\":null,\"evidenceReference\":null,\"sourceKind\":null,\"sourceLink\":null,\"requiresMyAction\":false},{\"key\":\"policy-acknowledg"
+ }
+]

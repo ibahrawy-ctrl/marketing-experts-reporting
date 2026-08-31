@@ -1,0 +1,26 @@
+{
+ "subjectUserId": "bda9cb8b-4164-44ee-9a25-a0fdc0ab0884",
+ "subjectName": "حساب اختبار اصطناعي R5",
+ "tracks": [
+  {
+   "cadence": "WeeklyPulse",
+   "cadenceSource": "notConfigured",
+   "periodType": "Weekly",
+   "currentPeriodKey": "2026-W36",
+   "templates": [],
+   "isConfigured": false,
+   "blockingReason": "مسار نبض الأسبوع غير مُهيّأ لهذا الموظّف: لا قالب أسبوعيّ فعّال مُسنَد له. هذا لا يمسّ المسار الربعيّ الرسميّ."
+  },
+  {
+   "cadence": "Quarterly",
+   "cadenceSource": "notConfigured",
+   "periodType": "Quarterly",
+   "currentPeriodKey": "2026-Q3",
+   "templates": [],
+   "isConfigured": false,
+   "blockingReason": "المسار الربعيّ الرسميّ غير مُهيّأ لهذا الموظّف: لا قالب ربعيّ فعّال مُسنَد له. هذا لا يمسّ مسار نبض الأسبوع."
+  }
+ ],
+ "isConfigured": false,
+ "blockingReason": "لا يوجد إعداد KPI فعّال لهذا الموظّف على أيّ مسار: لا قالب نبض أسبوعيّ ولا قالب ربعيّ رسميّ مُسنَد له. اربط قالبًا بمسمّاه أو فريقه أو إدارته قبل إنشاء التقييم."
+}

@@ -17,6 +17,12 @@ public interface IPeriodService
     ResolvedPeriod LastCompletedWeek();
 
     /// <summary>
+    /// DEC-01/1 — الربع الميلاديّ **الجاري** بتوقيت <c>Asia/Riyadh</c> (وليس آخر ربع مكتمل).
+    /// هو الفترة الافتراضيّة لصفحة KPI؛ يبقى <c>IsOpen = true</c> ما دام الربع لم ينته.
+    /// </summary>
+    ResolvedPeriod CurrentQuarter();
+
+    /// <summary>
     /// الفترة السابقة المقارِنة لفترة محلولة (أسبوع−7 أيام، شهر−1، ربع−1، سنة−1،
     /// والمخصّص يُزاح بطول المدى نفسه). تُستعمل لحساب <c>delta</c>/<c>trend</c>.
     /// </summary>

@@ -1,0 +1,41 @@
+{
+ "removedAssignments": [
+  {
+   "template": "مؤشرات أداء المودريشن",
+   "status": 200
+  },
+  {
+   "template": "مؤشرات أداء الفيديو",
+   "status": 200
+  },
+  {
+   "template": "مؤشرات أداء المصمم",
+   "status": 200
+  },
+  {
+   "template": "مؤشرات أداء كاتب المحتوى",
+   "status": 200
+  },
+  {
+   "template": "مؤشرات أداء SEO",
+   "status": 200
+  },
+  {
+   "template": "مؤشرات مشتري الإعلانات",
+   "status": 200
+  },
+  {
+   "template": "النبض الأسبوعي العام",
+   "status": 200
+  },
+  {
+   "template": "مؤشرات مندوب المبيعات",
+   "status": 200
+  },
+  {
+   "template": "مؤشرات مندوب مبيعات B2C",
+   "status": 200
+  }
+ ],
+ "deleteUser": 200
+}

@@ -3,7 +3,9 @@ import type { ReactNode } from 'react';
 import { DashboardShell } from './components/DashboardShell';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AliasRedirect } from './components/AliasRedirect';
-import { ROUTE_ALIASES } from './lib/navConfig';
+import { FEATURES, ROUTE_ALIASES } from './lib/navConfig';
+import { useAuth } from './lib/auth';
+import { FeatureDisabledState } from './components/states';
 import LoginPage from './pages/LoginPage';
 import HomePage from './pages/HomePage';
 import ExecutiveReportsPage from './pages/ExecutiveReportsPage';
@@ -34,6 +36,7 @@ import ReportViewGrantsPage from './pages/ReportViewGrantsPage';
 import EmailNotificationsPage from './pages/EmailNotificationsPage';
 import EmailControlCenterPage from './pages/EmailControlCenterPage';
 import EmployeeProfilePage from './pages/EmployeeProfilePage';
+import EmployeeDirectoryPage from './pages/EmployeeDirectoryPage';
 import AttendancePage from './pages/AttendancePage';
 import HrOperationsPage from './pages/HrOperationsPage';
 import { MyKpiPage, EmployeeKpiPage } from './pages/IndividualKpiPage';
@@ -154,15 +157,38 @@ function Landing() {
   );
 }
 
-function Protected({ children, roles }: { children: ReactNode; roles?: Role[] }) {
+/**
+ * P123-R1 — بوّابة الميزة على مستوى المسار.
+ *
+ * تُطبَّق **داخل** `DashboardShell` عمدًا لا قبله: المستخدم الذي يكتب رابطًا مباشرًا لسطح مغلق
+ * يجب أن يبقى داخل التطبيق ويقرأ سببًا مفهومًا، لا أن يُقذَف إلى `/app` بلا تفسير فيظنّ الرابط
+ * معطوبًا. وهي ليست تفويضًا: العَلَم إخفاء ميزة، والتخويل يبقى خادميًّا كاملًا خلفها.
+ */
+function FeatureGate({ featureKey, children }: { featureKey?: string; children: ReactNode }) {
+  const { features } = useAuth();
+  if (featureKey && !features.has(featureKey)) return <FeatureDisabledState />;
+  return <>{children}</>;
+}
+
+function Protected({
+  children,
+  roles,
+  featureKey,
+}: {
+  children: ReactNode;
+  roles?: Role[];
+  featureKey?: string;
+}) {
   return (
     <ProtectedRoute roles={roles}>
-      <DashboardShell>{children}</DashboardShell>
+      <DashboardShell>
+        <FeatureGate featureKey={featureKey}>{children}</FeatureGate>
+      </DashboardShell>
     </ProtectedRoute>
   );
 }
 
-const APP_ROUTES: { path: string; element: ReactNode; roles?: Role[] }[] = [
+const APP_ROUTES: { path: string; element: ReactNode; roles?: Role[]; featureKey?: string }[] = [
   { path: '/app', element: <HomePage /> },
   { path: '/app/teams', element: <TeamsPage />, roles: EXEC_ROLES },
   { path: '/app/teams/:teamId', element: <TeamDetailsPage />, roles: EXEC_ROLES },
@@ -198,8 +224,11 @@ const APP_ROUTES: { path: string; element: ReactNode; roles?: Role[] }[] = [
   // `selfRoute` ضروريّ لا زخرفيّ: المقطع الثابت `me` يفوز على `:userId` في المطابقة، فلا
   // باراميتر أصلًا هنا ⇒ اشتقاق وضع الذات من `useParams` كان يُنتج معرّفًا فارغًا فيسقط
   // المسار في العرض الإداريّ ويعرض شاشة المنع بدل ملفّ المستخدم نفسه.
-  { path: '/app/employee/me', element: <EmployeeProfilePage selfRoute /> },
+  { path: '/app/employee/me', element: <EmployeeProfilePage selfRoute />, featureKey: FEATURES.employee360 },
   { path: '/app/employee/:userId', element: <EmployeeProfilePage /> },
+  // P123-R2 — دليل الموظّفين: بلا بوّابة أدوار عمدًا. النطاق مفروض خادمًا في `/directory/users`
+  // بالمُحلِّل نفسه الذي يحرس ملفّ الموظّف، فأدنى نطاق (`own`) يعطي الموظّفَ نفسَه لا شاشة منع.
+  { path: '/app/employees', element: <EmployeeDirectoryPage /> },
   // مؤشرات أداء فردية (KPI-INDIVIDUAL-DASHBOARD-R1): «مؤشرات أدائي» للموظّف الحالي،
   // و«مؤشرات أداء الموظف» لموظّف بعينه — النطاق مفروض خادمًا (self-or-scope ⇒ 403/404 خارج النطاق).
   { path: '/app/my-kpi', element: <MyKpiPage /> },
@@ -214,12 +243,12 @@ const APP_ROUTES: { path: string; element: ReactNode; roles?: Role[] }[] = [
   // الحضور والالتزام (P2-ATT-007): مسار **جديد** لا يستبدل شيئًا. بلا بوّابة أدوار عمدًا — الموظّف
   // طرفٌ أصيل في آلة الحالات (يقرّ أو يعترض)، وقصر الصفحة على الإدارة يُفقده حقّ الردّ. الرؤية
   // والإجراءات محسومة خادميًّا: خارج النطاق 404، والأزرار تُرسَم من `allowedActions` وحدها.
-  { path: '/app/attendance', element: <AttendancePage /> },
+  { path: '/app/attendance', element: <AttendancePage />, featureKey: FEATURES.attendance },
   // لوحة عمليّات الموارد البشريّة (P2-HR-009): مسار **جديد** لا يستبدل شيئًا. بلا بوّابة أدوار في
   // الواجهة عمدًا — المفتاح `HrOperations.View` تخويل صريح لا يمنحه أيّ دور ضمنًا، فبوّابة الأدوار
   // هنا كانت ستكذب في الاتّجاهين: تمنع حاملَ المفتاح، وتُوهم غير الحامل بأنّ له سطحًا. الخادم
   // يردّ 403 بلا مفتاح و404 خارج النطاق، والصفحة تعرض ذلك رسالةً مفهومة.
-  { path: '/app/hr-operations', element: <HrOperationsPage /> },
+  { path: '/app/hr-operations', element: <HrOperationsPage />, featureKey: FEATURES.hrOperations },
   // خدمات الموظف (V1.1): الأرصدة وطلبات الموارد البشرية — متاح لكل مصادَق عليه (النطاق مفروض خادمًا).
   { path: '/app/balances', element: <MyBalancesPage /> },
   { path: '/app/hr-requests', element: <HrRequestsPage /> },
@@ -292,7 +321,15 @@ export default function App() {
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<LoginPage />} />
       {APP_ROUTES.map((r) => (
-        <Route key={r.path} path={r.path} element={<Protected roles={r.roles}>{r.element}</Protected>} />
+        <Route
+          key={r.path}
+          path={r.path}
+          element={
+            <Protected roles={r.roles} featureKey={r.featureKey}>
+              {r.element}
+            </Protected>
+          }
+        />
       ))}
       {/*
         مسارات الـalias (P3-NAV-003) — مشتقّة من سجلّ الملاحة وحده، فلا قائمة موازية تتباعد عنه.

@@ -100,7 +100,10 @@ public record KpiTemplateAssignmentRowDto(
     TemplateAssignmentKind Kind,
     string? Notes,
     bool IsActive,
-    DateTime CreatedAtUtc);
+    DateTime CreatedAtUtc,
+    // DEC-01/6 — تاريخا سريان الإسناد؛ null = ساري بلا حدّ (سلوك ما قبل R5 حرفيًّا).
+    DateOnly? EffectiveFrom = null,
+    DateOnly? EffectiveTo = null);
 
 // تغطية قالب KPI: المعلومات + المرتبطون + المستثنون بأسبابهم + الإسنادات/الاستثناءات الصريحة.
 // تطبّق نفس أولوية الاختيار بالخادم (Employee→JobRole→Team→Department→General، Exclude يتفوّق)
@@ -122,11 +125,16 @@ public record KpiTemplateAssignmentsDto(
     IReadOnlyList<KpiTemplateAssignmentRowDto> Assignments);
 
 // إنشاء إسناد/استثناء صريح لقالب KPI على مستوى (موظّف/مسمّى/فريق/إدارة).
+// DEC-01/6 — لكلّ تغيير تواتر/قالب تاريخُ سريان: الفترات التاريخيّة لا يُعاد تفسيرها بإعداد لاحق.
+// DEC-01/8 — الاستثناء (Exclude) المؤقَّت بتاريخَي سريان هو «الإعفاء الإداريّ المسجَّل» الذي يخفض
+// المقام (AdjustedExpected) بدل أن يُعاقِب الموظّف. الحدّان الفارغان ⇒ سلوك ما قبل R5 حرفيًّا.
 public record CreateKpiAssignmentRequest(
     TemplateAssignmentScope ScopeType,
     Guid ScopeId,
     TemplateAssignmentKind Kind,
-    string? Notes = null);
+    string? Notes = null,
+    DateOnly? EffectiveFrom = null,
+    DateOnly? EffectiveTo = null);
 
 // تعطيل/تفعيل إسناد قائم + تعديل الملاحظة.
 public record UpdateKpiAssignmentRequest(bool IsActive, string? Notes = null);
@@ -217,6 +225,41 @@ public record KpiEvaluationLookupDto(bool Found, KpiEvaluationDto? Evaluation);
 // = مرؤوسوه المباشرون فقط (ManagerId == المُقيّم)، أو كل الموظّفين إن كان أدمن (IsAdminOverride).
 public record EvaluatableSubjectDto(Guid Id, string FullName, string Email);
 public record EvaluatableSubjectsDto(bool IsAdminOverride, IReadOnlyList<EvaluatableSubjectDto> Subjects);
+
+/// <summary>قالب مؤهَّل لإنشاء تقييم لهذا الموظّف — الاسم فقط، بلا تفاصيل تقنيّة.</summary>
+public record KpiEvaluationSetupTemplateDto(Guid Id, string Name);
+
+/// <summary>
+/// مسار تقييم واحد للموظّف — نبض الأسبوع أو التقييم الربعيّ الرسميّ — محسومًا خادميًّا وحده:
+/// مصدر الحسم، ونوع الفترة، ومفتاح الفترة الجارية، والقوالب المؤهَّلة <b>لهذا المسار وحده</b>.
+/// <c>IsConfigured = false</c> حالة مسمّاة لهذا المسار: إمّا لا إسناد فعّال عليه وإمّا لا قالب
+/// منشور له إصدار منشور. لا يمسّ ذلك المسار المقابل إطلاقًا (OBS-R5-01/3).
+/// </summary>
+public record KpiEvaluationTrackDto(
+    KpiCadence Cadence,
+    string CadenceSource,
+    PeriodType PeriodType,
+    string CurrentPeriodKey,
+    IReadOnlyList<KpiEvaluationSetupTemplateDto> Templates,
+    bool IsConfigured,
+    string? BlockingReason);
+
+/// <summary>
+/// DEC-01/2+5 و OBS-R5-01 — «الإعداد الفعّال» لإنشاء تقييم لموظّف بعينه، محسومًا <b>خادميًّا بالكامل</b>.
+/// المستخدم لا يُسأل عن نوع التقييم ولا عن التواتر، ويُعاد إليه <b>المساران معًا</b> لأنّهما متزامنان
+/// لا متبادلان: قالب ربعيّ لا يُلغي نبض الأسبوع ولا العكس.
+/// <para>
+/// <c>Tracks</c> يحوي دائمًا مدخلًا لكلّ مسار بحالته المسمّاة، فلا يُخفي غيابُ أحدهما الآخرَ.
+/// <c>IsConfigured = false</c> على مستوى الموظّف يعني أنّ <b>كلا</b> المسارين غير مُهيّأ، وعندها
+/// تعرض الواجهة <c>BlockingReason</c> ولا تُرسل طلب إنشاء غير صالح أصلًا.
+/// </para>
+/// </summary>
+public record KpiEvaluationSetupDto(
+    Guid SubjectUserId,
+    string SubjectName,
+    IReadOnlyList<KpiEvaluationTrackDto> Tracks,
+    bool IsConfigured,
+    string? BlockingReason);
 
 public record KpiResultInput(Guid KpiMetricId, decimal? RawValue, decimal? Score, string? Note);
 

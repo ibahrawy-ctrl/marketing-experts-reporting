@@ -1,0 +1,110 @@
+[
+ {
+  "id": "2e85d983-a748-42d8-b752-d97ebbb7af9d",
+  "title": "مؤشرات أداء المودريشن",
+  "description": "تقييم أسبوعي للمودريشن — مبني على أرقام تقرير المديرشن الأسبوعي الحالي بدون تكامل خارجي",
+  "jobRoleId": null,
+  "cadence": "WeeklyPulse",
+  "status": "Published",
+  "ownerId": "74c79c4b-d403-494c-aafe-a2d63caf3965",
+  "isActive": true,
+  "latestVersionNumber": 1,
+  "metricCount": 5
+ },
+ {
+  "id": "66a0e6ff-5d3c-4330-b31f-bc1efc473638",
+  "title": "مؤشرات أداء الفيديو",
+  "description": "تقييم أسبوعي لفريق الفيديو — مبني على أرقام تقرير فريق الفيديو الحالي بدون تكامل خارجي",
+  "jobRoleId": null,
+  "cadence": "WeeklyPulse",
+  "status": "Published",
+  "ownerId": "74c79c4b-d403-494c-aafe-a2d63caf3965",
+  "isActive": true,
+  "latestVersionNumber": 1,
+  "metricCount": 5
+ },
+ {
+  "id": "be23dce7-caa5-4757-ae25-9c3484c6fd70",
+  "title": "مؤشرات أداء المصمم",
+  "description": "تقييم أسبوعي للمصمّم — مبني على أرقام تقرير فريق التصميم الحالي بدون تكامل خارجي",
+  "jobRoleId": null,
+  "cadence": "WeeklyPulse",
+  "status": "Published",
+  "ownerId": "74c79c4b-d403-494c-aafe-a2d63caf3965",
+  "isActive": true,
+  "latestVersionNumber": 1,
+  "metricCount": 5
+ },
+ {
+  "id": "84670a21-3920-472e-9002-05b8d91d4938",
+  "title": "مؤشرات أداء كاتب المحتوى",
+  "description": "تقييم أسبوعي لكاتب المحتوى — مبني على أرقام تقرير كاتب المحتوى الحالي بدون تكامل خارجي",
+  "jobRoleId": null,
+  "cadence": "WeeklyPulse",
+  "status": "Published",
+  "ownerId": "74c79c4b-d403-494c-aafe-a2d63caf3965",
+  "isActive": true,
+  "latestVersionNumber": 1,
+  "metricCount": 5
+ },
+ {
+  "id": "be7a1c2a-d6bd-4601-a9ad-5760f4a28884",
+  "title": "مؤشرات أداء SEO",
+  "description": "تقييم أسبوعي لأداء فريق/أخصائي SEO — مبني على أرقام تقارير SEO الحالية بدون تكامل خارجي",
+  "jobRoleId": null,
+  "cadence": "WeeklyPulse",
+  "status": "Published",
+  "ownerId": "74c79c4b-d403-494c-aafe-a2d63caf3965",
+  "isActive": true,
+  "latestVersionNumber": 1,
+  "metricCount": 5
+ },
+ {
+  "id": "1d8789f5-225a-4411-b275-784eb5ffaca2",
+  "title": "مؤشرات مشتري الإعلانات",
+  "description": "تقييم ربع سنوي لأداء الحملات المدفوعة",
+  "jobRoleId": null,
+  "cadence": "Quarterly",
+  "status": "Published",
+  "ownerId": "74c79c4b-d403-494c-aafe-a2d63caf3965",
+  "isActive": true,
+  "latestVersionNumber": 1,
+  "metricCount": 4
+ },
+ {
+  "id": "f4cb8852-3dc6-4829-845c-831e7a7859a2",
+  "title": "النبض الأسبوعي العام",
+  "description": "تقييم أسبوعي موجز لجميع الموظفين",
+  "jobRoleId": null,
+  "cadence": "WeeklyPulse",
+  "status": "Published",
+  "ownerId": "74c79c4b-d403-494c-aafe-a2d63caf3965",
+  "isActive": true,
+  "latestVersionNumber": 1,
+  "metricCount": 3
+ },
+ {
+  "id": "c380d8a9-c950-4e17-875e-da232e51f69a",
+  "title": "مؤشرات مندوب المبيعات",
+  "description": "تقييم ربع سنوي لمندوب المبيعات",
+  "jobRoleId": null,
+  "cadence": "Quarterly",
+  "status": "Published",
+  "ownerId": "74c79c4b-d403-494c-aafe-a2d63caf3965",
+  "isActive": true,
+  "latestVersionNumber": 1,
+  "metricCount": 4
+ },
+ {
+  "id": "c32c18cf-2d54-458d-91cb-dc8c4a7acd28",
+  "title": "مؤشرات مندوب مبيعات B2C",
+  "description": "تقييم أسبوعي لمندوب مبيعات الأفراد (B2C) — مبني على أرقام التقرير الفردي",
+  "jobRoleId": null,
+  "cadence": "WeeklyPulse",
+  "status": "Published",
+  "ownerId": "74c79c4b-d403-494c-aafe-a2d63caf3965",
+  "isActive": true,
+  "latestVersionNumber": 1,
+  "metricCount": 5
+ }
+]

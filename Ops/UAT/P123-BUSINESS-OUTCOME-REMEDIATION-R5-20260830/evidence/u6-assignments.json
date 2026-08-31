@@ -1,0 +1,47 @@
+[
+ {
+  "template": "مؤشرات أداء المودريشن",
+  "cadence": "WeeklyPulse",
+  "status": 200
+ },
+ {
+  "template": "مؤشرات أداء الفيديو",
+  "cadence": "WeeklyPulse",
+  "status": 200
+ },
+ {
+  "template": "مؤشرات أداء المصمم",
+  "cadence": "WeeklyPulse",
+  "status": 200
+ },
+ {
+  "template": "مؤشرات أداء كاتب المحتوى",
+  "cadence": "WeeklyPulse",
+  "status": 200
+ },
+ {
+  "template": "مؤشرات أداء SEO",
+  "cadence": "WeeklyPulse",
+  "status": 200
+ },
+ {
+  "template": "مؤشرات مشتري الإعلانات",
+  "cadence": "Quarterly",
+  "status": 200
+ },
+ {
+  "template": "النبض الأسبوعي العام",
+  "cadence": "WeeklyPulse",
+  "status": 200
+ },
+ {
+  "template": "مؤشرات مندوب المبيعات",
+  "cadence": "Quarterly",
+  "status": 200
+ },
+ {
+  "template": "مؤشرات مندوب مبيعات B2C",
+  "cadence": "WeeklyPulse",
+  "status": 200
+ }
+]

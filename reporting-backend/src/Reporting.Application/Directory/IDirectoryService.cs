@@ -86,6 +86,15 @@ public interface IDirectoryService
     Task<Result<DirectoryUserDto>> UpdateUserBasicAsync(Guid userId, UpdateUserBasicRequest req, Guid actingUserId, bool actingIsAdmin, CancellationToken ct = default);
 
     /// <summary>
+    /// DEF-R5-002 — تسجيل نافذة خدمة الموظّف (الالتحاق/انتهاء الخدمة) على سطح إدارة الموظّف القائم — Admin/CeoSupport/HR.
+    /// الطلب يعلن الحالة النهائيّة للحقلين معًا (null = غير مسجَّل). حاجز الحساب الحسّاس يُطبَّق على غير الأدمن.
+    /// يرفض تاريخ خروج أسبق من الالتحاق، ويرفض تسجيل خروج بلا التحاق. يسجّل Audit
+    /// <c>user.employment_window.updated</c> بالقيم القديمة/الجديدة + المنفّذ + الوقت.
+    /// لا يُعيد كتابة أيّ تقييم تاريخيّ: الأثر حسابيّ عند كلّ فترة تُطلَب (مقام DEC-01/8).
+    /// </summary>
+    Task<Result<DirectoryUserDto>> UpdateUserEmploymentWindowAsync(Guid userId, UpdateUserEmploymentWindowRequest req, Guid actingUserId, bool actingIsAdmin, CancellationToken ct = default);
+
+    /// <summary>
     /// تعديل الانتماء التنظيمي للموظف (الإدارة/الفريق/المدير) عند نقل تنظيمي — Admin/CeoSupport/HR/GM/CEO.
     /// قيود أمان صارمة: لا تعطيل، لا تغيير ذاتي، لا مدير غير نشط، لا علاقة دائرية.
     /// حاجز الحساب الحسّاس يُطبَّق على غير الأدمن فقط: HR/CeoSupport/GM/CEO ممنوعون من تعديل Admin/CEO/GM/CeoSupport (403)،

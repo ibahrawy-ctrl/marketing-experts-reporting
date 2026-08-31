@@ -4,7 +4,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Reporting.Application.Common;
 using Reporting.Domain.Entities.EmployeeServices;
+using Reporting.Domain.Entities.Kpi;
 using Reporting.Domain.Entities.Org;
+using Reporting.Domain.Entities.System;
 using Reporting.Domain.Entities.Templates;
 using Reporting.Domain.Enums;
 using Reporting.Infrastructure.Identity;
@@ -357,6 +359,9 @@ public static class OrgSeeder
             (VideoReportSchema.KpiTitle, "VIDEO_EDITOR"),
             (ModerationReportSchema.KpiTitle, "SOCIAL_MOD"),
         };
+        // OBS-R5-01/6 — الربط بمسمّى لا يُلغي مسار النبض العامّ: سلّم الأولويّة يُطبَّق داخل كلّ مسار
+        // على حدة، فقالب «مؤشرات مندوب المبيعات» الربعيّ المربوط بـSALES_B2B لا يُخفي «النبض الأسبوعي
+        // العام» عن موظّفي المسمّى نفسه. ولأنّ هذا تغيير حالة على قالب قائم، يُسجَّل له أثر صريح.
         foreach (var (title, code) in kpiTitleToRole)
         {
             if (Role(code) is not { } rid) continue;
@@ -365,6 +370,20 @@ public static class OrgSeeder
             {
                 kpi.JobRoleId = rid;
                 changed = true;
+                db.AuditLogs.Add(new AuditLog
+                {
+                    Action = "KpiTemplateSeedBinding.JobRoleAssigned",
+                    EntityType = nameof(KpiTemplate),
+                    EntityId = kpi.Id,
+                    DataJson = JsonSerializer.Serialize(new
+                    {
+                        title,
+                        jobRoleCode = code,
+                        before = (Guid?)null,
+                        after = rid,
+                        cadence = kpi.Cadence.ToString()
+                    })
+                });
             }
         }
 

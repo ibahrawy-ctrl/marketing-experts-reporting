@@ -1016,7 +1016,7 @@ public class DailyApplicabilityUnifiedOverdueTests
         var kpiOptions = Options.Create(new KpiFeatureOptions());
         var kpiCalc = new KpiCalculationService(
             db, scopeResolver, currentUser, new CanonicalPeriodService(new SystemClock()),
-            new SystemClock(), kpiOptions);
+            new SystemClock(), scope.ServiceProvider.GetRequiredService<IKpiTemplateService>(), kpiOptions);
         var svc = new ReportingService(db, currentUser, scopeResolver, kpiCalc, kpiOptions);
 
         var r = await svc.SubmissionComplianceAsync(W28Key, null, null);
