@@ -1,0 +1,112 @@
+{
+    "ticket": "REPORT_TEMPLATE_PUBLICATION_GUARD_HOTFIX_R1",
+    "database": "tplguard_repro",
+    "templates": [
+        {
+            "title": "تقرير المديرشن الأسبوعي",
+            "versions": [
+                {
+                    "versionId": "48374cdf-9073-4ee3-ad43-09ef8ce8d126",
+                    "versionNumber": 8,
+                    "expectWorkItems": false,
+                    "expectFieldCount": 5,
+                    "expectSchemaVersion2": false
+                },
+                {
+                    "versionId": "a28354c2-68e2-4ed8-9905-75cc58d85ada",
+                    "versionNumber": 9,
+                    "expectWorkItems": true,
+                    "expectFieldCount": 5,
+                    "expectSchemaVersion2": true
+                }
+            ],
+            "templateId": "db8c764d-6f10-4997-8c07-512334dad30b",
+            "applicabilityFloorUtc": "2026-08-23T16:48:14.336225Z",
+            "effectiveVersionNumber": 9,
+            "expectedPublishedVersionNumbers": [
+                8,
+                9
+            ]
+        },
+        {
+            "title": "تقرير فريق التصميم",
+            "versions": [
+                {
+                    "versionId": "edb54ab6-a441-452f-82de-96268780a86d",
+                    "versionNumber": 7,
+                    "expectWorkItems": false,
+                    "expectFieldCount": 5,
+                    "expectSchemaVersion2": false
+                },
+                {
+                    "versionId": "4c5b6c9a-ec46-4c6b-ad87-176826b43d05",
+                    "versionNumber": 8,
+                    "expectWorkItems": true,
+                    "expectFieldCount": 5,
+                    "expectSchemaVersion2": true
+                }
+            ],
+            "templateId": "e9734e7f-490e-4380-9424-5354865a3153",
+            "applicabilityFloorUtc": "2026-08-23T16:48:14.331739Z",
+            "effectiveVersionNumber": 8,
+            "expectedPublishedVersionNumbers": [
+                7,
+                8
+            ]
+        },
+        {
+            "title": "تقرير فريق الفيديو",
+            "versions": [
+                {
+                    "versionId": "30d18be2-db0a-4050-b121-59bc733883bd",
+                    "versionNumber": 7,
+                    "expectWorkItems": false,
+                    "expectFieldCount": 5,
+                    "expectSchemaVersion2": false
+                },
+                {
+                    "versionId": "f32ea97c-56cb-425f-8296-09a0d71e4059",
+                    "versionNumber": 8,
+                    "expectWorkItems": true,
+                    "expectFieldCount": 5,
+                    "expectSchemaVersion2": true
+                }
+            ],
+            "templateId": "32f263b9-d715-47b3-9bc9-8cd80f2f8ce5",
+            "applicabilityFloorUtc": "2026-08-23T16:48:14.333934Z",
+            "effectiveVersionNumber": 8,
+            "expectedPublishedVersionNumbers": [
+                7,
+                8
+            ]
+        },
+        {
+            "title": "تقرير كاتب المحتوى الأسبوعي",
+            "versions": [
+                {
+                    "versionId": "d934b8b0-4654-4b0c-8f53-a43d279b4e84",
+                    "versionNumber": 8,
+                    "expectWorkItems": false,
+                    "expectFieldCount": 5,
+                    "expectSchemaVersion2": false
+                },
+                {
+                    "versionId": "ed4796e4-9d21-4443-8c3f-091efe6ffcb8",
+                    "versionNumber": 9,
+                    "expectWorkItems": true,
+                    "expectFieldCount": 5,
+                    "expectSchemaVersion2": true
+                }
+            ],
+            "templateId": "5e6ad325-b26c-4fd6-b4f8-d415dae44c89",
+            "applicabilityFloorUtc": "2026-08-23T16:48:14.328944Z",
+            "effectiveVersionNumber": 9,
+            "expectedPublishedVersionNumbers": [
+                8,
+                9
+            ]
+        }
+    ],
+    "actorEmail": "admin@marketingexperts.local",
+    "baselineDatabase": "tplguard_before"
+}

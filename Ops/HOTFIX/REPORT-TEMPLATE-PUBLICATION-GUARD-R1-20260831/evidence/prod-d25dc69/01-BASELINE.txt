@@ -1,0 +1,47 @@
+### BASELINE 2026-08-31T13:58:06Z ###
+== systemd ==
+MainPID=1780089
+NRestarts=0
+ExecMainStartTimestamp=Mon 2026-08-31 06:39:04 UTC
+ActiveState=active
+SubState=running
+== health ==
+health=200
+== stamp ==
+1.0.0+045cb0df3e296a86fff3c1677d40534b86231778
+== artifact ==
+dlls=37 files=46
+25d6f978c9c3e5f34f9a149e8bd0b805
+== db counters ==
+107|77|330|49|2026-08-31 06:39:09.825766+00|2026-08-31 06:12:37.860862+00
+== multi-published families ==
+16
+== phase2/feature flags (أسماء وقيم غير سرّيّة فقط) ==
+EmailNotifications__Mode=Enabled
+Scheduler__Enabled=true
+== 5xx/errors آخر 3 ساعات ==
+error_like_lines=5
+== audit + email counters ==
+                                                             ^
+HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
+== users/roles/perm fingerprint ==
+34|12|39
+== full versions fingerprint (BEFORE) ==
+rows=107
+md5=54dc81f2e99d060b0c69cd31901a6324
+== submissions fingerprint (BEFORE) ==
+rows=330
+md5=1d7806dba3b8e324edaf94fb1245d97f
+== status distribution + audit ==
+ApprovedByDirectManager|27
+Closed|208
+Draft|10
+Returned|15
+Submitted|70
+audit_rows=1534
+== أسطر الأخطاء الخمسة ==
+Aug 31 13:09:12 srv1747233 reporting-api[1780089]:       Email sent to walaagomaa898@gmail.com via smtp.gmail.com:587 (subject=تذكير بتقرير المب�
+Aug 31 13:09:13 srv1747233 reporting-api[1780089]:       Email sent to zinabo130@gmail.com via smtp.gmail.com:587 (subject=تذكير بتقرير المبيع�
+Aug 31 13:09:14 srv1747233 reporting-api[1780089]:       Email sent to Ashakmal5@gmail.com via smtp.gmail.com:587 (subject=تذكير بتقرير المبيع�
+Aug 31 13:09:15 srv1747233 reporting-api[1780089]:       Email sent to reemgaballah17@gmail.com via smtp.gmail.com:587 (subject=تذكير بتقرير المب
+Aug 31 13:09:17 srv1747233 reporting-api[1780089]:       Email sent to bds@marketingexperts.com.sa via smtp.gmail.com:587 (subject=تذكير بتقرير ال�

@@ -1,0 +1,112 @@
+{
+    "ticket": "REPORT_TEMPLATE_PUBLICATION_GUARD_HOTFIX_R1",
+    "database": "reporting_test_uat",
+    "templates": [
+        {
+            "title": "تقرير المديرشن الأسبوعي",
+            "versions": [
+                {
+                    "versionId": "6eaf6956-472c-4291-baf7-8ef9f09ea86e",
+                    "versionNumber": 4,
+                    "expectWorkItems": false,
+                    "expectFieldCount": 5,
+                    "expectSchemaVersion2": false
+                },
+                {
+                    "versionId": "7c4bb7b6-a53b-4f33-8b7d-0a3704db288b",
+                    "versionNumber": 5,
+                    "expectWorkItems": true,
+                    "expectFieldCount": 5,
+                    "expectSchemaVersion2": true
+                }
+            ],
+            "templateId": "3a4775c2-5a78-4171-b70f-d2b029f4ff92",
+            "applicabilityFloorUtc": "2026-07-12T08:30:21.258837Z",
+            "effectiveVersionNumber": 5,
+            "expectedPublishedVersionNumbers": [
+                4,
+                5
+            ]
+        },
+        {
+            "title": "تقرير فريق التصميم",
+            "versions": [
+                {
+                    "versionId": "597d49f9-754d-42d8-b452-3112df1c912a",
+                    "versionNumber": 4,
+                    "expectWorkItems": false,
+                    "expectFieldCount": 5,
+                    "expectSchemaVersion2": false
+                },
+                {
+                    "versionId": "388570d8-3a74-449b-b311-598e887fbce4",
+                    "versionNumber": 5,
+                    "expectWorkItems": true,
+                    "expectFieldCount": 5,
+                    "expectSchemaVersion2": true
+                }
+            ],
+            "templateId": "4b50b69d-5b3b-4160-89d4-1c524bb96458",
+            "applicabilityFloorUtc": "2026-07-12T08:30:21.255636Z",
+            "effectiveVersionNumber": 5,
+            "expectedPublishedVersionNumbers": [
+                4,
+                5
+            ]
+        },
+        {
+            "title": "تقرير فريق الفيديو",
+            "versions": [
+                {
+                    "versionId": "d26b6a10-616e-49bb-ba8f-5942fa04bac7",
+                    "versionNumber": 4,
+                    "expectWorkItems": false,
+                    "expectFieldCount": 5,
+                    "expectSchemaVersion2": false
+                },
+                {
+                    "versionId": "407a4aa6-3e34-4f8b-9b21-e65f11b96cbf",
+                    "versionNumber": 5,
+                    "expectWorkItems": true,
+                    "expectFieldCount": 5,
+                    "expectSchemaVersion2": true
+                }
+            ],
+            "templateId": "6f492ed5-b0fb-4b95-894c-f52ef9e8abee",
+            "applicabilityFloorUtc": "2026-07-12T08:30:21.257403Z",
+            "effectiveVersionNumber": 5,
+            "expectedPublishedVersionNumbers": [
+                4,
+                5
+            ]
+        },
+        {
+            "title": "تقرير كاتب المحتوى الأسبوعي",
+            "versions": [
+                {
+                    "versionId": "0ac84366-5a10-4e2c-8de0-bfa8010cd034",
+                    "versionNumber": 4,
+                    "expectWorkItems": false,
+                    "expectFieldCount": 5,
+                    "expectSchemaVersion2": false
+                },
+                {
+                    "versionId": "e36d04d3-b8c9-4c0e-b41d-0e5ff7588032",
+                    "versionNumber": 6,
+                    "expectWorkItems": true,
+                    "expectFieldCount": 5,
+                    "expectSchemaVersion2": true
+                }
+            ],
+            "templateId": "9e375ad7-8a65-46f4-849f-886d5b795bfe",
+            "applicabilityFloorUtc": "2026-07-12T08:30:21.253733Z",
+            "effectiveVersionNumber": 6,
+            "expectedPublishedVersionNumbers": [
+                4,
+                6
+            ]
+        }
+    ],
+    "actorEmail": "admin@marketingexperts.local",
+    "baselineDatabase": "reporting_test_uat"
+}

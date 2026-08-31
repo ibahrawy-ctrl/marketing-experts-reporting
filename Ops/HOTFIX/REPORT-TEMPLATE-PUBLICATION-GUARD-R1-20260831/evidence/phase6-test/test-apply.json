@@ -1,0 +1,442 @@
+{
+  "ticket": "REPORT_TEMPLATE_PUBLICATION_GUARD_HOTFIX_R1",
+  "tool": "TemplatePublicationReconciler",
+  "mode": "APPLY",
+  "database": "reporting_test_uat",
+  "actorId": "74c79c4b-d403-494c-aafe-a2d63caf3965",
+  "generatedAtUtc": "2026-08-31T09:01:20.0614992Z",
+  "refusals": 0,
+  "verdict": "APPLIED_AND_VERIFIED",
+  "templates": [
+    {
+      "title": "\u062A\u0642\u0631\u064A\u0631 \u0627\u0644\u0645\u062F\u064A\u0631\u0634\u0646 \u0627\u0644\u0623\u0633\u0628\u0648\u0639\u064A",
+      "templateId": "3a4775c2-5a78-4171-b70f-d2b029f4ff92",
+      "effectiveVersionNumberExpected": 5,
+      "expectedPublishedVersionNumbers": [
+        4,
+        5
+      ],
+      "applicabilityFloorExpectedUtc": "2026-07-12T08:30:21.258837Z",
+      "before": [
+        {
+          "versionId": "88cd74a6-c9ce-498d-bf61-1530d9ed7986",
+          "versionNumber": 1,
+          "isPublished": false,
+          "publishedAtUtc": "2026-07-12T08:30:20.8093570Z"
+        },
+        {
+          "versionId": "790e04da-b064-4dd5-bfe1-42c5a15f16b4",
+          "versionNumber": 2,
+          "isPublished": false,
+          "publishedAtUtc": "2026-07-12T08:30:21.1763700Z"
+        },
+        {
+          "versionId": "b593a022-b641-4fc6-a002-57a54127d4a5",
+          "versionNumber": 3,
+          "isPublished": false,
+          "publishedAtUtc": "2026-07-12T08:30:21.2345720Z"
+        },
+        {
+          "versionId": "6eaf6956-472c-4291-baf7-8ef9f09ea86e",
+          "versionNumber": 4,
+          "isPublished": true,
+          "publishedAtUtc": "2026-07-12T08:30:21.2588370Z"
+        },
+        {
+          "versionId": "7c4bb7b6-a53b-4f33-8b7d-0a3704db288b",
+          "versionNumber": 5,
+          "isPublished": false,
+          "publishedAtUtc": "2026-08-31T05:50:46.8099850Z"
+        }
+      ],
+      "effectiveBefore": 4,
+      "submissionsByVersionBefore": {
+        "6eaf6956-472c-4291-baf7-8ef9f09ea86e:Closed": 1,
+        "7c4bb7b6-a53b-4f33-8b7d-0a3704db288b:Draft": 1
+      },
+      "versions": [
+        {
+          "versionNumber": 4,
+          "decision": "ALREADY_PUBLISHED"
+        },
+        {
+          "versionNumber": 5,
+          "decision": "WILL_PUBLISH",
+          "originalPublishedAtUtc": "2026-08-31T05:50:46.8099850Z"
+        }
+      ],
+      "decision": "WILL_RECONCILE",
+      "after": [
+        {
+          "versionId": "88cd74a6-c9ce-498d-bf61-1530d9ed7986",
+          "versionNumber": 1,
+          "isPublished": false,
+          "publishedAtUtc": "2026-07-12T08:30:20.8093570Z"
+        },
+        {
+          "versionId": "790e04da-b064-4dd5-bfe1-42c5a15f16b4",
+          "versionNumber": 2,
+          "isPublished": false,
+          "publishedAtUtc": "2026-07-12T08:30:21.1763700Z"
+        },
+        {
+          "versionId": "b593a022-b641-4fc6-a002-57a54127d4a5",
+          "versionNumber": 3,
+          "isPublished": false,
+          "publishedAtUtc": "2026-07-12T08:30:21.2345720Z"
+        },
+        {
+          "versionId": "6eaf6956-472c-4291-baf7-8ef9f09ea86e",
+          "versionNumber": 4,
+          "isPublished": true,
+          "publishedAtUtc": "2026-07-12T08:30:21.2588370Z"
+        },
+        {
+          "versionId": "7c4bb7b6-a53b-4f33-8b7d-0a3704db288b",
+          "versionNumber": 5,
+          "isPublished": true,
+          "publishedAtUtc": "2026-08-31T05:50:46.8099850Z"
+        }
+      ],
+      "effectiveAfter": 5,
+      "publishedSetAfter": [
+        4,
+        5
+      ],
+      "submissionsByVersionAfter": {
+        "6eaf6956-472c-4291-baf7-8ef9f09ea86e:Closed": 1,
+        "7c4bb7b6-a53b-4f33-8b7d-0a3704db288b:Draft": 1
+      },
+      "historicalSubmissionsUnchanged": true,
+      "publishedSetMatchesReference": true,
+      "applicabilityFloorAfterUtc": "2026-07-12T08:30:21.2588370Z",
+      "applicabilityFloorPreserved": true,
+      "effectiveMatchesExpected": true
+    },
+    {
+      "title": "\u062A\u0642\u0631\u064A\u0631 \u0641\u0631\u064A\u0642 \u0627\u0644\u062A\u0635\u0645\u064A\u0645",
+      "templateId": "4b50b69d-5b3b-4160-89d4-1c524bb96458",
+      "effectiveVersionNumberExpected": 5,
+      "expectedPublishedVersionNumbers": [
+        4,
+        5
+      ],
+      "applicabilityFloorExpectedUtc": "2026-07-12T08:30:21.255636Z",
+      "before": [
+        {
+          "versionId": "52a3cc3c-31bf-4294-8205-c8ce1f5a2e95",
+          "versionNumber": 1,
+          "isPublished": false,
+          "publishedAtUtc": "2026-07-12T08:30:20.8317440Z"
+        },
+        {
+          "versionId": "27ef16ee-9fc1-4a5e-9309-fa63a01c26c1",
+          "versionNumber": 2,
+          "isPublished": false,
+          "publishedAtUtc": "2026-07-12T08:30:21.1610020Z"
+        },
+        {
+          "versionId": "89e49901-a61d-45ae-83dc-e87addf46554",
+          "versionNumber": 3,
+          "isPublished": false,
+          "publishedAtUtc": "2026-07-12T08:30:21.2313750Z"
+        },
+        {
+          "versionId": "597d49f9-754d-42d8-b452-3112df1c912a",
+          "versionNumber": 4,
+          "isPublished": true,
+          "publishedAtUtc": "2026-07-12T08:30:21.2556360Z"
+        },
+        {
+          "versionId": "388570d8-3a74-449b-b311-598e887fbce4",
+          "versionNumber": 5,
+          "isPublished": false,
+          "publishedAtUtc": "2026-08-31T05:50:46.7781600Z"
+        }
+      ],
+      "effectiveBefore": 4,
+      "submissionsByVersionBefore": {
+        "388570d8-3a74-449b-b311-598e887fbce4:Draft": 1
+      },
+      "versions": [
+        {
+          "versionNumber": 4,
+          "decision": "ALREADY_PUBLISHED"
+        },
+        {
+          "versionNumber": 5,
+          "decision": "WILL_PUBLISH",
+          "originalPublishedAtUtc": "2026-08-31T05:50:46.7781600Z"
+        }
+      ],
+      "decision": "WILL_RECONCILE",
+      "after": [
+        {
+          "versionId": "52a3cc3c-31bf-4294-8205-c8ce1f5a2e95",
+          "versionNumber": 1,
+          "isPublished": false,
+          "publishedAtUtc": "2026-07-12T08:30:20.8317440Z"
+        },
+        {
+          "versionId": "27ef16ee-9fc1-4a5e-9309-fa63a01c26c1",
+          "versionNumber": 2,
+          "isPublished": false,
+          "publishedAtUtc": "2026-07-12T08:30:21.1610020Z"
+        },
+        {
+          "versionId": "89e49901-a61d-45ae-83dc-e87addf46554",
+          "versionNumber": 3,
+          "isPublished": false,
+          "publishedAtUtc": "2026-07-12T08:30:21.2313750Z"
+        },
+        {
+          "versionId": "597d49f9-754d-42d8-b452-3112df1c912a",
+          "versionNumber": 4,
+          "isPublished": true,
+          "publishedAtUtc": "2026-07-12T08:30:21.2556360Z"
+        },
+        {
+          "versionId": "388570d8-3a74-449b-b311-598e887fbce4",
+          "versionNumber": 5,
+          "isPublished": true,
+          "publishedAtUtc": "2026-08-31T05:50:46.7781600Z"
+        }
+      ],
+      "effectiveAfter": 5,
+      "publishedSetAfter": [
+        4,
+        5
+      ],
+      "submissionsByVersionAfter": {
+        "388570d8-3a74-449b-b311-598e887fbce4:Draft": 1
+      },
+      "historicalSubmissionsUnchanged": true,
+      "publishedSetMatchesReference": true,
+      "applicabilityFloorAfterUtc": "2026-07-12T08:30:21.2556360Z",
+      "applicabilityFloorPreserved": true,
+      "effectiveMatchesExpected": true
+    },
+    {
+      "title": "\u062A\u0642\u0631\u064A\u0631 \u0641\u0631\u064A\u0642 \u0627\u0644\u0641\u064A\u062F\u064A\u0648",
+      "templateId": "6f492ed5-b0fb-4b95-894c-f52ef9e8abee",
+      "effectiveVersionNumberExpected": 5,
+      "expectedPublishedVersionNumbers": [
+        4,
+        5
+      ],
+      "applicabilityFloorExpectedUtc": "2026-07-12T08:30:21.257403Z",
+      "before": [
+        {
+          "versionId": "2007347d-a6cd-4c71-89c4-ba012740c151",
+          "versionNumber": 1,
+          "isPublished": false,
+          "publishedAtUtc": "2026-07-12T08:30:20.8340550Z"
+        },
+        {
+          "versionId": "e08a852c-a33b-47e3-9654-126636fb87cf",
+          "versionNumber": 2,
+          "isPublished": false,
+          "publishedAtUtc": "2026-07-12T08:30:21.1631840Z"
+        },
+        {
+          "versionId": "1486b223-5a2d-4969-a1ee-42968a179e90",
+          "versionNumber": 3,
+          "isPublished": false,
+          "publishedAtUtc": "2026-07-12T08:30:21.2330360Z"
+        },
+        {
+          "versionId": "d26b6a10-616e-49bb-ba8f-5942fa04bac7",
+          "versionNumber": 4,
+          "isPublished": true,
+          "publishedAtUtc": "2026-07-12T08:30:21.2574030Z"
+        },
+        {
+          "versionId": "407a4aa6-3e34-4f8b-9b21-e65f11b96cbf",
+          "versionNumber": 5,
+          "isPublished": false,
+          "publishedAtUtc": "2026-08-31T05:50:46.4741770Z"
+        }
+      ],
+      "effectiveBefore": 4,
+      "submissionsByVersionBefore": {
+        "407a4aa6-3e34-4f8b-9b21-e65f11b96cbf:Draft": 1
+      },
+      "versions": [
+        {
+          "versionNumber": 4,
+          "decision": "ALREADY_PUBLISHED"
+        },
+        {
+          "versionNumber": 5,
+          "decision": "WILL_PUBLISH",
+          "originalPublishedAtUtc": "2026-08-31T05:50:46.4741770Z"
+        }
+      ],
+      "decision": "WILL_RECONCILE",
+      "after": [
+        {
+          "versionId": "2007347d-a6cd-4c71-89c4-ba012740c151",
+          "versionNumber": 1,
+          "isPublished": false,
+          "publishedAtUtc": "2026-07-12T08:30:20.8340550Z"
+        },
+        {
+          "versionId": "e08a852c-a33b-47e3-9654-126636fb87cf",
+          "versionNumber": 2,
+          "isPublished": false,
+          "publishedAtUtc": "2026-07-12T08:30:21.1631840Z"
+        },
+        {
+          "versionId": "1486b223-5a2d-4969-a1ee-42968a179e90",
+          "versionNumber": 3,
+          "isPublished": false,
+          "publishedAtUtc": "2026-07-12T08:30:21.2330360Z"
+        },
+        {
+          "versionId": "d26b6a10-616e-49bb-ba8f-5942fa04bac7",
+          "versionNumber": 4,
+          "isPublished": true,
+          "publishedAtUtc": "2026-07-12T08:30:21.2574030Z"
+        },
+        {
+          "versionId": "407a4aa6-3e34-4f8b-9b21-e65f11b96cbf",
+          "versionNumber": 5,
+          "isPublished": true,
+          "publishedAtUtc": "2026-08-31T05:50:46.4741770Z"
+        }
+      ],
+      "effectiveAfter": 5,
+      "publishedSetAfter": [
+        4,
+        5
+      ],
+      "submissionsByVersionAfter": {
+        "407a4aa6-3e34-4f8b-9b21-e65f11b96cbf:Draft": 1
+      },
+      "historicalSubmissionsUnchanged": true,
+      "publishedSetMatchesReference": true,
+      "applicabilityFloorAfterUtc": "2026-07-12T08:30:21.2574030Z",
+      "applicabilityFloorPreserved": true,
+      "effectiveMatchesExpected": true
+    },
+    {
+      "title": "\u062A\u0642\u0631\u064A\u0631 \u0643\u0627\u062A\u0628 \u0627\u0644\u0645\u062D\u062A\u0648\u0649 \u0627\u0644\u0623\u0633\u0628\u0648\u0639\u064A",
+      "templateId": "9e375ad7-8a65-46f4-849f-886d5b795bfe",
+      "effectiveVersionNumberExpected": 6,
+      "expectedPublishedVersionNumbers": [
+        4,
+        6
+      ],
+      "applicabilityFloorExpectedUtc": "2026-07-12T08:30:21.253733Z",
+      "before": [
+        {
+          "versionId": "cf29dadf-7b34-4d96-aff8-73bfbc9811f5",
+          "versionNumber": 1,
+          "isPublished": false,
+          "publishedAtUtc": "2026-07-12T08:30:20.8372680Z"
+        },
+        {
+          "versionId": "63706888-e178-45e9-bc72-107c83d85fb1",
+          "versionNumber": 2,
+          "isPublished": false,
+          "publishedAtUtc": "2026-07-12T08:30:21.1580520Z"
+        },
+        {
+          "versionId": "3595e9d5-ffb9-4004-ab62-55477368f79a",
+          "versionNumber": 3,
+          "isPublished": false,
+          "publishedAtUtc": "2026-07-12T08:30:21.2294130Z"
+        },
+        {
+          "versionId": "0ac84366-5a10-4e2c-8de0-bfa8010cd034",
+          "versionNumber": 4,
+          "isPublished": true,
+          "publishedAtUtc": "2026-07-12T08:30:21.2537330Z"
+        },
+        {
+          "versionId": "794260c2-77a5-4d64-8c07-9de4db8639d3",
+          "versionNumber": 5,
+          "isPublished": false,
+          "publishedAtUtc": "2026-08-29T21:14:31.4236220Z"
+        },
+        {
+          "versionId": "e36d04d3-b8c9-4c0e-b41d-0e5ff7588032",
+          "versionNumber": 6,
+          "isPublished": false,
+          "publishedAtUtc": "2026-08-31T05:50:47.0477900Z"
+        }
+      ],
+      "effectiveBefore": 4,
+      "submissionsByVersionBefore": {
+        "794260c2-77a5-4d64-8c07-9de4db8639d3:Submitted": 1,
+        "794260c2-77a5-4d64-8c07-9de4db8639d3:Closed": 1,
+        "e36d04d3-b8c9-4c0e-b41d-0e5ff7588032:Submitted": 1
+      },
+      "versions": [
+        {
+          "versionNumber": 4,
+          "decision": "ALREADY_PUBLISHED"
+        },
+        {
+          "versionNumber": 6,
+          "decision": "WILL_PUBLISH",
+          "originalPublishedAtUtc": "2026-08-31T05:50:47.0477900Z"
+        }
+      ],
+      "decision": "WILL_RECONCILE",
+      "after": [
+        {
+          "versionId": "cf29dadf-7b34-4d96-aff8-73bfbc9811f5",
+          "versionNumber": 1,
+          "isPublished": false,
+          "publishedAtUtc": "2026-07-12T08:30:20.8372680Z"
+        },
+        {
+          "versionId": "63706888-e178-45e9-bc72-107c83d85fb1",
+          "versionNumber": 2,
+          "isPublished": false,
+          "publishedAtUtc": "2026-07-12T08:30:21.1580520Z"
+        },
+        {
+          "versionId": "3595e9d5-ffb9-4004-ab62-55477368f79a",
+          "versionNumber": 3,
+          "isPublished": false,
+          "publishedAtUtc": "2026-07-12T08:30:21.2294130Z"
+        },
+        {
+          "versionId": "0ac84366-5a10-4e2c-8de0-bfa8010cd034",
+          "versionNumber": 4,
+          "isPublished": true,
+          "publishedAtUtc": "2026-07-12T08:30:21.2537330Z"
+        },
+        {
+          "versionId": "794260c2-77a5-4d64-8c07-9de4db8639d3",
+          "versionNumber": 5,
+          "isPublished": false,
+          "publishedAtUtc": "2026-08-29T21:14:31.4236220Z"
+        },
+        {
+          "versionId": "e36d04d3-b8c9-4c0e-b41d-0e5ff7588032",
+          "versionNumber": 6,
+          "isPublished": true,
+          "publishedAtUtc": "2026-08-31T05:50:47.0477900Z"
+        }
+      ],
+      "effectiveAfter": 6,
+      "publishedSetAfter": [
+        4,
+        6
+      ],
+      "submissionsByVersionAfter": {
+        "794260c2-77a5-4d64-8c07-9de4db8639d3:Submitted": 1,
+        "794260c2-77a5-4d64-8c07-9de4db8639d3:Closed": 1,
+        "e36d04d3-b8c9-4c0e-b41d-0e5ff7588032:Submitted": 1
+      },
+      "historicalSubmissionsUnchanged": true,
+      "publishedSetMatchesReference": true,
+      "applicabilityFloorAfterUtc": "2026-07-12T08:30:21.2537330Z",
+      "applicabilityFloorPreserved": true,
+      "effectiveMatchesExpected": true
+    }
+  ]
+}

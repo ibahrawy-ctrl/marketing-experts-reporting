@@ -1,0 +1,112 @@
+{
+    "ticket": "REPORT_TEMPLATE_PUBLICATION_GUARD_HOTFIX_R1",
+    "database": "reporting_rc",
+    "templates": [
+        {
+            "title": "تقرير المديرشن الأسبوعي",
+            "versions": [
+                {
+                    "versionId": "d767997b-8eea-4765-a0cd-b157ecf072a7",
+                    "versionNumber": 8,
+                    "expectWorkItems": false,
+                    "expectFieldCount": 5,
+                    "expectSchemaVersion2": false
+                },
+                {
+                    "versionId": "977340dc-946d-4700-902a-5c926c866274",
+                    "versionNumber": 9,
+                    "expectWorkItems": true,
+                    "expectFieldCount": 5,
+                    "expectSchemaVersion2": true
+                }
+            ],
+            "templateId": "db8c764d-6f10-4997-8c07-512334dad30b",
+            "applicabilityFloorUtc": "2026-08-16T17:58:41.715944Z",
+            "effectiveVersionNumber": 9,
+            "expectedPublishedVersionNumbers": [
+                8,
+                9
+            ]
+        },
+        {
+            "title": "تقرير فريق التصميم",
+            "versions": [
+                {
+                    "versionId": "6c4ce613-0d41-4e00-b87b-3f48e2611cb9",
+                    "versionNumber": 7,
+                    "expectWorkItems": false,
+                    "expectFieldCount": 5,
+                    "expectSchemaVersion2": false
+                },
+                {
+                    "versionId": "a79068d3-a995-4722-87fa-8e12a3f35f97",
+                    "versionNumber": 8,
+                    "expectWorkItems": true,
+                    "expectFieldCount": 5,
+                    "expectSchemaVersion2": true
+                }
+            ],
+            "templateId": "e9734e7f-490e-4380-9424-5354865a3153",
+            "applicabilityFloorUtc": "2026-08-16T17:58:41.709593Z",
+            "effectiveVersionNumber": 8,
+            "expectedPublishedVersionNumbers": [
+                7,
+                8
+            ]
+        },
+        {
+            "title": "تقرير فريق الفيديو",
+            "versions": [
+                {
+                    "versionId": "1e1957ae-2408-4cd4-8a39-a0633e59e4a2",
+                    "versionNumber": 7,
+                    "expectWorkItems": false,
+                    "expectFieldCount": 5,
+                    "expectSchemaVersion2": false
+                },
+                {
+                    "versionId": "2338a07f-f799-4c94-8bcd-8fb0603c495a",
+                    "versionNumber": 8,
+                    "expectWorkItems": true,
+                    "expectFieldCount": 5,
+                    "expectSchemaVersion2": true
+                }
+            ],
+            "templateId": "32f263b9-d715-47b3-9bc9-8cd80f2f8ce5",
+            "applicabilityFloorUtc": "2026-08-16T17:58:41.712477Z",
+            "effectiveVersionNumber": 8,
+            "expectedPublishedVersionNumbers": [
+                7,
+                8
+            ]
+        },
+        {
+            "title": "تقرير كاتب المحتوى الأسبوعي",
+            "versions": [
+                {
+                    "versionId": "597e6895-304d-4370-b210-61062cd12f5e",
+                    "versionNumber": 8,
+                    "expectWorkItems": false,
+                    "expectFieldCount": 5,
+                    "expectSchemaVersion2": false
+                },
+                {
+                    "versionId": "8ee1a12b-edcb-4886-9572-ba7bab765d89",
+                    "versionNumber": 10,
+                    "expectWorkItems": true,
+                    "expectFieldCount": 5,
+                    "expectSchemaVersion2": true
+                }
+            ],
+            "templateId": "5e6ad325-b26c-4fd6-b4f8-d415dae44c89",
+            "applicabilityFloorUtc": "2026-08-16T17:58:41.706742Z",
+            "effectiveVersionNumber": 10,
+            "expectedPublishedVersionNumbers": [
+                8,
+                10
+            ]
+        }
+    ],
+    "actorEmail": "admin@marketingexperts.local",
+    "baselineDatabase": "reporting_rc"
+}
