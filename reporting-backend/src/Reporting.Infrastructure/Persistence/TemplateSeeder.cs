@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Reporting.Application.Common;
 using Reporting.Domain.Entities.Kpi;
 using Reporting.Domain.Entities.System;
@@ -18,6 +19,7 @@ public static class TemplateSeeder
     {
         var db = services.GetRequiredService<AppDbContext>();
         var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
+        var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger(nameof(TemplateSeeder));
 
         var admins = await userManager.GetUsersInRoleAsync(Roles.Admin);
         var ownerId = admins.FirstOrDefault()?.Id;
@@ -25,11 +27,11 @@ public static class TemplateSeeder
 
         await SeedReportTemplatesAsync(db, ownerId.Value);
         // RC-4 Task 4 (Path A): توحيد تقارير التنفيذ على ProjectRepeatableSection — نقل الأرقام داخل كل مشروع (v2).
-        await UpgradeExecutionTemplatesToProjectFirstAsync(db, ownerId.Value);
+        await UpgradeExecutionTemplatesToProjectFirstAsync(db, ownerId.Value, logger);
         // RC-4 Task 4D1: قوالب التنفيذ v3 — Taxonomy (SingleSelect) بدل الأرقام المسطّحة، تُبنى خياراتها من كتالوج تصنيفات التنفيذ.
-        await UpgradeExecutionTemplatesToTaxonomyV3Async(db, ownerId.Value);
+        await UpgradeExecutionTemplatesToTaxonomyV3Async(db, ownerId.Value, logger);
         // RC-4 Task 4D3: قوالب التنفيذ v4 — خيارات Select ديناميكية (catalogDomain) تُقرأ وقت التعبئة من الكتالوج، مع لقطة احتياطيّة.
-        await UpgradeExecutionTemplatesToTaxonomyV4Async(db, ownerId.Value);
+        await UpgradeExecutionTemplatesToTaxonomyV4Async(db, ownerId.Value, logger);
         // إبقاء عائلة قوالب Production القديمة (ERDS Phase 3) كـ Legacy/Archived بلا حذف (لا تُعرَض للإسناد الجديد).
         await ArchiveLegacyProductionTemplatesAsync(db);
         await SeedKpiTemplatesAsync(db, ownerId.Value);
@@ -83,7 +85,7 @@ public static class TemplateSeeder
     // تُضيف إصدارًا منشورًا جديدًا (v2) لكل قالب تنفيذيّ من العائلة المرتبطة بالمسمّى الوظيفي،
     // حيث تنتقل كل الأرقام التشغيلية إلى داخل قسم المشاريع المتكرّر (ProjectRepeatableSection).
     // إضافيّ بحت: التقارير القديمة تبقى على لقطة إصدارها v1 (لا حذف، لا Migration). idempotent عبر الحارس على المفتاح "delayed".
-    private static async Task UpgradeExecutionTemplatesToProjectFirstAsync(AppDbContext db, Guid ownerId)
+    private static async Task UpgradeExecutionTemplatesToProjectFirstAsync(AppDbContext db, Guid ownerId, ILogger logger)
     {
         foreach (var upgrade in ProjectFirstExecutionUpgrades)
         {
@@ -101,30 +103,11 @@ public static class TemplateSeeder
                 && f.ConfigJson is not null
                 && f.ConfigJson.Replace(" ", "").Contains("\"key\":\"delayed\""));
 
-            var projectFirstVersion = template.Versions.FirstOrDefault(IsProjectFirst);
-            if (projectFirstVersion is not null)
+            // الترقية مطبَّقة سلفًا ⟹ لا شيء ينقص ⟹ لا كتابة إطلاقًا. حالة النشر ملك للمسار الرسميّ وحده.
+            if (template.Versions.Any(IsProjectFirst))
             {
-                // إن وُجد إصدار Taxonomy v3 فهو الأحدث ويملك حالة النشر — لا نلمس شيئًا هنا كي لا نتنازع معه في كل إقلاع.
-                if (template.Versions.Any(IsTaxonomyV3)) continue;
-                // الترقية مطبَّقة سلفًا — لكن نضمن أنّ Project-First هو الإصدار المنشور الوحيد (إصلاح ذاتي idempotent).
-                foreach (var v in template.Versions)
-                {
-                    var shouldPublish = v.Id == projectFirstVersion.Id;
-                    if (v.IsPublished != shouldPublish)
-                    {
-                        v.IsPublished = shouldPublish;
-                        v.UpdatedAtUtc = DateTime.UtcNow;
-                    }
-                }
+                ReportPublicationState(logger, template, "ProjectFirst");
                 continue;
-            }
-
-            // إلغاء نشر الإصدارات المنشورة القديمة (v1 المسطّح): يبقى Project-First (v2) هو الإصدار المنشور الوحيد.
-            // التقارير القديمة تظلّ مقروءة عبر لقطة إصدارها (مرجع FK)، فلا يتأثّر شيء من الظاهر سابقًا.
-            foreach (var old in template.Versions.Where(v => v.IsPublished))
-            {
-                old.IsPublished = false;
-                old.UpdatedAtUtc = DateTime.UtcNow;
             }
 
             var nextNumber = (template.Versions.Count == 0 ? 0 : template.Versions.Max(v => v.VersionNumber)) + 1;
@@ -153,9 +136,60 @@ public static class TemplateSeeder
             // الإصدار الجديد Modified (فيُصدر UPDATE يطال 0 صفوف). نُضيفه صراحةً للسياق ليُصنَّف Added
             // ويُولَّد مفتاحه، فيُدرَج إدراجًا نظيفًا هو وحقوله.
             db.Add(version);
+            UnpublishPredecessorsOnCreation(template, version);
         }
 
         await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// حدث نشر عند **الإنشاء** حصرًا: الإصدار المُنشَأ للتوّ يصير المنشور الوحيد لعائلته، فتُلغى
+    /// حالة نشر سابقاته — وهي قاعدة النشر الرسميّة نفسها (المنشور واحد لكلّ عائلة).
+    /// هذا ليس فرضًا لحالة النشر عند كلّ إقلاع: الفرع الذي يستدعي هذه الدالّة لا يُبلَغ أصلًا إلّا حين
+    /// تكون الترقية ناقصة؛ وبمجرّد إنشائها مرّة يخرج البذر مبكّرًا بلا أيّ كتابة في كلّ إقلاع لاحق.
+    /// التقارير التاريخيّة تبقى مرتبطة بإصداراتها؛ إلغاء النشر يمسّ الإنشاءات المستقبليّة وحدها.
+    /// </summary>
+    private static void UnpublishPredecessorsOnCreation(ReportTemplate template, ReportTemplateVersion created)
+    {
+        foreach (var previous in template.Versions.Where(v => v != created && v.IsPublished))
+        {
+            previous.IsPublished = false;
+            previous.UpdatedAtUtc = DateTime.UtcNow;
+        }
+    }
+
+    /// <summary>
+    /// تشخيص حالة النشر لعائلة قالب عند الإقلاع — **قراءة فقط، بلا أيّ كتابة**.
+    /// عقد زمن التشغيل الموحَّد هو «أعلى VersionNumber بين الإصدارات المنشورة»
+    /// (SubmissionService/UnifiedReportStatusService/ReportTemplateService)، وهو يتحمّل تعدّد المنشورة.
+    /// لذلك لا يختار البذر فائزًا ولا يُلغي نشر شيء؛ يكتفي بتسجيل الحالة، والمصالحة تمرّ بالمسار الرسميّ
+    /// (ReportTemplateService.PublishVersionAsync) أو بأداة مراجعة مستقلّة.
+    /// </summary>
+    private static void ReportPublicationState(ILogger logger, ReportTemplate template, string stage)
+    {
+        var published = template.Versions.Where(v => v.IsPublished)
+            .OrderByDescending(v => v.VersionNumber).ToList();
+
+        if (published.Count == 0)
+        {
+            logger.LogWarning(
+                "TemplateSeeder[{Stage}]: القالب «{Title}» ({TemplateId}) بلا أيّ إصدار منشور — يتعذّر إنشاء تقارير جديدة عليه. لم تُجرَ أيّ كتابة؛ يلزم نشر صريح عبر المسار الرسميّ.",
+                stage, template.Title, template.Id);
+            return;
+        }
+
+        if (published.Count > 1)
+        {
+            logger.LogWarning(
+                "TemplateSeeder[{Stage}]: القالب «{Title}» ({TemplateId}) يملك {Count} إصدارًا منشورًا [{Versions}]. زمن التشغيل سيستعمل v{Effective}. لم تُجرَ أيّ كتابة؛ المصالحة — إن لزمت — تمرّ بالمسار الرسميّ للنشر.",
+                stage, template.Title, template.Id, published.Count,
+                string.Join(", ", published.Select(v => $"v{v.VersionNumber}")), published[0].VersionNumber);
+            return;
+        }
+
+        logger.LogDebug(
+            "TemplateSeeder[{Stage}]: القالب «{Title}» ({TemplateId}) — إصدار منشور واحد v{Effective}. لا كتابة.",
+            stage, template.Title, template.Id, published[0].VersionNumber);
     }
 
     // علامة إصدار Taxonomy v3: يحوي حقلًا فرعيًّا من نوع Select داخل قسم المشاريع.
@@ -176,7 +210,7 @@ public static class TemplateSeeder
     // كل صفّ داخل قسم المشاريع يمثّل تصنيف إنتاج واضح (SingleSelect) بدل الأرقام المسطّحة.
     // الخيارات لقطة تُبنى من كتالوج تصنيفات التنفيذ (القيم النشطة مرتّبة حسب SortOrder لكل Domain).
     // إضافيّ بحت: v1/v2 تبقى مقروءة عبر لقطات إصداراتها (لا حذف، لا Migration لتخزين القيم). idempotent عبر الحارس IsTaxonomyV3.
-    private static async Task UpgradeExecutionTemplatesToTaxonomyV3Async(AppDbContext db, Guid ownerId)
+    private static async Task UpgradeExecutionTemplatesToTaxonomyV3Async(AppDbContext db, Guid ownerId, ILogger logger)
     {
         // خريطة الخيارات من الكتالوج (لقطة تُخزَّن داخل ConfigJson لكل قالب).
         var catalog = (await db.ExecutionTaxonomyValues
@@ -261,28 +295,11 @@ public static class TemplateSeeder
                 .FirstOrDefaultAsync(t => t.Title == upgrade.Title);
             if (template is null) continue; // القالب غير مبذور بعد — تخطٍّ آمن.
 
-            var v3Version = template.Versions.FirstOrDefault(IsTaxonomyV3);
-            if (v3Version is not null)
+            // الترقية مطبَّقة سلفًا ⟹ لا شيء ينقص ⟹ لا كتابة إطلاقًا. حالة النشر ملك للمسار الرسميّ وحده.
+            if (template.Versions.Any(IsTaxonomyV3))
             {
-                // الترقية مطبَّقة سلفًا — نضمن أنّ v3 هو الإصدار المنشور الوحيد (إصلاح ذاتي idempotent).
-                foreach (var v in template.Versions)
-                {
-                    var shouldPublish = v.Id == v3Version.Id;
-                    if (v.IsPublished != shouldPublish)
-                    {
-                        v.IsPublished = shouldPublish;
-                        v.UpdatedAtUtc = DateTime.UtcNow;
-                    }
-                }
+                ReportPublicationState(logger, template, "TaxonomyV3");
                 continue;
-            }
-
-            // إلغاء نشر الإصدارات المنشورة (v1 المسطّح + v2 Project-First): يبقى v3 هو المنشور الوحيد.
-            // التقارير القديمة تبقى مقروءة عبر لقطة إصدارها (مرجع FK) فلا يتأثّر شيء ظاهر سابقًا.
-            foreach (var old in template.Versions.Where(v => v.IsPublished))
-            {
-                old.IsPublished = false;
-                old.UpdatedAtUtc = DateTime.UtcNow;
             }
 
             var nextNumber = (template.Versions.Count == 0 ? 0 : template.Versions.Max(v => v.VersionNumber)) + 1;
@@ -309,6 +326,7 @@ public static class TemplateSeeder
             template.Versions.Add(version);
             // نُضيف الإصدار صراحةً للسياق ليُصنَّف Added (وإلا قد يصنّفه EF Modified فيُصدر UPDATE بلا أثر).
             db.Add(version);
+            UnpublishPredecessorsOnCreation(template, version);
         }
 
         await db.SaveChangesAsync();
@@ -318,7 +336,7 @@ public static class TemplateSeeder
     // كل حقل Select يحمل الآن catalogDomain: تُجلب خياراته النشطة وقت تعبئة التقرير من الكتالوج مباشرةً
     // (تعديلات الأدمن في 4D2 تظهر في التقارير الجديدة بلا إصدار قالب جديد). Options تبقى لقطةً احتياطيّة (fallback).
     // إضافيّ بحت: v1/v2/v3 تبقى مقروءة عبر لقطات إصداراتها (مرجع FK، لا حذف، لا Migration). idempotent عبر الحارس IsTaxonomyV4.
-    private static async Task UpgradeExecutionTemplatesToTaxonomyV4Async(AppDbContext db, Guid ownerId)
+    private static async Task UpgradeExecutionTemplatesToTaxonomyV4Async(AppDbContext db, Guid ownerId, ILogger logger)
     {
         // لقطة احتياطيّة من الكتالوج (fallback فقط عند تعذّر الجلب الديناميكيّ) — نفس مصدر v3.
         var catalog = (await db.ExecutionTaxonomyValues
@@ -403,28 +421,11 @@ public static class TemplateSeeder
                 .FirstOrDefaultAsync(t => t.Title == upgrade.Title);
             if (template is null) continue; // القالب غير مبذور بعد — تخطٍّ آمن.
 
-            var v4Version = template.Versions.FirstOrDefault(IsTaxonomyV4);
-            if (v4Version is not null)
+            // الترقية مطبَّقة سلفًا ⟹ لا شيء ينقص ⟹ لا كتابة إطلاقًا. حالة النشر ملك للمسار الرسميّ وحده.
+            if (template.Versions.Any(IsTaxonomyV4))
             {
-                // الترقية مطبَّقة سلفًا — نضمن أنّ v4 هو الإصدار المنشور الوحيد (إصلاح ذاتي idempotent).
-                foreach (var v in template.Versions)
-                {
-                    var shouldPublish = v.Id == v4Version.Id;
-                    if (v.IsPublished != shouldPublish)
-                    {
-                        v.IsPublished = shouldPublish;
-                        v.UpdatedAtUtc = DateTime.UtcNow;
-                    }
-                }
+                ReportPublicationState(logger, template, "TaxonomyV4");
                 continue;
-            }
-
-            // إلغاء نشر الإصدارات المنشورة (v1/v2/v3): يبقى v4 هو المنشور الوحيد.
-            // التقارير القديمة تبقى مقروءة عبر لقطة إصدارها (مرجع FK) فلا يتأثّر شيء ظاهر سابقًا.
-            foreach (var old in template.Versions.Where(v => v.IsPublished))
-            {
-                old.IsPublished = false;
-                old.UpdatedAtUtc = DateTime.UtcNow;
             }
 
             var nextNumber = (template.Versions.Count == 0 ? 0 : template.Versions.Max(v => v.VersionNumber)) + 1;
@@ -451,6 +452,7 @@ public static class TemplateSeeder
             template.Versions.Add(version);
             // نُضيف الإصدار صراحةً للسياق ليُصنَّف Added (وإلا قد يصنّفه EF Modified فيُصدر UPDATE بلا أثر).
             db.Add(version);
+            UnpublishPredecessorsOnCreation(template, version);
         }
 
         await db.SaveChangesAsync();

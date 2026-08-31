@@ -1,0 +1,58 @@
+=== A) FULL-DB PUBLICATION DIFF: tplguard_repro (reconciled) vs tplguard_before (baseline) ===
+psql:/tmp/tplguard/verify.sql:7: error: /tmp/tplguard/base-versions.csv: Permission denied
+psql:/tmp/tplguard/verify.sql:11: error: /tmp/tplguard/base-versions.csv: No such file or directory
+--- rows whose IsPublished differs from baseline (expect 0) ---
++------------------+
+| ispublished_diff |
++------------------+
+|                0 |
++------------------+
+
+--- rows whose PublishedAtUtc differs from baseline (expect 0) ---
++------------------+
+| publishedat_diff |
++------------------+
+|                0 |
++------------------+
+
+--- rows present in one side only (expect 0/0) ---
++---------------+--------------+
+| only_in_repro | only_in_base |
++---------------+--------------+
+|           107 |            0 |
++---------------+--------------+
+
+=== B) APPLICABILITY FLOOR — four families ===
++-----------------------------+----------------+
+|            title            |  floor_repro   |
++-----------------------------+----------------+
+| تقرير المديرشن الأسبوعي     | 08-23 16:48:14 |
+| تقرير فريق التصميم          | 08-23 16:48:14 |
+| تقرير فريق الفيديو          | 08-23 16:48:14 |
+| تقرير كاتب المحتوى الأسبوعي | 08-23 16:48:14 |
++-----------------------------+----------------+
+
+=== C) EFFECTIVE RUNTIME WINNER + workItems ===
++-----------------------------+----------------+---------------+
+|            title            | effective_vnum | has_workitems |
++-----------------------------+----------------+---------------+
+| تقرير المديرشن الأسبوعي     |              9 | t             |
+| تقرير فريق التصميم          |              8 | t             |
+| تقرير فريق الفيديو          |              8 | t             |
+| تقرير كاتب المحتوى الأسبوعي |              9 | t             |
++-----------------------------+----------------+---------------+
+
+=== D) SUBMISSIONS TOTALS — repro vs baseline (expect identical) ===
++-------------------+
+| submissions_repro |
++-------------------+
+|               328 |
++-------------------+
+
+=== E) AUDIT TRAIL OF THE RECONCILIATION ===
++---------------------------+-----------------------+-----+
+|          action           |        entity         | cnt |
++---------------------------+-----------------------+-----+
+| TemplateVersionReconciled | ReportTemplateVersion |   4 |
++---------------------------+-----------------------+-----+
+

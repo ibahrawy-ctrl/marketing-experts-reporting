@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>TemplatePublicationReconciler</RootNamespace>
+    <AssemblyName>TemplatePublicationReconciler</AssemblyName>
+    <!-- أداة مصالحة نشر إصدارات القوالب — خارج Reporting.sln ولا تُنشر مع الـAPI.
+         Dry-Run افتراضيّ · المسار الرسميّ (ReportTemplateService.PublishVersionAsync) حصرًا ·
+         حارس بصمات · لا حذف · لا إلغاء نشر · لا مساس بالتقارير التاريخيّة · Idempotent. -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\..\reporting-backend\src\Reporting.Infrastructure\Reporting.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>
