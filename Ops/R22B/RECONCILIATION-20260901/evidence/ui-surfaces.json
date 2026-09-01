@@ -1,0 +1,46 @@
+{
+ "surfaces": {
+  "SUBMISSION_DETAIL_AND_HISTORY": {
+   "text": "س1/تصميم: ملفّ المصدر غير مرفق.\nس2/تصميم: وحّد مقاسات البانرات.\nس3/تصميم: أعد الإرسال بعد التصحيح.",
+   "renderedLines": 11,
+   "whiteSpace": "pre-wrap",
+   "overflowWrap": "break-word",
+   "wordBreak": "normal"
+  },
+  "NOTIFICATION_BELL": {
+   "text": "س1/تصميم: ملفّ المصدر غير مرفق.\nس2/تصميم: وحّد مقاسات البانرات.\nس3/تصميم: أعد الإرسال بعد التصحيح.",
+   "renderedLines": 11,
+   "whiteSpace": "pre-wrap",
+   "overflowWrap": "break-word",
+   "wordBreak": "normal"
+  },
+  "APPROVAL_TEXTAREA": {
+   "found": true,
+   "tagName": "TEXTAREA",
+   "rows": 4,
+   "resize": "vertical",
+   "value": "سطر إدخال أوّل\nسطر إدخال ثانٍ\nسطر إدخال ثالث",
+   "newlineCount": 2,
+   "enterPreserved": true,
+   "formStillOpen": true
+  },
+  "PAYLOAD": {
+   "raw": "{\"comment\":\"سطر إدخال أوّل\\nسطر إدخال ثانٍ\\nسطر إدخال ثالث\"}",
+   "newlineEscaped": true
+  },
+  "ADMIN_ARCHIVE": {
+   "text": "س1/محتوى: الأدلّة ناقصة على مقالين.\nس2/محتوى: صحّح عدد الكلمات في الجدول.\nس3/محتوى: أعد الإرسال قبل نهاية اليوم.",
+   "renderedLines": 11,
+   "whiteSpace": "pre-wrap",
+   "overflowWrap": "break-word",
+   "wordBreak": "normal"
+  }
+ },
+ "log": [
+  "DETAIL = {\"text\":\"س1/تصميم: ملفّ المصدر غير مرفق.\\nس2/تصميم: وحّد مقاسات البانرات.\\nس3/تصميم: أعد الإرسال بعد التصحيح.\",\"renderedLines\":11,\"whiteSpace\":\"pre-wrap\",\"overflowWrap\":\"break-word\",\"wordBreak\":\"normal\"}",
+  "BELL = {\"text\":\"س1/تصميم: ملفّ المصدر غير مرفق.\\nس2/تصميم: وحّد مقاسات البانرات.\\nس3/تصميم: أعد الإرسال بعد التصحيح.\",\"renderedLines\":11,\"whiteSpace\":\"pre-wrap\",\"overflowWrap\":\"break-word\",\"wordBreak\":\"normal\"}",
+  "TEXTAREA = {\"found\":true,\"tagName\":\"TEXTAREA\",\"rows\":4,\"resize\":\"vertical\",\"value\":\"سطر إدخال أوّل\\nسطر إدخال ثانٍ\\nسطر إدخال ثالث\",\"newlineCount\":2,\"enterPreserved\":true,\"formStillOpen\":true}",
+  "PAYLOAD = {\"raw\":\"{\\\"comment\\\":\\\"سطر إدخال أوّل\\\\nسطر إدخال ثانٍ\\\\nسطر إدخال ثالث\\\"}\",\"newlineEscaped\":true}",
+  "ARCHIVE = {\"text\":\"س1/محتوى: الأدلّة ناقصة على مقالين.\\nس2/محتوى: صحّح عدد الكلمات في الجدول.\\nس3/محتوى: أعد الإرسال قبل نهاية اليوم.\",\"renderedLines\":11,\"whiteSpace\":\"pre-wrap\",\"overflowWrap\":\"break-word\",\"wordBreak\":\"normal\"}"
+ ]
+}

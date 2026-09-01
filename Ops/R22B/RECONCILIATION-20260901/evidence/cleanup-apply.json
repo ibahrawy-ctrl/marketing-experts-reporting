@@ -1,0 +1,448 @@
+{
+ "mode": "apply",
+ "diff": {
+  "users": {
+   "beforeCount": 33,
+   "nowCount": 40,
+   "created": [
+    "9751460c-f92a-4d58-af6f-28554a16981d",
+    "a83d4808-ec5b-409c-af18-fd56dea6b5ee",
+    "acae4a9b-2be4-41d0-a006-63871872b4ff",
+    "b4be9e62-e374-4812-b7b3-4020d85e7679",
+    "c05e6443-796a-42ed-8edc-20918e740b94",
+    "dad203e1-51a2-4d61-8adc-de3e931407e3",
+    "e5f477ae-d5c7-47cc-816c-8f5c91dea375"
+   ],
+   "planned": [
+    "9751460c-f92a-4d58-af6f-28554a16981d",
+    "a83d4808-ec5b-409c-af18-fd56dea6b5ee",
+    "acae4a9b-2be4-41d0-a006-63871872b4ff",
+    "b4be9e62-e374-4812-b7b3-4020d85e7679",
+    "c05e6443-796a-42ed-8edc-20918e740b94",
+    "dad203e1-51a2-4d61-8adc-de3e931407e3",
+    "e5f477ae-d5c7-47cc-816c-8f5c91dea375"
+   ],
+   "createdEqualsPlanned": true,
+   "untouchedPreExisting": true,
+   "labels": [
+    "r22r-video@r22uat.test",
+    "r22r-lead@r22uat.test",
+    "r22r-moderation@r22uat.test",
+    "r22r-manager@r22uat.test",
+    "r22r-design@r22uat.test",
+    "r22r-content@r22uat.test",
+    "r22r-seo@r22uat.test"
+   ]
+  },
+  "clients": {
+   "beforeCount": 10,
+   "nowCount": 11,
+   "created": [
+    "025e7609-4579-4243-8859-1501bb162c44"
+   ],
+   "planned": [
+    "025e7609-4579-4243-8859-1501bb162c44"
+   ],
+   "createdEqualsPlanned": true,
+   "untouchedPreExisting": true,
+   "labels": [
+    "R22R — عميل UAT (مؤقّت)"
+   ]
+  },
+  "projects": {
+   "beforeCount": 18,
+   "nowCount": 23,
+   "created": [
+    "1465b0ad-ed6b-46d5-9159-e1564a9652d6",
+    "3f90a403-72d3-4c99-96f4-7c730d984e77",
+    "427339c7-693f-4971-932a-d5529c6a58c4",
+    "730748cf-fdb5-4f69-b810-2e168b8585e4",
+    "c41fb011-60f8-4348-b110-41637a53a28c"
+   ],
+   "planned": [
+    "1465b0ad-ed6b-46d5-9159-e1564a9652d6",
+    "3f90a403-72d3-4c99-96f4-7c730d984e77",
+    "427339c7-693f-4971-932a-d5529c6a58c4",
+    "730748cf-fdb5-4f69-b810-2e168b8585e4",
+    "c41fb011-60f8-4348-b110-41637a53a28c"
+   ],
+   "createdEqualsPlanned": true,
+   "untouchedPreExisting": true,
+   "labels": [
+    "R22R — مشروع SEO",
+    "R22R — مشروع التصميم",
+    "R22R — مشروع المديرشن",
+    "R22R — مشروع المحتوى",
+    "R22R — مشروع الفيديو"
+   ]
+  }
+ },
+ "plan": {
+  "users": [
+   "a83d4808-ec5b-409c-af18-fd56dea6b5ee",
+   "b4be9e62-e374-4812-b7b3-4020d85e7679",
+   "dad203e1-51a2-4d61-8adc-de3e931407e3",
+   "c05e6443-796a-42ed-8edc-20918e740b94",
+   "9751460c-f92a-4d58-af6f-28554a16981d",
+   "acae4a9b-2be4-41d0-a006-63871872b4ff",
+   "e5f477ae-d5c7-47cc-816c-8f5c91dea375"
+  ],
+  "clients": [
+   "025e7609-4579-4243-8859-1501bb162c44"
+  ],
+  "projects": [
+   "730748cf-fdb5-4f69-b810-2e168b8585e4",
+   "3f90a403-72d3-4c99-96f4-7c730d984e77",
+   "c41fb011-60f8-4348-b110-41637a53a28c",
+   "427339c7-693f-4971-932a-d5529c6a58c4",
+   "1465b0ad-ed6b-46d5-9159-e1564a9652d6"
+  ],
+  "jobRoles": [
+   "7e9421d3-8639-44c1-af45-84efbfce0de2",
+   "0df480d0-faa9-4032-be3a-32d0ffc10f66",
+   "8e56820f-ad87-4de3-8785-dce94786fe2d",
+   "5b84f044-3c33-4afc-a082-8732fc1f52c8",
+   "abf312e0-35a5-478a-87cb-d8bbe72474d2"
+  ],
+  "teams": [
+   "fd04fd34-90a5-470b-b98f-d6b110e0db97"
+  ],
+  "departments": [
+   "06117e76-f106-4b63-9f5b-6361c149405d"
+  ],
+  "templates": [
+   {
+    "id": "9e375ad7-8a65-46f4-849f-886d5b795bfe",
+    "title": "تقرير كاتب المحتوى الأسبوعي",
+    "jobRoleId": null,
+    "description": "تقرير أسبوعي لكاتب المحتوى",
+    "classification": "Primary",
+    "defaultPeriodType": "Weekly",
+    "jobRoleIdNow": "7e9421d3-8639-44c1-af45-84efbfce0de2",
+    "needsRestore": true
+   },
+   {
+    "id": "4b50b69d-5b3b-4160-89d4-1c524bb96458",
+    "title": "تقرير فريق التصميم",
+    "jobRoleId": null,
+    "description": "تقرير أسبوعي لفريق التصميم",
+    "classification": "Primary",
+    "defaultPeriodType": "Weekly",
+    "jobRoleIdNow": "0df480d0-faa9-4032-be3a-32d0ffc10f66",
+    "needsRestore": true
+   },
+   {
+    "id": "6f492ed5-b0fb-4b95-894c-f52ef9e8abee",
+    "title": "تقرير فريق الفيديو",
+    "jobRoleId": null,
+    "description": "تقرير أسبوعي لفريق الفيديو",
+    "classification": "Primary",
+    "defaultPeriodType": "Weekly",
+    "jobRoleIdNow": "8e56820f-ad87-4de3-8785-dce94786fe2d",
+    "needsRestore": true
+   },
+   {
+    "id": "3a4775c2-5a78-4171-b70f-d2b029f4ff92",
+    "title": "تقرير المديرشن الأسبوعي",
+    "jobRoleId": null,
+    "description": "تقرير أسبوعي لإدارة التعليقات والرسائل",
+    "classification": "Primary",
+    "defaultPeriodType": "Weekly",
+    "jobRoleIdNow": "5b84f044-3c33-4afc-a082-8732fc1f52c8",
+    "needsRestore": true
+   },
+   {
+    "id": "06970634-2141-4a83-bbe0-c8debfa6870e",
+    "title": "تقرير متابعة مقالات SEO الأسبوعي",
+    "jobRoleId": null,
+    "description": "متابعة أسبوعية لمقالات SEO",
+    "classification": "Primary",
+    "defaultPeriodType": "Weekly",
+    "jobRoleIdNow": "abf312e0-35a5-478a-87cb-d8bbe72474d2",
+    "needsRestore": true
+   }
+  ],
+  "submissions": [
+   "4ca2eea2-e50d-43dc-a3cc-2cf6eca14a24",
+   "a1a5129f-6a67-4fc1-837e-cda95ce643b7",
+   "b26e1244-5e00-46be-9940-ccceb9879c64",
+   "e5ef7c88-b16d-4a11-a0a9-5da0f538d664"
+  ],
+  "submissionsAlreadyGone": [
+   "4ab22892-8cea-42c6-8b5d-c03bc5c37e38"
+  ]
+ },
+ "verify": {
+  "usersStillPresent": [],
+  "usersActive": [],
+  "preExistingUsersIntact": true,
+  "projectsActive": [
+   "730748cf-fdb5-4f69-b810-2e168b8585e4",
+   "3f90a403-72d3-4c99-96f4-7c730d984e77",
+   "c41fb011-60f8-4348-b110-41637a53a28c",
+   "427339c7-693f-4971-932a-d5529c6a58c4",
+   "1465b0ad-ed6b-46d5-9159-e1564a9652d6"
+  ],
+  "preExistingProjectsIntact": true,
+  "preExistingClientsIntact": true,
+  "clientStatus": "None",
+  "templatesRestored": true
+ },
+ "log": [
+  {
+   "step": "login-admin",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "list-users",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "diff-users",
+   "status": 200,
+   "note": "before=33 now=40 created=7 match=True"
+  },
+  {
+   "step": "list-clients",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "diff-clients",
+   "status": 200,
+   "note": "before=10 now=11 created=1 match=True"
+  },
+  {
+   "step": "list-projects",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "diff-projects",
+   "status": 200,
+   "note": "before=18 now=23 created=5 match=True"
+  },
+  {
+   "step": "verify-submission-4ab22892",
+   "status": 200,
+   "note": "محذوف إداريًّا سلفًا"
+  },
+  {
+   "step": "verify-submission-4ca2eea2",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "verify-submission-a1a5129f",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "verify-submission-b26e1244",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "verify-submission-e5ef7c88",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "plan-submissions",
+   "status": 200,
+   "note": "4 للحذف · 1 محذوف سلفًا"
+  },
+  {
+   "step": "list-templates",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "plan-templates",
+   "status": 200,
+   "note": "5/5 تحتاج استعادة JobRoleId"
+  },
+  {
+   "step": "restore-template-9e375ad7",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "restore-template-4b50b69d",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "restore-template-6f492ed5",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "restore-template-3a4775c2",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "restore-template-06970634",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "soft-delete-submission-4ca2eea2",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "soft-delete-submission-a1a5129f",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "soft-delete-submission-b26e1244",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "soft-delete-submission-e5ef7c88",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "archive-project-730748cf",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "archive-project-3f90a403",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "archive-project-c41fb011",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "archive-project-427339c7",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "archive-project-1465b0ad",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "archive-client",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "invalidate-tokens-a83d4808",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "deactivate-user-a83d4808",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "invalidate-tokens-b4be9e62",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "deactivate-user-b4be9e62",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "invalidate-tokens-dad203e1",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "deactivate-user-dad203e1",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "invalidate-tokens-c05e6443",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "deactivate-user-c05e6443",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "invalidate-tokens-9751460c",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "deactivate-user-9751460c",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "invalidate-tokens-acae4a9b",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "deactivate-user-acae4a9b",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "invalidate-tokens-e5f477ae",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "deactivate-user-e5f477ae",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "archive-jobrole-7e9421d3",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "archive-jobrole-0df480d0",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "archive-jobrole-8e56820f",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "archive-jobrole-5b84f044",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "archive-jobrole-abf312e0",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "deactivate-team",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "deactivate-department",
+   "status": 200,
+   "note": ""
+  }
+ ]
+}
