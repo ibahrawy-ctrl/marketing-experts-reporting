@@ -1268,7 +1268,9 @@ export function SubmissionDetail({ id, onBack }: { id: string; onBack: () => voi
             {sub.approvalSteps.filter((a) => a.comment).map((a) => (
               <li key={a.level} className="border-b border-line pb-2 last:border-0">
                 <p className="font-medium text-navy">{a.approverName ?? '—'} · {approvalStatusLabel[a.status]}</p>
-                <p className="text-ink-2">{a.comment}</p>
+                {/* REPORT-APPROVAL-COMMENTS-MULTILINE-HOTFIX-R1: whitespace-pre-wrap يحفظ الأسطر عند العرض،
+                    و break-words يمنع تجاوز النص الطويل حدود البطاقة أفقيًّا. */}
+                <p className="whitespace-pre-wrap break-words text-ink-2">{a.comment}</p>
               </li>
             ))}
           </ul>
@@ -1280,7 +1282,15 @@ export function SubmissionDetail({ id, onBack }: { id: string; onBack: () => voi
           <h2 className="mb-3 font-semibold text-navy">إجراء الاعتماد</h2>
           <div className="mb-3">
             <Field label="ملاحظة / سبب" help="مطلوب عند الإعادة للتعديل أو التصعيد">
-              <Input value={comment} onChange={(e) => setComment(e.target.value)} placeholder="اكتب سبب القرار…" />
+              {/* REPORT-APPROVAL-COMMENTS-MULTILINE-HOTFIX-R1: textarea بدل input — <input> يبتلع Enter ولا يقبل \n
+                  فتضيع الأسطر قبل مغادرة المتصفّح. نص عادي فقط (لا محرّر غنيّ ولا Markdown ولا HTML). */}
+              <textarea
+                className="w-full resize-y rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-navy"
+                rows={4}
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                placeholder="اكتب سبب القرار…"
+              />
             </Field>
           </div>
           <div className="flex flex-wrap gap-2">

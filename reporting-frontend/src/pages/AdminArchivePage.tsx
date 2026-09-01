@@ -280,7 +280,9 @@ function ArchiveDetailsModal({
                             <td className="px-3 py-2">{s.level}</td>
                             <td className="px-3 py-2">{s.approverName ?? s.approverId}</td>
                             <td className="px-3 py-2">{s.status}</td>
-                            <td className="px-3 py-2 text-ink-2">{s.comment ?? '—'}</td>
+                            {/* R22B/MULTILINE: whitespace-pre-wrap يحفظ أسطر التعليق، وbreak-words يمنع
+                                كسر تخطيط الجدول بنصّ طويل بلا مسافات. مطابق لـSubmissionsPage. */}
+                            <td className="px-3 py-2 text-ink-2 whitespace-pre-wrap break-words">{s.comment ?? '—'}</td>
                             <td className="px-3 py-2 text-ink-2">{formatDateTime(s.decidedAtUtc)}</td>
                           </tr>
                         ))}

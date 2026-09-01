@@ -63,7 +63,9 @@ export function NotificationsBell() {
                   }`}
                 >
                   <p className="text-sm font-semibold text-ink">{n.title}</p>
-                  {n.body && <p className="mt-0.5 text-xs text-ink-2">{n.body}</p>}
+                  {/* REPORT-APPROVAL-COMMENTS-MULTILINE-HOTFIX-R1: نصّ الإشعار نسخة من تعليق الاعتماد،
+                      فيحتاج نفس الحفاظ على الأسطر + كسر الكلمات داخل عرض الجرس الثابت (w-80). */}
+                  {n.body && <p className="mt-0.5 whitespace-pre-wrap break-words text-xs text-ink-2">{n.body}</p>}
                   <p className="mt-1 text-[11px] text-ink-3">{formatDate(n.createdAtUtc)}</p>
                 </button>
               ))
