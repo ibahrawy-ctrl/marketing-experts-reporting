@@ -1,0 +1,427 @@
+{
+ "period": "2026-W36",
+ "surfaces": {},
+ "templates": {
+  "content": {
+   "email": "r22r-content@r22uat.test",
+   "templateId": "9e375ad7-8a65-46f4-849f-886d5b795bfe",
+   "templateTitle": "تقرير كاتب المحتوى الأسبوعي",
+   "assignedCount": 1,
+   "seesOwnTemplate": true,
+   "periodKey": "2026-W36",
+   "submissionId": "4ab22892-8cea-42c6-8b5d-c03bc5c37e38",
+   "requiredFieldCount": 1,
+   "statusAfterSubmit": "Submitted",
+   "statusAfterReturn": "Returned",
+   "sentComment": "س1/محتوى: الأدلّة ناقصة على مقالين.\nس2/محتوى: صحّح عدد الكلمات في الجدول.\nس3/محتوى: أعد الإرسال قبل نهاية اليوم.",
+   "sentLineCount": 3,
+   "apiRereadStatus": 200,
+   "apiRereadComment": "س1/محتوى: الأدلّة ناقصة على مقالين.\nس2/محتوى: صحّح عدد الكلمات في الجدول.\nس3/محتوى: أعد الإرسال قبل نهاية اليوم.",
+   "apiRereadLineCount": 3,
+   "apiRereadExact": true,
+   "bellStatus": 200,
+   "bellBody": "س1/محتوى: الأدلّة ناقصة على مقالين.\nس2/محتوى: صحّح عدد الكلمات في الجدول.\nس3/محتوى: أعد الإرسال قبل نهاية اليوم.",
+   "bellLineCount": 3,
+   "bellContainsFullComment": true,
+   "readerStatus": 200,
+   "readerExact": true
+  },
+  "design": {
+   "email": "r22r-design@r22uat.test",
+   "templateId": "4b50b69d-5b3b-4160-89d4-1c524bb96458",
+   "templateTitle": "تقرير فريق التصميم",
+   "assignedCount": 1,
+   "seesOwnTemplate": true,
+   "periodKey": "2026-W36",
+   "submissionId": "e5ef7c88-b16d-4a11-a0a9-5da0f538d664",
+   "requiredFieldCount": 1,
+   "statusAfterSubmit": "Submitted",
+   "statusAfterReturn": "Returned",
+   "sentComment": "س1/تصميم: ملفّ المصدر غير مرفق.\nس2/تصميم: وحّد مقاسات البانرات.\nس3/تصميم: أعد الإرسال بعد التصحيح.",
+   "sentLineCount": 3,
+   "apiRereadStatus": 200,
+   "apiRereadComment": "س1/تصميم: ملفّ المصدر غير مرفق.\nس2/تصميم: وحّد مقاسات البانرات.\nس3/تصميم: أعد الإرسال بعد التصحيح.",
+   "apiRereadLineCount": 3,
+   "apiRereadExact": true,
+   "bellStatus": 200,
+   "bellBody": "س1/تصميم: ملفّ المصدر غير مرفق.\nس2/تصميم: وحّد مقاسات البانرات.\nس3/تصميم: أعد الإرسال بعد التصحيح.",
+   "bellLineCount": 3,
+   "bellContainsFullComment": true,
+   "readerStatus": 200,
+   "readerExact": true
+  },
+  "video": {
+   "email": "r22r-video@r22uat.test",
+   "templateId": "6f492ed5-b0fb-4b95-894c-f52ef9e8abee",
+   "templateTitle": "تقرير فريق الفيديو",
+   "assignedCount": 1,
+   "seesOwnTemplate": true,
+   "periodKey": "2026-W36",
+   "submissionId": "a1a5129f-6a67-4fc1-837e-cda95ce643b7",
+   "requiredFieldCount": 1,
+   "statusAfterSubmit": "Submitted",
+   "statusAfterReturn": "Returned",
+   "sentComment": "س1/فيديو: مدّة المقطع تتجاوز المتّفق عليه.\nس2/فيديو: أضف الترجمة العربيّة.\nس3/فيديو: أعد الرفع بدقّة أعلى.",
+   "sentLineCount": 3,
+   "apiRereadStatus": 200,
+   "apiRereadComment": "س1/فيديو: مدّة المقطع تتجاوز المتّفق عليه.\nس2/فيديو: أضف الترجمة العربيّة.\nس3/فيديو: أعد الرفع بدقّة أعلى.",
+   "apiRereadLineCount": 3,
+   "apiRereadExact": true,
+   "bellStatus": 200,
+   "bellBody": "س1/فيديو: مدّة المقطع تتجاوز المتّفق عليه.\nس2/فيديو: أضف الترجمة العربيّة.\nس3/فيديو: أعد الرفع بدقّة أعلى.",
+   "bellLineCount": 3,
+   "bellContainsFullComment": true,
+   "readerStatus": 200,
+   "readerExact": true
+  },
+  "moderation": {
+   "email": "r22r-moderation@r22uat.test",
+   "templateId": "3a4775c2-5a78-4171-b70f-d2b029f4ff92",
+   "templateTitle": "تقرير المديرشن الأسبوعي",
+   "assignedCount": 1,
+   "seesOwnTemplate": true,
+   "periodKey": "2026-W36",
+   "submissionId": "4ca2eea2-e50d-43dc-a3cc-2cf6eca14a24",
+   "requiredFieldCount": 1,
+   "statusAfterSubmit": "Submitted",
+   "statusAfterReturn": "Returned",
+   "sentComment": "س1/مديرشن: زمن الاستجابة غير مسجّل.\nس2/مديرشن: صنّف الشكاوى حسب النوع.\nس3/مديرشن: أعد الإرسال مع الأدلّة.",
+   "sentLineCount": 3,
+   "apiRereadStatus": 200,
+   "apiRereadComment": "س1/مديرشن: زمن الاستجابة غير مسجّل.\nس2/مديرشن: صنّف الشكاوى حسب النوع.\nس3/مديرشن: أعد الإرسال مع الأدلّة.",
+   "apiRereadLineCount": 3,
+   "apiRereadExact": true,
+   "bellStatus": 200,
+   "bellBody": "س1/مديرشن: زمن الاستجابة غير مسجّل.\nس2/مديرشن: صنّف الشكاوى حسب النوع.\nس3/مديرشن: أعد الإرسال مع الأدلّة.",
+   "bellLineCount": 3,
+   "bellContainsFullComment": true,
+   "readerStatus": 200,
+   "readerExact": true
+  },
+  "seo": {
+   "email": "r22r-seo@r22uat.test",
+   "templateId": "06970634-2141-4a83-bbe0-c8debfa6870e",
+   "templateTitle": "تقرير متابعة مقالات SEO الأسبوعي",
+   "assignedCount": 1,
+   "seesOwnTemplate": true,
+   "periodKey": "2026-W36",
+   "submissionId": "b26e1244-5e00-46be-9940-ccceb9879c64",
+   "requiredFieldCount": 1,
+   "statusAfterSubmit": "Submitted",
+   "statusAfterReturn": "Returned",
+   "sentComment": "س1/سيو: الكلمات المفتاحيّة غير محدّثة.\nس2/سيو: أضف روابط داخليّة للمقالين.\nس3/سيو: أعد الإرسال بعد المراجعة.",
+   "sentLineCount": 3,
+   "apiRereadStatus": 200,
+   "apiRereadComment": "س1/سيو: الكلمات المفتاحيّة غير محدّثة.\nس2/سيو: أضف روابط داخليّة للمقالين.\nس3/سيو: أعد الإرسال بعد المراجعة.",
+   "apiRereadLineCount": 3,
+   "apiRereadExact": true,
+   "bellStatus": 200,
+   "bellBody": "س1/سيو: الكلمات المفتاحيّة غير محدّثة.\nس2/سيو: أضف روابط داخليّة للمقالين.\nس3/سيو: أعد الإرسال بعد المراجعة.",
+   "bellLineCount": 3,
+   "bellContainsFullComment": true,
+   "readerStatus": 200,
+   "readerExact": true
+  }
+ },
+ "log": [
+  {
+   "step": "login r22b-hotfix-admin@r22uat.test",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "login r22r-lead@r22uat.test",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "login r22r-content@r22uat.test",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "eligibility-content",
+   "status": 200,
+   "note": "assigned=1 own=True"
+  },
+  {
+   "step": "create-content",
+   "status": 200,
+   "note": "4ab22892-8cea-42c6-8b5d-c03bc5c37e38 2026-W36"
+  },
+  {
+   "step": "save-values-content",
+   "status": 200,
+   "note": "1"
+  },
+  {
+   "step": "submit-content",
+   "status": 200,
+   "note": "Submitted"
+  },
+  {
+   "step": "return-content",
+   "status": 200,
+   "note": "Returned"
+  },
+  {
+   "step": "api-reread-content",
+   "status": 200,
+   "note": "lines=3 exact=True"
+  },
+  {
+   "step": "bell-content",
+   "status": 200,
+   "note": "lines=3 full=True"
+  },
+  {
+   "step": "independent-reader-content",
+   "status": 200,
+   "note": "exact=True"
+  },
+  {
+   "step": "login r22r-design@r22uat.test",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "eligibility-design",
+   "status": 200,
+   "note": "assigned=1 own=True"
+  },
+  {
+   "step": "create-design",
+   "status": 200,
+   "note": "e5ef7c88-b16d-4a11-a0a9-5da0f538d664 2026-W36"
+  },
+  {
+   "step": "save-values-design",
+   "status": 200,
+   "note": "1"
+  },
+  {
+   "step": "submit-design",
+   "status": 200,
+   "note": "Submitted"
+  },
+  {
+   "step": "return-design",
+   "status": 200,
+   "note": "Returned"
+  },
+  {
+   "step": "api-reread-design",
+   "status": 200,
+   "note": "lines=3 exact=True"
+  },
+  {
+   "step": "bell-design",
+   "status": 200,
+   "note": "lines=3 full=True"
+  },
+  {
+   "step": "independent-reader-design",
+   "status": 200,
+   "note": "exact=True"
+  },
+  {
+   "step": "login r22r-video@r22uat.test",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "eligibility-video",
+   "status": 200,
+   "note": "assigned=1 own=True"
+  },
+  {
+   "step": "create-video",
+   "status": 200,
+   "note": "a1a5129f-6a67-4fc1-837e-cda95ce643b7 2026-W36"
+  },
+  {
+   "step": "save-values-video",
+   "status": 200,
+   "note": "1"
+  },
+  {
+   "step": "submit-video",
+   "status": 200,
+   "note": "Submitted"
+  },
+  {
+   "step": "return-video",
+   "status": 200,
+   "note": "Returned"
+  },
+  {
+   "step": "api-reread-video",
+   "status": 200,
+   "note": "lines=3 exact=True"
+  },
+  {
+   "step": "bell-video",
+   "status": 200,
+   "note": "lines=3 full=True"
+  },
+  {
+   "step": "independent-reader-video",
+   "status": 200,
+   "note": "exact=True"
+  },
+  {
+   "step": "login r22r-moderation@r22uat.test",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "eligibility-moderation",
+   "status": 200,
+   "note": "assigned=1 own=True"
+  },
+  {
+   "step": "create-moderation",
+   "status": 200,
+   "note": "4ca2eea2-e50d-43dc-a3cc-2cf6eca14a24 2026-W36"
+  },
+  {
+   "step": "save-values-moderation",
+   "status": 200,
+   "note": "1"
+  },
+  {
+   "step": "submit-moderation",
+   "status": 200,
+   "note": "Submitted"
+  },
+  {
+   "step": "return-moderation",
+   "status": 200,
+   "note": "Returned"
+  },
+  {
+   "step": "api-reread-moderation",
+   "status": 200,
+   "note": "lines=3 exact=True"
+  },
+  {
+   "step": "bell-moderation",
+   "status": 200,
+   "note": "lines=3 full=True"
+  },
+  {
+   "step": "independent-reader-moderation",
+   "status": 200,
+   "note": "exact=True"
+  },
+  {
+   "step": "login r22r-seo@r22uat.test",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "eligibility-seo",
+   "status": 200,
+   "note": "assigned=1 own=True"
+  },
+  {
+   "step": "create-seo",
+   "status": 200,
+   "note": "b26e1244-5e00-46be-9940-ccceb9879c64 2026-W36"
+  },
+  {
+   "step": "save-values-seo",
+   "status": 200,
+   "note": "1"
+  },
+  {
+   "step": "submit-seo",
+   "status": 200,
+   "note": "Submitted"
+  },
+  {
+   "step": "return-seo",
+   "status": 200,
+   "note": "Returned"
+  },
+  {
+   "step": "api-reread-seo",
+   "status": 200,
+   "note": "lines=3 exact=True"
+  },
+  {
+   "step": "bell-seo",
+   "status": 200,
+   "note": "lines=3 full=True"
+  },
+  {
+   "step": "independent-reader-seo",
+   "status": 200,
+   "note": "exact=True"
+  },
+  {
+   "step": "login r22r-content@r22uat.test",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "resubmit-after-return",
+   "status": 200,
+   "note": "Submitted"
+  },
+  {
+   "step": "approve-with-injection-comment",
+   "status": 200,
+   "note": "Closed"
+  },
+  {
+   "step": "approve-api-reread",
+   "status": 200,
+   "note": "exact=True"
+  },
+  {
+   "step": "admin-soft-delete",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "archive-detail",
+   "status": 200,
+   "note": "steps=2 approveExact=True returnExact=True"
+  },
+  {
+   "step": "email-preview",
+   "status": 200,
+   "note": "br=2 scriptEncoded=True"
+  }
+ ],
+ "approve": {
+  "submissionId": "4ab22892-8cea-42c6-8b5d-c03bc5c37e38",
+  "sent": "اعتماد/س1: شكرًا، صُحِّحت الملاحظات.\nاعتماد/س2: <script>alert('xss')</script> & \"اقتباس\"\nاعتماد/س3: أُغلق التقرير للفترة.",
+  "status": "Closed",
+  "apiRereadExact": true,
+  "apiRereadLineCount": 3
+ },
+ "archive": {
+  "submissionId": "4ab22892-8cea-42c6-8b5d-c03bc5c37e38",
+  "deleteStatus": 200,
+  "detailStatus": 200,
+  "stepCount": 2,
+  "comments": [
+   "س1/محتوى: الأدلّة ناقصة على مقالين.\nس2/محتوى: صحّح عدد الكلمات في الجدول.\nس3/محتوى: أعد الإرسال قبل نهاية اليوم.",
+   "اعتماد/س1: شكرًا، صُحِّحت الملاحظات.\nاعتماد/س2: <script>alert('xss')</script> & \"اقتباس\"\nاعتماد/س3: أُغلق التقرير للفترة."
+  ],
+  "approveCommentExact": true,
+  "returnCommentExact": true
+ },
+ "email": {
+  "listStatus": 200,
+  "templateCount": 10,
+  "key": "MANUAL_REMINDER",
+  "previewStatus": 200,
+  "bodyHtml": "<!DOCTYPE html>\n<html dir=\"rtl\" lang=\"ar\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"></head>\n<body style=\"margin:0;background:#f4f6f9;font-family:Tahoma,Arial,sans-serif\">\n  <div style=\"max-width:560px;margin:24px auto;background:#fff;border-radius:10px;overflow:hidden;border:1px solid #e6e9ef\">\n    <div style=\"background:#1F2A44;padding:18px 24px\"><span style=\"color:#fff;font-size:16px;font-weight:bold\">خبراء التسويق — نظام تقارير الأداء</span></div>\n    <div style=\"padding:24px\">\n      <h1 style=\"margin:0 0 14px;font-size:19px;color:#1F2A44\">R22R — عيّنة عنوان</h1>\n      <p style=\"margin:0 0 16px;font-size:15px;line-height:1.8;color:#333\">اعتماد/س1: شكرًا، صُحِّحت الملاحظات.<br />اعتماد/س2: &lt;script&gt;alert(&#39;xss&#39;)&lt;/script&gt; &amp; &quot;اقتباس&quot;<br />اعتماد/س3: أُغلق التقرير للفترة.</p>\n      <p style=\"margin:0\"><a href=\"https://reports.example/app\" style=\"display:inline-block;background:#E8772E;color:#fff;text-decoration:none;padding:10px 22px;border-radius:6px;font-size:14px\">فتح في النظام</a></p>\n    </div>\n    <div style=\"padding:14px 24px;background:#fafbfc;border-top:1px solid #eef1f5;color:#8a94a6;font-size:12px\">هذه رسالة آلية من نظام التقارير الداخلي. الرجاء عدم الرد عليها.</div>\n  </div>\n</body></html>",
+  "brCount": 2,
+  "scriptEncoded": true,
+  "ampEncoded": true
+ }
+}

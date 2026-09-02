@@ -1,0 +1,335 @@
+{
+ "prefix": "R22R",
+ "userPasswordFile": "/root/.r22c-user-pw",
+ "employees": {
+  "content": {
+   "jobRoleId": "7e9421d3-8639-44c1-af45-84efbfce0de2",
+   "email": "r22r-content@r22uat.test",
+   "userId": "dad203e1-51a2-4d61-8adc-de3e931407e3",
+   "templateId": "9e375ad7-8a65-46f4-849f-886d5b795bfe",
+   "templateTitle": "تقرير كاتب المحتوى الأسبوعي",
+   "jobRoleIdBefore": null,
+   "classificationBefore": "Primary",
+   "descriptionBefore": "تقرير أسبوعي لكاتب المحتوى",
+   "defaultPeriodTypeBefore": "Weekly",
+   "projectId": "730748cf-fdb5-4f69-b810-2e168b8585e4",
+   "projectName": "R22R — مشروع المحتوى"
+  },
+  "design": {
+   "jobRoleId": "0df480d0-faa9-4032-be3a-32d0ffc10f66",
+   "email": "r22r-design@r22uat.test",
+   "userId": "c05e6443-796a-42ed-8edc-20918e740b94",
+   "templateId": "4b50b69d-5b3b-4160-89d4-1c524bb96458",
+   "templateTitle": "تقرير فريق التصميم",
+   "jobRoleIdBefore": null,
+   "classificationBefore": "Primary",
+   "descriptionBefore": "تقرير أسبوعي لفريق التصميم",
+   "defaultPeriodTypeBefore": "Weekly",
+   "projectId": "3f90a403-72d3-4c99-96f4-7c730d984e77",
+   "projectName": "R22R — مشروع التصميم"
+  },
+  "video": {
+   "jobRoleId": "8e56820f-ad87-4de3-8785-dce94786fe2d",
+   "email": "r22r-video@r22uat.test",
+   "userId": "9751460c-f92a-4d58-af6f-28554a16981d",
+   "templateId": "6f492ed5-b0fb-4b95-894c-f52ef9e8abee",
+   "templateTitle": "تقرير فريق الفيديو",
+   "jobRoleIdBefore": null,
+   "classificationBefore": "Primary",
+   "descriptionBefore": "تقرير أسبوعي لفريق الفيديو",
+   "defaultPeriodTypeBefore": "Weekly",
+   "projectId": "c41fb011-60f8-4348-b110-41637a53a28c",
+   "projectName": "R22R — مشروع الفيديو"
+  },
+  "moderation": {
+   "jobRoleId": "5b84f044-3c33-4afc-a082-8732fc1f52c8",
+   "email": "r22r-moderation@r22uat.test",
+   "userId": "acae4a9b-2be4-41d0-a006-63871872b4ff",
+   "templateId": "3a4775c2-5a78-4171-b70f-d2b029f4ff92",
+   "templateTitle": "تقرير المديرشن الأسبوعي",
+   "jobRoleIdBefore": null,
+   "classificationBefore": "Primary",
+   "descriptionBefore": "تقرير أسبوعي لإدارة التعليقات والرسائل",
+   "defaultPeriodTypeBefore": "Weekly",
+   "projectId": "427339c7-693f-4971-932a-d5529c6a58c4",
+   "projectName": "R22R — مشروع المديرشن"
+  },
+  "seo": {
+   "jobRoleId": "abf312e0-35a5-478a-87cb-d8bbe72474d2",
+   "email": "r22r-seo@r22uat.test",
+   "userId": "e5f477ae-d5c7-47cc-816c-8f5c91dea375",
+   "templateId": "06970634-2141-4a83-bbe0-c8debfa6870e",
+   "templateTitle": "تقرير متابعة مقالات SEO الأسبوعي",
+   "jobRoleIdBefore": null,
+   "classificationBefore": "Primary",
+   "descriptionBefore": "متابعة أسبوعية لمقالات SEO",
+   "defaultPeriodTypeBefore": "Weekly",
+   "projectId": "1465b0ad-ed6b-46d5-9159-e1564a9652d6",
+   "projectName": "R22R — مشروع SEO"
+  }
+ },
+ "preExisting": {
+  "users": [
+   "16bc21fc-98a0-4bf7-9bcb-8350cd3466d9",
+   "22f9c9db-e37b-46be-af0f-34f179634d06",
+   "2e12a40e-e093-43b2-94fd-3eeb75d2271f",
+   "314cb94f-d32b-45b8-9375-a90ccd00d14c",
+   "41d337b0-db09-4f28-b9e7-452d03214cc7",
+   "4791d6fb-82bd-4d28-ade5-8976b566f51c",
+   "4b5074eb-0b73-4f0a-b342-a8bf936548a7",
+   "4fc80f1d-5202-45eb-a381-3c412886b56c",
+   "532be888-ddf1-46a9-8584-f851fe60b293",
+   "5723a11b-a9e5-4723-a1d7-656fb90b2c66",
+   "57cee269-5594-4090-8cff-4fd4adf441c2",
+   "66ad9d20-b186-4c3b-b753-ed20c4413854",
+   "6f36c86a-8028-4de4-b6c0-f3a81aac991f",
+   "7211c84c-f4af-4574-b5ed-c25bfd38bbaa",
+   "74c79c4b-d403-494c-aafe-a2d63caf3965",
+   "7b3210b8-6de7-4ee6-b5a0-a0eb919773a9",
+   "7caf6b85-8d5a-45b9-ad6e-85adbf6ca7c1",
+   "7f0044d7-f98b-4bb4-a5c4-77890db97eec",
+   "9516ef6f-1099-4bd7-8fe6-c36f5ba8f919",
+   "a52656b1-f048-48f4-9887-5ed368a87c6b",
+   "ae8a6c60-412a-446a-aa97-8bad208dd70f",
+   "c3726dbb-1fc2-4e7f-8856-b9aabfa2fe05",
+   "c8155848-b421-426b-a2be-7433aa953291",
+   "d266045d-4be4-4aac-b7c6-c1b89de21d9c",
+   "de210ca6-f008-4983-8786-77c3e59ce2b6",
+   "e2ac8113-16c1-4ad8-b45c-a6dccb31499a",
+   "ecb1eed7-a455-4459-a48d-caf3c94cfd17",
+   "f18df329-4e41-489c-9887-aeca572658e7",
+   "f8000000-0000-4000-8000-000000000001",
+   "f8000000-0000-4000-8000-000000000002",
+   "f8000000-0000-4000-8000-000000000003",
+   "f8000000-0000-4000-8000-000000000004",
+   "f8000000-0000-4000-8000-000000000005"
+  ],
+  "clients": [
+   "0181867b-b28b-4bba-80be-7c8722d3bf6f",
+   "0323066b-0b21-4f26-b28a-69ebbad96865",
+   "1d08c935-d0a8-4712-947d-ff3e11b0d8d8",
+   "257dfc0b-49d7-4db8-9b42-4bd4337380e1",
+   "30eedf6f-2450-45aa-adb8-22b55a37f905",
+   "5fc158a1-e26e-487d-9282-87bad60e397c",
+   "91ab4f03-e11d-40c4-9309-bb2b9c1b4e74",
+   "bff99e78-df4f-4c9b-bc17-c259250f4958",
+   "cc877dc2-dc6d-4fb1-97e0-fb84a1714571",
+   "f2dd43c4-8b97-470d-a775-54094b01c87c"
+  ],
+  "projects": [
+   "0b3d7e8d-3052-48f0-9d16-2e9fc6f09617",
+   "1d3ae941-05a2-43c9-a37d-8e32fbac5796",
+   "2d0eeff7-a42f-4ee5-b30e-045e259fee9b",
+   "40075b7b-29b6-4623-8a68-e16d8ae13645",
+   "44388186-3e2a-4825-8b92-a8307abdc941",
+   "498c05ec-15a3-49dd-8471-73cdb80b1891",
+   "51710a1a-386d-4cce-a8ac-0665aaee9d9b",
+   "6a494b63-f0c0-4491-8ae9-bc074821e067",
+   "6d215754-4a35-44e5-8753-4e0ad058f64b",
+   "767e67da-f70f-4947-b8a6-ae7088151927",
+   "97bf97bc-b12f-470d-bab9-8748d91696ac",
+   "9e731196-f87f-4bbf-82cd-260d06d90b56",
+   "bf6ee6da-08dc-474b-b6fc-b1f68d83af04",
+   "c7ea6b1d-9bcd-4cda-a103-4de88c77f9cb",
+   "ce97fb93-6139-4093-9183-0ec9bc02ce5d",
+   "ceea1351-7514-48bc-bbab-55446ffcfe41",
+   "d13a438c-bdda-4d09-a992-284fe21cabaa",
+   "e95cbb1d-814a-4c50-bddc-69e48ec8aec1"
+  ]
+ },
+ "departmentId": "06117e76-f106-4b63-9f5b-6361c149405d",
+ "teamId": "fd04fd34-90a5-470b-b98f-d6b110e0db97",
+ "reviewerId": "a83d4808-ec5b-409c-af18-fd56dea6b5ee",
+ "reviewerEmail": "r22r-lead@r22uat.test",
+ "readerId": "b4be9e62-e374-4812-b7b3-4020d85e7679",
+ "readerEmail": "r22r-manager@r22uat.test",
+ "clientId": "025e7609-4579-4243-8859-1501bb162c44",
+ "serviceType": "Social",
+ "log": [
+  {
+   "step": "login-admin",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "fingerprint-users",
+   "status": 200,
+   "note": "33"
+  },
+  {
+   "step": "fingerprint-clients",
+   "status": 200,
+   "note": "10"
+  },
+  {
+   "step": "fingerprint-projects",
+   "status": 200,
+   "note": "18"
+  },
+  {
+   "step": "create-department",
+   "status": 200,
+   "note": "06117e76-f106-4b63-9f5b-6361c149405d"
+  },
+  {
+   "step": "create-jobrole-content",
+   "status": 200,
+   "note": "7e9421d3-8639-44c1-af45-84efbfce0de2"
+  },
+  {
+   "step": "create-jobrole-design",
+   "status": 200,
+   "note": "0df480d0-faa9-4032-be3a-32d0ffc10f66"
+  },
+  {
+   "step": "create-jobrole-video",
+   "status": 200,
+   "note": "8e56820f-ad87-4de3-8785-dce94786fe2d"
+  },
+  {
+   "step": "create-jobrole-moderation",
+   "status": 200,
+   "note": "5b84f044-3c33-4afc-a082-8732fc1f52c8"
+  },
+  {
+   "step": "create-jobrole-seo",
+   "status": 200,
+   "note": "abf312e0-35a5-478a-87cb-d8bbe72474d2"
+  },
+  {
+   "step": "create-team",
+   "status": 200,
+   "note": "fd04fd34-90a5-470b-b98f-d6b110e0db97"
+  },
+  {
+   "step": "create-reviewer",
+   "status": 200,
+   "note": "a83d4808-ec5b-409c-af18-fd56dea6b5ee"
+  },
+  {
+   "step": "create-independent-reader",
+   "status": 200,
+   "note": "b4be9e62-e374-4812-b7b3-4020d85e7679"
+  },
+  {
+   "step": "set-team-leader",
+   "status": 200,
+   "note": "a83d4808-ec5b-409c-af18-fd56dea6b5ee"
+  },
+  {
+   "step": "create-user-content",
+   "status": 200,
+   "note": "dad203e1-51a2-4d61-8adc-de3e931407e3"
+  },
+  {
+   "step": "set-user-jobrole-content",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "create-user-design",
+   "status": 200,
+   "note": "c05e6443-796a-42ed-8edc-20918e740b94"
+  },
+  {
+   "step": "set-user-jobrole-design",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "create-user-video",
+   "status": 200,
+   "note": "9751460c-f92a-4d58-af6f-28554a16981d"
+  },
+  {
+   "step": "set-user-jobrole-video",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "create-user-moderation",
+   "status": 200,
+   "note": "acae4a9b-2be4-41d0-a006-63871872b4ff"
+  },
+  {
+   "step": "set-user-jobrole-moderation",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "create-user-seo",
+   "status": 200,
+   "note": "e5f477ae-d5c7-47cc-816c-8f5c91dea375"
+  },
+  {
+   "step": "set-user-jobrole-seo",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "list-templates",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "set-template-jobrole-content",
+   "status": 200,
+   "note": "9e375ad7-8a65-46f4-849f-886d5b795bfe"
+  },
+  {
+   "step": "set-template-jobrole-design",
+   "status": 200,
+   "note": "4b50b69d-5b3b-4160-89d4-1c524bb96458"
+  },
+  {
+   "step": "set-template-jobrole-video",
+   "status": 200,
+   "note": "6f492ed5-b0fb-4b95-894c-f52ef9e8abee"
+  },
+  {
+   "step": "set-template-jobrole-moderation",
+   "status": 200,
+   "note": "3a4775c2-5a78-4171-b70f-d2b029f4ff92"
+  },
+  {
+   "step": "set-template-jobrole-seo",
+   "status": 200,
+   "note": "06970634-2141-4a83-bbe0-c8debfa6870e"
+  },
+  {
+   "step": "create-client",
+   "status": 200,
+   "note": "025e7609-4579-4243-8859-1501bb162c44"
+  },
+  {
+   "step": "list-projects",
+   "status": 200,
+   "note": ""
+  },
+  {
+   "step": "create-project-content",
+   "status": 200,
+   "note": "730748cf-fdb5-4f69-b810-2e168b8585e4"
+  },
+  {
+   "step": "create-project-design",
+   "status": 200,
+   "note": "3f90a403-72d3-4c99-96f4-7c730d984e77"
+  },
+  {
+   "step": "create-project-video",
+   "status": 200,
+   "note": "c41fb011-60f8-4348-b110-41637a53a28c"
+  },
+  {
+   "step": "create-project-moderation",
+   "status": 200,
+   "note": "427339c7-693f-4971-932a-d5529c6a58c4"
+  },
+  {
+   "step": "create-project-seo",
+   "status": 200,
+   "note": "1465b0ad-ed6b-46d5-9159-e1564a9652d6"
+  }
+ ]
+}
