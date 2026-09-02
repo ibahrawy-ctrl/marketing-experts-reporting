@@ -2,6 +2,45 @@
 
 **التاريخ:** 2 سبتمبر 2026 · `MODE = READ_ONLY` · لم يقع أيّ `commit`/`push`/`reset`/`rebase`/نشر/كتابة على TEST.
 
+> ## ⚠︎ تصحيحات لاحقة (2 سبتمبر 2026 — تسبق قراءة بقيّة الملفّ وتَجُبّ ما يخالفها)
+>
+> هذا الملفّ كُتب في لحظة زمنيّة سابقة، وأربع عبارات فيه صارت غير دقيقة. التصحيح توثيقيّ بحت ولا يمسّ
+> أيّ ملفّ مصدر ولا أيّ نتيجة وظيفيّة.
+>
+> **(ت-1) عدد اختبارات الواجهة = `844/844` لا `843/843`.**
+> ما ورد في §3 و§5 من أنّ «`844` غير موجود في أيّ أثر محفوظ» وأنّ `FRONTEND_COUNT_DELTA = UNREPRODUCIBLE_NO_844_ARTIFACT`
+> **مُلغًى**. أُعيد القياس على شجرة الالتزام الوظيفيّ `bb37d1a`: `Test Files 73 passed (73)` ·
+> `Tests 844 passed (844)` · `VITEST_EXIT=0`. سبب الخطأ الأصليّ: نقل رقم من سجلّ سابق بلا إعادة قياس.
+> **`FRONTEND_TEST_COUNT_AUTHORITY = 844/844`.**
+>
+> **(ت-2) المرجعان الاحتياطيّان أُنشئا فعليًّا بأمر صريح.**
+> ما ورد في §3 من أنّ `backup/unexpected-r22b-commit-1db114d` «المرجع غائب، ولم يُنشَأ امتثالًا للتعليمات»
+> كان صحيحًا **وقت التدقيق فقط**. أُنشئ المرجعان بعده بأمر صريح، وهما قائمان الآن محلّيًّا:
+> ```
+> refs/heads/backup/unexpected-r22b-commit-1db114d → 1db114d
+> refs/heads/backup/unexpected-r22b-commit-7c269df → 7c269df
+> BACKUP_REFS_EXIST = YES   ·   BACKUP_REFS_PUSHED_TO_ORIGIN = NO (محلّيّان)
+> ```
+>
+> **(ت-3) الفرع القديم مدفوع — والادّعاء بخلاف ذلك مُصحَّح.**
+> ```
+> PUSHED = YES_ON_LEGACY_BRANCH_ONLY
+> origin/hotfix/r22b-multiline-idempotency-reconciliation-20260901 = 7c269df   ← مدفوع
+> origin/develop = cd09b67a…  ·  origin/main = 508509ad…                       ← لم يُمسّا
+> ```
+> أي أنّ `1db114d` و`7c269df` منشوران على البعيد داخل **الفرع القديم وحده**، ولم يدخلا `develop` ولا `main`.
+>
+> **(ت-4) فرق الـRunbook ملفّ كامل من 75 سطرًا لا «سطر واحد».**
+> عبارة §6 و«سطر واحد فقط» في تقارير هذه الجولة تصف **سجلًّا واحدًا في `name-status`** لا سطر محتوى واحدًا.
+> القياس الصريح:
+> ```
+> git diff --numstat bb37d1a 1db114d
+>   75  0  Docs/Runbooks/FRONTEND-ARTIFACT-PROVENANCE-GATE-R1.md
+> git diff --shortstat bb37d1a 1db114d   ⟹ 1 file changed, 75 insertions(+)
+> ```
+> فالتلوّث الذي بُنيت عليه `PREMERGE_COMMIT_INTEGRITY = FAIL` هو **إدراج ملفّ توثيقيّ كامل (75 سطرًا)**
+> داخل التزام وظيفيّ، وهو أثقل ممّا توحي به صياغة «سجلّ واحد».
+
 ---
 
 ## 1. كائن الالتزام `1db114d` كما هو

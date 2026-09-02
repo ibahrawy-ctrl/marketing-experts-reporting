@@ -49,7 +49,7 @@
 
 ```
 FRONTEND_COMPONENT_TESTS = PASS   (14 تعليق + 4 أرشيف)
-FULL_FRONTEND_SUITE      = PASS   73 ملفًّا / 843 اختبارًا
+FULL_FRONTEND_SUITE      = PASS   73 ملفًّا / 844 اختبارًا   ← مُصحَّح (كان 843 خطأً)
 TSC_BUILD                = PASS   exit 0
 PRODUCTION_BUILD         = PASS
 BACKEND_BUILD            = PASS   0 Error(s)
@@ -62,6 +62,12 @@ BUNDLE_MULTILINE_GATE    = PASS   7/7
 ```
 
 > حزمة التكامل جرت على قاعدة **معزولة نظيفة** `reporting_recon_20260901` (لا `reporting_test` الملوّثة)، بعد تطبيق تصحيح `Classification='Supplementary'` الموثَّق. صفر فشل — أفضل من خطّ الأساس التاريخيّ (8 حالات فشل).
+
+> **تصحيح توثيقيّ (2 سبتمبر 2026 · لا أثر على الكود):** الرقم المسجَّل سابقًا `843` كان **خطأً**، والصحيح
+> `844`. القياس أُعيد على شجرة الالتزام الوظيفيّ `bb37d1a` نفسها داخل شجرة عمل معزولة:
+> `npx vitest run` ⟹ `Test Files 73 passed (73)` · `Tests 844 passed (844)` · `VITEST_EXIT=0`.
+> **`FRONTEND_TEST_COUNT_AUTHORITY = 844/844`** ويلغي كلّ ذكر سابق لـ`843` في هذا الملفّ وفي
+> `COMMIT-IDENTITY-AUDIT-ADDENDUM.md`. لم تتغيّر أيّ نتيجة وظيفيّة: العدّ فقط هو ما صُحِّح.
 
 ---
 
