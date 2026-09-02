@@ -93,11 +93,24 @@ public interface IEmailSender
 /// <summary>قالب بريد عربي RTL بسيط ومتوافق مع عملاء البريد (مشترك بين الإشعارات واختبار البريد).</summary>
 public static class EmailHtml
 {
+    /// <summary>
+    /// R22B/MULTILINE-EMAIL: يحفظ أسطر النصّ في بريد HTML **بعد** الترميز الآمن حصرًا.
+    /// الترتيب مُلزِم: (1) ترميز HTML كامل ⟹ أيّ وسم في مُدخَل المستخدم يصير نصًّا حرفيًّا،
+    /// (2) توحيد نهايات الأسطر CRLF/CR إلى LF، (3) استبدال LF بـ<br /> — وهو الوسم الوحيد
+    /// الذي نحقنه نحن ولا يأتي من المستخدم. عملاء البريد لا يعتمدون على white-space:pre-line
+    /// اعتمادًا موثوقًا، لذلك <br /> بدل CSS. **ممنوع** عكس الترتيب أو تمرير HTML خام.
+    /// </summary>
+    internal static string EncodeWithLineBreaks(string value)
+        => System.Net.WebUtility.HtmlEncode(value)
+            .Replace("\r\n", "\n")
+            .Replace("\r", "\n")
+            .Replace("\n", "<br />");
+
     public static string Build(string title, string? body, string? link)
     {
         var safeTitle = System.Net.WebUtility.HtmlEncode(title);
         var safeBody = string.IsNullOrWhiteSpace(body) ? "" :
-            $"<p style=\"margin:0 0 16px;font-size:15px;line-height:1.8;color:#333\">{System.Net.WebUtility.HtmlEncode(body)}</p>";
+            $"<p style=\"margin:0 0 16px;font-size:15px;line-height:1.8;color:#333\">{EncodeWithLineBreaks(body)}</p>";
         var safeLink = string.IsNullOrWhiteSpace(link) ? "" :
             $"<p style=\"margin:0\"><a href=\"{System.Net.WebUtility.HtmlEncode(link)}\" style=\"display:inline-block;background:#E8772E;color:#fff;text-decoration:none;padding:10px 22px;border-radius:6px;font-size:14px\">فتح في النظام</a></p>";
 

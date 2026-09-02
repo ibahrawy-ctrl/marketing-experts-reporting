@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Reporting.Application.Audit;
 using Reporting.Application.Clients;
 using Reporting.Application.Common;
@@ -66,24 +67,34 @@ public class SubmissionService : ISubmissionService
         if (string.IsNullOrWhiteSpace(request.PeriodKey))
             return Result<SubmissionDto>.Failure("مفتاح الفترة مطلوب.", "submission.period_required");
 
+        // حارس الإسناد المركزي (TEMPLATE-ROLE-GUARD): يُمنع إنشاء/فتح مسودة لقالب غير مُسنَد للمستخدم،
+        // بنفس منطق assignedOnly المصدر الوحيد للحقيقة. لا إعفاء ضمني لأي دور (لا انتحال بالنيابة هنا).
+        // يُقدَّم على كلّ ما بعده: الأمن أوّلًا، فلا يُكشف وجود تقرير لقالب غير مُسنَد.
+        if (!await _templates.IsTemplateAssignedToUserAsync(userId, request.ReportTemplateId, ct))
+            return Result<SubmissionDto>.Failure(
+                "هذا القالب غير مُسنَد إليك ولا يمكنك إنشاء تقرير به.", "report.template_not_assigned");
+
+        var periodKey = request.PeriodKey.Trim();
+
+        // DEFECT-IDEMPOTENCY-01 — هويّة التقرير التشغيليّة هي **نَسَب القالب عبر كلّ إصداراته**
+        // (ReportTemplateId + SubmitterId + PeriodKey)، لا لقطةُ إصدارٍ منه. المفتاح القديم
+        // (ReportTemplateVersionId + …) كان يجعل تغيُّرَ الإصدار النافذ يُخفي تقرير الموظّف القائم
+        // فيُنشَأ ثانٍ لنفس الفترة. الفحص يسبق حسم الإصدار النافذ عمدًا: تقرير قائم على إصدار لم يعد
+        // منشورًا يجب أن يُعاد كما هو لا أن يُحجَب برسالة «لا يوجد إصدار منشور».
+        var lineage = await FindByTemplateLineageAsync(request.ReportTemplateId, userId, periodKey, ct);
+        if (lineage.Count > 1)
+            return Result<SubmissionDto>.Failure(
+                $"يوجد أكثر من تقرير لنفس القالب والفترة ({string.Join(", ", lineage)}). يلزم تدخّل إداريّ لتوحيدها قبل المتابعة.",
+                "submission.duplicate_period_reports.conflict");
+        if (lineage.Count == 1)
+            return Result<SubmissionDto>.Success(await BuildDtoAsync(lineage[0], ct));
+
         var version = await _db.ReportTemplateVersions
             .Where(v => v.ReportTemplateId == request.ReportTemplateId && v.IsPublished)
             .OrderByDescending(v => v.VersionNumber)
             .FirstOrDefaultAsync(ct);
         if (version is null)
             return Result<SubmissionDto>.Failure("لا يوجد إصدار منشور لهذا القالب.", "template.no_published_version.conflict");
-
-        // حارس الإسناد المركزي (TEMPLATE-ROLE-GUARD): يُمنع إنشاء/فتح مسودة لقالب غير مُسنَد للمستخدم،
-        // بنفس منطق assignedOnly المصدر الوحيد للحقيقة. لا إعفاء ضمني لأي دور (لا انتحال بالنيابة هنا).
-        if (!await _templates.IsTemplateAssignedToUserAsync(userId, request.ReportTemplateId, ct))
-            return Result<SubmissionDto>.Failure(
-                "هذا القالب غير مُسنَد إليك ولا يمكنك إنشاء تقرير به.", "report.template_not_assigned");
-
-        var periodKey = request.PeriodKey.Trim();
-        var existing = await _db.ReportSubmissions.FirstOrDefaultAsync(
-            s => s.ReportTemplateVersionId == version.Id && s.SubmitterId == userId && s.PeriodKey == periodKey, ct);
-        if (existing is not null)
-            return Result<SubmissionDto>.Success(await BuildDtoAsync(existing.Id, ct));
 
         var me = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
 
@@ -179,10 +190,55 @@ public class SubmissionService : ISubmissionService
             ClientId = linkedClientId
         };
         _db.ReportSubmissions.Add(submission);
-        await _db.SaveChangesAsync(ct);
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (IsPeriodUniqueViolation(ex))
+        {
+            // SAME_VERSION_CONCURRENCY_GUARD: طلبان متزامنان لنفس (مستخدم، قالب، فترة) يحسمان نفس
+            // الإصدار النافذ فيتصادمان على الفهرس الفريد الجزئيّ القائم. لا نُنشئ ثانيًا ولا نُخفي
+            // الخطأ: نُبعِد الكيان الفاشل، ونُعيد القراءة بالمفتاح المنطقيّ، ونُعيد السجلّ الواحد.
+            _db.Entry(submission).State = EntityState.Detached;
+            var raced = await FindByTemplateLineageAsync(request.ReportTemplateId, userId, periodKey, ct);
+            if (raced.Count == 1)
+                return Result<SubmissionDto>.Success(await BuildDtoAsync(raced[0], ct));
+            throw; // لم يُفسِّر الانتهاكَ سجلٌّ قائم ⟹ سببٌ آخر لا يُبتلع.
+        }
 
         return Result<SubmissionDto>.Success(await BuildDtoAsync(submission.Id, ct));
     }
+
+    /// <summary>
+    /// اسم الفهرس الفريد الجزئيّ على <c>(ReportTemplateVersionId, SubmitterId, PeriodKey)</c> كما
+    /// يولّده EF فعليًّا في PostgreSQL (مقصوص إلى حدّ المعرّف 63 محرفًا بعلامة القصّ <c>~</c>).
+    /// اسمٌ صريح لا مطابقةٌ عامّة على رمز الحالة: أيّ انتهاك تفرّد من قيد آخر يجب ألّا يُبتلع.
+    /// يحرسه اختبار يقارن هذا الثابت باسم الفهرس في القاعدة، فلا ينزلق صامتًا.
+    /// </summary>
+    internal const string PeriodUniqueIndexName =
+        "IX_report_submissions_ReportTemplateVersionId_SubmitterId_Peri~";
+
+    internal static bool IsPeriodUniqueViolation(DbUpdateException ex)
+        => ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } pg
+           && pg.ConstraintName == PeriodUniqueIndexName;
+
+    /// <summary>
+    /// DEFECT-IDEMPOTENCY-01 — يُرجِع معرّفات تقارير المستخدم لنفس الفترة عبر **كلّ** إصدارات القالب،
+    /// مرتَّبةً بالأقدم إنشاءً. المرشِّح العامّ يستبعد المحذوف إداريًّا تلقائيًّا، فيطابق تمامًا مُرشِّح
+    /// الفهرس الفريد الجزئيّ <c>IsDeleted = false</c>.
+    /// </summary>
+    private Task<List<Guid>> FindByTemplateLineageAsync(
+        Guid reportTemplateId, Guid submitterId, string periodKey, CancellationToken ct)
+        => _db.ReportSubmissions
+            .Where(s => s.SubmitterId == submitterId && s.PeriodKey == periodKey)
+            .Join(_db.ReportTemplateVersions,
+                s => s.ReportTemplateVersionId,
+                v => v.Id,
+                (s, v) => new { s.Id, s.CreatedAtUtc, v.ReportTemplateId })
+            .Where(x => x.ReportTemplateId == reportTemplateId)
+            .OrderBy(x => x.CreatedAtUtc)
+            .Select(x => x.Id)
+            .ToListAsync(ct);
 
     public async Task<Result<SubmissionDto>> GetAsync(Guid submissionId, CancellationToken ct = default)
     {

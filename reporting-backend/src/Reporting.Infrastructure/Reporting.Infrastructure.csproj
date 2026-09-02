@@ -10,6 +10,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- R22B/DEFECT-IDEMPOTENCY-01: يُتيح لاختبارات التكامل قياس مرشِّح استثناء الازدواج مباشرةً
+         (ألّا يُبتلع إلّا انتهاك قيد التفرّد المحدَّد بعينه) بلا توسيع السطح العامّ للمكتبة. -->
+    <InternalsVisibleTo Include="Reporting.IntegrationTests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <EmbeddedResource Include="Assets\Fonts\Tajawal-Regular.ttf" />
     <EmbeddedResource Include="Assets\Fonts\Tajawal-Medium.ttf" />
     <EmbeddedResource Include="Assets\Fonts\Tajawal-Bold.ttf" />
