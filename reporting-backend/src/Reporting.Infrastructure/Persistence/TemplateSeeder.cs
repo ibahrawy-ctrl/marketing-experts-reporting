@@ -32,6 +32,8 @@ public static class TemplateSeeder
         await UpgradeExecutionTemplatesToTaxonomyV3Async(db, ownerId.Value, logger);
         // RC-4 Task 4D3: قوالب التنفيذ v4 — خيارات Select ديناميكية (catalogDomain) تُقرأ وقت التعبئة من الكتالوج، مع لقطة احتياطيّة.
         await UpgradeExecutionTemplatesToTaxonomyV4Async(db, ownerId.Value, logger);
+        // VIS-05 — قالب متابعة مقالات SEO: «الحالة» و«تاريخ التسليم» كانا عمودَي جدول حرّ.
+        await UpgradeSeoArticlesTemplateAsync(db, ownerId.Value, logger);
         // إبقاء عائلة قوالب Production القديمة (ERDS Phase 3) كـ Legacy/Archived بلا حذف (لا تُعرَض للإسناد الجديد).
         await ArchiveLegacyProductionTemplatesAsync(db);
         await SeedKpiTemplatesAsync(db, ownerId.Value);
@@ -457,6 +459,111 @@ public static class TemplateSeeder
 
         await db.SaveChangesAsync();
     }
+
+    // ===== VIS-05 — قالب «تقرير متابعة مقالات SEO الأسبوعي» إلى قوائم محكومة =====
+    //
+    // **السبب الجذريّ الدقيق**: «الحالة» و«تاريخ التسليم» لم يكونا حقلَين خاطئَي النوع، بل
+    // **عمودَي `SGrid`** داخل قسم المشاريع، وأعمدة الجدول نصّ حرّ بطبيعتها في هذا النموذج.
+    // فلا تحقّق ولا تجميع ولا مقارنة عبر الأسابيع، وكلّ كاتب يخترع مفرداته.
+    //
+    // **لماذا `work_status` ولا نطاق جديد**: الكتالوج الرسميّ (`ExecutionTaxonomySeeder`) يضمّ
+    // 22 نطاقًا ليس فيها `seo_status` ولا `article_status`، واستحداث نطاق جديد محظور صراحةً.
+    // `work_status` (مسودّة/مراجعة/معتمَد/منشور) هو النطاق العامّ المستعمَل سلفًا لقالب المحتوى،
+    // ويصف دورة حياة المقال وصفًا مطابقًا. القرار قرار مالك المنتج لا اجتهاد بذر.
+    //
+    // **لماذا بنود عمل لا جدول**: المقال الواحد يحمل حالة وتاريخ تسليم خاصّين به، وهذا يستلزم
+    // حقولًا مكتوبة النوع لكلّ مقال — وهو تحديدًا ما يوفّره الصفّ داخل قسم المشاريع المتكرّر.
+    // الجدولان الحرّان القديمان لا يُحذفان من التاريخ: إصدارات v1..v4 تبقى مقروءة بلقطاتها.
+    //
+    // إضافيّ بحت · بلا هجرة · idempotent عبر الحارس `IsSeoArticlesGoverned`.
+    private static async Task UpgradeSeoArticlesTemplateAsync(AppDbContext db, Guid ownerId, ILogger logger)
+    {
+        const string title = "تقرير متابعة مقالات SEO الأسبوعي";
+
+        var template = await db.ReportTemplates
+            .Include(t => t.Versions).ThenInclude(v => v.Fields)
+            .FirstOrDefaultAsync(t => t.Title == title);
+        if (template is null) return; // القالب غير مبذور بعد — تخطٍّ آمن.
+
+        if (template.Versions.Any(IsSeoArticlesGoverned))
+        {
+            ReportPublicationState(logger, template, "SeoArticlesGoverned");
+            return;
+        }
+
+        var workStatus = await db.ExecutionTaxonomyValues
+            .Where(v => v.IsActive && v.Domain == "work_status")
+            .OrderBy(v => v.SortOrder).Select(v => v.NameAr).ToArrayAsync();
+        // الكتالوج فارغ ⟹ لا لقطة احتياطيّة تُبنى، ولا تُخترع قائمة. لا كتابة إطلاقًا.
+        if (workStatus.Length == 0)
+        {
+            logger.LogWarning(
+                "TemplateSeeder[SeoArticlesGoverned]: نطاق «work_status» بلا قيم نشطة — تُركت الترقية بلا تنفيذ ولم تُجرَ أيّ كتابة.");
+            return;
+        }
+
+        var fields = new[]
+        {
+            Sec("🔢 ملخص الأسبوع"),
+            Num("عدد المقالات المخطط لها"),
+            Num("عدد المقالات المنشورة"),
+            Num("عدد المقالات المتأخرة"),
+            Sec("📁 تفاصيل المشاريع — صفّ لكلّ مقال"),
+            Proj("تفاصيل المشروع",
+                SShort("article_title", "عنوان المقال", true),
+                SShort("keyword", "الكلمة المفتاحية", true),
+                SSelectCat("work_status", "حالة المقال", true, "work_status", workStatus),
+                SShort("reviewer", "المراجع"),
+                SDate("delivery_date", "تاريخ التسليم", true),
+                SShort("published_url", "رابط المنشورة"),
+                SNum("word_count", "عدد الكلمات"),
+                SLong("notes", "ملاحظات")),
+            Sec("📋 الجداول العامة"),
+            Grid("المتأخرة", "المقال", "سبب التأخير", "الموعد الجديد"),
+            Grid("خطة الأسبوع القادم", "المقال", "الكلمة المفتاحية", "الموعد"),
+            Sec("📝 ملاحظات"),
+            Long("أبرز إنجاز"),
+            Long("أبرز تحدٍّ"),
+            Long("اقتراحات"),
+            Note("ملاحظات للإدارة"),
+        };
+
+        var version = new ReportTemplateVersion
+        {
+            VersionNumber = (template.Versions.Count == 0 ? 0 : template.Versions.Max(v => v.VersionNumber)) + 1,
+            IsPublished = true,
+            PublishedAtUtc = DateTime.UtcNow,
+            PublishedById = ownerId
+        };
+        var order = 0;
+        foreach (var f in fields)
+        {
+            version.Fields.Add(new TemplateField
+            {
+                Label = f.Label,
+                FieldType = f.Type,
+                IsRequired = f.Required,
+                HelpText = f.Help,
+                ConfigJson = BuildConfigJson(f),
+                Order = order++
+            });
+        }
+        template.Versions.Add(version);
+        db.Add(version);
+        UnpublishPredecessorsOnCreation(template, version);
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// حارس v5 لقالب مقالات SEO: قسم المشاريع يحمل حقل حالة مسنودًا بنطاق <c>work_status</c>
+    /// **وحقل تاريخ مكتوب النوع**. وجود <c>catalogDomain</c> وحده لا يكفي حارسًا لأنّ v4 قد
+    /// تحمله لقوالب أخرى؛ والاقتران بالتاريخ هو ما يميّز هذه الترقية بالتحديد.
+    /// </summary>
+    private static bool IsSeoArticlesGoverned(ReportTemplateVersion v) => v.Fields.Any(f =>
+        f.FieldType == FieldType.ProjectRepeatableSection
+        && f.ConfigJson is not null
+        && f.ConfigJson.Replace(" ", "").Contains("\"catalogDomain\":\"work_status\"")
+        && f.ConfigJson.Replace(" ", "").Contains("\"key\":\"delivery_date\""));
 
     // ===== RC-4 Task 4 (Path A) — أرشفة عائلة قوالب Production القديمة (ERDS Phase 3) =====
     // إبقاؤها للقراءة الخلفية فقط (Legacy)؛ لا تُعرَض للإسناد/الإنشاء الجديد. idempotent (يعمل فقط على غير المؤرشف).

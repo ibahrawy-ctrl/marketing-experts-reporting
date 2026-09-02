@@ -72,6 +72,10 @@ public record ClientFilter(
     bool IncludeClosed = false);
 
 // ===== Linked report row (تقارير مرتبطة بعميل/مشروع) =====
+// VIS-02ب: الصفّ كان يحمل تسعة حقول لا تكفي لاتّخاذ قرار من داخل مساحة المشروع —
+// لا اسم قالب يميّز تقرير التصميم من تقرير السيو، ولا آخر تحديث، ولا عدد بنود العمل،
+// ولا نتيجة آخر قرار اعتماد، ولا سبب الإرجاع. الحقول الستّة التالية اختياريّة الموضع
+// حتّى تبقى المواضع التسعة الأولى متوافقة مع كلّ المُنشِئين القائمين.
 public record LinkedReportRow(
     Guid SubmissionId,
     Guid SubmitterId,
@@ -81,7 +85,13 @@ public record LinkedReportRow(
     SubmissionStatus Status,
     DateTime? SubmittedAtUtc,
     Guid? ClientId,
-    Guid? ProjectId);
+    Guid? ProjectId,
+    string? TemplateName = null,
+    DateTime? LastUpdatedAtUtc = null,
+    int WorkItemCount = 0,
+    ApprovalStatus? LastDecision = null,
+    DateTime? LastDecisionAtUtc = null,
+    string? LastReturnReason = null);
 
 // ===== Account Manager — Client Health =====
 public record ClientHealthRow(

@@ -2402,6 +2402,13 @@ export interface LinkedReportRow {
   submittedAtUtc: string | null;
   clientId: string | null;
   projectId: string | null;
+  // VIS-02ب — حقول القرار داخل مساحة المشروع (اختياريّة: قوائم العميل لا تملؤها).
+  templateName?: string | null;
+  lastUpdatedAtUtc?: string | null;
+  workItemCount?: number;
+  lastDecision?: ApprovalStatus | null;
+  lastDecisionAtUtc?: string | null;
+  lastReturnReason?: string | null;
 }
 
 /**

@@ -971,3 +971,18 @@ export function monthKey(year: number, month: number): string {
 export function quarterKey(year: number, quarter: number): string {
   return `${year}-Q${quarter}`;
 }
+
+// عزل اتّجاهيّ لمقطع نصّيّ داخل فقرة RTL (VIS-01).
+// `<option>` لا يقبل عناصر أبناء ⟹ لا يمكن استعمال `<bdi>`، والحلّ المعياريّ الوحيد
+// هو محارف العزل النصّيّة: FSI (U+2068) … PDI (U+2069). بدونها يُعيد خوارزم Unicode
+// ترتيبَ المقاطع اللاتينيّة داخل السلسلة العربيّة فيظهر الاسم مبتورًا/مقلوبًا.
+export function bidiIsolate(text: string): string {
+  return `\u2068${text}\u2069`;
+}
+
+// تسمية موحّدة لخيار المشروع في القوائم المنسدلة: «اسم المشروع — اسم العميل»
+// مع عزل كلّ طرف على حدة حتّى لا تتداخل الأسماء اللاتينيّة مع العربيّة.
+export function projectOptionLabel(name: string, clientName?: string | null): string {
+  const base = bidiIsolate(name);
+  return clientName ? `${base} — ${bidiIsolate(clientName)}` : base;
+}

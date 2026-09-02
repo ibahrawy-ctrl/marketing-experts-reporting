@@ -34,6 +34,7 @@ import { ProjectHealthPanel } from '../components/project360/ProjectHealthPanel'
 import { ProjectKpisTab } from '../components/project360/ProjectKpisTab';
 import { ProjectObjectivesTab } from '../components/project360/ProjectObjectivesTab';
 import { ProjectOverviewTab } from '../components/project360/ProjectOverviewTab';
+import { ProjectReportsTab } from '../components/project360/ProjectReportsTab';
 import { ProjectStrategyTab } from '../components/project360/ProjectStrategyTab';
 import {
   Detail,
@@ -114,6 +115,13 @@ export default function Project360Page() {
       id: 'execution',
       label: 'تحديثات التنفيذ',
       content: <ProjectExecutionBridgeTab projectId={projectId} access={access} />,
+    },
+    // VIS-02: التقارير المرتبطة بالمشروع — كانت غائبة عن المساحة كلّها رغم وجود
+    // النقطة والمكوّن، فبدا النظام كأنّه لا يربط تقارير التنفيذ بمشاريعها.
+    {
+      id: 'reports',
+      label: 'التقارير المرتبطة',
+      content: <ProjectReportsTab projectId={projectId} />,
     },
     {
       id: 'governance',

@@ -253,7 +253,7 @@ public class ProjectService : IProjectService
         var exists = await _db.Projects.AnyAsync(p => p.Id == id, ct);
         if (!exists) return Result<IReadOnlyList<LinkedReportRow>>.Failure(ProjectNotFoundMessage, ProjectNotFoundCode);
 
-        var rows = await LinkedReportsAsync(LinkedToProject(id), ct);
+        var rows = await LinkedReportsAsync(LinkedToProject(id), id, ct);
         return Result<IReadOnlyList<LinkedReportRow>>.Success(rows);
     }
 
@@ -491,15 +491,93 @@ public class ProjectService : IProjectService
         return false;
     }
 
+    /// <summary>
+    /// صفوف التقارير المرتبطة بمشروع، مُثراة بما يلزم لاتّخاذ قرار من داخل مساحة المشروع (VIS-02ب):
+    /// اسم القالب · آخر تحديث · عدد بنود العمل المرصودة **لهذا المشروع وحده** · آخر قرار اعتماد · سبب الإرجاع.
+    /// كلّ إثراء يُجلَب باستعلام مُجمَّع واحد (لا N+1).
+    /// </summary>
     private async Task<IReadOnlyList<LinkedReportRow>> LinkedReportsAsync(
-        System.Linq.Expressions.Expression<Func<Domain.Entities.Submissions.ReportSubmission, bool>> predicate, CancellationToken ct)
+        System.Linq.Expressions.Expression<Func<Domain.Entities.Submissions.ReportSubmission, bool>> predicate,
+        Guid projectId, CancellationToken ct)
     {
         var subs = await _db.ReportSubmissions.AsNoTracking().Where(predicate)
             .OrderByDescending(s => s.CreatedAtUtc).ToListAsync(ct);
+        if (subs.Count == 0) return new List<LinkedReportRow>();
+
         var names = await UserNamesAsync(subs.Select(s => s.SubmitterId), ct);
+        var subIds = subs.Select(s => s.Id).ToList();
+        var versionIds = subs.Select(s => s.ReportTemplateVersionId).Distinct().ToList();
+
+        // اسم القالب من نَسَب الإصدار: بدونه يستحيل تمييز تقرير التصميم من تقرير السيو في القائمة.
+        var templateNames = await _db.ReportTemplateVersions.AsNoTracking()
+            .Where(v => versionIds.Contains(v.Id))
+            .Join(_db.ReportTemplates.AsNoTracking(), v => v.ReportTemplateId, t => t.Id,
+                  (v, t) => new { v.Id, t.Title })
+            .ToDictionaryAsync(x => x.Id, x => x.Title, ct);
+
+        // آخر خطوة اعتماد مقضيّة لكلّ تسليم (القرار وتاريخه)، وآخر خطوة إرجاع (السبب).
+        var decided = await _db.ApprovalSteps.AsNoTracking()
+            .Where(a => subIds.Contains(a.ReportSubmissionId) && a.DecidedAtUtc != null)
+            .Select(a => new { a.ReportSubmissionId, a.Status, a.DecidedAtUtc, a.Comment })
+            .ToListAsync(ct);
+        var lastDecision = decided
+            .GroupBy(a => a.ReportSubmissionId)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(a => a.DecidedAtUtc).First());
+        var lastReturn = decided
+            .Where(a => a.Status == ApprovalStatus.Returned)
+            .GroupBy(a => a.ReportSubmissionId)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(a => a.DecidedAtUtc).First().Comment);
+
+        // عدد بنود العمل المرصودة لهذا المشروع داخل كلّ تسليم — يُحسب من أقسام
+        // ProjectRepeatableSection وحدها كي لا يُحتسب ورود المعرّف في حقل حرّ.
+        var sectionJson = await _db.SubmissionFieldValues.AsNoTracking()
+            .Where(v => subIds.Contains(v.ReportSubmissionId) && v.ValueJson != null
+                        && _db.TemplateFields.Any(f => f.Id == v.TemplateFieldId
+                                                       && f.FieldType == FieldType.ProjectRepeatableSection))
+            .Select(v => new { v.ReportSubmissionId, v.ValueJson })
+            .ToListAsync(ct);
+        var workItemCounts = new Dictionary<Guid, int>();
+        foreach (var row in sectionJson)
+            workItemCounts[row.ReportSubmissionId] =
+                workItemCounts.GetValueOrDefault(row.ReportSubmissionId)
+                + CountWorkItemsForProject(row.ValueJson!, projectId);
+
         return subs.Select(s => new LinkedReportRow(
             s.Id, s.SubmitterId, names.GetValueOrDefault(s.SubmitterId),
-            s.PeriodType, s.PeriodKey, s.Status, s.SubmittedAtUtc, s.ClientId, s.ProjectId)).ToList();
+            s.PeriodType, s.PeriodKey, s.Status, s.SubmittedAtUtc, s.ClientId, s.ProjectId,
+            TemplateName: templateNames.GetValueOrDefault(s.ReportTemplateVersionId),
+            LastUpdatedAtUtc: s.UpdatedAtUtc,
+            WorkItemCount: workItemCounts.GetValueOrDefault(s.Id),
+            LastDecision: lastDecision.TryGetValue(s.Id, out var d) ? d.Status : null,
+            LastDecisionAtUtc: lastDecision.TryGetValue(s.Id, out var d2) ? d2.DecidedAtUtc : null,
+            LastReturnReason: lastReturn.GetValueOrDefault(s.Id))).ToList();
+    }
+
+    /// <summary>
+    /// عدد بنود العمل داخل بطاقات هذا المشروع وحده. بطاقة بلا مصفوفة بنود = بندٌ واحد ضمنيّ
+    /// (القوالب التي لا تُفعّل بنود العمل تحمل مجموعة إجابات واحدة لكلّ مشروع).
+    /// </summary>
+    private static int CountWorkItemsForProject(string valueJson, Guid projectId)
+    {
+        try
+        {
+            var entries = JsonSerializer.Deserialize<List<SectionEntryWithItems>>(valueJson, SectionJson);
+            if (entries is null) return 0;
+            var total = 0;
+            foreach (var e in entries)
+            {
+                if (e.ProjectId != projectId) continue;
+                total += e.WorkItems is { Count: > 0 } ? e.WorkItems.Count : 1;
+            }
+            return total;
+        }
+        catch { return 0; }
+    }
+
+    private sealed class SectionEntryWithItems
+    {
+        public Guid? ProjectId { get; set; }
+        public List<JsonElement>? WorkItems { get; set; }
     }
 
     private async Task<List<ProjectDto>> MapManyAsync(IReadOnlyCollection<Project> projects, CancellationToken ct)

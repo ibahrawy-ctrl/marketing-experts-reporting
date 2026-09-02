@@ -103,6 +103,16 @@ export function apiErrorCode(
   return { message: fallback };
 }
 
+// سياسة إعادة المحاولة الموحّدة للاستعلامات (VIS-03):
+// أخطاء العميل 4xx (وأبرزها 404 «غير موجود» و403 «خارج النطاق») **نهائيّة**، وإعادة محاولتها
+// تُبقي `isLoading` صحيحًا طوال التراجع الأُسّيّ فيظهر دوّار بلا نهاية بدل حالة الخطأ.
+// تُعاد المحاولة فقط لأخطاء الشبكة/الخادم (بلا استجابة أو 5xx) وبحدّ أقصى محاولتان.
+export function shouldRetryQuery(failureCount: number, error: unknown): boolean {
+  const { status } = apiErrorCode(error);
+  if (status !== undefined && status >= 400 && status < 500) return false;
+  return failureCount < 2;
+}
+
 // رسالة خطأ نوعية موحّدة لأزرار الاعتماد/القرار (APPROVAL ACTION UX R1):
 // - كود auth.forbidden (فقدان دور المعتمِد الحاليّ داخل شاشة قرار) ⟶ اعتمده مستخدم آخر / لم تعد المعتمِد الحاليّ.
 // - 409 / *.conflict / not_actionable / no_pending_step / already ⟶ الطلب لم يعد متاحًا (قد يكون نُفِّذ مسبقًا).

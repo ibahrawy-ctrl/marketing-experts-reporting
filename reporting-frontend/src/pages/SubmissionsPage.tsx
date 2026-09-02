@@ -18,6 +18,8 @@ import {
   periodTypeLabel,
   approvalStatusLabel,
   formatDate,
+  formatDateTime,
+  projectOptionLabel,
 } from '../lib/format';
 import { WeeklyCycleCalendarPicker } from '../components/WeeklyCycleCalendarPicker';
 import { DailyCalendarPicker } from '../components/DailyCalendarPicker';
@@ -595,7 +597,7 @@ function MineTab({ onOpen }: { onOpen: (id: string) => void }) {
                   <option value="">بلا ربط بمشروع</option>
                   {linkableProjects?.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name}{p.clientName ? ` — ${p.clientName}` : ''}
+                      {projectOptionLabel(p.name, p.clientName)}
                     </option>
                   ))}
                 </Select>
@@ -861,6 +863,9 @@ export function SubmissionDetail({ id, onBack }: { id: string; onBack: () => voi
   const [err, setErr] = useState<string | null>(null);
   const [draft, setDraft] = useState<Record<string, FieldValueInput>>({});
   const [comment, setComment] = useState('');
+  // VIS-04: تأكيد الحفظ كان عابرًا (Toast يختفي) فلم يبقَ للموظّف أثر يثبت أنّ المسودّة حُفظت.
+  // هذا المؤشّر ثابت بجوار زرّ الحفظ ويحمل وقت آخر حفظ ناجح في هذه الجلسة.
+  const [savedAtUtc, setSavedAtUtc] = useState<string | null>(null);
 
   // يُعيد Promise حتى ننتظر تحديث الكاش قبل Toast/الرجوع (لا رجوع قبل تحديث البيانات).
   const invalidateAll = () =>
@@ -1099,12 +1104,21 @@ export function SubmissionDetail({ id, onBack }: { id: string; onBack: () => voi
           if (save.isPending || submit.isPending) return;
           try {
             await save.mutateAsync(sub.fieldValues);
+            setSavedAtUtc(new Date().toISOString());
             toast.success('✅ تم حفظ البيانات بنجاح');
           } catch { /* الخطأ يظهر عبر Toast من onError */ }
         }}
       >
         حفظ
       </Button>
+      {savedAtUtc && (
+        <span
+          data-testid="draft-saved-indicator"
+          className="rounded-lg border border-green-600/40 bg-green-50 px-3 py-1.5 text-sm text-green-800"
+        >
+          ✅ حُفظت المسودّة — آخر حفظ {formatDateTime(savedAtUtc)}
+        </span>
+      )}
       <Button
         variant="ghost"
         loading={submit.isPending || save.isPending}
@@ -1766,7 +1780,7 @@ export function ProjectRepeatableEditor({
                   <option value="">اختر مشروعًا…</option>
                   {optionsFor(entry.projectId).map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name}{p.clientName ? ` — ${p.clientName}` : ''}
+                      {projectOptionLabel(p.name, p.clientName)}
                     </option>
                   ))}
                 </Select>
@@ -1888,7 +1902,7 @@ export function ProjectRepeatableDisplay({
   const projectName = (pid: string | null) => {
     if (!pid) return 'بدون مشروع محدّد';
     const p = projects.find((x) => x.id === pid);
-    return p ? `${p.name}${p.clientName ? ` — ${p.clientName}` : ''}` : 'مشروع غير معروف';
+    return p ? projectOptionLabel(p.name, p.clientName) : 'مشروع غير معروف';
   };
   const showAnswer = (sf: RepeatableSubField, raw: string | undefined): string => {
     if (raw == null || raw === '') return '—';

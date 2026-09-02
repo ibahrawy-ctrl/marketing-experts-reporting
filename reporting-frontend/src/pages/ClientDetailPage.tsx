@@ -76,6 +76,7 @@ import {
   defaultVisibilityForCategory,
   roleLabel,
   formatBytes,
+  approvalStatusLabel,
 } from '../lib/format';
 import { apiErrorMessage } from '../lib/api';
 import {
@@ -979,10 +980,13 @@ export function LinkedReportsCard({
   rows,
   title,
   projectId,
+  showDecisionColumns = false,
 }: {
   rows: LinkedReportRow[];
   title: string;
   projectId?: string;
+  // VIS-02ب: أعمدة القرار تظهر في سياق المشروع فقط؛ قوائم العميل لا يملؤها الخادم.
+  showDecisionColumns?: boolean;
 }) {
   return (
     <Card>
@@ -994,17 +998,30 @@ export function LinkedReportsCard({
           <table className="w-full min-w-[640px] text-right text-sm">
             <thead className="border-b border-line bg-offwhite text-xs text-ink-2">
               <tr>
+                {/* «القالب» أوّلًا — بدونه تتشابه صفوف السيو والتصميم والفيديو تمامًا. */}
+                {showDecisionColumns && <th className="px-3 py-2.5 font-semibold">القالب</th>}
                 <th className="px-3 py-2.5 font-semibold">مُقدِّم التقرير</th>
                 <th className="px-3 py-2.5 font-semibold">الدورية</th>
                 <th className="px-3 py-2.5 font-semibold">الفترة</th>
                 <th className="px-3 py-2.5 font-semibold">الحالة</th>
                 <th className="px-3 py-2.5 font-semibold">تاريخ الإرسال</th>
+                {showDecisionColumns && (
+                  <>
+                    <th className="px-3 py-2.5 font-semibold">آخر تحديث</th>
+                    <th className="px-3 py-2.5 font-semibold">بنود العمل</th>
+                    <th className="px-3 py-2.5 font-semibold">آخر قرار اعتماد</th>
+                    <th className="px-3 py-2.5 font-semibold">سبب الإرجاع</th>
+                  </>
+                )}
                 <th className="px-3 py-2.5 font-semibold"></th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => (
                 <tr key={r.submissionId} className="border-b border-line last:border-0 hover:bg-offwhite">
+                  {showDecisionColumns && (
+                    <td className="px-3 py-2.5 font-medium text-ink">{r.templateName ?? '—'}</td>
+                  )}
                   <td className="px-3 py-2.5 font-medium text-ink">{r.submitterName ?? '—'}</td>
                   <td className="px-3 py-2.5 text-ink-2">{periodTypeLabel[r.periodType]}</td>
                   <td className="px-3 py-2.5 text-ink-2">{r.periodKey}</td>
@@ -1014,6 +1031,19 @@ export function LinkedReportsCard({
                     </Badge>
                   </td>
                   <td className="px-3 py-2.5 text-ink-2">{formatDate(r.submittedAtUtc)}</td>
+                  {showDecisionColumns && (
+                    <>
+                      <td className="px-3 py-2.5 text-ink-2">{formatDate(r.lastUpdatedAtUtc)}</td>
+                      <td className="px-3 py-2.5 text-ink-2">{r.workItemCount ?? 0}</td>
+                      <td className="px-3 py-2.5 text-ink-2">
+                        {r.lastDecision ? approvalStatusLabel[r.lastDecision] : '—'}
+                      </td>
+                      {/* سبب الإرجاع متعدّد الأسطر يُحفَظ كما كتبه المعتمِد (R22B). */}
+                      <td className="px-3 py-2.5 whitespace-pre-wrap break-words text-ink-2">
+                        {r.lastReturnReason ?? '—'}
+                      </td>
+                    </>
+                  )}
                   <td className="px-3 py-2.5">
                     <Link
                       to={

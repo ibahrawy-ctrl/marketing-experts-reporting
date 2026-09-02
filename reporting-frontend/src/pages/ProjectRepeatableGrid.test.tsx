@@ -3,6 +3,7 @@ import { render as rtlRender, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import { describe, it, expect, vi } from 'vitest';
+import { projectOptionLabel } from '../lib/format';
 import {
   parseGrid,
   parseRepeatableConfig,
@@ -260,7 +261,8 @@ it('36 ProjectRepeatableDisplay shows all SEO keyword metrics in the same row', 
   };
   const entries: ProjectRepeatableEntry[] = [{ projectId: 'p1', answers: { kw: JSON.stringify([row]) } }];
   render(<ProjectRepeatableDisplay config={cfg} entries={entries} projects={[project('p1', 'مشروع أ', 'عميل س')]} />);
-  expect(screen.getByText('مشروع أ — عميل س')).toBeInTheDocument();
+  // VIS-01: التسمية تُبنى بعزل اتّجاهيّ (FSI/PDI) فلا تُطابَق بسلسلة نصّيّة خام.
+  expect(screen.getByText(projectOptionLabel('مشروع أ', 'عميل س'))).toBeInTheDocument();
   // الخلايا الست في صفّ الجدول نفسه.
   const cells = screen.getAllByRole('cell');
   const texts = cells.map((c) => c.textContent);

@@ -28,6 +28,7 @@ const SCHEMA_URL = `/projects/${PROJECT_ID}/strategy/schema`;
 const DELIVERABLES_URL = `/projects/${PROJECT_ID}/contract-deliverables`;
 const RISKS_URL = `/projects/${PROJECT_ID}/risks`;
 const RECOMPUTE_URL = `/projects/${PROJECT_ID}/health/recompute`;
+const REPORTS_URL = `/projects/${PROJECT_ID}/reports`;
 
 // ---------------------------------------------------------------------
 // **لا تمويه لـ`useAuth` بعد الآن**: الصفحة لم تعد تشتقّ الصلاحيّة من الأدوار
@@ -144,6 +145,7 @@ beforeEach(() => {
     [DELIVERABLES_URL]: [],
     [`${DELIVERABLES_URL}/types`]: [],
     [RISKS_URL]: [],
+    [REPORTS_URL]: [],
     [`/projects/${PROJECT_ID}/decisions`]: [],
     [`/projects/${PROJECT_ID}/notes`]: [],
     '/directory/users': [],
@@ -226,7 +228,9 @@ describe('Project360Page — التحميل الأوّل والصحّة', () => 
 });
 
 describe('Project360Page — التبويبات', () => {
-  it('يعرض تبويبات R2 الثمانية فقط', async () => {
+  // VIS-02: صار العدد تسعة بإضافة «التقارير المرتبطة». الترتيب جزء من العقد: التقارير
+  // تلي «تحديثات التنفيذ» وتسبق «القرارات والحوكمة» لأنّها مُدخَل القرار لا نتيجته.
+  it('يعرض تبويبات R2 التسعة فقط', async () => {
     await renderLoaded();
     const names = screen.getAllByRole('tab').map((t) => t.textContent);
     expect(names).toEqual([
@@ -237,8 +241,61 @@ describe('Project360Page — التبويبات', () => {
       'المؤشّرات والقراءات',
       'المخرَجات التعاقديّة',
       'تحديثات التنفيذ',
+      'التقارير المرتبطة',
       'القرارات والحوكمة',
     ]);
+  });
+
+  // VIS-02 — التقارير المرتبطة داخل مساحة عمل المشروع.
+  //
+  // الادّعاء الأوّل كسولٌ كبقيّة التبويبات: لا يُطلق النداء إلّا عند الفتح. لولاه لصار
+  // كلّ فتح لمساحة العمل يجرّ استعلامًا إضافيًّا، وهو بالضبط ما تمنعه بنية التبويبات.
+  it('لا يطلب تقارير المشروع قبل فتح تبويبها، ويطلبها مرّة واحدة عند الفتح', async () => {
+    await renderLoaded();
+    expect(getCalls).not.toContain(REPORTS_URL);
+    fireEvent.click(screen.getByRole('tab', { name: 'التقارير المرتبطة' }));
+    await waitFor(() => expect(countOf(getCalls, REPORTS_URL)).toBe(1));
+  });
+
+  // الادّعاء الثاني هو جوهر العيب: الصفّ التسعة-حقول لم يكن يكفي لاتّخاذ قرار من هنا.
+  // القيم مُتنافرة عمدًا (قالب السيو، ثلاثة بنود، قرار «مُرجَع» بسبب متعدّد الأسطر)
+  // حتّى لا يمرّ الادّعاء على قيمة افتراضيّة أو على تسمية العمود نفسها.
+  it('يعرض أعمدة القرار المُثراة في سياق المشروع', async () => {
+    getBodies[REPORTS_URL] = [
+      {
+        submissionId: 'sub-1',
+        submitterId: 'user-1',
+        submitterName: 'نورة السالم',
+        periodType: 'Weekly',
+        periodKey: '2026-W36',
+        status: 'Returned',
+        submittedAtUtc: '2026-09-01T08:00:00Z',
+        clientId: 'client-1',
+        projectId: PROJECT_ID,
+        templateName: 'تقرير متابعة مقالات SEO',
+        lastUpdatedAtUtc: '2026-09-02T10:30:00Z',
+        workItemCount: 3,
+        lastDecision: 'Returned',
+        lastReturnReason: 'السطر الأوّل\nالسطر الثاني',
+      },
+    ];
+    await renderLoaded();
+    fireEvent.click(screen.getByRole('tab', { name: 'التقارير المرتبطة' }));
+
+    const table = await screen.findByRole('table');
+    for (const header of ['القالب', 'آخر تحديث', 'بنود العمل', 'آخر قرار اعتماد', 'سبب الإرجاع'])
+      expect(within(table).getByText(header)).toBeInTheDocument();
+
+    expect(within(table).getByText('تقرير متابعة مقالات SEO')).toBeInTheDocument();
+    expect(within(table).getByText('3')).toBeInTheDocument();
+    // السبب متعدّد الأسطر يُعرَض بنصّه كاملًا لا مبتورًا عند أوّل سطر (R22B).
+    // المطابقة حرفيّة على `textContent`: مطابِق Testing Library الافتراضيّ يطبّع المسافات
+    // فيبتلع `\n` نفسه ⟹ ادّعاء «الأسطر محفوظة» كان سينجح حتّى لو دُمِجت الأسطر.
+    const reasonCell = Array.from(table.querySelectorAll('td')).find(
+      (td) => td.textContent === 'السطر الأوّل\nالسطر الثاني',
+    );
+    expect(reasonCell).toBeDefined();
+    expect(reasonCell!.className).toContain('whitespace-pre-wrap');
   });
 
   it('لا يعرض تبويبات المستندات أو المهامّ أو CRM أو المالية', async () => {

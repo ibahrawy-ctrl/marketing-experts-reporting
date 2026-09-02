@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Reporting.Application.Clients;
@@ -42,6 +43,34 @@ public class ReportsTests
     /// <summary>عنصر PRS صالح واحد بمشروع مُختار (بلا حقول فرعية — لأن الحقول الفرعية لقوالب Media Buyer/SEO غير مطلوبة).</summary>
     private static string ProjectSectionValue(Guid projectId)
         => $"[{{\"projectId\":\"{projectId}\",\"answers\":{{}}}}]";
+
+    /// <summary>
+    /// عنصر PRS صالح لقالب «تقرير متابعة مقالات SEO الأسبوعي» بعد ترقية VIS-05.
+    ///
+    /// <para>قبل الترقية كان القسم بلا حقول فرعيّة إلزاميّة، فكان <c>answers:{}</c> الفارغ مقبولًا.
+    /// بعدها صار كلّ مقال صفًّا محكومًا يفرض أربعة حقول: عنوان المقال · الكلمة المفتاحيّة ·
+    /// حالة محكومة من نطاق <c>work_status</c> · تاريخ تسليم مكتوب النوع. العنصر الفارغ يُرفَض 400.</para>
+    ///
+    /// <para>قيمة الحالة تُقرأ من لقطة الخيارات في القالب المنشور نفسه لا تُكتَب حرفيًّا،
+    /// كي يبقى الاختبار صحيحًا إذا تغيّرت مفردات الكتالوج.</para>
+    /// </summary>
+    private async Task<string> ArticlesSectionValueAsync(Guid templateId, Guid projectId)
+    {
+        var admin = await TestAuth.LoginAsAdminAsync(_factory);
+        var detail = await (await admin.GetAsync($"/api/report-templates/{templateId}"))
+            .ReadAsync<ReportTemplateDetailDto>();
+        var section = detail!.Versions.Single(v => v.IsPublished).Fields
+            .Single(f => f.FieldType == FieldType.ProjectRepeatableSection);
+
+        using var doc = JsonDocument.Parse(section.ConfigJson!);
+        var status = doc.RootElement.GetProperty("fields").EnumerateArray()
+            .Single(f => f.GetProperty("key").GetString() == "work_status")
+            .GetProperty("options")[0].GetString();
+
+        return $"[{{\"projectId\":\"{projectId}\",\"answers\":{{"
+            + "\"article_title\":\"مقال تجميع SEO\",\"keyword\":\"كلمة اختبار\","
+            + $"\"work_status\":\"{status}\",\"delivery_date\":\"2026-01-15\"}}}}]";
+    }
 
     private static async Task<(Guid TemplateId, Guid FieldId)> PublishTemplateAsync(HttpClient admin)
     {
@@ -570,7 +599,7 @@ public class ReportsTests
     {
         var d = await (await c.PostAsJsonAsync("/api/submissions",
             new CreateSubmissionRequest(templateId, PeriodType.Weekly, period))).ReadAsync<SubmissionDto>();
-        await c.PutAsJsonAsync($"/api/submissions/{d!.Id}/values",
+        var saved = await c.PutAsJsonAsync($"/api/submissions/{d!.Id}/values",
             new SaveFieldValuesRequest(new[]
             {
                 new FieldValueInput(improvedF, null, improved, null, null, null),
@@ -579,6 +608,8 @@ public class ReportsTests
                 new FieldValueInput(issuesF, null, issues, null, null, null),
                 new FieldValueInput(projectSectionF, null, null, null, null, ProjectSectionValue(projectId)),
             }));
+        // الحفظ يُتحقَّق منه صراحةً: رفضٌ صامت هنا يترك الأرقام صفرًا فيظهر العطل بعيدًا عن سببه.
+        Assert.True(saved.IsSuccessStatusCode, await saved.Content.ReadAsStringAsync());
         var submitted = await (await c.PostAsync($"/api/submissions/{d.Id}/submit", null)).ReadAsync<SubmissionDto>();
         Assert.NotNull(submitted);
         Assert.NotEqual(SubmissionStatus.Draft, submitted!.Status);
@@ -591,14 +622,17 @@ public class ReportsTests
     {
         var d = await (await c.PostAsJsonAsync("/api/submissions",
             new CreateSubmissionRequest(templateId, PeriodType.Weekly, period))).ReadAsync<SubmissionDto>();
-        await c.PutAsJsonAsync($"/api/submissions/{d!.Id}/values",
+        var saved = await c.PutAsJsonAsync($"/api/submissions/{d!.Id}/values",
             new SaveFieldValuesRequest(new[]
             {
                 new FieldValueInput(plannedF, null, planned, null, null, null),
                 new FieldValueInput(publishedF, null, published, null, null, null),
                 new FieldValueInput(lateF, null, late, null, null, null),
-                new FieldValueInput(projectSectionF, null, null, null, null, ProjectSectionValue(projectId)),
+                new FieldValueInput(projectSectionF, null, null, null, null,
+                    await ArticlesSectionValueAsync(templateId, projectId)),
             }));
+        // الحفظ يُتحقَّق منه صراحةً: رفضٌ صامت هنا يترك الأرقام صفرًا فيظهر العطل بعيدًا عن سببه.
+        Assert.True(saved.IsSuccessStatusCode, await saved.Content.ReadAsStringAsync());
         var submitted = await (await c.PostAsync($"/api/submissions/{d.Id}/submit", null)).ReadAsync<SubmissionDto>();
         Assert.NotNull(submitted);
         Assert.NotEqual(SubmissionStatus.Draft, submitted!.Status);
