@@ -68,13 +68,26 @@
 
 ## 3) الحفظ المُنجَز (غير مدمِّر)
 
-مرجعان محلّيّان **لا يُدفعان أبدًا**:
+مرجعان محلّيّان **أُنشئا بأمر `git branch` صريح لغرض الحماية**، وبقيا محلّيَّين ولا يُدفعان:
 ```
 backup/unexpected-r22b-commit-1db114d → 1db114db32ecf8e5ff4e6625d72601520899287d
 backup/unexpected-r22b-commit-7c269df → 7c269df127f3092f9d032ecf5bb707dfadfb757d
+BACKUP_REFS_CREATED_BY_EXPLICIT_COMMAND = YES
+BACKUP_REFS_REMAIN_LOCAL                = YES   ·   BACKUP_REFS_PUSHED = NO
 ```
-`HEAD` الحاليّ = `7c269df` على `hotfix/r22b-multiline-idempotency-reconciliation-20260901`.
-الشجرة المتتبَّعة نظيفة (`git status --porcelain -uno` بلا مخرجات). **لا شيء دُفِع.**
+`HEAD` وقت تحرير هذه الفقرة = `7c269df` على `hotfix/r22b-multiline-idempotency-reconciliation-20260901`.
+الشجرة المتتبَّعة نظيفة (`git status --porcelain -uno` بلا مخرجات).
+
+> **تصحيح (2 سبتمبر 2026):** عبارة «**لا شيء دُفِع**» التي وردت هنا **غير صحيحة** وتُلغى.
+> الفرع القديم كان — ولا يزال — مدفوعًا على البعيد، فالالتزامان منشوران داخله وحده:
+> ```
+> UNEXPECTED_COMMIT_PUSHED = YES_ON_LEGACY_BRANCH_ONLY
+> LEGACY_REMOTE_BRANCH     = hotfix/r22b-multiline-idempotency-reconciliation-20260901
+> LEGACY_REMOTE_HEAD       = 7c269df127f3092f9d032ecf5bb707dfadfb757d
+> DEVELOP_TOUCHED          = NO
+> MAIN_TOUCHED             = NO
+> ```
+> ما لم يُدفع قطّ هو **المرجعان الاحتياطيّان** `backup/unexpected-r22b-commit-*` فقط، لا الالتزامان.
 
 ---
 
@@ -83,8 +96,12 @@ backup/unexpected-r22b-commit-7c269df → 7c269df127f3092f9d032ecf5bb707dfadfb75
 ```
 UNEXPECTED_LOCAL_COMMIT_DETECTED    = YES
 UNEXPECTED_COMMIT_SHA               = 1db114d , 7c269df
-UNEXPECTED_COMMIT_PUSHED            = NO
-UNEXPECTED_COMMIT_PRESERVED         = YES_LOCAL_BACKUP_REF (both)
+UNEXPECTED_COMMIT_PUSHED            = YES_ON_LEGACY_BRANCH_ONLY   ← مُصحَّح (كان NO خطأً)
+LEGACY_REMOTE_BRANCH                = hotfix/r22b-multiline-idempotency-reconciliation-20260901
+LEGACY_REMOTE_HEAD                  = 7c269df127f3092f9d032ecf5bb707dfadfb757d
+DEVELOP_TOUCHED                     = NO
+MAIN_TOUCHED                        = NO
+UNEXPECTED_COMMIT_PRESERVED         = YES_LOCAL_BACKUP_REF (both, أُنشئا بأمر صريح وبقيا محلّيَّين)
 UNEXPECTED_COMMIT_ORIGIN            = PROVEN_CONCURRENT_AGENT_SESSION_3ecd3c72
 GIT_HOOK_AS_CAUSE                   = DISPROVEN
 CLAUDE_HOOK_AS_CAUSE                = DISPROVEN
