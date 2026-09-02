@@ -1,0 +1,43 @@
+{
+  "review": {
+    "shots": [
+      "review-01-pending.png",
+      "review-02-reviewer-sees-multiline.png",
+      "review-03-after-approvals.png"
+    ],
+    "pending": [
+      "تقرير فريق الفيديو R22B إغلاق — موظّف video (UAT مؤقّت) أسبوعي 2026-W36 مُرسَل عرض",
+      "تقرير فريق التصميم R22B إغلاق — موظّف design (UAT مؤقّت) أسبوعي 2026-W36 مُرسَل عرض",
+      "تقرير كاتب المحتوى الأسبوعي R22B إغلاق — موظّف content (UAT مؤقّت) أسبوعي 2026-W36 مُرسَل عرض"
+    ],
+    "approved": [
+      "تقرير فريق الفيديو R22B إغلاق — موظّف video (UAT مؤقّت) أسبوعي 2026-W36 مُرسَل عرض",
+      "تقرير فريق التصميم R22B إغلاق — موظّف design (UAT مؤقّت) أسبوعي 2026-W36 مُرسَل عرض",
+      "تقرير كاتب المحتوى الأسبوعي R22B إغلاق — موظّف content (UAT مؤقّت) أسبوعي 2026-W36 مُرسَل عرض"
+    ],
+    "multilineOnReviewSurface": [
+      {
+        "hasSecondLine": true,
+        "newlinePreserved": true,
+        "approverCard": true,
+        "row": "تقرير فريق الفيديو R22B إغلاق — موظّف video (UAT مؤقّت) أسبوعي 2026-W36 مُرسَل عرض"
+      },
+      {
+        "hasSecondLine": true,
+        "newlinePreserved": true,
+        "approverCard": true,
+        "row": "تقرير فريق التصميم R22B إغلاق — موظّف design (UAT مؤقّت) أسبوعي 2026-W36 مُرسَل عرض"
+      },
+      {
+        "hasSecondLine": true,
+        "newlinePreserved": true,
+        "approverCard": true,
+        "row": "تقرير كاتب المحتوى الأسبوعي R22B إغلاق — موظّف content (UAT مؤقّت) أسبوعي 2026-W36 مُرسَل عرض"
+      }
+    ],
+    "pendingAfter": [],
+    "status": "DONE",
+    "consoleErrors": [],
+    "apiFailures": []
+  }
+}

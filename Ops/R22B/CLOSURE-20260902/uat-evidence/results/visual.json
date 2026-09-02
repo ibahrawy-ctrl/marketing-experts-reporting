@@ -1,0 +1,162 @@
+{
+  "desktop": {
+    "viewport": "desktop",
+    "shots": [
+      "visual-desktop-home.png",
+      "visual-desktop-submissions.png",
+      "visual-desktop-project.png",
+      "visual-desktop-project360.png",
+      "visual-desktop-error-surface.png",
+      "visual-desktop-empty-surface.png",
+      "visual-desktop-loading-surface.png"
+    ],
+    "overflow": {
+      "home": {
+        "scrollW": 1440,
+        "clientW": 1440,
+        "dir": "rtl"
+      },
+      "submissions": {
+        "scrollW": 1440,
+        "clientW": 1440,
+        "dir": "rtl"
+      },
+      "project": {
+        "scrollW": 1440,
+        "clientW": 1440,
+        "dir": "rtl"
+      },
+      "project360": {
+        "scrollW": 1440,
+        "clientW": 1440,
+        "dir": "rtl"
+      }
+    },
+    "errorSurface": [
+      "العملاء والمشروعات",
+      "›",
+      "المشروعات",
+      "›",
+      "التفاصيل",
+      "تعذّر عرض المشروع",
+      "قد يكون المشروع خارج نطاق صلاحيتك أو غير موجود.",
+      "إعادة المحاولة"
+    ],
+    "emptySurface": [
+      "العملاء والمشروعات",
+      "›",
+      "المشروعات",
+      "›",
+      "التفاصيل",
+      "تعذّر عرض المشروع",
+      "قد يكون المشروع خارج نطاق صلاحيتك أو غير موجود.",
+      "إعادة المحاولة"
+    ],
+    "loadingSurface": [
+      "العملاء والمشروعات",
+      "›",
+      "المشروعات",
+      "›",
+      "التفاصيل",
+      "يتم تحميل بيانات المشروع…"
+    ],
+    "loadingHasSpinner": true,
+    "status": "DONE",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "apiFailures": [
+      "404 GET /api/projects/ef4a0e14-da5b-4870-a32f-2bed28d077e7",
+      "404 GET /api/projects/ef4a0e14-da5b-4870-a32f-2bed28d077e7/summary",
+      "404 GET /api/projects/ef4a0e14-da5b-4870-a32f-2bed28d077e7/reports",
+      "404 GET /api/projects/00000000-0000-0000-0000-000000000000",
+      "404 GET /api/projects/00000000-0000-0000-0000-000000000000/summary",
+      "404 GET /api/projects/00000000-0000-0000-0000-000000000000/reports"
+    ]
+  },
+  "mobile": {
+    "viewport": "mobile",
+    "shots": [
+      "visual-mobile-home.png",
+      "visual-mobile-submissions.png",
+      "visual-mobile-project.png",
+      "visual-mobile-project360.png",
+      "visual-mobile-error-surface.png",
+      "visual-mobile-empty-surface.png",
+      "visual-mobile-loading-surface.png"
+    ],
+    "overflow": {
+      "home": {
+        "scrollW": 390,
+        "clientW": 390,
+        "dir": "rtl"
+      },
+      "submissions": {
+        "scrollW": 390,
+        "clientW": 390,
+        "dir": "rtl"
+      },
+      "project": {
+        "scrollW": 390,
+        "clientW": 390,
+        "dir": "rtl"
+      },
+      "project360": {
+        "scrollW": 390,
+        "clientW": 390,
+        "dir": "rtl"
+      }
+    },
+    "errorSurface": [
+      "العملاء والمشروعات",
+      "›",
+      "المشروعات",
+      "›",
+      "التفاصيل",
+      "تعذّر عرض المشروع",
+      "قد يكون المشروع خارج نطاق صلاحيتك أو غير موجود.",
+      "إعادة المحاولة"
+    ],
+    "emptySurface": [
+      "العملاء والمشروعات",
+      "›",
+      "المشروعات",
+      "›",
+      "التفاصيل",
+      "تعذّر عرض المشروع",
+      "قد يكون المشروع خارج نطاق صلاحيتك أو غير موجود.",
+      "إعادة المحاولة"
+    ],
+    "loadingSurface": [
+      "العملاء والمشروعات",
+      "›",
+      "المشروعات",
+      "›",
+      "التفاصيل",
+      "يتم تحميل بيانات المشروع…"
+    ],
+    "loadingHasSpinner": true,
+    "status": "DONE",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "apiFailures": [
+      "404 GET /api/projects/ef4a0e14-da5b-4870-a32f-2bed28d077e7",
+      "404 GET /api/projects/ef4a0e14-da5b-4870-a32f-2bed28d077e7/summary",
+      "404 GET /api/projects/ef4a0e14-da5b-4870-a32f-2bed28d077e7/reports",
+      "404 GET /api/projects/00000000-0000-0000-0000-000000000000/summary",
+      "404 GET /api/projects/00000000-0000-0000-0000-000000000000",
+      "404 GET /api/projects/00000000-0000-0000-0000-000000000000/reports"
+    ]
+  }
+}
