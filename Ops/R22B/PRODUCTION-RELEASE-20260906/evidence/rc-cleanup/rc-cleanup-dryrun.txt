@@ -1,0 +1,77 @@
+== TEMP_USERS ==
+                  Id                  |            Email             | IsActive 
+--------------------------------------+------------------------------+----------
+ e2257fd0-bf22-4818-bda8-2bccd632a435 | r22brel-am@rc-uat.local      | t
+ 1d4fe116-3d62-446d-b697-972d1f6bb4e2 | r22brel-content@rc-uat.local | t
+ a1fc4c78-02e9-408f-b53f-fd178347d711 | r22brel-lead@rc-uat.local    | t
+ 22bdd125-fbf6-4d96-a500-c1bc4b14ddef | r22brel-out@rc-uat.local     | t
+ f9df279f-91f1-4193-bd31-25c912f5d744 | r22brel-seo@rc-uat.local     | t
+(5 rows)
+
+== TEMP_ACTIVE_REFRESH_TOKENS ==
+            Email             | active_tokens 
+------------------------------+---------------
+ r22brel-am@rc-uat.local      |             3
+ r22brel-content@rc-uat.local |            31
+ r22brel-lead@rc-uat.local    |            21
+ r22brel-out@rc-uat.local     |             2
+ r22brel-seo@rc-uat.local     |            19
+(5 rows)
+
+== TEMP_SUBMISSIONS ==
+                  Id                  |            Email             | Status | PeriodKey | IsDeleted 
+--------------------------------------+------------------------------+--------+-----------+-----------
+ 4d981b10-4876-4558-b35f-8c12f7c5603a | r22brel-content@rc-uat.local | Closed | 2026-W36  | f
+ de13df0f-5d56-42aa-ad98-2f77c7e48b72 | r22brel-content@rc-uat.local | Closed | 2026-W37  | f
+ 289621dd-b5ef-4284-b9a9-bf07b040b371 | r22brel-content@rc-uat.local | Closed | 2026-W35  | f
+ c861d79a-0e57-4a8a-9e27-977ecee35109 | r22brel-seo@rc-uat.local     | Closed | 2026-W37  | f
+ dc76b6c8-e7e5-41dd-869f-6b81acdd9419 | r22brel-seo@rc-uat.local     | Closed | 2026-W36  | f
+ 42dd90e5-d408-453e-98f9-6bc3528d166d | r22brel-seo@rc-uat.local     | Draft  | 2026-W35  | f
+(6 rows)
+
+== TEMP_PROJECTS ==
+                  Id                  |             Name              | Status 
+--------------------------------------+-------------------------------+--------
+ a0668ebd-7086-4989-9188-b9d44ec21456 | R22BREL — مشروع content (UAT) | Active
+ ef4ab7ce-4721-441a-826f-2549ce76154d | R22BREL — مشروع seo (UAT)     | Active
+ d9497ea9-62ee-468a-9092-2f23b8da4367 | R22BREL — مشروع خارج النطاق   | Active
+(3 rows)
+
+== TEMP_CLIENTS ==
+                  Id                  |           Name            | Status 
+--------------------------------------+---------------------------+--------
+ 6a728948-de62-492b-bb08-d0d07acd8241 | R22BREL — عميل UAT (مؤقّت) | Active
+(1 row)
+
+== TEMP_TEAMS_DEPTS ==
+ kind |                  Id                  |       NameAr        | IsActive 
+------+--------------------------------------+---------------------+----------
+ team | 65ef9351-dc2c-44ef-9ba3-0747a3a6667d | R22BREL — فريق UAT  | t
+ dept | d9959c01-d187-4c00-90de-063338ddb8b0 | R22BREL — إدارة UAT | t
+(2 rows)
+
+== REAL_ACCOUNTS_BASELINE ==
+ total_users | active_users | temp_users 
+-------------+--------------+------------
+          58 |           40 |          5
+(1 row)
+
+          real_users_md5          
+----------------------------------
+ f70223ae6763b68204da370428dd0310
+(1 row)
+
+== REAL_DATA_BASELINE ==
+ real_submissions | real_submissions_deleted | real_projects | real_clients 
+------------------+--------------------------+---------------+--------------
+               40 |                        2 |            36 |            9
+(1 row)
+
+== SEO_TEMPLATE_V7_GUARD ==
+           ReportTemplateId           | VersionNumber | IsPublished |             row_md5              
+--------------------------------------+---------------+-------------+----------------------------------
+ 46e100e3-b3ea-4b38-8447-3105d38b7bc7 |             7 | t           | 1c888017b0115ccc09ddb7013fb69bc3
+ 46e100e3-b3ea-4b38-8447-3105d38b7bc7 |             6 | f           | 79f7ba651324cf71f91269ccb4d217f2
+ 46e100e3-b3ea-4b38-8447-3105d38b7bc7 |             5 | f           | c723cf501e7419a4ccbaabae714c3364
+(3 rows)
+

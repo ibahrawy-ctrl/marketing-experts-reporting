@@ -1,0 +1,69 @@
+{
+ "engine": "webkit",
+ "results": [
+  {
+   "engine": "webkit",
+   "check": "VIS_02_desktop_P360_HAS_LINKED_REPORTS",
+   "result": "PASS",
+   "note": "[\"التقارير المرتبطة\"]"
+  },
+  {
+   "engine": "webkit",
+   "check": "VIS_01_desktop_PROJECT_NAME_NOT_TRUNCATED",
+   "result": "PASS",
+   "note": "n=1 bad=[]"
+  },
+  {
+   "engine": "webkit",
+   "check": "VIS_03_desktop_OUT_OF_SCOPE_MESSAGE_NOT_SPINNER",
+   "result": "PASS",
+   "note": "spinners=0 | ☰ نظام تقارير الأداء والتشغيل 🔔5 R R22BREL — موظّف محتوى (UAT) موظف الرئيسية الموظفون التقارير الأداء وKPI الحوكمة العم"
+  },
+  {
+   "engine": "webkit",
+   "check": "VIS_02_mobile390_P360_HAS_LINKED_REPORTS",
+   "result": "PASS",
+   "note": "[\"التقارير المرتبطة\"]"
+  },
+  {
+   "engine": "webkit",
+   "check": "VIS_01_mobile390_PROJECT_NAME_NOT_TRUNCATED",
+   "result": "PASS",
+   "note": "n=1 bad=[]"
+  },
+  {
+   "engine": "webkit",
+   "check": "VIS_03_mobile390_OUT_OF_SCOPE_MESSAGE_NOT_SPINNER",
+   "result": "PASS",
+   "note": "spinners=0 | ☰ 🔔5 R العملاء والمشروعات › المشروعات › التفاصيل المشروع غير موجود المشروع غير موجود أو أنّه خارج نطاق صلاحيّتك."
+  },
+  {
+   "engine": "webkit",
+   "check": "VIS_05_SEO_STATUS_IS_SELECT",
+   "result": "PASS",
+   "note": "[{\"opts\":[\"اختر مشروعًا…\",\"⁨R22BREL — مشروع seo (UAT)⁩ — ⁨R22BREL — عميل UAT (مؤقّت)⁩\",\"⁨R22BREL — مشروع content (UAT)⁩ — ⁨R22BREL — عميل UAT (مؤقّت)⁩\"]},{\"opts\":[\"اختر…\",\"Draft\",\"Revision\",\"Approved\""
+  },
+  {
+   "engine": "webkit",
+   "check": "VIS_05_SEO_DELIVERY_DATE_IS_DATE_INPUT",
+   "result": "PASS",
+   "note": "dates=1 labels=تاريخ التسليم *"
+  },
+  {
+   "engine": "webkit",
+   "check": "VIS_GATE_CONSOLE_ERRORS_ZERO",
+   "result": "PASS",
+   "note": ""
+  },
+  {
+   "engine": "webkit",
+   "check": "VIS_03_DENIAL_IS_404_BY_DESIGN",
+   "result": "PASS",
+   "note": "expected404=2"
+  }
+ ],
+ "consoleErrors": [],
+ "expectedOutOfScope404": [
+  "Failed to load resource: the server responded with a status of 404 (Not Found)"
+ ]
+}

@@ -1,0 +1,295 @@
+{
+ "periodKey": "2026-W36",
+ "artifacts": {
+  "periodKey": "2026-W36",
+  "submissionId": "4d981b10-4876-4558-b35f-8c12f7c5603a",
+  "repeatableFieldId": "9bb2c461-b94b-4438-9833-e219fb2b5849"
+ },
+ "results": [
+  {
+   "check": "EMP_LOGIN",
+   "result": "PASS",
+   "note": "r22brel-content@rc-uat.local"
+  },
+  {
+   "check": "EMP_CREATE_DRAFT",
+   "result": "PASS",
+   "note": "200"
+  },
+  {
+   "check": "EMP_CORRECT_TEMPLATE_RESOLVED",
+   "result": "PASS",
+   "note": "تقرير كاتب المحتوى الأسبوعي"
+  },
+  {
+   "check": "EMP_DRAFT_STATUS",
+   "result": "PASS",
+   "note": "Draft"
+  },
+  {
+   "check": "EMP_IDEMPOTENT_NO_DUPLICATE",
+   "result": "PASS",
+   "note": "200 4d981b10-4876-4558-b35f-8c12f7c5603a"
+  },
+  {
+   "check": "EMP_OPEN_DRAFT_WITH_FIELDS",
+   "result": "PASS",
+   "note": "200 حقول=5"
+  },
+  {
+   "check": "EMP_SAVE_DRAFT",
+   "result": "PASS",
+   "note": "200"
+  },
+  {
+   "check": "EMP_RELOAD_DRAFT",
+   "result": "PASS",
+   "note": "200"
+  },
+  {
+   "check": "EMP_LONGTEXT_PERSISTS_EXACTLY",
+   "result": "PASS",
+   "note": "2/2 حالة"
+  },
+  {
+   "check": "MULTILINE_MATRIX_ALL_CASES",
+   "result": "PASS",
+   "note": "حالات مغطّاة=['single', 'three']"
+  },
+  {
+   "check": "WORK_ITEMS_COUNT_PRESERVED",
+   "result": "PASS",
+   "note": "بنود=2"
+  },
+  {
+   "check": "WORK_ITEM_1_MULTILINE_PRESERVED",
+   "result": "FAIL",
+   "note": "'بند 1 — السطر الأوّل\\nالسطر الثاني\\n\\nالسطر الرابع بعد فراغ'"
+  },
+  {
+   "check": "WORK_ITEM_2_MULTILINE_PRESERVED",
+   "result": "FAIL",
+   "note": "\"بند 2 — <b>ملاحظة</b>\\n<script>alert('x')</script>\\nسطر ثالث & رمز\""
+  },
+  {
+   "check": "WORK_ITEMS_INDEPENDENT",
+   "result": "PASS",
+   "note": "بندان مستقلّان فعلًا"
+  },
+  {
+   "check": "LINE_BREAKS_PRESERVED",
+   "result": "PASS",
+   "note": "أسطر محفوظة في الحقول والبنود"
+  },
+  {
+   "check": "HTML_STORED_VERBATIM_NOT_STRIPPED",
+   "result": "PASS",
+   "note": "التخزين حرفيّ؛ التهريب مسؤوليّة طبقة العرض"
+  },
+  {
+   "check": "INDEPENDENT_EDIT_PERSISTED",
+   "result": "FAIL",
+   "note": "c1=3 c2=9"
+  },
+  {
+   "check": "EMP_SUBMIT",
+   "result": "PASS",
+   "note": "200"
+  },
+  {
+   "check": "STATUS_AFTER_SUBMIT",
+   "result": "PASS",
+   "note": "Submitted"
+  },
+  {
+   "check": "NO_DUPLICATE_REPORT_CREATED",
+   "result": "PASS",
+   "note": "تقارير=1"
+  },
+  {
+   "check": "LEAD_QUEUE_NOT_FALSELY_EMPTY",
+   "result": "PASS",
+   "note": "200 عناصر=1"
+  },
+  {
+   "check": "LEAD_QUEUE_CONTAINS_REPORT",
+   "result": "PASS",
+   "note": "4d981b10-4876-4558-b35f-8c12f7c5603a"
+  },
+  {
+   "check": "LEAD_READS_ALL_DATA_INCLUDING_MULTILINE",
+   "result": "FAIL",
+   "note": "200 حقول=5"
+  },
+  {
+   "check": "LEAD_RETURN_WITH_MULTILINE_COMMENT",
+   "result": "PASS",
+   "note": "200"
+  },
+  {
+   "check": "LEAD_QUEUE_CLEARED_AFTER_DECISION",
+   "result": "PASS",
+   "note": "عناصر=0"
+  },
+  {
+   "check": "EMP_SEES_RETURN_REASON",
+   "result": "PASS",
+   "note": "خطوات=1"
+  },
+  {
+   "check": "RETURN_COMMENT_LINE_BREAKS_PRESERVED",
+   "result": "PASS",
+   "note": "أسطر=4/4"
+  },
+  {
+   "check": "STATUS_AFTER_RETURN",
+   "result": "PASS",
+   "note": "Returned"
+  },
+  {
+   "check": "EMP_CAN_EDIT_AFTER_RETURN",
+   "result": "PASS",
+   "note": "True"
+  },
+  {
+   "check": "EMP_RESUBMIT",
+   "result": "PASS",
+   "note": "200"
+  },
+  {
+   "check": "LEAD_APPROVE_WITH_MULTILINE_COMMENT",
+   "result": "PASS",
+   "note": "200"
+  },
+  {
+   "check": "FINAL_STATUS_APPROVED",
+   "result": "PASS",
+   "note": "Closed"
+  },
+  {
+   "check": "BOTH_DECISION_COMMENTS_RETAINED",
+   "result": "PASS",
+   "note": "تعليقات=2"
+  },
+  {
+   "check": "APPROVE_COMMENT_MULTILINE_PRESERVED",
+   "result": "PASS",
+   "note": ""
+  },
+  {
+   "check": "DATA_INTACT_AFTER_APPROVAL",
+   "result": "FAIL",
+   "note": ""
+  },
+  {
+   "check": "CROSS_USER_ACCESS_BLOCKED",
+   "result": "PASS",
+   "note": "403"
+  },
+  {
+   "check": "UNAUTHORIZED_MESSAGE_IS_GENERIC",
+   "result": "PASS",
+   "note": "لا يكشف وجود المورد أو محتواه"
+  },
+  {
+   "check": "NON_LEADER_NO_APPROVAL_QUEUE",
+   "result": "PASS",
+   "note": "200 عناصر=0"
+  },
+  {
+   "check": "AM_READS_LINKED_REPORTS_IN_PROJECT360",
+   "result": "PASS",
+   "note": "200 عناصر=1"
+  },
+  {
+   "check": "PROJECT360_STATUS_MATCHES_SOURCE_TRUTH",
+   "result": "PASS",
+   "note": "p360=Closed مصدر=Closed"
+  },
+  {
+   "check": "AM_CANNOT_APPROVE",
+   "result": "PASS",
+   "note": "403"
+  },
+  {
+   "check": "AM_CANNOT_RETURN",
+   "result": "PASS",
+   "note": "403"
+  },
+  {
+   "check": "PROJECT360_OUT_OF_SCOPE_EMPTY_OR_DENIED",
+   "result": "PASS",
+   "note": "404 عناصر=0"
+  },
+  {
+   "check": "OTHER_PROJECT_USER_SEES_NOTHING",
+   "result": "PASS",
+   "note": "404"
+  },
+  {
+   "check": "REPORTING_OVERVIEW_CONTAINS_REPORT",
+   "result": "PASS",
+   "note": "200 عناصر=57"
+  },
+  {
+   "check": "REPORTING_STATUS_MATCHES_SOURCE_TRUTH",
+   "result": "PASS",
+   "note": "تقرير=Closed مصدر=Closed"
+  },
+  {
+   "check": "REPORTING_PERIOD_AND_DATE_CORRECT",
+   "result": "PASS",
+   "note": "2026-W36"
+  },
+  {
+   "check": "REPORTING_FILTER_STATUS_APPROVED",
+   "result": "FAIL",
+   "note": "400 عناصر=0"
+  },
+  {
+   "check": "REPORTING_FILTER_SEMANTICS_CONSISTENT",
+   "result": "PASS",
+   "note": ""
+  },
+  {
+   "check": "REPORTING_STATUS_EXCLUSIVE",
+   "result": "PASS",
+   "note": "عناصر=0"
+  },
+  {
+   "check": "REPORTING_COUNTS_REACHABLE",
+   "result": "PASS",
+   "note": "200 {\"periodKey\": \"2026-W36\", \"total\": 2, \"byStatus\": [{\"status\": \"Closed\", \"count\": 1}, {\"status\": \"Submitted\", \"count\": 1}"
+  },
+  {
+   "check": "REPORTING_EMPTY_STATE_IS_TRUE_EMPTY",
+   "result": "PASS",
+   "note": "200 عناصر=0"
+  },
+  {
+   "check": "ADMIN_ARCHIVE_SURFACE_HAS_MULTILINE",
+   "result": "PASS",
+   "note": "تعليقات=2"
+  },
+  {
+   "check": "SEO_TEMPLATE_REACHABLE",
+   "result": "PASS",
+   "note": "200"
+  },
+  {
+   "check": "SEO_WORK_STATUS_PRESENT",
+   "result": "PASS",
+   "note": ""
+  },
+  {
+   "check": "SEO_WORK_STATUS_VALUES",
+   "result": "FAIL",
+   "note": "draft/revision/approved/published"
+  },
+  {
+   "check": "SEO_TEMPLATE_CLASSIFICATION_SUPPLEMENTARY",
+   "result": "PASS",
+   "note": "Supplementary"
+  }
+ ]
+}

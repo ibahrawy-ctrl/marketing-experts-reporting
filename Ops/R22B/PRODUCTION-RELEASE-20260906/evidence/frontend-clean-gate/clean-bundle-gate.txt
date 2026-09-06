@@ -1,0 +1,12 @@
+R22B-MULTILINE-RESTORE · فحص الحزمة: dist/assets (1 ملفّ JS)
+  [PASS] MULTILINE_ELEMENT — حقل تعليق التقرير عنصر متعدّد الأسطر (textarea) لا <input type="text"> · anchors=1 · textarea=true · rows:4=true
+  [PASS] RESIZE_Y — الصنف resize-y حاضر (تمدّد رأسيّ للحقل) · occurrences=1
+  [PASS] WHITESPACE_PRE_WRAP — whitespace-pre-wrap حاضر (حفظ الأسطر عند العرض) · occurrences=27
+  [PASS] BREAK_WORDS — break-words حاضر مقترنًا بـpre-wrap (منع التجاوز الأفقيّ) · pre-wrap+break-words=4
+  [PASS] COMMENT_FIELD_PRESENT — حقل «ملاحظة / سبب» ما زال موجودًا في الحزمة · occurrences=2
+  [PASS] NO_ENTER_BLOCKER — لا معالج لوحة مفاتيح ولا preventDefault في جوار حقل تعليق التقرير · anchors=1 · blocker=none
+  [PASS] NO_SECRETS — لا مفاتيح خاصّة ولا توكنات JWT مضمَّنة في الحزمة · none
+BUNDLE_MULTILINE_GATE=PASS
+BUNDLE_GATE_EXIT=
+BUNDLE_GATE_EXIT=
+BUNDLE_GATE_EXIT=0

@@ -1,0 +1,80 @@
+{
+ "engine": "chromium",
+ "version": "148.0.7778.96",
+ "results": [
+  {
+   "engine": "chromium",
+   "check": "P360_PAGE_RENDERS",
+   "result": "PASS",
+   "note": "☰\nنظام تقارير الأداء والتشغيل\n🔔\n5\nR\nR22BREL — موظّف محتوى (UAT)\nموظف\nالرئيسية\nالموظفون\nالتقارير\nالأداء وKPI\nا"
+  },
+  {
+   "engine": "chromium",
+   "check": "P360_LINKED_REPORTS_TAB",
+   "result": "PASS",
+   "note": "[\"التقارير\",\"النظرة العامّة\",\"التقارير المرتبطة\"]"
+  },
+  {
+   "engine": "chromium",
+   "check": "P360_NO_OVERFLOW_DESKTOP",
+   "result": "PASS",
+   "note": "{\"doc\":0,\"worstEl\":102,\"dir\":\"rtl\"}"
+  },
+  {
+   "engine": "chromium",
+   "check": "REPORT_STATUS_CLOSED",
+   "result": "PASS",
+   "note": "مُغلق"
+  },
+  {
+   "engine": "chromium",
+   "check": "REPORT_BOTH_COMMENTS_PRE_WRAP",
+   "result": "PASS",
+   "note": "[\"pre-wrap\",\"pre-wrap\",\"pre-wrap\",\"pre-wrap\",\"pre-wrap\",\"pre-wrap\",\"pre-wrap\",\"pre-wrap\",\"pre-wrap\"]"
+  },
+  {
+   "engine": "chromium",
+   "check": "REPORT_NO_OVERFLOW_DESKTOP",
+   "result": "PASS",
+   "note": "{\"doc\":0,\"worstEl\":2,\"dir\":\"rtl\"}"
+  },
+  {
+   "engine": "chromium",
+   "check": "MOBILE_390_NO_HORIZONTAL_OVERFLOW",
+   "result": "PASS",
+   "note": "{\"doc\":0,\"worstEl\":53,\"dir\":\"rtl\"}"
+  },
+  {
+   "engine": "chromium",
+   "check": "MOBILE_390_MULTILINE_PRESERVED",
+   "result": "PASS",
+   "note": "n=9"
+  },
+  {
+   "engine": "chromium",
+   "check": "ADMIN_ARCHIVE_PAGE_RENDERS",
+   "result": "PASS",
+   "note": "☰\nنظام تقارير الأداء والتشغيل\n🔔\n3\nم\nمدير النظام\nمدير النظام\nالرئيسية\nالموظفون\nالتقارير\nالأداء وKPI\nالحوكمة\nال"
+  },
+  {
+   "engine": "chromium",
+   "check": "ADMIN_ARCHIVE_NO_OVERFLOW",
+   "result": "PASS",
+   "note": "{\"doc\":0,\"worstEl\":2,\"dir\":\"rtl\"}"
+  },
+  {
+   "engine": "chromium",
+   "check": "CONSOLE_ERRORS_ZERO",
+   "result": "PASS",
+   "note": ""
+  },
+  {
+   "engine": "chromium",
+   "check": "UNEXPECTED_NETWORK_ERRORS_ZERO",
+   "result": "PASS",
+   "note": ""
+  }
+ ],
+ "consoleErrors": [],
+ "networkErrors": []
+}

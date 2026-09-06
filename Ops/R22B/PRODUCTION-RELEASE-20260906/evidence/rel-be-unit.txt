@@ -1,0 +1,17 @@
+  Determining projects to restore...
+  Restored /private/tmp/r22b-release-20260906/reporting-backend/src/Reporting.Domain/Reporting.Domain.csproj (in 31 ms).
+  Restored /private/tmp/r22b-release-20260906/reporting-backend/src/Reporting.Application/Reporting.Application.csproj (in 34 ms).
+  Restored /private/tmp/r22b-release-20260906/reporting-backend/src/Reporting.Infrastructure/Reporting.Infrastructure.csproj (in 877 ms).
+  Restored /private/tmp/r22b-release-20260906/reporting-backend/tests/Reporting.UnitTests/Reporting.UnitTests.csproj (in 1.02 sec).
+  Reporting.Domain -> /private/tmp/r22b-release-20260906/reporting-backend/src/Reporting.Domain/bin/Debug/net8.0/Reporting.Domain.dll
+  Reporting.Application -> /private/tmp/r22b-release-20260906/reporting-backend/src/Reporting.Application/bin/Debug/net8.0/Reporting.Application.dll
+  Reporting.Infrastructure -> /private/tmp/r22b-release-20260906/reporting-backend/src/Reporting.Infrastructure/bin/Debug/net8.0/Reporting.Infrastructure.dll
+  Reporting.UnitTests -> /private/tmp/r22b-release-20260906/reporting-backend/tests/Reporting.UnitTests/bin/Debug/net8.0/Reporting.UnitTests.dll
+Test run for /private/tmp/r22b-release-20260906/reporting-backend/tests/Reporting.UnitTests/bin/Debug/net8.0/Reporting.UnitTests.dll (.NETCoreApp,Version=v8.0)
+VSTest version 17.11.1 (arm64)
+
+Starting test execution, please wait...
+A total of 1 test files matched the specified pattern.
+
+Passed!  - Failed:     0, Passed:   618, Skipped:     0, Total:   618, Duration: 45 ms - Reporting.UnitTests.dll (net8.0)
+EXIT=0

@@ -1,0 +1,24 @@
+OK  200 login-admin 
+== DRY-RUN — لا كتابة. الخطط: ==
+  POST /api/submissions/4d981b10-4876-4558-b35f-8c12f7c5603a/admin-delete  (حذف ناعم + سبب)
+  POST /api/submissions/de13df0f-5d56-42aa-ad98-2f77c7e48b72/admin-delete  (حذف ناعم + سبب)
+  POST /api/submissions/289621dd-b5ef-4284-b9a9-bf07b040b371/admin-delete  (حذف ناعم + سبب)
+  POST /api/submissions/c861d79a-0e57-4a8a-9e27-977ecee35109/admin-delete  (حذف ناعم + سبب)
+  POST /api/submissions/dc76b6c8-e7e5-41dd-869f-6b81acdd9419/admin-delete  (حذف ناعم + سبب)
+  POST /api/submissions/42dd90e5-d408-453e-98f9-6bc3528d166d/admin-delete  (حذف ناعم + سبب)
+  POST /api/projects/a0668ebd-7086-4989-9188-b9d44ec21456/archive
+  POST /api/projects/ef4ab7ce-4721-441a-826f-2549ce76154d/archive
+  POST /api/projects/d9497ea9-62ee-468a-9092-2f23b8da4367/archive
+  POST /api/clients/6a728948-de62-492b-bb08-d0d07acd8241/archive
+  POST /api/directory/users/e2257fd0-bf22-4818-bda8-2bccd632a435/reset-password  (إبطال توكنات r22brel-am@rc-uat.local وحده)
+  PUT  /api/directory/users/e2257fd0-bf22-4818-bda8-2bccd632a435  IsActive=false
+  POST /api/directory/users/1d4fe116-3d62-446d-b697-972d1f6bb4e2/reset-password  (إبطال توكنات r22brel-content@rc-uat.local وحده)
+  PUT  /api/directory/users/1d4fe116-3d62-446d-b697-972d1f6bb4e2  IsActive=false
+  POST /api/directory/users/a1fc4c78-02e9-408f-b53f-fd178347d711/reset-password  (إبطال توكنات r22brel-lead@rc-uat.local وحده)
+  PUT  /api/directory/users/a1fc4c78-02e9-408f-b53f-fd178347d711  IsActive=false
+  POST /api/directory/users/22bdd125-fbf6-4d96-a500-c1bc4b14ddef/reset-password  (إبطال توكنات r22brel-out@rc-uat.local وحده)
+  PUT  /api/directory/users/22bdd125-fbf6-4d96-a500-c1bc4b14ddef  IsActive=false
+  POST /api/directory/users/f9df279f-91f1-4193-bd31-25c912f5d744/reset-password  (إبطال توكنات r22brel-seo@rc-uat.local وحده)
+  PUT  /api/directory/users/f9df279f-91f1-4193-bd31-25c912f5d744  IsActive=false
+  PUT  /api/directory/teams/65ef9351-dc2c-44ef-9ba3-0747a3a6667d  IsActive=false
+  PUT  /api/directory/departments/d9959c01-d187-4c00-90de-063338ddb8b0  IsActive=false

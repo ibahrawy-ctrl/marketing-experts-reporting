@@ -1,0 +1,11 @@
+
+ RUN  v4.1.8 /private/tmp/rel-fe-clean/reporting-frontend
+
+Not implemented: navigation to another Document
+
+ Test Files  75 passed (75)
+      Tests  857 passed (857)
+   Start at  20:34:20
+   Duration  12.14s (transform 5.22s, setup 3.57s, import 14.61s, tests 35.15s, environment 39.02s)
+
+VITEST_EXIT=0

@@ -1,0 +1,163 @@
+{
+ "submissionId": "de13df0f-5d56-42aa-ad98-2f77c7e48b72",
+ "results": [
+  {
+   "check": "UI_EMP_LOGIN",
+   "result": "PASS",
+   "note": "r22brel-content@rc-uat.local"
+  },
+  {
+   "check": "UI_EMP_MY_REPORTS_NOT_FALSELY_EMPTY",
+   "result": "PASS",
+   "note": "قوالب=1"
+  },
+  {
+   "check": "UI_EMP_ENTITLEMENT_CORRECT_TEMPLATE",
+   "result": "PASS",
+   "note": "تقرير كاتب المحتوى الأسبوعي — مطلوب"
+  },
+  {
+   "check": "UI_EMP_OPEN_CURRENT_PERIOD",
+   "result": "PASS",
+   "note": "تقرير كاتب المحتوى الأسبوعي"
+  },
+  {
+   "check": "UI_EMP_SUBMISSION_URL_SCOPED",
+   "result": "PASS",
+   "note": "/app/my-reports?open=de13df0f-5d56-42aa-ad98-2f77c7e48b72"
+  },
+  {
+   "check": "UI_EMP_PROJECT_IN_SCOPE_SELECTED",
+   "result": "PASS",
+   "note": "R22BREL — مشروع content (UAT)"
+  },
+  {
+   "check": "UI_EMP_TWO_WORK_ITEMS",
+   "result": "PASS",
+   "note": "بنود=2"
+  },
+  {
+   "check": "UI_MULTILINE_TYPED_INTO_TEXTAREA",
+   "result": "PASS",
+   "note": "أسطر بند1=4 بند2=3"
+  },
+  {
+   "check": "UI_MULTILINE_ELEMENT_IS_TEXTAREA",
+   "result": "PASS",
+   "note": "{\"ws\":\"pre-wrap\",\"rows\":3,\"resize\":\"vertical\"}"
+  },
+  {
+   "check": "UI_EMP_SAVE_CONFIRMATION_REAL",
+   "result": "PASS",
+   "note": "حفظ | ✅ حُفظت المسودّة — آخر حفظ ٦ سبتمبر ٢٠٢٦، ٠٤:٠٥ م"
+  },
+  {
+   "check": "UI_EMP_RELOAD_ITEMS_PERSIST",
+   "result": "PASS",
+   "note": "بنود بعد التحميل=2"
+  },
+  {
+   "check": "UI_EMP_RELOAD_MULTILINE_PRESERVED",
+   "result": "PASS",
+   "note": "أسطر=4/3"
+  },
+  {
+   "check": "UI_EMP_ITEMS_INDEPENDENT",
+   "result": "PASS",
+   "note": "البندان مختلفان فعلًا"
+  },
+  {
+   "check": "UI_EMP_SUBMIT_STATUS_VISIBLE",
+   "result": "PASS",
+   "note": "مُرسَل"
+  },
+  {
+   "check": "UI_LEAD_LOGIN",
+   "result": "PASS",
+   "note": "r22brel-lead@rc-uat.local"
+  },
+  {
+   "check": "UI_LEAD_QUEUE_NOT_FALSELY_EMPTY",
+   "result": "PASS",
+   "note": "الطابور يعرض التقرير"
+  },
+  {
+   "check": "UI_LEAD_READS_ALL_MULTILINE_DATA",
+   "result": "PASS",
+   "note": "القائد يقرأ نصّ البندين كاملًا"
+  },
+  {
+   "check": "UI_HTML_ESCAPED_NO_SCRIPT_EXECUTION",
+   "result": "PASS",
+   "note": "{\"injected\":false,\"scriptTags\":0,\"textHasTag\":true}"
+  },
+  {
+   "check": "UI_LEAD_RETURN_WITH_MULTILINE_COMMENT",
+   "result": "FAIL",
+   "note": "تمّ الإرجاع"
+  },
+  {
+   "check": "UI_EMP_SEES_RETURN_REASON",
+   "result": "FAIL",
+   "note": "ظهر سبب الإرجاع"
+  },
+  {
+   "check": "UI_RETURN_COMMENT_LINE_BREAKS_RENDERED",
+   "result": "FAIL",
+   "note": "null"
+  },
+  {
+   "check": "UI_EMP_RESUBMIT",
+   "result": "PASS",
+   "note": ""
+  },
+  {
+   "check": "UI_FINAL_STATUS_APPROVED_VISIBLE",
+   "result": "FAIL",
+   "note": "غير ظاهرة"
+  },
+  {
+   "check": "UI_BOTH_DECISION_COMMENTS_VISIBLE",
+   "result": "FAIL",
+   "note": ""
+  },
+  {
+   "check": "UI_CONSOLE_ERRORS_ZERO",
+   "result": "FAIL",
+   "note": "[emp] [2026-09-06T13:05:15.617Z] Error: Failed to complete negotiation with the server: TypeError: Failed to fetch ; [emp] [2026-09-06T13:05:15.617Z] Error: Failed to start the connection: Error: Failed to complete negotiation with the server: TypeError: Failed to fetch ; [lead] [2026-09-06T13:06:08"
+  },
+  {
+   "check": "UI_UNEXPECTED_NETWORK_ERRORS_ZERO",
+   "result": "PASS",
+   "note": ""
+  },
+  {
+   "check": "UI_HORIZONTAL_OVERFLOW_ZERO",
+   "result": "PASS",
+   "note": "[{\"page\":\"report-draft\",\"doc\":0,\"worstEl\":129,\"dir\":\"rtl\"},{\"page\":\"leader-review\",\"doc\":0,\"worstEl\":0,\"dir\":\"rtl\"}]"
+  }
+ ],
+ "artifacts": {
+  "consoleErrors": [
+   "[emp] [2026-09-06T13:05:15.617Z] Error: Failed to complete negotiation with the server: TypeError: Failed to fetch",
+   "[emp] [2026-09-06T13:05:15.617Z] Error: Failed to start the connection: Error: Failed to complete negotiation with the server: TypeError: Failed to fetch",
+   "[lead] [2026-09-06T13:06:08.982Z] Error: Failed to complete negotiation with the server: TypeError: Failed to fetch",
+   "[lead] [2026-09-06T13:06:08.982Z] Error: Failed to start the connection: Error: Failed to complete negotiation with the server: TypeError: Failed to fetch"
+  ],
+  "apiFailures": [],
+  "overflow": [
+   {
+    "page": "report-draft",
+    "doc": 0,
+    "worstEl": 129,
+    "dir": "rtl"
+   },
+   {
+    "page": "leader-review",
+    "doc": 0,
+    "worstEl": 0,
+    "dir": "rtl"
+   }
+  ]
+ }
+}

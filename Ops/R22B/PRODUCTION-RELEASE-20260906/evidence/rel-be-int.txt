@@ -1,0 +1,22 @@
+  Determining projects to restore...
+  Restored /private/tmp/r22b-release-20260906/reporting-backend/src/Reporting.Api/Reporting.Api.csproj (in 203 ms).
+  Restored /private/tmp/r22b-release-20260906/reporting-backend/tests/Reporting.IntegrationTests/Reporting.IntegrationTests.csproj (in 286 ms).
+  3 of 5 projects are up-to-date for restore.
+  Reporting.Domain -> /private/tmp/r22b-release-20260906/reporting-backend/src/Reporting.Domain/bin/Debug/net8.0/Reporting.Domain.dll
+  Reporting.Application -> /private/tmp/r22b-release-20260906/reporting-backend/src/Reporting.Application/bin/Debug/net8.0/Reporting.Application.dll
+  Reporting.Infrastructure -> /private/tmp/r22b-release-20260906/reporting-backend/src/Reporting.Infrastructure/bin/Debug/net8.0/Reporting.Infrastructure.dll
+  Reporting.Api -> /private/tmp/r22b-release-20260906/reporting-backend/src/Reporting.Api/bin/Debug/net8.0/Reporting.Api.dll
+/private/tmp/r22b-release-20260906/reporting-backend/tests/Reporting.IntegrationTests/DecOneKpiJourneyContractTests.cs(387,20): warning CS8604: Possible null reference argument for parameter 'source' in 'IEnumerable<KpiSourcePeriodDto> Enumerable.Where<KpiSourcePeriodDto>(IEnumerable<KpiSourcePeriodDto> source, Func<KpiSourcePeriodDto, bool> predicate)'. [/private/tmp/r22b-release-20260906/reporting-backend/tests/Reporting.IntegrationTests/Reporting.IntegrationTests.csproj]
+/private/tmp/r22b-release-20260906/reporting-backend/tests/Reporting.IntegrationTests/ReportTemplateTests.cs(121,17): warning CS8604: Possible null reference argument for parameter 'source' in 'ReportTemplateDto Enumerable.Single<ReportTemplateDto>(IEnumerable<ReportTemplateDto> source, Func<ReportTemplateDto, bool> predicate)'. [/private/tmp/r22b-release-20260906/reporting-backend/tests/Reporting.IntegrationTests/Reporting.IntegrationTests.csproj]
+/private/tmp/r22b-release-20260906/reporting-backend/tests/Reporting.IntegrationTests/RoleAwarePersonalAccessE2ETests.cs(73,45): warning CS8604: Possible null reference argument for parameter 'source' in 'IEnumerable<Guid> Enumerable.Select<SubmissionListItemDto, Guid>(IEnumerable<SubmissionListItemDto> source, Func<SubmissionListItemDto, Guid> selector)'. [/private/tmp/r22b-release-20260906/reporting-backend/tests/Reporting.IntegrationTests/Reporting.IntegrationTests.csproj]
+/private/tmp/r22b-release-20260906/reporting-backend/tests/Reporting.IntegrationTests/RoleAwarePersonalAccessE2ETests.cs(101,34): warning CS8604: Possible null reference argument for parameter 'source' in 'IEnumerable<Guid> Enumerable.Select<SubmissionListItemDto, Guid>(IEnumerable<SubmissionListItemDto> source, Func<SubmissionListItemDto, Guid> selector)'. [/private/tmp/r22b-release-20260906/reporting-backend/tests/Reporting.IntegrationTests/Reporting.IntegrationTests.csproj]
+/private/tmp/r22b-release-20260906/reporting-backend/tests/Reporting.IntegrationTests/UnifiedReportStatusTests.cs(325,22): warning CS8604: Possible null reference argument for parameter 'source' in 'UnifiedReportCycleStatusDto Enumerable.First<UnifiedReportCycleStatusDto>(IEnumerable<UnifiedReportCycleStatusDto> source, Func<UnifiedReportCycleStatusDto, bool> predicate)'. [/private/tmp/r22b-release-20260906/reporting-backend/tests/Reporting.IntegrationTests/Reporting.IntegrationTests.csproj]
+  Reporting.IntegrationTests -> /private/tmp/r22b-release-20260906/reporting-backend/tests/Reporting.IntegrationTests/bin/Debug/net8.0/Reporting.IntegrationTests.dll
+Test run for /private/tmp/r22b-release-20260906/reporting-backend/tests/Reporting.IntegrationTests/bin/Debug/net8.0/Reporting.IntegrationTests.dll (.NETCoreApp,Version=v8.0)
+VSTest version 17.11.1 (arm64)
+
+Starting test execution, please wait...
+A total of 1 test files matched the specified pattern.
+
+Passed!  - Failed:     0, Passed:  2311, Skipped:     0, Total:  2311, Duration: 8 m 50 s - Reporting.IntegrationTests.dll (net8.0)
+EXIT=0

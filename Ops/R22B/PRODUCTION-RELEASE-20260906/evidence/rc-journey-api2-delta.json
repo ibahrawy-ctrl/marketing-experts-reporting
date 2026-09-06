@@ -1,0 +1,52 @@
+[
+ {
+  "check": "R2_WORK_ITEM_1_MULTILINE_PRESERVED_MOD_DIGITS",
+  "result": "PASS",
+  "note": "خانات عربيّة-هنديّة مطبَّعة بتصميم قائم"
+ },
+ {
+  "check": "R2_WORK_ITEM_2_MULTILINE_PRESERVED_MOD_DIGITS",
+  "result": "PASS",
+  "note": ""
+ },
+ {
+  "check": "R2_INDEPENDENT_EDIT_PERSISTED",
+  "result": "PASS",
+  "note": "c1=3 c2=9 والنصّ سليم"
+ },
+ {
+  "check": "R2_DATA_INTACT_AFTER_APPROVAL",
+  "result": "PASS",
+  "note": "أسطر 3/2 كما أُدخِلت"
+ },
+ {
+  "check": "R2_LEAD_READS_ALL_DATA_INCLUDING_MULTILINE",
+  "result": "PASS",
+  "note": "حقول=5 بنود=2 مطابقة تامّة"
+ },
+ {
+  "check": "R2_REPORTING_FILTER_STATUS_CLOSED",
+  "result": "FAIL",
+  "note": "200 عناصر=1"
+ },
+ {
+  "check": "R2_REPORTING_FILTER_EXCLUSIVE",
+  "result": "PASS",
+  "note": "Draft n=0"
+ },
+ {
+  "check": "R2_SEO_WORK_STATUS_VALUES",
+  "result": "PASS",
+  "note": "حالة المقال ['Draft', 'Revision', 'Approved', 'Published']"
+ },
+ {
+  "check": "R2_SEO_DELIVERY_DATE_IS_DATE",
+  "result": "PASS",
+  "note": "delivery_date:Date"
+ },
+ {
+  "check": "R2_SEO_HISTORICAL_VERSIONS_UNCHANGED",
+  "result": "PASS",
+  "note": "إصدارات قديمة بها work_status=[] · v7 منشور"
+ }
+]

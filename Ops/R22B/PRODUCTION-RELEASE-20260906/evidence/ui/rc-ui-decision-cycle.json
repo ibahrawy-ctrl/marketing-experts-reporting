@@ -1,0 +1,102 @@
+{
+ "sub": "289621dd-b5ef-4284-b9a9-bf07b040b371",
+ "emp": "r22brel-content@rc-uat.local",
+ "results": [
+  {
+   "check": "RC_UI_DECISION_CARD_PRESENT",
+   "result": "PASS",
+   "note": "[{\"t\":\"اعتماد\",\"disabled\":false,\"title\":\"\"},{\"t\":\"إعادة للتعديل\",\"disabled\":true,\"title\":\"اكتب سبب الإعادة أولًا\"},{\"t\":\"تصعيد\",\"disabled\":true,\"title\":\"اكتب سبب التصعيد أولًا\"}]"
+  },
+  {
+   "check": "RC_UI_RETURN_DISABLED_UNTIL_REASON",
+   "result": "PASS",
+   "note": "{\"t\":\"إعادة للتعديل\",\"disabled\":true,\"title\":\"اكتب سبب الإعادة أولًا\"}"
+  },
+  {
+   "check": "RC_UI_RETURN_COMMENT_TYPED_IN_CARD",
+   "result": "PASS",
+   "note": "{\"card\":true,\"ta\":true,\"len\":125,\"nl\":4}"
+  },
+  {
+   "check": "RC_UI_RETURN_ENABLED_AFTER_REASON",
+   "result": "PASS",
+   "note": "{\"t\":\"إعادة للتعديل\",\"disabled\":false,\"title\":\"\"}"
+  },
+  {
+   "check": "RC_UI_LEAD_RETURN_WITH_MULTILINE_COMMENT",
+   "result": "PASS",
+   "note": "CLICKED | ✅ تم إرجاع التقرير للتعديل"
+  },
+  {
+   "check": "RC_UI_STATUS_RETURNED",
+   "result": "PASS",
+   "note": "مُرسَل,مُعاد للتعديل,مُغلق"
+  },
+  {
+   "check": "RC_UI_LEFT_PENDING_QUEUE",
+   "result": "PASS",
+   "note": "sidInQueue=false"
+  },
+  {
+   "check": "RC_UI_EMP_SEES_RETURN_REASON",
+   "result": "PASS",
+   "note": "سبب الإرجاع من الواجهة — السطر الأوّل\nالسطر الثاني: صحّح العدد\n\nالسطر الرابع بعد فراغ\n<b>عريض</b> & <script>alert(1)</sc"
+  },
+  {
+   "check": "RC_UI_RETURN_COMMENT_LINE_BREAKS_RENDERED",
+   "result": "PASS",
+   "note": "ws=pre-wrap nl=4"
+  },
+  {
+   "check": "RC_UI_RETURN_COMMENT_HTML_ESCAPED",
+   "result": "PASS",
+   "note": "literal tags shown as text"
+  },
+  {
+   "check": "RC_UI_EMP_STATUS_RETURNED_VISIBLE",
+   "result": "PASS",
+   "note": "مُعاد للتعديل"
+  },
+  {
+   "check": "RC_UI_EMP_RESUBMIT",
+   "result": "PASS",
+   "note": "CLICKED | ✅ تم إرسال التقرير للاعتماد"
+  },
+  {
+   "check": "RC_UI_APPROVE_COMMENT_TYPED_IN_CARD",
+   "result": "PASS",
+   "note": "{\"card\":true,\"ta\":true,\"len\":58,\"nl\":2}"
+  },
+  {
+   "check": "RC_UI_LEAD_APPROVE_WITH_MULTILINE_COMMENT",
+   "result": "PASS",
+   "note": "CLICKED | ✅ تم اعتماد التقرير بنجاح"
+  },
+  {
+   "check": "RC_UI_FINAL_STATUS_CLOSED_VISIBLE",
+   "result": "PASS",
+   "note": "مُغلق"
+  },
+  {
+   "check": "RC_UI_BOTH_DECISION_COMMENTS_VISIBLE",
+   "result": "PASS",
+   "note": "ret=true apr=true count=4"
+  },
+  {
+   "check": "RC_UI_NO_SCRIPT_EXECUTION",
+   "result": "PASS",
+   "note": "windowXss=false"
+  },
+  {
+   "check": "RC_UI_NO_HORIZONTAL_OVERFLOW",
+   "result": "PASS",
+   "note": "{\"doc\":0,\"dir\":\"rtl\"}"
+  },
+  {
+   "check": "RC_UI_CONSOLE_ERRORS_ZERO",
+   "result": "PASS",
+   "note": ""
+  }
+ ],
+ "consoleErrors": []
+}

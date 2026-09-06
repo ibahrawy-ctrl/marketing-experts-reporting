@@ -1,0 +1,140 @@
+[
+ {
+  "step": "login-admin",
+  "status": 200,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "step": "admin-delete-submission-4d981b10",
+  "status": 200,
+  "ok": true,
+  "note": "{'id': '4d981b10-4876-4558-b35f-8c12f7c5603a', 'reportTemplateVersionId': '8ee1a12b-edcb-4886-9572-ba7bab765d89', 'templateTitle': 'تقرير كاتب المحتوى الأسبوعي', 'submitterId': '1d4fe116-3d62-446d-b69"
+ },
+ {
+  "step": "admin-delete-submission-de13df0f",
+  "status": 200,
+  "ok": true,
+  "note": "{'id': 'de13df0f-5d56-42aa-ad98-2f77c7e48b72', 'reportTemplateVersionId': '8ee1a12b-edcb-4886-9572-ba7bab765d89', 'templateTitle': 'تقرير كاتب المحتوى الأسبوعي', 'submitterId': '1d4fe116-3d62-446d-b69"
+ },
+ {
+  "step": "admin-delete-submission-289621dd",
+  "status": 200,
+  "ok": true,
+  "note": "{'id': '289621dd-b5ef-4284-b9a9-bf07b040b371', 'reportTemplateVersionId': '8ee1a12b-edcb-4886-9572-ba7bab765d89', 'templateTitle': 'تقرير كاتب المحتوى الأسبوعي', 'submitterId': '1d4fe116-3d62-446d-b69"
+ },
+ {
+  "step": "admin-delete-submission-c861d79a",
+  "status": 200,
+  "ok": true,
+  "note": "{'id': 'c861d79a-0e57-4a8a-9e27-977ecee35109', 'reportTemplateVersionId': 'afbbaebc-b8f5-408e-9c82-0b64b3452799', 'templateTitle': 'تقرير متابعة مقالات SEO الأسبوعي', 'submitterId': 'f9df279f-91f1-419"
+ },
+ {
+  "step": "admin-delete-submission-dc76b6c8",
+  "status": 200,
+  "ok": true,
+  "note": "{'id': 'dc76b6c8-e7e5-41dd-869f-6b81acdd9419', 'reportTemplateVersionId': 'afbbaebc-b8f5-408e-9c82-0b64b3452799', 'templateTitle': 'تقرير متابعة مقالات SEO الأسبوعي', 'submitterId': 'f9df279f-91f1-419"
+ },
+ {
+  "step": "admin-delete-submission-42dd90e5",
+  "status": 200,
+  "ok": true,
+  "note": "{'id': '42dd90e5-d408-453e-98f9-6bc3528d166d', 'reportTemplateVersionId': 'afbbaebc-b8f5-408e-9c82-0b64b3452799', 'templateTitle': 'تقرير متابعة مقالات SEO الأسبوعي', 'submitterId': 'f9df279f-91f1-419"
+ },
+ {
+  "step": "archive-project-a0668ebd",
+  "status": 200,
+  "ok": true,
+  "note": "{'id': 'a0668ebd-7086-4989-9188-b9d44ec21456', 'clientId': '6a728948-de62-492b-bb08-d0d07acd8241', 'clientName': 'R22BREL — عميل UAT (مؤقّت)', 'name': 'R22BREL — مشروع content (UAT)', 'serviceType': '"
+ },
+ {
+  "step": "archive-project-ef4ab7ce",
+  "status": 200,
+  "ok": true,
+  "note": "{'id': 'ef4ab7ce-4721-441a-826f-2549ce76154d', 'clientId': '6a728948-de62-492b-bb08-d0d07acd8241', 'clientName': 'R22BREL — عميل UAT (مؤقّت)', 'name': 'R22BREL — مشروع seo (UAT)', 'serviceType': 'Soci"
+ },
+ {
+  "step": "archive-project-d9497ea9",
+  "status": 200,
+  "ok": true,
+  "note": "{'id': 'd9497ea9-62ee-468a-9092-2f23b8da4367', 'clientId': '6a728948-de62-492b-bb08-d0d07acd8241', 'clientName': 'R22BREL — عميل UAT (مؤقّت)', 'name': 'R22BREL — مشروع خارج النطاق', 'serviceType': 'So"
+ },
+ {
+  "step": "archive-client",
+  "status": 200,
+  "ok": true,
+  "note": "{'id': '6a728948-de62-492b-bb08-d0d07acd8241', 'name': 'R22BREL — عميل UAT (مؤقّت)', 'status': 'Closed', 'accountManagerId': 'e2257fd0-bf22-4818-bda8-2bccd632a435', 'accountManagerName': 'R22BREL — مد"
+ },
+ {
+  "step": "revoke-tokens-r22brel-am",
+  "status": 200,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "step": "deactivate-r22brel-am",
+  "status": 200,
+  "ok": true,
+  "note": "{'id': 'e2257fd0-bf22-4818-bda8-2bccd632a435', 'fullName': 'R22BREL — مدير حساب UAT (مؤقّت)', 'email': 'r22brel-am@rc-uat.local', 'isActive': False, 'roles': ['AccountPortfolioReader'], 'departmentId'"
+ },
+ {
+  "step": "revoke-tokens-r22brel-content",
+  "status": 200,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "step": "deactivate-r22brel-content",
+  "status": 200,
+  "ok": true,
+  "note": "{'id': '1d4fe116-3d62-446d-b697-972d1f6bb4e2', 'fullName': 'R22BREL — موظّف محتوى (UAT)', 'email': 'r22brel-content@rc-uat.local', 'isActive': False, 'roles': ['Employee'], 'departmentId': 'd9959c01-d"
+ },
+ {
+  "step": "revoke-tokens-r22brel-lead",
+  "status": 200,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "step": "deactivate-r22brel-lead",
+  "status": 200,
+  "ok": true,
+  "note": "{'id': 'a1fc4c78-02e9-408f-b53f-fd178347d711', 'fullName': 'R22BREL — قائد فريق UAT (مؤقّت)', 'email': 'r22brel-lead@rc-uat.local', 'isActive': False, 'roles': ['TeamLeader'], 'departmentId': 'd9959c0"
+ },
+ {
+  "step": "revoke-tokens-r22brel-out",
+  "status": 200,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "step": "deactivate-r22brel-out",
+  "status": 200,
+  "ok": true,
+  "note": "{'id': '22bdd125-fbf6-4d96-a500-c1bc4b14ddef', 'fullName': 'R22BREL — موظّف خارج النطاق (UAT)', 'email': 'r22brel-out@rc-uat.local', 'isActive': False, 'roles': ['Employee'], 'departmentId': 'd9959c01"
+ },
+ {
+  "step": "revoke-tokens-r22brel-seo",
+  "status": 200,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "step": "deactivate-r22brel-seo",
+  "status": 200,
+  "ok": true,
+  "note": "{'id': 'f9df279f-91f1-4193-bd31-25c912f5d744', 'fullName': 'R22BREL — محرّر SEO (UAT)', 'email': 'r22brel-seo@rc-uat.local', 'isActive': False, 'roles': ['Employee'], 'departmentId': 'd9959c01-d187-4c"
+ },
+ {
+  "step": "deactivate-team",
+  "status": 200,
+  "ok": true,
+  "note": "{'id': '65ef9351-dc2c-44ef-9ba3-0747a3a6667d', 'nameAr': 'R22BREL — فريق UAT', 'nameEn': 'R22BREL UAT Team', 'departmentId': 'd9959c01-d187-4c00-90de-063338ddb8b0', 'teamLeaderId': None, 'isActive': F"
+ },
+ {
+  "step": "deactivate-department",
+  "status": 200,
+  "ok": true,
+  "note": "{'id': 'd9959c01-d187-4c00-90de-063338ddb8b0', 'nameAr': 'R22BREL — إدارة UAT', 'nameEn': 'R22BREL UAT Dept', 'code': None, 'managerId': None, 'isActive': False}"
+ }
+]

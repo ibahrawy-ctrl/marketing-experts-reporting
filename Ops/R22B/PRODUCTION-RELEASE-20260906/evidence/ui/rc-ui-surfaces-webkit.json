@@ -1,0 +1,80 @@
+{
+ "engine": "webkit",
+ "version": "26.4",
+ "results": [
+  {
+   "engine": "webkit",
+   "check": "P360_PAGE_RENDERS",
+   "result": "PASS",
+   "note": "☰\nنظام تقارير الأداء والتشغيل\n🔔5\nR\nR22BREL — موظّف محتوى (UAT)\nموظف\nالرئيسية\nالموظفون\nالتقارير\nالأداء وKPI\nال"
+  },
+  {
+   "engine": "webkit",
+   "check": "P360_LINKED_REPORTS_TAB",
+   "result": "PASS",
+   "note": "[\"التقارير\",\"النظرة العامّة\",\"التقارير المرتبطة\"]"
+  },
+  {
+   "engine": "webkit",
+   "check": "P360_NO_OVERFLOW_DESKTOP",
+   "result": "PASS",
+   "note": "{\"doc\":0,\"worstEl\":100,\"dir\":\"rtl\"}"
+  },
+  {
+   "engine": "webkit",
+   "check": "REPORT_STATUS_CLOSED",
+   "result": "PASS",
+   "note": "مُغلق"
+  },
+  {
+   "engine": "webkit",
+   "check": "REPORT_BOTH_COMMENTS_PRE_WRAP",
+   "result": "PASS",
+   "note": "[\"pre-wrap\",\"pre-wrap\",\"pre-wrap\",\"pre-wrap\",\"pre-wrap\",\"pre-wrap\",\"pre-wrap\",\"pre-wrap\",\"pre-wrap\"]"
+  },
+  {
+   "engine": "webkit",
+   "check": "REPORT_NO_OVERFLOW_DESKTOP",
+   "result": "PASS",
+   "note": "{\"doc\":0,\"worstEl\":2,\"dir\":\"rtl\"}"
+  },
+  {
+   "engine": "webkit",
+   "check": "MOBILE_390_NO_HORIZONTAL_OVERFLOW",
+   "result": "PASS",
+   "note": "{\"doc\":0,\"worstEl\":52,\"dir\":\"rtl\"}"
+  },
+  {
+   "engine": "webkit",
+   "check": "MOBILE_390_MULTILINE_PRESERVED",
+   "result": "PASS",
+   "note": "n=9"
+  },
+  {
+   "engine": "webkit",
+   "check": "ADMIN_ARCHIVE_PAGE_RENDERS",
+   "result": "PASS",
+   "note": "☰\nنظام تقارير الأداء والتشغيل\n🔔3\nم\nمدير النظام\nمدير النظام\nالرئيسية\nالموظفون\nالتقارير\nالأداء وKPI\nالحوكمة\nالع"
+  },
+  {
+   "engine": "webkit",
+   "check": "ADMIN_ARCHIVE_NO_OVERFLOW",
+   "result": "PASS",
+   "note": "{\"doc\":0,\"worstEl\":2,\"dir\":\"rtl\"}"
+  },
+  {
+   "engine": "webkit",
+   "check": "CONSOLE_ERRORS_ZERO",
+   "result": "PASS",
+   "note": ""
+  },
+  {
+   "engine": "webkit",
+   "check": "UNEXPECTED_NETWORK_ERRORS_ZERO",
+   "result": "PASS",
+   "note": ""
+  }
+ ],
+ "consoleErrors": [],
+ "networkErrors": []
+}

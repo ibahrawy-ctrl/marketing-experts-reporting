@@ -1,0 +1,799 @@
+{
+ "id": "46e100e3-b3ea-4b38-8447-3105d38b7bc7",
+ "title": "تقرير متابعة مقالات SEO الأسبوعي",
+ "description": "متابعة أسبوعية لمقالات SEO",
+ "jobRoleId": "13fb4b32-b1e0-4772-9d14-2f8f87fa2cdb",
+ "defaultPeriodType": "Weekly",
+ "status": "Published",
+ "ownerId": "49607be5-8278-493f-8e08-9a4b2641abb2",
+ "isActive": true,
+ "classification": "Supplementary",
+ "versions": [
+  {
+   "id": "0069ec82-166f-44b9-82b9-b8803ce1a7b0",
+   "versionNumber": 1,
+   "isPublished": false,
+   "publishedAtUtc": "2026-06-18T00:04:05.612582Z",
+   "fields": [
+    {
+     "id": "8fc809c5-9a5f-4d36-bbe8-5a755dac6992",
+     "label": "🔢 ملخص الأسبوع",
+     "key": null,
+     "fieldType": "SectionHeader",
+     "order": 0,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "5e3770dd-8fe1-42af-8092-f8ed47eb5551",
+     "label": "عدد المقالات المخطط لها",
+     "key": null,
+     "fieldType": "Number",
+     "order": 1,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "942effcb-d15b-4da2-8ba7-1bb558a4981f",
+     "label": "عدد المقالات المنشورة",
+     "key": null,
+     "fieldType": "Number",
+     "order": 2,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "151d9149-7b06-4829-a16f-42bc9482f78a",
+     "label": "عدد المقالات المتأخرة",
+     "key": null,
+     "fieldType": "Number",
+     "order": 3,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "36b0c8d3-ba5a-4f9f-9ade-335bbbaa2fd2",
+     "label": "📋 الجداول",
+     "key": null,
+     "fieldType": "SectionHeader",
+     "order": 4,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "518d19b4-66fd-4583-a461-56257f91e559",
+     "label": "جدول المقالات",
+     "key": null,
+     "fieldType": "TableGrid",
+     "order": 5,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": "{\"columns\": [\"المقال\", \"الكلمة المفتاحية\", \"الحالة\", \"تاريخ النشر\"]}"
+    },
+    {
+     "id": "7e7496c9-6fa5-439a-b16a-4c609831cf24",
+     "label": "تفاصيل المنشورة",
+     "key": null,
+     "fieldType": "TableGrid",
+     "order": 6,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": "{\"columns\": [\"المقال\", \"الرابط\", \"عدد الكلمات\"]}"
+    },
+    {
+     "id": "efb77da4-ba54-4448-8806-91c030aebc42",
+     "label": "المتأخرة",
+     "key": null,
+     "fieldType": "TableGrid",
+     "order": 7,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": "{\"columns\": [\"المقال\", \"سبب التأخير\", \"الموعد الجديد\"]}"
+    },
+    {
+     "id": "9b34f6a2-0a6b-4b45-829a-028508e18dac",
+     "label": "خطة الأسبوع القادم",
+     "key": null,
+     "fieldType": "TableGrid",
+     "order": 8,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": "{\"columns\": [\"المقال\", \"الكلمة المفتاحية\", \"الموعد\"]}"
+    },
+    {
+     "id": "4e24c2f1-3eaa-47d2-a225-19f665258d09",
+     "label": "📝 ملاحظات",
+     "key": null,
+     "fieldType": "SectionHeader",
+     "order": 9,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "c8af3273-b9b2-4c93-894c-70e6bfbf4a3e",
+     "label": "أبرز إنجاز",
+     "key": null,
+     "fieldType": "LongText",
+     "order": 10,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "66f3b65b-cafd-4037-9ef1-c9417c6022cb",
+     "label": "أبرز تحدٍّ",
+     "key": null,
+     "fieldType": "LongText",
+     "order": 11,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "a8491173-191c-42d1-970d-fae37e715360",
+     "label": "اقتراحات",
+     "key": null,
+     "fieldType": "LongText",
+     "order": 12,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "36e9bffb-95e7-4ad9-966a-20781defc9a8",
+     "label": "ملاحظات للإدارة",
+     "key": null,
+     "fieldType": "LongText",
+     "order": 13,
+     "isRequired": false,
+     "helpText": "اكتب هنا…",
+     "configJson": null
+    }
+   ],
+   "submissionCount": 0,
+   "isCurrentPublished": false,
+   "canDelete": true,
+   "deleteBlockReason": null
+  },
+  {
+   "id": "82b315a3-bc53-4425-a090-486963efa5b3",
+   "versionNumber": 2,
+   "isPublished": false,
+   "publishedAtUtc": "2026-06-25T12:06:31.42609Z",
+   "fields": [
+    {
+     "id": "1810eca3-8151-485b-be08-dff1c79aa10c",
+     "label": "🔢 ملخص الأسبوع — الأرقام",
+     "key": "sec_summary",
+     "fieldType": "SectionHeader",
+     "order": 0,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "7f87b1c6-b48c-412d-a418-a6c0efc8d082",
+     "label": "مقالات هذا الأسبوع",
+     "key": "articles_this_week",
+     "fieldType": "Number",
+     "order": 1,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "25446ab6-d298-4496-b0e3-00855cd1bf2f",
+     "label": "منشور",
+     "key": "published_count",
+     "fieldType": "Number",
+     "order": 2,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "ff648071-5ea4-4f91-a6d5-cc1138710c1a",
+     "label": "جاهز للنشر",
+     "key": "ready_count",
+     "fieldType": "Number",
+     "order": 3,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "2f0fd035-a91a-4d73-af9e-c17951b3a347",
+     "label": "قيد الكتابة / المراجعة",
+     "key": "in_progress_count",
+     "fieldType": "Number",
+     "order": 4,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "e62a9b44-6cf6-4731-a6c2-7c21dd61695e",
+     "label": "متأخر",
+     "key": "delayed_count",
+     "fieldType": "Number",
+     "order": 5,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "47e7c96b-7ed4-462c-bd9c-8b5ef52b4c2c",
+     "label": "تم الاعتماد من أول مرة",
+     "key": "approved_first_time",
+     "fieldType": "Number",
+     "order": 6,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "06e847a9-342d-4f27-aa90-6cc3cfacbce6",
+     "label": "تمت المراجعة أكثر من مرة",
+     "key": "revised_multiple",
+     "fieldType": "Number",
+     "order": 7,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "b742de37-7de0-4bdf-8c5f-253e913e481b",
+     "label": "📋 المقالات (لكل مشروع)",
+     "key": "sec_articles",
+     "fieldType": "SectionHeader",
+     "order": 8,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "f728855f-f484-498c-ab33-fcb17f4f35b6",
+     "label": "مقالات SEO حسب المشروع",
+     "key": "seo_article_projects",
+     "fieldType": "ProjectRepeatableSection",
+     "order": 9,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": "{\"fields\": [{\"key\": \"articleTitle\", \"type\": \"ShortText\", \"label\": \"عنوان المقال\", \"required\": true}, {\"key\": \"keyword\", \"type\": \"ShortText\", \"label\": \"الكلمة المفتاحية\", \"required\": false}, {\"key\": \"articleStatus\", \"type\": \"ShortText\", \"label\": \"الحالة (مخطط/قيد الكتابة/مراجعة/جاهز للنشر/منشور/متأخر)\", \"required\": true}, {\"key\": \"plannedDeliveryDate\", \"type\": \"ShortText\", \"label\": \"تاريخ التسليم المخطط\", \"required\": false}, {\"key\": \"publishedUrl\", \"type\": \"ShortText\", \"label\": \"رابط المقال (إن نُشر)\", \"required\": false}, {\"key\": \"wordCount\", \"type\": \"Number\", \"label\": \"عدد الكلمات\", \"required\": false}, {\"key\": \"delayDays\", \"type\": \"Number\", \"label\": \"التأخير (أيام، إن وُجد)\", \"required\": false}, {\"key\": \"delayReason\", \"type\": \"LongText\", \"label\": \"سبب التأخير\", \"required\": false}, {\"key\": \"nextAction\", \"type\": \"LongText\", \"label\": \"الخطوة التالية\", \"required\": false}, {\"key\": \"notes\", \"type\": \"LongText\", \"label\": \"ملاحظات\", \"required\": false}], \"maxProjects\": 10, \"minProjects\": 1, \"projectRequired\": true}"
+    },
+    {
+     "id": "246ded05-0b83-4caa-b836-489666374a91",
+     "label": "📝 ملاحظات وتحديات الأسبوع",
+     "key": "sec_notes",
+     "fieldType": "SectionHeader",
+     "order": 10,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "9aceb52f-889b-41b4-95c4-085c27f98001",
+     "label": "✅ أبرز إنجاز هذا الأسبوع",
+     "key": "top_achievement",
+     "fieldType": "LongText",
+     "order": 11,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "eca99fc8-76c9-4578-92ae-71a07e031dbb",
+     "label": "⚠️ أبرز تحدي أو عقبة",
+     "key": "top_challenge",
+     "fieldType": "LongText",
+     "order": 12,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "763194dc-0c6c-498a-9a68-922dcee96ae3",
+     "label": "💡 اقتراحات للتحسين",
+     "key": "improvement_suggestions",
+     "fieldType": "LongText",
+     "order": 13,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "1159b5aa-312e-4c21-b9be-9e3786f8c80c",
+     "label": "📌 ملاحظات للإدارة",
+     "key": "management_notes",
+     "fieldType": "LongText",
+     "order": 14,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    }
+   ],
+   "submissionCount": 0,
+   "isCurrentPublished": false,
+   "canDelete": true,
+   "deleteBlockReason": null
+  },
+  {
+   "id": "854fe473-bb23-41f7-a107-4cd0b07c6250",
+   "versionNumber": 3,
+   "isPublished": false,
+   "publishedAtUtc": "2026-07-02T05:31:14.739451Z",
+   "fields": [
+    {
+     "id": "c8f3a731-3e04-4952-8631-796e1553edf6",
+     "label": "🔢 ملخص الأسبوع",
+     "key": null,
+     "fieldType": "SectionHeader",
+     "order": 0,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "88f168ff-b217-41bb-b23f-876523e97a71",
+     "label": "عدد المقالات المخطط لها",
+     "key": null,
+     "fieldType": "Number",
+     "order": 1,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "b06c58a1-b835-441b-9778-009293bbf197",
+     "label": "عدد المقالات المنشورة",
+     "key": null,
+     "fieldType": "Number",
+     "order": 2,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "7f768862-9e31-4732-9d1f-bfd780501d54",
+     "label": "عدد المقالات المتأخرة",
+     "key": null,
+     "fieldType": "Number",
+     "order": 3,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "4e36d8aa-d102-41d5-ad82-0feb1825a531",
+     "label": "📁 تفاصيل المشاريع",
+     "key": null,
+     "fieldType": "SectionHeader",
+     "order": 4,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "4c10bfc2-6ab1-4941-ba0f-e0d82c9a39b5",
+     "label": "تفاصيل المشروع",
+     "key": null,
+     "fieldType": "ProjectRepeatableSection",
+     "order": 5,
+     "isRequired": false,
+     "helpText": "أضف قسمًا لكل مشروع.",
+     "configJson": "{\"fields\": [{\"key\": \"articles\", \"type\": \"Grid\", \"label\": \"مقالات المشروع\", \"columns\": [\"عنوان المقال\", \"الكلمة المفتاحية\", \"الحالة\", \"المراجع\", \"تاريخ التسليم\", \"ملاحظات\"], \"required\": false}, {\"key\": \"published\", \"type\": \"Grid\", \"label\": \"تفاصيل المنشورة\", \"columns\": [\"المقال\", \"الرابط\", \"عدد الكلمات\"], \"required\": false}, {\"key\": \"project_notes\", \"type\": \"LongText\", \"label\": \"ملاحظات المشروع\", \"columns\": null, \"required\": false}], \"maxProjects\": 0, \"minProjects\": 1, \"projectRequired\": true}"
+    },
+    {
+     "id": "c8696073-0733-41c2-aa08-d0b674ac9cf1",
+     "label": "📋 الجداول العامة",
+     "key": null,
+     "fieldType": "SectionHeader",
+     "order": 6,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "96fd9356-1fe0-406b-aa03-ed63994410a6",
+     "label": "المتأخرة",
+     "key": null,
+     "fieldType": "TableGrid",
+     "order": 7,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": "{\"columns\": [\"المقال\", \"سبب التأخير\", \"الموعد الجديد\"]}"
+    },
+    {
+     "id": "90214d51-69f3-4e38-a4a1-fc0db74fc3bd",
+     "label": "خطة الأسبوع القادم",
+     "key": null,
+     "fieldType": "TableGrid",
+     "order": 8,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": "{\"columns\": [\"المقال\", \"الكلمة المفتاحية\", \"الموعد\"]}"
+    },
+    {
+     "id": "8f6e3a32-fdc0-4fb7-8e45-7e53c4b22a25",
+     "label": "📝 ملاحظات",
+     "key": null,
+     "fieldType": "SectionHeader",
+     "order": 9,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "03c6291e-66c6-4d3f-8eea-f8a8923beb66",
+     "label": "أبرز إنجاز",
+     "key": null,
+     "fieldType": "LongText",
+     "order": 10,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "6c62841a-9d1c-431f-82f8-06b0e48ef171",
+     "label": "أبرز تحدٍّ",
+     "key": null,
+     "fieldType": "LongText",
+     "order": 11,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "bb75d46d-31c0-48f1-9339-0c59b8a2ccf6",
+     "label": "اقتراحات",
+     "key": null,
+     "fieldType": "LongText",
+     "order": 12,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "55ca2808-98df-4299-9c61-b792fd313f79",
+     "label": "ملاحظات للإدارة",
+     "key": null,
+     "fieldType": "LongText",
+     "order": 13,
+     "isRequired": false,
+     "helpText": "اكتب هنا…",
+     "configJson": null
+    }
+   ],
+   "submissionCount": 0,
+   "isCurrentPublished": false,
+   "canDelete": true,
+   "deleteBlockReason": null
+  },
+  {
+   "id": "3629af3e-76ae-4dbe-8c91-af26a2d7bc78",
+   "versionNumber": 4,
+   "isPublished": false,
+   "publishedAtUtc": "2026-07-02T11:03:54.484065Z",
+   "fields": [
+    {
+     "id": "f6d4ac44-f10c-4aa2-b711-72870aee2ed0",
+     "label": "📝 نظرة عامة",
+     "key": null,
+     "fieldType": "SectionHeader",
+     "order": 0,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "876b29bf-2bd3-4e44-9e04-40afbe32ddb0",
+     "label": "ملخص الأسبوع",
+     "key": null,
+     "fieldType": "LongText",
+     "order": 1,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "98164394-19fb-42e7-a8bf-c38c8da8881e",
+     "label": "التحديات",
+     "key": null,
+     "fieldType": "LongText",
+     "order": 2,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "50ca1a96-0a8a-4347-ab03-10d0f920f67f",
+     "label": "🔢 مؤشرات الأداء (KPI)",
+     "key": null,
+     "fieldType": "SectionHeader",
+     "order": 3,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "5e0b7461-1746-46a1-b59b-04a395fb05cf",
+     "label": "عدد المقالات المخطط لها",
+     "key": null,
+     "fieldType": "Number",
+     "order": 4,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "401e46c5-4b29-42e7-b6ff-e6c3bde16cf3",
+     "label": "عدد المقالات المنشورة",
+     "key": null,
+     "fieldType": "Number",
+     "order": 5,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "f67ae463-7b6e-4b58-9258-7423eb37876c",
+     "label": "عدد المقالات المتأخرة",
+     "key": null,
+     "fieldType": "Number",
+     "order": 6,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "2929dcb4-5e64-43e7-b40a-e46b2f5ad704",
+     "label": "📁 تفاصيل المشاريع",
+     "key": null,
+     "fieldType": "SectionHeader",
+     "order": 7,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "e94a3caa-1f9c-497b-b9b7-21b99966ce1c",
+     "label": "تفاصيل المشروع",
+     "key": null,
+     "fieldType": "ProjectRepeatableSection",
+     "order": 8,
+     "isRequired": false,
+     "helpText": "أضف قسمًا لكل مشروع/عميل.",
+     "configJson": "{\"fields\": [{\"key\": \"articles\", \"type\": \"Grid\", \"label\": \"المقالات\", \"columns\": [\"عنوان المقال\", \"الكلمة المفتاحية\", \"الحالة\", \"المراجع\", \"تاريخ التسليم\", \"ملاحظات\"], \"required\": false}, {\"key\": \"published\", \"type\": \"Grid\", \"label\": \"المنشور/المرفوع\", \"columns\": [\"المقال\", \"الرابط\", \"تاريخ النشر\", \"الحالة\", \"ملاحظات\"], \"required\": false}, {\"key\": \"done\", \"type\": \"LongText\", \"label\": \"ما تم إنجازه\", \"columns\": null, \"required\": false}, {\"key\": \"issues\", \"type\": \"LongText\", \"label\": \"أهم مشاكل المشروع\", \"columns\": null, \"required\": false}, {\"key\": \"next_week\", \"type\": \"LongText\", \"label\": \"المطلوب الأسبوع القادم\", \"columns\": null, \"required\": false}, {\"key\": \"decisions\", \"type\": \"LongText\", \"label\": \"قرارات أو موافقات مطلوبة\", \"columns\": null, \"required\": false}], \"maxProjects\": 0, \"minProjects\": 1, \"projectRequired\": true}"
+    }
+   ],
+   "submissionCount": 0,
+   "isCurrentPublished": false,
+   "canDelete": true,
+   "deleteBlockReason": null
+  },
+  {
+   "id": "e0cbce32-57a4-40d1-896c-80e7ca0eae23",
+   "versionNumber": 5,
+   "isPublished": false,
+   "publishedAtUtc": "2026-07-02T16:41:49.945428Z",
+   "fields": [
+    {
+     "id": "b0a7449c-dad5-42f9-b091-3f764f08f34f",
+     "label": "📁 تفاصيل المشاريع",
+     "key": null,
+     "fieldType": "SectionHeader",
+     "order": 0,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "474a44d7-1155-485d-9895-2c7cbcb3d056",
+     "label": "المشروع",
+     "key": null,
+     "fieldType": "ProjectRepeatableSection",
+     "order": 1,
+     "isRequired": false,
+     "helpText": "أضف قسمًا لكل مشروع/عميل — كل شيء يُملأ داخل المشروع.",
+     "configJson": "{\"fields\": [{\"key\": \"project_status\", \"type\": \"Select\", \"label\": \"الحالة العامة للمشروع\", \"columns\": null, \"options\": [\"🟢 ممتاز\", \"🟡 مستقر\", \"🔴 يحتاج تدخل\"], \"required\": false}, {\"key\": \"time_consumption\", \"type\": \"Percentage\", \"label\": \"نسبة استهلاك المشروع من وقتك هذا الأسبوع (%)\", \"columns\": null, \"options\": null, \"required\": false}, {\"key\": \"articles_planned\", \"type\": \"Number\", \"label\": \"عدد المقالات المخطط لها\", \"columns\": null, \"options\": null, \"required\": false}, {\"key\": \"articles_published\", \"type\": \"Number\", \"label\": \"عدد المقالات المنشورة\", \"columns\": null, \"options\": null, \"required\": false}, {\"key\": \"articles_late\", \"type\": \"Number\", \"label\": \"عدد المقالات المتأخرة\", \"columns\": null, \"options\": null, \"required\": false}, {\"key\": \"articles_grid\", \"type\": \"Grid\", \"label\": \"المقالات\", \"columns\": [\"عنوان المقال\", \"الكلمة المفتاحية\", \"الحالة\", \"المراجع\", \"تاريخ التسليم\", \"ملاحظات\"], \"options\": null, \"required\": false}, {\"key\": \"done\", \"type\": \"LongText\", \"label\": \"ما تم إنجازه\", \"columns\": null, \"options\": null, \"required\": false}, {\"key\": \"issues\", \"type\": \"LongText\", \"label\": \"أهم مشاكل المشروع\", \"columns\": null, \"options\": null, \"required\": false}, {\"key\": \"next_week\", \"type\": \"LongText\", \"label\": \"المطلوب الأسبوع القادم\", \"columns\": null, \"options\": null, \"required\": false}, {\"key\": \"decisions_needed\", \"type\": \"LongText\", \"label\": \"قرارات مطلوبة\", \"columns\": null, \"options\": null, \"required\": false}, {\"key\": \"recommendations\", \"type\": \"LongText\", \"label\": \"اقتراحات / توصيات\", \"columns\": null, \"options\": null, \"required\": false}], \"maxProjects\": 0, \"minProjects\": 1, \"projectRequired\": true}"
+    }
+   ],
+   "submissionCount": 1,
+   "isCurrentPublished": false,
+   "canDelete": false,
+   "deleteBlockReason": "لا يمكن حذف هذه النسخة لأنها مستخدمة في 1 تقريرًا سابقًا."
+  },
+  {
+   "id": "4c131918-cd35-4ca6-92a9-f932a997508b",
+   "versionNumber": 6,
+   "isPublished": false,
+   "publishedAtUtc": "2026-08-31T06:09:55.846177Z",
+   "fields": [
+    {
+     "id": "c80ab94a-0299-4ac5-8c46-800f75b1a5d2",
+     "label": "📁 تفاصيل المشاريع",
+     "key": null,
+     "fieldType": "SectionHeader",
+     "order": 0,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "10e4d537-4377-42cf-bed4-8520b7cb266c",
+     "label": "المشروع",
+     "key": null,
+     "fieldType": "ProjectRepeatableSection",
+     "order": 1,
+     "isRequired": false,
+     "helpText": "أضف قسمًا لكل مشروع/عميل — كل شيء يُملأ داخل المشروع.",
+     "configJson": "{\"fields\": [{\"key\": \"project_status\", \"type\": \"Select\", \"label\": \"الحالة العامة للمشروع\", \"columns\": null, \"options\": [\"🟢 ممتاز\", \"🟡 مستقر\", \"🔴 يحتاج تدخل\"], \"required\": false}, {\"key\": \"time_consumption\", \"type\": \"Percentage\", \"label\": \"نسبة استهلاك المشروع من وقتك هذا الأسبوع (%)\", \"columns\": null, \"options\": null, \"required\": false}, {\"key\": \"articles_planned\", \"type\": \"Number\", \"label\": \"عدد المقالات المخطط لها\", \"columns\": null, \"options\": null, \"required\": false}, {\"key\": \"articles_published\", \"type\": \"Number\", \"label\": \"عدد المقالات المنشورة\", \"columns\": null, \"options\": null, \"required\": false}, {\"key\": \"articles_late\", \"type\": \"Number\", \"label\": \"عدد المقالات المتأخرة\", \"columns\": null, \"options\": null, \"required\": false}, {\"key\": \"done\", \"type\": \"LongText\", \"label\": \"ما تم إنجازه\", \"columns\": null, \"options\": null, \"required\": false}, {\"key\": \"issues\", \"type\": \"LongText\", \"label\": \"أهم مشاكل المشروع\", \"columns\": null, \"options\": null, \"required\": false}, {\"key\": \"next_week\", \"type\": \"LongText\", \"label\": \"المطلوب الأسبوع القادم\", \"columns\": null, \"options\": null, \"required\": false}, {\"key\": \"decisions_needed\", \"type\": \"LongText\", \"label\": \"قرارات مطلوبة\", \"columns\": null, \"options\": null, \"required\": false}, {\"key\": \"recommendations\", \"type\": \"LongText\", \"label\": \"اقتراحات / توصيات\", \"columns\": null, \"options\": null, \"required\": false}], \"workItems\": {\"key\": \"workItems\", \"label\": \"بنود العمل\", \"fields\": [{\"key\": \"article_title\", \"type\": \"ShortText\", \"label\": \"عنوان المقال\", \"columns\": null, \"options\": null, \"required\": false}, {\"key\": \"target_keyword\", \"type\": \"ShortText\", \"label\": \"الكلمة المفتاحية\", \"columns\": null, \"options\": null, \"required\": false}, {\"key\": \"article_status\", \"type\": \"ShortText\", \"label\": \"الحالة\", \"columns\": null, \"options\": null, \"required\": false}, {\"key\": \"reviewer\", \"type\": \"ShortText\", \"label\": \"المراجع\", \"columns\": null, \"options\": null, \"required\": false}, {\"key\": \"delivery_date\", \"type\": \"ShortText\", \"label\": \"تاريخ التسليم\", \"columns\": null, \"options\": null, \"required\": false}, {\"key\": \"notes\", \"type\": \"LongText\", \"label\": \"ملاحظات\", \"columns\": null, \"options\": null, \"required\": false}], \"addLabel\": \"+ إضافة بند عمل\", \"maxItems\": 0, \"minItems\": 1, \"uniqueBy\": [], \"itemLabel\": \"بند عمل\"}, \"maxProjects\": 0, \"minProjects\": 1, \"schemaVersion\": 2, \"projectRequired\": true}"
+    }
+   ],
+   "submissionCount": 0,
+   "isCurrentPublished": false,
+   "canDelete": true,
+   "deleteBlockReason": null
+  },
+  {
+   "id": "afbbaebc-b8f5-408e-9c82-0b64b3452799",
+   "versionNumber": 7,
+   "isPublished": true,
+   "publishedAtUtc": "2026-09-06T12:28:07.205211Z",
+   "fields": [
+    {
+     "id": "55f3595d-55e0-4e5f-b6b6-3d2aa59745e1",
+     "label": "🔢 ملخص الأسبوع",
+     "key": null,
+     "fieldType": "SectionHeader",
+     "order": 0,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "e7c81411-12ea-4bd9-bacb-2c49e14fb640",
+     "label": "عدد المقالات المخطط لها",
+     "key": null,
+     "fieldType": "Number",
+     "order": 1,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "c0db86cf-71f3-419f-97e7-8d9a140c335b",
+     "label": "عدد المقالات المنشورة",
+     "key": null,
+     "fieldType": "Number",
+     "order": 2,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "4d0e4bde-5193-420c-b135-df19b37654b4",
+     "label": "عدد المقالات المتأخرة",
+     "key": null,
+     "fieldType": "Number",
+     "order": 3,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "04dbc303-e84e-4a9e-b651-073f1fbe3f59",
+     "label": "📁 تفاصيل المشاريع — صفّ لكلّ مقال",
+     "key": null,
+     "fieldType": "SectionHeader",
+     "order": 4,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "ad1688ec-c5b4-475b-8c45-2072e0d2b9d8",
+     "label": "تفاصيل المشروع",
+     "key": null,
+     "fieldType": "ProjectRepeatableSection",
+     "order": 5,
+     "isRequired": false,
+     "helpText": "أضف قسمًا لكل مشروع.",
+     "configJson": "{\"fields\": [{\"key\": \"article_title\", \"type\": \"ShortText\", \"label\": \"عنوان المقال\", \"columns\": null, \"options\": null, \"required\": true, \"catalogDomain\": null}, {\"key\": \"keyword\", \"type\": \"ShortText\", \"label\": \"الكلمة المفتاحية\", \"columns\": null, \"options\": null, \"required\": true, \"catalogDomain\": null}, {\"key\": \"work_status\", \"type\": \"Select\", \"label\": \"حالة المقال\", \"columns\": null, \"options\": [\"Draft\", \"Revision\", \"Approved\", \"Published\"], \"required\": true, \"catalogDomain\": \"work_status\"}, {\"key\": \"reviewer\", \"type\": \"ShortText\", \"label\": \"المراجع\", \"columns\": null, \"options\": null, \"required\": false, \"catalogDomain\": null}, {\"key\": \"delivery_date\", \"type\": \"Date\", \"label\": \"تاريخ التسليم\", \"columns\": null, \"options\": null, \"required\": true, \"catalogDomain\": null}, {\"key\": \"published_url\", \"type\": \"ShortText\", \"label\": \"رابط المنشورة\", \"columns\": null, \"options\": null, \"required\": false, \"catalogDomain\": null}, {\"key\": \"word_count\", \"type\": \"Number\", \"label\": \"عدد الكلمات\", \"columns\": null, \"options\": null, \"required\": false, \"catalogDomain\": null}, {\"key\": \"notes\", \"type\": \"LongText\", \"label\": \"ملاحظات\", \"columns\": null, \"options\": null, \"required\": false, \"catalogDomain\": null}], \"maxProjects\": 0, \"minProjects\": 1, \"projectRequired\": true}"
+    },
+    {
+     "id": "9de57b9f-5aaa-4d0d-ba93-c57ee2fc311b",
+     "label": "📋 الجداول العامة",
+     "key": null,
+     "fieldType": "SectionHeader",
+     "order": 6,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "25e298e9-9c6a-4c24-ac56-51c88503db4b",
+     "label": "المتأخرة",
+     "key": null,
+     "fieldType": "TableGrid",
+     "order": 7,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": "{\"columns\": [\"المقال\", \"سبب التأخير\", \"الموعد الجديد\"]}"
+    },
+    {
+     "id": "93931d39-a9b7-4f8e-8956-e6f3c37f74b8",
+     "label": "خطة الأسبوع القادم",
+     "key": null,
+     "fieldType": "TableGrid",
+     "order": 8,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": "{\"columns\": [\"المقال\", \"الكلمة المفتاحية\", \"الموعد\"]}"
+    },
+    {
+     "id": "fb30921c-da4c-4fc4-abbe-7ae9577fbe95",
+     "label": "📝 ملاحظات",
+     "key": null,
+     "fieldType": "SectionHeader",
+     "order": 9,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "22c1f48e-3f7a-40ad-9430-75288928367e",
+     "label": "أبرز إنجاز",
+     "key": null,
+     "fieldType": "LongText",
+     "order": 10,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "d47de876-50f5-4587-8bf8-55cf4e97af81",
+     "label": "أبرز تحدٍّ",
+     "key": null,
+     "fieldType": "LongText",
+     "order": 11,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "37e0d45e-d8e5-4b46-ae15-4f31f1b83d63",
+     "label": "اقتراحات",
+     "key": null,
+     "fieldType": "LongText",
+     "order": 12,
+     "isRequired": false,
+     "helpText": null,
+     "configJson": null
+    },
+    {
+     "id": "8ceb86f4-0ae9-4e63-9b62-6e2efa98ed1f",
+     "label": "ملاحظات للإدارة",
+     "key": null,
+     "fieldType": "LongText",
+     "order": 13,
+     "isRequired": false,
+     "helpText": "اكتب هنا…",
+     "configJson": null
+    }
+   ],
+   "submissionCount": 0,
+   "isCurrentPublished": true,
+   "canDelete": false,
+   "deleteBlockReason": "لا يمكن حذف النسخة المنشورة الحالية المستخدَمة للتقارير الجديدة."
+  }
+ ],
+ "submissionCount": 1,
+ "canHardDelete": false
+}

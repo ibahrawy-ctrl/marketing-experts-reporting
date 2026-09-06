@@ -1,0 +1,132 @@
+{
+ "submissionId": "dc76b6c8-e7e5-41dd-869f-6b81acdd9419",
+ "results": [
+  {
+   "check": "RC_UI_EMP_LOGIN",
+   "result": "PASS",
+   "note": "r22brel-seo@rc-uat.local"
+  },
+  {
+   "check": "RC_UI_FRESH_SUBMISSION_CREATED",
+   "result": "PASS",
+   "note": "dc76b6c8-e7e5-41dd-869f-6b81acdd9419"
+  },
+  {
+   "check": "RC_UI_SEO_PROJECT_CARD_IN_SCOPE",
+   "result": "FAIL",
+   "note": "R22BREL — مشروع seo (UAT)"
+  },
+  {
+   "check": "RC_UI_SEO_MULTILINE_TEXTAREA",
+   "result": "FAIL",
+   "note": "null"
+  },
+  {
+   "check": "RC_UI_SEO_SAVE_OK",
+   "result": "FAIL",
+   "note": ""
+  },
+  {
+   "check": "RC_UI_SEO_SUBMIT",
+   "result": "FAIL",
+   "note": ""
+  },
+  {
+   "check": "RC_UI_LEAD_LOGIN",
+   "result": "PASS",
+   "note": "lead"
+  },
+  {
+   "check": "RC_UI_LEAD_SEES_MULTILINE",
+   "result": "PASS",
+   "note": ""
+  },
+  {
+   "check": "RC_UI_RETURN_GUARD_DISABLED_WITHOUT_REASON",
+   "result": "FAIL",
+   "note": "null"
+  },
+  {
+   "check": "RC_UI_RETURN_GUARD_ENABLED_AFTER_REASON",
+   "result": "FAIL",
+   "note": "{\"len\":85,\"nl\":4,\"inCard\":false} → null"
+  },
+  {
+   "check": "RC_UI_LEAD_RETURN_WITH_MULTILINE_COMMENT",
+   "result": "FAIL",
+   "note": "null | "
+  },
+  {
+   "check": "RC_UI_LEFT_PENDING_QUEUE_AFTER_RETURN",
+   "result": "PASS",
+   "note": "sid غائب في /app/submissions"
+  },
+  {
+   "check": "RC_UI_STATUS_RETURNED",
+   "result": "FAIL",
+   "note": ""
+  },
+  {
+   "check": "RC_UI_EMP_SEES_RETURN_REASON",
+   "result": "FAIL",
+   "note": ""
+  },
+  {
+   "check": "RC_UI_RETURN_COMMENT_LINE_BREAKS_RENDERED",
+   "result": "FAIL",
+   "note": "null"
+  },
+  {
+   "check": "RC_UI_EMP_RESUBMIT",
+   "result": "FAIL",
+   "note": ""
+  },
+  {
+   "check": "RC_UI_LEAD_APPROVE_WITH_MULTILINE_COMMENT",
+   "result": "FAIL",
+   "note": "null | {\"len\":58,\"nl\":3,\"inCard\":false}"
+  },
+  {
+   "check": "RC_UI_FINAL_STATUS_APPROVED_VISIBLE",
+   "result": "PASS",
+   "note": "مُغلق"
+  },
+  {
+   "check": "RC_UI_BOTH_DECISION_COMMENTS_VISIBLE",
+   "result": "FAIL",
+   "note": ""
+  },
+  {
+   "check": "RC_UI_DATA_INTACT_AFTER_APPROVAL",
+   "result": "PASS",
+   "note": ""
+  },
+  {
+   "check": "RC_UI_NO_SCRIPT_EXECUTION",
+   "result": "PASS",
+   "note": "النصّ يُعرَض كنصّ لا ككود"
+  },
+  {
+   "check": "RC_UI_RTL_AND_NO_OVERFLOW",
+   "result": "PASS",
+   "note": "{\"doc\":0,\"dir\":\"rtl\"}"
+  },
+  {
+   "check": "RC_UI_CONSOLE_ERRORS_ZERO",
+   "result": "FAIL",
+   "note": "[emp] [2026-09-06T13:27:11.276Z] Error: Failed to complete negotiation with the server: TypeError: Failed to fetch ; [emp] [2026-09-06T13:27:11.276Z] Error: Failed to start the connection: Error: Failed to complete negotiation with the server: TypeError: Failed to fetch ; [lead] [2026-09-06T13:28:44"
+  },
+  {
+   "check": "RC_UI_UNEXPECTED_NETWORK_ERRORS_ZERO",
+   "result": "PASS",
+   "note": ""
+  }
+ ],
+ "consoleErrors": [
+  "[emp] [2026-09-06T13:27:11.276Z] Error: Failed to complete negotiation with the server: TypeError: Failed to fetch",
+  "[emp] [2026-09-06T13:27:11.276Z] Error: Failed to start the connection: Error: Failed to complete negotiation with the server: TypeError: Failed to fetch",
+  "[lead] [2026-09-06T13:28:44.791Z] Error: Failed to complete negotiation with the server: TypeError: Failed to fetch",
+  "[lead] [2026-09-06T13:28:44.791Z] Error: Failed to start the connection: Error: Failed to complete negotiation with the server: TypeError: Failed to fetch"
+ ],
+ "networkFailures": []
+}
