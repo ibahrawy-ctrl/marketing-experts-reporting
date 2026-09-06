@@ -1,0 +1,73 @@
+R22B — التحقّق المصادَق عليه على الإنتاج الحقيقيّ (قراءة فقط تمامًا)
+=====================================================================
+العنوان: https://reports.emarketingacademy.net  (بلا نفق، بلا واجهة محلّيّة)
+وقت خطّ الأساس: BASELINE_UTC = 2026-09-06T18:14:33Z
+
+§ الجلسة المستعملة (كتبها المالك بنفسه داخل المتصفّح؛ لم يُقرأ ولا يُطبَع ولا يُخزَّن
+  أيّ توكن أو كوكي أو كلمة مرور، وملفّ الجلسة خارج Git في /private/tmp/prod-auth/)
+  CAPTURED_PROFILE   = ceo
+  IDENTITY           = 7e2cb6ac-09e0-4cd6-83dd-6701aa42374f · roles=["CEO"] · scopeType=company
+  الدور المُلتقَط CEO لا Employee ⟹ رحلتا §3 و§4 (الموظّف وقائد الفريق) لم تُنفَّذا.
+
+§ خطّ الأساس قبل أيّ كتابة (SQL قراءة فقط عبر sudo -u postgres psql)
+  TOTAL_SUBMISSIONS  = 347
+  STATUS             = Closed 215 · Submitted 79 · ApprovedByDirectManager 29 · Returned 15 · Draft 9
+  APPROVAL_STEPS     = 393
+  USERS              = 34
+  TEMPLATE_VERSIONS  = 108   (منشورة 75)
+  PROJECTS           = 35    CLIENTS = 11
+  REAL_USERS_MD5     = 1baba08c7e95c48ad80e4faf5760bd9a
+  SUBMISSIONS_MD5    = 0883f621b11db6f88a64d436896f387d
+  ملاحظة أمانة: `Submitted` كانت 74 عند قياس أسبق في نفس اليوم وصارت 79 —
+  نشاط مستخدمين حقيقيّين على نظام حيّ، لا أثر لهذه المهمّة (صفر كتابة، انظر أدناه).
+
+§ حارس عدم الكتابة (مفروض آليًّا داخل المتصفّح)
+  كلّ طلب POST/PUT/PATCH/DELETE مُلغى بواسطة ctx.route قبل مغادرته المتصفّح.
+  UNSAFE_REQUESTS_ATTEMPTED = 0     ⟹ PRODUCTION_WRITES_BY_THIS_TASK = 0
+  RAW_SQL_WRITE = 0 · HARD_DELETE = 0 · REAL_ACCOUNT_FIELDS_UNCHANGED = YES
+
+§ بوّابة الأسطح المصادَق عليها — Chromium × (1440×900, 390×844) = 18 قياسًا
+  16/16 صفحة حقيقيّة PASS  ·  2 قياسان لمسبار المنع المقصود (P09) بسلوك صحيح.
+  المعايير في كلّ صفحة: dir=rtl · HORIZONTAL_OVERFLOW=0 · CONSOLE_ERRORS=0 ·
+  NETWORK_ERRORS=0 · HTTP_5XX=0 · لا شاشة دخول · لا مؤشّر تحميل عالق (spinners=0).
+
+  P01 /app                              PASS  PASS
+  P02 /app/submissions                  PASS  PASS
+  P03 /app/my-reports                   PASS  PASS
+  P04 /app/submissions?open=<تسليم قائم> PASS  PASS
+  P05 /app/admin/archive                PASS  PASS
+  P06 /app/projects                     PASS  PASS
+  P07 /app/report-templates             PASS  PASS
+  P08 /app/report-calendar              PASS  PASS
+  P09 مسبار منع (مشروع غير موجود)        سلوك صحيح (تفصيل أدناه)
+
+§ §6 — مسبار المنع وعدم إفشاء الوجود  (GET /app/projects/000…000/360)
+  HTTP_403 = 0 · HTTP_404 = 1 ⟹ الرفض يُرجِع 404 لا 403 (مطابق للقاعدة المعماريّة).
+  الرسالة المعروضة: «المشروع غير موجود — المشروع غير موجود أو أنّه خارج نطاق صلاحيّتك»
+  ⟹ صيغة واحدة لا تفرّق بين «غير موجود» و«ممنوع» ⟹ EXISTENCE_DISCLOSURE = NONE.
+  التحميل ينتهي (spinners=0) والاتّجاه RTL سليم والانسياح 0.
+  خطأ الكونسول الوحيد هو تسجيل المتصفّح نفسه للـ404 المقصود:
+  «Failed to load resource: the server responded with a status of 404 (Not Found)»
+  ⟹ سلوك متوقَّع لا عيب. الأدلّة: screenshots-auth/P09-notfound-{desktop,mobile390}.png
+
+§ §5 — تصيير التعليق متعدّد الأسطر على بيانات إنتاج حقيقيّة قائمة (بلا إنشاء أيّ سجلّ)
+  التسليم المقيس: de3e9c56-6a01-401f-97d6-a90dafb87708 · Status=Closed · PeriodKey=2026-W32
+  (تعليق اعتماد حقيقيّ سابق لهذه المهمّة تمامًا؛ لم يُنشأ ولم يُعدَّل ولم يُحذف.)
+  المقيس داخل المتصفّح على الإنتاج الحيّ:
+    len                 = 2793 حرفًا
+    newlines            = 50   ⟹ 51 سطرًا منطقيًّا
+    white-space         = pre-wrap        ← الأسطر محفوظة لا مطويّة
+    overflow-wrap       = break-word
+    lineHeight          = 20px
+    renderedHeight      = 1140px ⟹ ≈57 سطرًا بصريًّا ≥ 51 سطرًا منطقيًّا
+    clipped (scrollHeight-clientHeight>2) = false   ← لا قصّ ولا إخفاء
+  ⟹ MULTILINE_PRODUCTION_RENDERING = PASS على الإنتاج الحقيقيّ بأثر بشريّ فعليّ.
+  السند القاعديّ (قراءة فقط): approval_steps تحوي تعليقات بـ51 و49 و21 و2 سطرًا.
+
+§ ما لم يُنفَّذ ولماذا (تصنيف أمين)
+  EMPLOYEE_LOGIN            = NOT_RUN_ROLE_NOT_SUPPLIED   (المُلتقَط CEO)
+  TEAM_LEADER_LOGIN         = NOT_RUN_ROLE_NOT_SUPPLIED
+  PRODUCTION_WRITE_CANARY   = NOT_RUN_NO_EMPLOYEE_SESSION
+  WEBKIT_AUTHENTICATED      = NOT_RUN_WOULD_REQUIRE_TOKEN_EXTRACTION
+    (إعادة استعمال جلسة Chromium في WebKit تستلزم استخراج توكن/كوكي وهو ممنوع صراحةً؛
+     WebKit مُثبَت مجهولًا 2/2 في بوّابة §10 المجهولة.)

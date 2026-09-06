@@ -100,14 +100,62 @@ PRODUCTION_DATA_CHANGE = SEO_TEMPLATE_V7_SEEDED_AT_BOOT  (تغيير منتَج 
 | توزيع رموز nginx منذ النشر | `200`×28 · `401`×4 · `404`×1 (مسبار مقصود) · **`5xx = 0`** |
 | سجلّ الخادم (warning فأعلى) | **لا مدخلات** · صفر `Applying migration` · صفر `duplicate key`/`unique constraint`/`SmtpException`/`Unhandled exception` |
 
-### 5-ب) ما لم يُنفَّذ — ويُسجَّل صراحةً بلا تجميل
-```
-PRODUCTION_AUTHENTICATED_JOURNEY = NOT_RUN_NO_PRODUCTION_CREDENTIALS
-PRODUCTION_WRITE_CANARY          = NOT_RUN_SAFETY_BOUNDARY
-```
-**السبب الدقيق:** لا تتوفّر لهذه المهمّة أيّ بيانات دخول لبيئة الإنتاج (المتاح حصرًا أسرار RC). والحصول عليها يستلزم أحد أمرين، وكلاهما **محظور صراحةً** في تصريح المهمّة نفسه: تصفير كلمة مرور حساب حقيقيّ (`REAL_ACCOUNT_PASSWORD_RESET`)، أو إنشاء حساب على بيئة حيّة فيها مستخدمون حقيقيّون — وهو أصلًا غير ممكن بلا اعتماد أدمن. لذلك **لم يُنفَّذ ولن يُختلق دليل عليه**.
+### 5-ب) الجولة المصادَق عليها على الإنتاج — ما أُنجِز فعلًا (6 سبتمبر · قراءة فقط)
 
-بناءً على ذلك، **لم تُقس على الإنتاج**: تسجيل الدخول بالأدوار (موظّف · قائد فريق · مدير عميل · أدمن · رفض خارج النطاق)، ودورة حياة التقرير (فتح ← إدخال ← حفظ مسوّدة ← إعادة تحميل ← إرسال)، ودورة القائد (طابور ← تعليق متعدّد الأسطر ← إرجاع ← إعادة إرسال ← اعتماد)، والأرشيف، وProject 360، والإشعارات، والعدّادات والمرشّحات. **كلّها مقيسة ومغلقة على RC** الذي يشغّل **المصدر نفسه** (`c5e0202`) بقطعة واجهة **مطابقة بايتيًّا** وبلا فارق تهيئة عدا عنوان الـAPI بالتصميم.
+بتصريح «الإغلاق المصادَق عليه — حسابات قائمة فقط»، فتح المالك جلسة إنتاج **بيده داخل المتصفّح** ولم يُقرأ ولا طُبِع ولا خُزِّن أيّ توكن أو كوكي أو كلمة مرور، وملفّ الجلسة خارج Git في `/private/tmp/prod-auth/`.
+
+```
+CAPTURED_SESSION_ROLE      = CEO   (7e2cb6ac… · scopeType=company)
+BASELINE_UTC               = 2026-09-06T18:14:33Z
+PRODUCTION_WRITES_BY_TASK  = 0     (حارس آليّ يُلغي كلّ POST/PUT/PATCH/DELETE قبل مغادرته المتصفّح)
+UNSAFE_REQUESTS_ATTEMPTED  = 0     RAW_SQL_WRITE = 0     HARD_DELETE = 0
+REAL_ACCOUNT_FIELDS_UNCHANGED = YES
+```
+
+خطّ الأساس قبل أيّ قياس: `TOTAL_SUBMISSIONS = 347` (Closed 215 · Submitted 79 · ApprovedByDirectManager 29 · Returned 15 · Draft 9) · `APPROVAL_STEPS = 393` · `USERS = 34` · `TEMPLATE_VERSIONS = 108` (منشورة 75) · `PROJECTS = 35` · `CLIENTS = 11` · `REAL_USERS_MD5 = 1baba08c…` · `SUBMISSIONS_MD5 = 0883f621…`.
+
+**بوّابة الأسطح المصادَق عليها — Chromium × (1440×900 · 390×844) = 18 قياسًا · 16/16 صفحة حقيقيّة PASS:**
+
+| السطح | مكتب | جوّال |
+|---|---|---|
+| `/app` الرئيسيّة | PASS | PASS |
+| `/app/submissions` سطح الفريق | PASS | PASS |
+| `/app/my-reports` تقاريري | PASS | PASS |
+| `/app/submissions?open=…` تفاصيل تسليم قائم | PASS | PASS |
+| `/app/admin/archive` الأرشيف | PASS | PASS |
+| `/app/projects` المشروعات | PASS | PASS |
+| `/app/report-templates` القوالب | PASS | PASS |
+| `/app/report-calendar` التقويم | PASS | PASS |
+
+المعيار في كلّ صفحة: `dir=rtl` · انسياح أفقيّ 0 · أخطاء كونسول 0 · أخطاء شبكة 0 · 5xx 0 · لا شاشة دخول · **لا مؤشّر تحميل عالق** (`spinners = 0`).
+
+**§ عدم إفشاء الوجود (مسبار منع مقصود على مشروع غير موجود):** `HTTP_403 = 0` · `HTTP_404 = 1` ⟹ الرفض يُرجِع **404 لا 403**، والرسالة موحَّدة «المشروع غير موجود أو أنّه خارج نطاق صلاحيّتك» ⟹ `EXISTENCE_DISCLOSURE = NONE`، والتحميل ينتهي. خطأ الكونسول الوحيد هناك هو تسجيل المتصفّح للـ404 المقصود نفسه.
+
+**§ الأسطر المتعدّدة على الإنتاج — إثبات حاكم على بيانات حقيقيّة قائمة بلا إنشاء أيّ سجلّ:**
+التسليم `de3e9c56-6a01-401f-97d6-a90dafb87708` (`Closed` · `2026-W32`) يحمل تعليق اعتماد حقيقيًّا **سابقًا لهذه المهمّة**؛ فُتِح للقراءة فقط وقيس داخل متصفّح على الإنتاج الحيّ:
+
+```
+len = 2793 حرفًا     newlines = 50  ⟹ 51 سطرًا منطقيًّا
+white-space   = pre-wrap        ← الأسطر محفوظة لا مطويّة
+overflow-wrap = break-word
+lineHeight = 20px · renderedHeight = 1140px ⟹ ≈57 سطرًا بصريًّا ≥ 51
+clipped = false                 ← لا قصّ ولا إخفاء
+MULTILINE_PRODUCTION_RENDERING = PASS
+```
+سند قاعديّ (قراءة فقط): `approval_steps` على الإنتاج تحوي تعليقات بـ51 و49 و21 و2 سطرًا ⟹ السلوك يخدم أثرًا بشريًّا فعليًّا لا حالة اصطناعيّة.
+
+الأدلّة: `evidence/production-authenticated/` (`authenticated-readonly-baseline.txt` · `prod-auth-readonly.json` · السكربتات) و18 لقطة في `screenshots-production/authenticated/` **مع إخفاء PII بالتمويه** (`redaction-log.txt`).
+
+### 5-ج) ما لم يُنفَّذ — ويُسجَّل صراحةً بلا تجميل
+```
+EMPLOYEE_LOGIN            = NOT_RUN_ROLE_NOT_SUPPLIED     (المُلتقَط CEO لا Employee)
+TEAM_LEADER_LOGIN         = NOT_RUN_ROLE_NOT_SUPPLIED
+PRODUCTION_WRITE_CANARY   = NOT_RUN_NO_EMPLOYEE_SESSION
+WEBKIT_AUTHENTICATED      = NOT_RUN_WOULD_REQUIRE_TOKEN_EXTRACTION
+```
+**السبب الدقيق:** التصريح يوجب استعمال حسابات قائمة فقط وأن يكتب المالك بيانات الدخول بنفسه، ويمنع إنشاء حساب أو تصفير كلمة مرور. الجلسة الوحيدة المتاحة دور **CEO**؛ ودورة القرار تحتاج **موظّفًا** يُنشئ التقرير و**قائد فريق** يراجعه — والـCEO في قمّة السلسلة فلا مراجِع فوقه. لذلك لم تُقس على الإنتاج: دورة حياة التقرير (إدخال ← حفظ مسوّدة ← إعادة تحميل ← إرسال)، ودورة القائد (طابور ← تعليق متعدّد الأسطر ← إرجاع ← إعادة إرسال ← اعتماد). **لم يُختلق دليل عليها.** أمّا WebKit المصادَق عليه فيستلزم نقل توكن/كوكي بين المحرّكين وهو **ممنوع صراحةً**، وWebKit مُثبَت مجهولًا 2/2.
+
+هذه المسارات **مقيسة ومغلقة على RC** الذي يشغّل **المصدر نفسه** (`c5e0202`) بقطعة واجهة **مطابقة بايتيًّا** وبلا فارق تهيئة عدا عنوان الـAPI بالتصميم.
 
 ## 6) التحقّق البصريّ بعد النشر
 
@@ -126,10 +174,25 @@ HORIZONTAL_OVERFLOW     = 0
 CONSOLE_ERRORS          = 0
 UNEXPECTED_NETWORK_ERRORS = 0
 PRODUCTION_5XX          = 0
-VIS_01..VIS_05 (على الإنتاج) = NOT_RUN_NO_PRODUCTION_CREDENTIALS
+```
+
+**بعد الجولة المصادَق عليها (§5-ب)** تُحدَّث الأسطح البصريّة الخمسة على الإنتاج كالآتي — كلّ تصنيف مسنود بقياس داخل المتصفّح على العنوان الحقيقيّ، بلا تجميل:
+
+| السطح | الحكم على الإنتاج | السند |
+|---|---|---|
+| VIS-01 التعليقات متعدّدة الأسطر | **PASS** | `white-space: pre-wrap` · 51 سطرًا منطقيًّا · ≈57 بصريًّا · `clipped=false` على تسليم إنتاج حقيقيّ |
+| VIS-02 الرفض خارج النطاق | **PASS** | 404 لا 403 · رسالة موحَّدة لا تفشي الوجود · التحميل ينتهي |
+| VIS-03 RTL والانسياح والقصّ | **PASS** | 16/16 قياسًا: `dir=rtl` · انسياح 0 على 1440 و390 |
+| VIS-04 إنهاء التحميل وسلامة الكونسول/الشبكة | **PASS** | `spinners=0` · كونسول 0 · شبكة 0 · 5xx 0 على ثمانية أسطح |
+| VIS-05 الأسطح الحاكمة (طابور · أرشيف · قوالب · تقويم · Project 360) | **PASS جزئيّ — عرضًا فقط** | الأسطح تُحمَّل وتُصيَّر سليمة؛ **أفعال القرار لم تُجرَّب** لغياب جلسة موظّف/قائد |
+
+```
+VIS_01 = PASS   VIS_02 = PASS   VIS_03 = PASS   VIS_04 = PASS
+VIS_05 = PASS_RENDERING_ONLY / DECISION_ACTIONS_NOT_EXERCISED
+HORIZONTAL_OVERFLOW (مصادَق) = 0   CONSOLE_ERRORS = 0
+UNEXPECTED_NETWORK_ERRORS   = 0   PRODUCTION_5XX = 0
 VIS_01..VIS_05 (على RC بالمصدر نفسه) = PASS 10/10 لكلّ محرّك
 ```
-الأسطح البصريّة الخمسة تتطلّب جلسة مُعتمَدة (Project 360، رفض خارج النطاق، حقول SEO، طابور المراجعة، بطاقات التعليقات) ⟹ لم تُقس على الإنتاج للسبب في §5-ب، ولم تُصنَّف PASS.
 
 ## 7) المراقبة
 
@@ -139,7 +202,7 @@ VIS_01..VIS_05 (على RC بالمصدر نفسه) = PASS 10/10 لكلّ محر�
 
 ## 8) قيود معروفة ومسجَّلة (لا تُطوى)
 
-1. **`PRODUCTION_AUTHENTICATED_JOURNEY = NOT_RUN`** و**`PRODUCTION_WRITE_CANARY = NOT_RUN_SAFETY_BOUNDARY`** — البرهان على تشغيل تقارير الموظّفين قائم على RC بالمصدر المطابق، لا على الإنتاج مباشرةً. رفع هذا القيد يحتاج جلسة دخول من المالك أو من المستخدمين أنفسهم.
+1. **دورة الكتابة على الإنتاج لم تُجرَّب:** `EMPLOYEE_LOGIN` و`TEAM_LEADER_LOGIN = NOT_RUN_ROLE_NOT_SUPPLIED` و`PRODUCTION_WRITE_CANARY = NOT_RUN_NO_EMPLOYEE_SESSION`. **القراءة والتصيير والصلاحيّات مُثبَتة على الإنتاج** (§5-ب)، أمّا أفعال القرار (حفظ مسوّدة · إرسال · إرجاع · اعتماد) فبرهانها قائم على RC بالمصدر المطابق. رفع القيد = جلسة **موظّف** + جلسة **قائد فريق** يراجعه، يكتبهما المالك بنفسه.
 2. **البريد:** `EMAIL = PASS_AT_RENDERER / NOT_RUN_RUNTIME (CHANNEL_DISABLED)`.
 3. **خيارات `work_status` بالإنجليزيّة** (`Draft/Revision/Approved/Published`) مطابِقةً لنسخة القالب المحكومة v7 — قرار المالك، ليست ارتدادًا.
 4. **`report_template_versions` تغيّر عند الإقلاع** (v7 لقالب SEO) — مقصود ومشروح في §4.
@@ -155,20 +218,32 @@ PENDING_MIGRATIONS                 = 0        PRODUCTION_5XX = 0
 BACKUP_VERIFICATION                = PASS     ROLLBACK_METHOD = مسجَّل في §1
 RC_CLEANUP                         = PASS
 SMOKE_ANONYMOUS                    = PASS     PROD_VISUAL_ANON_GATE = PASS (4/4)
-PRODUCTION_AUTHENTICATED_JOURNEY   = NOT_RUN_NO_PRODUCTION_CREDENTIALS
-PRODUCTION_WRITE_CANARY            = NOT_RUN_SAFETY_BOUNDARY
-VIS_01..VIS_05 (production)        = NOT_RUN_NO_PRODUCTION_CREDENTIALS
+PRODUCTION_AUTHENTICATED_READONLY  = PASS (16/16 قياسًا · جلسة CEO كتبها المالك بنفسه)
+PRODUCTION_WRITES_BY_THIS_TASK     = 0        RAW_SQL_WRITE = 0   HARD_DELETE = 0
+REAL_ACCOUNT_FIELDS_UNCHANGED      = YES      UNRELATED_SUBMISSIONS_UNCHANGED = YES
+MULTILINE_PRODUCTION_RENDERING     = PASS (pre-wrap · 51 سطرًا · لا قصّ · بيانات إنتاج حقيقيّة)
+ACCESS_DENIAL_NO_EXISTENCE_DISCLOSURE = PASS (404 لا 403)
+VIS_01 = PASS  VIS_02 = PASS  VIS_03 = PASS  VIS_04 = PASS
+VIS_05 = PASS_RENDERING_ONLY / DECISION_ACTIONS_NOT_EXERCISED
+EMPLOYEE_LOGIN                     = NOT_RUN_ROLE_NOT_SUPPLIED
+TEAM_LEADER_LOGIN                  = NOT_RUN_ROLE_NOT_SUPPLIED
+PRODUCTION_WRITE_CANARY            = NOT_RUN_NO_EMPLOYEE_SESSION
+CANARY_CLEANUP                     = NOT_APPLICABLE (لم يُنشأ canary)
+EMAIL_RENDERER                     = PASS      EMAIL_RUNTIME = NOT_RUN_CHANNEL_DISABLED
 
 R22B_REPORTING_PRODUCTION_RELEASE  = BLOCKED
 EMPLOYEE_REPORTING_OPERATIONAL     = NOT_PROVEN
+COMMENT_MULTILINE_PRODUCTION_RELEASE = PASS
 BLOCKERS = [
-  "PRODUCTION_AUTHENTICATED_JOURNEY = NOT_RUN — لا اعتماد دخول للإنتاج متاح لهذه المهمّة،
-   والحصول عليه يستلزم تصفير كلمة مرور حساب حقيقيّ أو إنشاء حساب على بيئة حيّة، وكلاهما محظور
-   صراحةً في تصريح المهمّة. لذا لم تُقس على الإنتاج: أدوار الدخول، ودورة حياة التقرير،
-   ودورة قرار القائد، وProject 360، والأرشيف، والإشعارات، والعدّادات والمرشّحات.",
-  "VIS_01..VIS_05 على الإنتاج = NOT_RUN لنفس السبب (أسطح تتطلّب جلسة مُعتمَدة)."
+  "EMPLOYEE_LOGIN = NOT_RUN_ROLE_NOT_SUPPLIED — الجلسة المتاحة دور CEO؛ ودورة القرار تحتاج
+   موظّفًا يُنشئ التقرير وقائد فريق يراجعه، والـCEO في قمّة السلسلة فلا مراجِع فوقه.
+   إنشاء حساب أو تصفير كلمة مرور محظور صراحةً ⟹ لم تُقس على الإنتاج أفعال:
+   حفظ المسوّدة، والإرسال، وإرجاع القائد، وإعادة الإرسال، والاعتماد.",
+  "TEAM_LEADER_LOGIN = NOT_RUN_ROLE_NOT_SUPPLIED — لنفس السبب."
 ]
 ```
+
+**قراءة الحكم بلا لبس:** `BLOCKED` هنا تعني **«التحقّق ناقص»** لا **«الإصدار معطوب»**. لم يُكتشَف أيّ عيب سلوكيّ على الإنتاج: النشر سليم، والقطعة مطابقة، والأسطح تُصيَّر صحيحة، وحارس الأسطر المتعدّدة يعمل على بيانات حقيقيّة، والرفض لا يفشي الوجود. **لا يُوصى بأيّ تراجع**، والتصريح نفسه ينصّ على ألّا يُنفَّذ تراجع لمجرّد نقص دليل. رفع الحاجب = جلستا **موظّف** و**قائد فريق** يكتبهما المالك بنفسه، ثمّ canary واحد ودورة قرار كاملة.
 
 **تفسير الحسم بلا مواربة:** النشر نفسه **نجح وصحّته مثبتة** — الهويّة مطابِقة، والخدمة حيّة، وصفر 5xx، وصفر هجرة، والحزمة الحيّة تجتاز حارس متعدّد الأسطر. **ولا يوجد عيب مكتشَف يستدعي التراجع، والتراجع غير موصى به.** لكنّ عقد الإغلاق يشترط لـ`PASS` أن يكون `EMPLOYEE_REPORTING_OPERATIONAL = YES`، وهذا يقتضي برهانًا مباشرًا على الإنتاج لم يُتَح تنفيذه ضمن الحدود الأمنيّة المفروضة في التصريح نفسه. البرهان القائم غير مباشر (RC بالمصدر نفسه ومطابقة بايتيّة للقطعة). **فالحكم `BLOCKED` هنا يعني «التحقّق ناقص»، لا «الإصدار معطوب».**
 
