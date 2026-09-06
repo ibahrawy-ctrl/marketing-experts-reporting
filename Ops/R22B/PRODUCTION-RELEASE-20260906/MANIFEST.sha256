@@ -1,3 +1,4 @@
+6fbd11e6c64663021a3655015e4af8f58b7c1f4522213f9b39d796d52a4ffd3f  ./PRODUCTION-DEPLOYMENT-AND-VERIFICATION.md
 d385d0ed837d16118d24ccaeb820d4a7c25d2011990ad636db23f5298f4772ff  ./RC-OPERATIONAL-AND-VISUAL-GATE.md
 4e1f990f71c7acc90b1483af0b61efb03d11bc024858de0b9b4cced2d1016407  ./RELEASE-READINESS-AND-GO-NO-GO.md
 49caebb21aba4a57460e40dfa35dd5c5268caee8c2253c54565f1a0492708f8c  ./evidence/frontend-clean-gate/clean-build.txt
@@ -8,6 +9,12 @@ d6b19c0981bb583507d94b98ba44985e7ad3998dfc5cba88eb2308eed4d4966f  ./evidence/fro
 75f903439597e79706c378792e0ab3b78ccc9f814c55d7c13acc2329a075ed46  ./evidence/frontend-clean-gate/clean-npm-ci.txt
 bcb1a61798abda8d8a3a775a1373725c955f1de0a18ef7e131bc06475bdc0f16  ./evidence/frontend-clean-gate/clean-tsc.txt
 4d59777f760e9a9390e823f60eecfcf52f2c3039c6c53070df452ffc11c181d4  ./evidence/prod-migs-live.txt
+2756bad9524d9e0eadb5d4f423d65b2111b2c5b462a48665ef7aba1b2d5cb840  ./evidence/production-deploy/backup-manifest.txt
+41c19e7028f3e24bfe315019aab1534b90f6e311745010bf79f7c46dfe420173  ./evidence/production-deploy/live-artifact-and-probes.txt
+4bb5b9e73e0ee809537397258316380567d10ddd8cc2a6fc248b2e856cb42689  ./evidence/production-deploy/monitoring-window.txt
+90453be32d858af4028fbfa9f6c384cb5715b897b448bc2d9990c24ed523084d  ./evidence/production-deploy/post-deploy-identity.txt
+706381e9305dd99596443ed2c5d34501669eac002e2f09a3840f9b062538eac6  ./evidence/production-deploy/prod-visual-anon.json
+d6d468f5b71ef4eec69a4a07b69a8d7eda4fde7937a5055646cfb346258ccf17  ./evidence/production-deploy/prod-visual-anon.mjs
 d08470a9e2302f123c34e83b6999e6666396ca9ae8561baab726f4d26e6d9f63  ./evidence/rc-cleanup/rc-cleanup-apply.json
 b0e64cafadff7a49787942d433060d0d968003eb83ddf01ccdcb4ee4970aecea  ./evidence/rc-cleanup/rc-cleanup-apply.py
 8affc678839fb416d66d78db33edaa604f8db0b6585f25e83f3a309e04cd3de3  ./evidence/rc-cleanup/rc-cleanup-apply.txt
@@ -89,3 +96,7 @@ f1f4359eb5475015c56afc2acc8a679a91fc8efc50f8a80c3a3d25cd0dc43b22  ./evidence/ui/
 4a0abac93f93a024ea869a3684a97a2441586f012bd6dedb491edf0aa52d8c14  ./evidence/ui/rc-vis-gate-chromium.json
 ab070b1954b735e2f4d111530f188546906f3ff804382ef984717fcc2e327875  ./evidence/ui/rc-vis-gate-webkit.json
 42c9df1b44de036cf60f225d34d5c4a38d7e25953ba265069ad2012fa2241f70  ./evidence/ui/rc-vis-gate.mjs
+d426aa2f19bb8eb2bccbafddac7b50cbd099888870855b058e99cb667916e4bd  ./screenshots-production/PROD-chromium-desktop-login.png
+19ae90bbdf32a1e7dfd2cec75082c51013a46a1f24fa706c0d6dce8fc526fb8e  ./screenshots-production/PROD-chromium-mobile390-login.png
+262f1828ae03a40732c8bdf9fabdd7e7d816e1271995348b8f104280caa6abea  ./screenshots-production/PROD-webkit-desktop-login.png
+a6dd2ea3acbae54b91ee31a5d61df5335cd4cff55d8bc096ea7b2eb272e510e1  ./screenshots-production/PROD-webkit-mobile390-login.png

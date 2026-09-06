@@ -1,0 +1,8 @@
+da3da662ac628ca7dac58697e05382d6cf7c6e7ba8ba77414904d017ad10b172  backend-publish-d25dc69.tar.gz
+838cd1d80cb933e6f4c78aeec9542925c6e084ad8e57ffbfa9ac0b4910e7e10a  frontend-dist-d25dc69.tar.gz
+747229fe91cb03ad1b9cc6ac9c4bed1b0f984e9e893427d643cc0f88b74e251c  reporting_prod.dump
+--- sizes ---
+total 48604
+-rw-r--r-- 1 root root 47765521 Sep  6 17:46 backend-publish-d25dc69.tar.gz
+-rw-r--r-- 1 root root   415037 Sep  6 17:46 frontend-dist-d25dc69.tar.gz
+-rw-rw-r-- 1 root root  1584182 Sep  6 17:46 reporting_prod.dump

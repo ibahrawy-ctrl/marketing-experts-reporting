@@ -1,0 +1,26 @@
+== LIVE BUNDLE DOWNLOADED FROM https://reports.emarketingacademy.net ==
+35e426369d6abfbf163eca68ad320f2f2dacad82668dd3774ad4ab650fabaf31  dist/assets/index-ENWa4a-J.css
+a7f11baa9a860624c5980e5d4536efc14e0b502f46dbf21bc8e7c5caa914ca30  dist/assets/index-o0jQqvkU.js
+== BUNDLE MULTILINE GATE ON LIVE ASSETS ==
+R22B-MULTILINE-RESTORE · فحص الحزمة: dist/assets (1 ملفّ JS)
+  [PASS] MULTILINE_ELEMENT — حقل تعليق التقرير عنصر متعدّد الأسطر (textarea) لا <input type="text"> · anchors=1 · textarea=true · rows:4=true
+  [PASS] RESIZE_Y — الصنف resize-y حاضر (تمدّد رأسيّ للحقل) · occurrences=1
+  [PASS] WHITESPACE_PRE_WRAP — whitespace-pre-wrap حاضر (حفظ الأسطر عند العرض) · occurrences=27
+  [PASS] BREAK_WORDS — break-words حاضر مقترنًا بـpre-wrap (منع التجاوز الأفقيّ) · pre-wrap+break-words=4
+  [PASS] COMMENT_FIELD_PRESENT — حقل «ملاحظة / سبب» ما زال موجودًا في الحزمة · occurrences=2
+  [PASS] NO_ENTER_BLOCKER — لا معالج لوحة مفاتيح ولا preventDefault في جوار حقل تعليق التقرير · anchors=1 · blocker=none
+  [PASS] NO_SECRETS — لا مفاتيح خاصّة ولا توكنات JWT مضمَّنة في الحزمة · none
+BUNDLE_MULTILINE_GATE=PASS
+LIVE_BUNDLE_GATE_EXIT=0
+== API BASE IN LIVE BUNDLE ==
+prod_api_base= True
+localhost5090= 0
+rc_leak= 0 test_leak= 0
+== ANONYMOUS PROBES ==
+/api/reports/my -> 404
+/api/projects -> 401
+/api/directory/users -> 401
+/api/submissions -> 401
+/api/auth/login(bad-creds) -> 401
+/health -> 200
+/ -> 200

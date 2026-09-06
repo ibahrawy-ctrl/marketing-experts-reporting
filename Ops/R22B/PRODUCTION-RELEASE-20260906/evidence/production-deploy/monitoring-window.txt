@@ -1,0 +1,20 @@
+MONITOR_AT=2026-09-06T17:52:59Z
+== SERVICE ==
+active
+NRestarts=0
+== HEALTH ==
+200
+== NGINX STATUS SINCE DEPLOY ==
+     28 200
+      4 401
+      1 404
+== 5xx COUNT ==
+0
+== BACKEND err/warn ==
+1
+== migration/duplicate/mail patterns ==
+0
+== DATA TOUCH SINCE DEPLOY ==
+submissions=0
+users=0
+template_ids=1
