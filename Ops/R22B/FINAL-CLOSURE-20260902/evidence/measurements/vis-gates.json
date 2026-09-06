@@ -1,0 +1,73 @@
+{
+  "VIS01": {
+    "candidateOptions": 5,
+    "isolatedOptions": 5,
+    "sample": "\"⁨R22C — مشروع SEO⁩ — ⁨R22C — عميل UAT (مؤقّت)⁩\"",
+    "codepoints": [
+      "2068",
+      "52",
+      "32",
+      "32"
+    ]
+  },
+  "textareaCount": 3,
+  "typedLines": 3,
+  "saveFound": true,
+  "VIS04": {
+    "present": true,
+    "text": "✅ حُفظت المسودّة — آخر حفظ ٢ سبتمبر ٢٠٢٦، ١٠:١٩ م"
+  },
+  "persistedAfterReload": {
+    "found": true,
+    "lines": 3,
+    "raw": "م1 — 763002\\nم2 — سطر ثانٍ · 45.7% ✓\\nم3 — third line"
+  },
+  "darkMode": {
+    "found": true,
+    "color": "rgb(82, 89, 107)",
+    "whiteSpace": "pre-wrap",
+    "bodyBg": "rgb(246, 247, 250)"
+  },
+  "forcedColors": {
+    "found": true,
+    "renderedLines": 9,
+    "whiteSpace": "pre-wrap"
+  },
+  "mobile": {
+    "found": true,
+    "renderedLines": 9,
+    "overflowsX": false,
+    "scrollW": 390,
+    "clientW": 390
+  },
+  "projectId": "bf6ee6da-08dc-474b-b6fc-b1f68d83af04",
+  "VIS02": {
+    "tabFound": true,
+    "table": {
+      "headers": [
+        "القالب",
+        "مُقدِّم التقرير",
+        "الدورية",
+        "الفترة",
+        "الحالة",
+        "تاريخ الإرسال",
+        "آخر تحديث",
+        "بنود العمل",
+        "آخر قرار اعتماد",
+        "سبب الإرجاع",
+        ""
+      ],
+      "rows": 3,
+      "emptyText": false
+    }
+  },
+  "VIS03": {
+    "requests": 2,
+    "statuses": [
+      200,
+      404
+    ],
+    "message": null
+  },
+  "stamp": "763002"
+}

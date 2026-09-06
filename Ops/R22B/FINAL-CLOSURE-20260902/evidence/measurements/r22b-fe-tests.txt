@@ -1,0 +1,153 @@
+
+ RUN  v4.1.8 /private/tmp/r22b-final-closure-20260902/reporting-frontend
+
+ ✓ src/pages/ProjectRepeatableGrid.test.tsx (51 tests) 468ms
+ ✓ src/components/EmailControlStatusPanel.test.tsx (24 tests) 901ms
+ ✓ src/components/project360/project360Tabs.test.tsx (27 tests) 913ms
+ ✓ src/pages/KpiOverview.test.tsx (20 tests) 1248ms
+ ✓ src/pages/LeaveGovernanceTab.test.tsx (36 tests) 1417ms
+ ✓ src/pages/AttendancePage.test.tsx (30 tests) 1450ms
+ ✓ src/pages/ClientDetailPage.test.tsx (24 tests) 1638ms
+ ✓ src/pages/UnifiedSubmissionOverview.test.tsx (30 tests) 1664ms
+ ✓ src/components/PresentationProfileReport.test.tsx (22 tests) 473ms
+ ✓ src/lib/navConfig.test.ts (28 tests) 9ms
+ ✓ src/pages/ProjectMultiWorkItems.test.tsx (19 tests) 355ms
+ ✓ src/components/Employee360Panel.test.tsx (20 tests) 822ms
+ ✓ src/components/project360/ProjectExecutionBridgeTab.test.tsx (16 tests) 525ms
+ ✓ src/pages/ProjectDeliverables.test.tsx (20 tests) 690ms
+ ✓ src/pages/Project360Page.test.tsx (26 tests) 1032ms
+ ✓ src/pages/ApprovalCommentsMultiline.test.tsx (14 tests) 681ms
+Not implemented: navigation to another Document
+ ✓ src/pages/KpiDualTrackJourney.test.tsx (6 tests) 871ms
+ ✓ src/pages/HrOperationsPage.test.tsx (14 tests) 886ms
+ ✓ src/pages/ProjectWorkstreams.test.tsx (15 tests) 619ms
+ ✓ src/components/EmployeeChecklistPanel.test.tsx (15 tests) 517ms
+ ✓ src/pages/TeamLeaderProjectExecutionPage.test.tsx (11 tests) 313ms
+ ✓ src/pages/orgPages.test.tsx (11 tests) 428ms
+stderr | src/pages/AdminArchivePage.test.tsx > AdminArchivePage — نافذة التفاصيل والاسترجاع > 12) الضغط على الاسترجاع بسبب صالح يستدعي mutateAsync بالجسم الصحيح
+An update to ArchiveDetailsModal inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ src/pages/AdminArchivePage.test.tsx (13 tests) 384ms
+ ✓ src/pages/KpiEvaluationSetupJourney.test.tsx (4 tests) 484ms
+ ✓ src/pages/RepeatableNumericValidation.test.tsx (17 tests) 234ms
+ ✓ src/components/DailyCalendarPicker.test.tsx (7 tests) 181ms
+ ✓ src/pages/ProjectReportSlicePage.test.tsx (8 tests) 304ms
+ ✓ src/pages/pages.test.tsx (7 tests) 285ms
+ ✓ src/approvalUx.test.tsx (11 tests) 218ms
+ ✓ src/pages/SalesAggregationPage.test.tsx (8 tests) 882ms
+ ✓ src/components/DashboardShell.nav.test.tsx (10 tests) 572ms
+ ✓ src/navSecurity.test.ts (7 tests) 37ms
+ ✓ src/components/DashboardShell.p3.test.tsx (15 tests) 751ms
+stderr | src/pages/ExecutionTaxonomyManagementPage.test.tsx > الإضافة تستدعي mutateAsync بالمجال والرمز والاسم والترتيب الصحيح
+An update to ExecutionTaxonomyManagementPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to ExecutionTaxonomyManagementPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to ExecutionTaxonomyManagementPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to ExecutionTaxonomyManagementPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ src/pages/ExecutionTaxonomyManagementPage.test.tsx (10 tests) 425ms
+ ✓ src/components/WeeklyCycleCalendarPicker.test.tsx (6 tests) 172ms
+ ✓ src/pages/B2bServiceSelect.test.tsx (7 tests) 504ms
+ ✓ src/lib/unifiedBanner.test.ts (10 tests) 7ms
+ ✓ src/pages/ProjectScopedReportNav.test.tsx (5 tests) 598ms
+     ✓ يقود زرّ «مساحة عمل المشروع (360)» إلى مساحة عمل نفس المشروع  357ms
+ ✓ src/pages/SalesRepDashboardPage.test.tsx (6 tests) 312ms
+ ✓ src/pages/EmployeeDirectoryPage.test.tsx (7 tests) 894ms
+ ✓ src/pages/AdminArchiveMultiline.test.tsx (4 tests) 557ms
+     ✓ يحفظ الأسطر المتعدّدة نصًّا وعرضًا (whitespace-pre-wrap)  415ms
+ ✓ src/components/DashboardShell.portfolio.nav.test.tsx (6 tests) 556ms
+   ✓ مدير الحساب (jobRoleCode === ACCOUNT_MGR) يرى وحدة «العملاء والمشروعات» في الشريط الجانبيّ  441ms
+ ✓ src/components/featureDisabled.test.tsx (5 tests) 429ms
+ ✓ src/lib/useArchive.test.tsx (8 tests) 133ms
+ ✓ src/pages/HrEmploymentWindow.test.tsx (3 tests) 650ms
+     ✓ يُحرَّر الحقلان داخل الصفّ نفسه ويُرسلان معًا حالةً نهائيّة إلى عقد إدارة الموظّف القائم  519ms
+ ✓ src/pages/TaxonomySelect.test.tsx (7 tests) 311ms
+ ✓ src/pages/EmployeeProfileSelfRoute.test.tsx (3 tests) 247ms
+ ✓ src/pages/DraftSavePersistentConfirmation.test.tsx (3 tests) 292ms
+ ✓ src/pages/TeamLeaderSalesDashboardPage.test.tsx (4 tests) 204ms
+ ✓ src/pages/ProjectAssignmentOutOfDirectoryScope.test.tsx (2 tests) 151ms
+ ✓ src/components/PresentationProfileClientNav.test.tsx (27 tests) 10797ms
+   ✓ 16 «نظرة عامة» تظهر بعد قسم «تفاصيل العملاء والمشروعات»  3034ms
+   ✓ 17 «الملخص الأسبوعي» يظهر بعد تفاصيل المشروعات ولا يُفقَد محتواه  3021ms
+   ✓ 18 «أبرز التحديات» تظهر بعد تفاصيل المشروعات ولا يُفقَد محتواها  3030ms
+ ✓ src/pages/ExecutiveReportsPage.test.tsx (3 tests) 153ms
+ ✓ src/components/NavOverflow.test.tsx (10 tests) 350ms
+ ✓ src/components/Tabs.test.tsx (8 tests) 376ms
+ ✓ src/pages/EmailNotificationsPage.test.tsx (2 tests) 361ms
+ ✓ src/pages/ProjectRoleAssignment.test.tsx (2 tests) 565ms
+   ✓ يُرسل مالك المشروع وقائد الفريق ضمن حمولة التعديل  365ms
+ ✓ src/routeRegistry.test.ts (9 tests) 3ms
+ ✓ src/components/DashboardShell.execution.nav.test.tsx (9 tests) 862ms
+   ✓ الدور TeamLeader يرى «لوحة تنفيذ الفريق»  420ms
+ ✓ src/pages/HomePage.test.tsx (4 tests) 524ms
+     ✓ dashboardType=Employee + دور Accountant ⇒ يعرض لوحة المالية  342ms
+ ✓ src/lib/surfaceState.test.ts (7 tests) 5ms
+ ✓ src/App.test.tsx (5 tests) 798ms
+     ✓ renders the system title and login link  646ms
+ ✓ src/components/ProtectedRoute.test.tsx (4 tests) 161ms
+ ✓ src/pages/GovernanceProjectLink.test.tsx (2 tests) 802ms
+     ✓ يرسل معرّف المشروع المختار ضمن حمولة الخطر  697ms
+ ✓ src/lib/dashboardPeriod.test.ts (12 tests) 6ms
+ ✓ src/lib/queryRetryPolicy.test.ts (4 tests) 4ms
+ ✓ src/lib/notificationLink.test.ts (7 tests) 4ms
+ ✓ src/lib/format.test.ts (6 tests) 15ms
+ ✓ src/pages/KpiPage.overflow.test.tsx (1 test) 276ms
+ ✓ src/components/Collapsible.test.tsx (5 tests) 777ms
+     ✓ مطويّ افتراضيًّا: aria-expanded=false والمنطقة مخفيّة  638ms
+ ✓ src/lib/numericNormalizer.test.ts (35 tests) 83ms
+ ✓ src/components/ShowMore.test.tsx (6 tests) 372ms
+ ✓ src/pages/AccountPortfolioClientPage.test.tsx (2 tests) 200ms
+ ✓ src/__trivial.test.ts (1 test) 1ms
+ ✓ src/lib/auth.test.tsx (2 tests) 158ms
+ ✓ src/components/StickyBar.test.tsx (2 tests) 73ms
+
+ Test Files  75 passed (75)
+      Tests  857 passed (857)
+   Start at  21:46:15
+   Duration  18.58s (transform 6.48s, setup 5.62s, import 20.92s, tests 46.42s, environment 69.36s)
+
+EXIT=0

@@ -1,0 +1,71 @@
+{
+  "subId": "1d761821-d916-485c-babe-88fabbf42dd8",
+  "surfaces": {
+    "approvalComments": {
+      "total": 5,
+      "multiline": [
+        {
+          "renderedLines": 9,
+          "whiteSpace": "pre-wrap",
+          "overflowWrap": "break-word",
+          "direction": "rtl",
+          "hasNewline": true,
+          "textLines": 3,
+          "sample": "السطر الأول — R22BML-design — سبب القرار\\nالسطر الثاني — Q3/2026 · 45.7% ✓ (مقبول"
+        },
+        {
+          "renderedLines": 9,
+          "whiteSpace": "pre-wrap",
+          "overflowWrap": "break-word",
+          "direction": "rtl",
+          "hasNewline": true,
+          "textLines": 3,
+          "sample": "السطر الأول — R22BML-design — سبب القرار\\nالسطر الثاني — Q3/2026 · 45.7% ✓ (مقبول"
+        },
+        {
+          "renderedLines": 9,
+          "whiteSpace": "pre-wrap",
+          "overflowWrap": "break-word",
+          "direction": "rtl",
+          "hasNewline": true,
+          "textLines": 3,
+          "sample": "السطر الأول — R22BML-design — سبب القرار\\nالسطر الثاني — Q3/2026 · 45.7% ✓ (مقبول"
+        }
+      ]
+    },
+    "commentInput": {
+      "found": false,
+      "textareaCount": 1
+    },
+    "adminArchive": {
+      "preWrapCells": 2,
+      "multiline": [
+        {
+          "renderedLines": 11,
+          "whiteSpace": "pre-wrap",
+          "overflowWrap": "break-word",
+          "direction": "rtl",
+          "hasNewline": true,
+          "textLines": 3,
+          "sample": "س1/تصميم: ملفّ المصدر غير مرفق.\\nس2/تصميم: وحّد مقاسات البانرات.\\nس3/تصميم: أعد ال"
+        },
+        {
+          "renderedLines": 5,
+          "whiteSpace": "pre-wrap",
+          "overflowWrap": "break-word",
+          "direction": "rtl",
+          "hasNewline": true,
+          "textLines": 3,
+          "sample": "سطر إدخال أوّل\\nسطر إدخال ثانٍ\\nسطر إدخال ثالث"
+        }
+      ],
+      "modalOpen": true,
+      "rowCount": 6
+    },
+    "notificationsBell": {
+      "total": 0,
+      "multiline": []
+    }
+  },
+  "login": "OK"
+}

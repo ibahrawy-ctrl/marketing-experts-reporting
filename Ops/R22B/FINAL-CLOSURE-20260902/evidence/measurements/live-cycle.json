@@ -1,0 +1,113 @@
+{
+  "employeeLogin": "OK",
+  "employeeTextareas": [
+    {
+      "ph": "",
+      "rows": 3
+    },
+    {
+      "ph": "",
+      "rows": 3
+    },
+    {
+      "ph": "",
+      "rows": 2
+    }
+  ],
+  "typedIntoField": {
+    "lines": 3
+  },
+  "saveButtonPresent": false,
+  "persistedAfterReload": {
+    "found": false
+  },
+  "submitButtonPresent": true,
+  "statusAfterSubmit": [],
+  "leadLogin": "OK",
+  "queueTabFound": true,
+  "queueBefore": {
+    "rows": 1,
+    "emptyText": false
+  },
+  "approvalCard": {
+    "present": true,
+    "textareas": [
+      {
+        "ph": "اكتب سبب القرار…",
+        "rows": 4,
+        "resize": "vertical"
+      },
+      {
+        "ph": "اكتب ملاحظتك الإدارية على هذا السياق…",
+        "rows": 3,
+        "resize": "vertical"
+      }
+    ]
+  },
+  "commentFieldFound": true,
+  "typedComment": {
+    "lines": 3,
+    "matchesIntended": true,
+    "raw": "سطر أوّل — قياس حيّ 569057\\nسطر ثانٍ — Q3/2026 · 45.7% ✓ (طويل)\\nthird line <b>&amp;</b> 123",
+    "scrollH": 96,
+    "clientH": 96,
+    "tag": "TEXTAREA"
+  },
+  "returnButtonFound": true,
+  "queueAfter": {
+    "rows": 0,
+    "emptyText": true
+  },
+  "commentRendered": {
+    "matched": 1,
+    "measures": [
+      {
+        "renderedLines": 8,
+        "whiteSpace": "pre-wrap",
+        "overflowWrap": "break-word",
+        "direction": "rtl",
+        "textLines": 3,
+        "sample": "سطر أوّل — قياس حيّ 569057\\nسطر ثانٍ — Q3/2026 · 45.7% ✓ (طويل)\\nthird line <b>&amp;</b> 123"
+      }
+    ]
+  },
+  "notifications": {
+    "total": 4,
+    "multiline": [
+      {
+        "renderedLines": 8,
+        "whiteSpace": "pre-wrap",
+        "overflowWrap": "break-word",
+        "direction": "rtl",
+        "textLines": 3,
+        "sample": "سطر أوّل — قياس حيّ 569057\\nسطر ثانٍ — Q3/2026 · 45.7% ✓ (طويل)\\nthird line <b>&amp;</b> 123"
+      },
+      {
+        "renderedLines": 9,
+        "whiteSpace": "pre-wrap",
+        "overflowWrap": "break-word",
+        "direction": "rtl",
+        "textLines": 3,
+        "sample": "السطر الأول — R22BML-design — سبب القرار\\nالسطر الثاني — Q3/2026 · 45.7% ✓ (مقبول)\\nالسطر ال"
+      },
+      {
+        "renderedLines": 9,
+        "whiteSpace": "pre-wrap",
+        "overflowWrap": "break-word",
+        "direction": "rtl",
+        "textLines": 3,
+        "sample": "السطر الأول — R22BML-design — سبب القرار\\nالسطر الثاني — Q3/2026 · 45.7% ✓ (مقبول)\\nالسطر ال"
+      },
+      {
+        "renderedLines": 9,
+        "whiteSpace": "pre-wrap",
+        "overflowWrap": "break-word",
+        "direction": "rtl",
+        "textLines": 3,
+        "sample": "السطر الأول — R22BML-design — سبب القرار\\nالسطر الثاني — Q3/2026 · 45.7% ✓ (مقبول)\\nالسطر ال"
+      }
+    ]
+  },
+  "stamp": "569057",
+  "intendedComment": "سطر أوّل — قياس حيّ 569057\\nسطر ثانٍ — Q3/2026 · 45.7% ✓ (طويل)\\nthird line <b>&amp;</b> 123"
+}

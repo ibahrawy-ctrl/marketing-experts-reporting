@@ -1,0 +1,15 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  Reporting.Domain -> /private/tmp/r22b-final-closure-20260902/reporting-backend/src/Reporting.Domain/bin/Debug/net8.0/Reporting.Domain.dll
+  Reporting.Application -> /private/tmp/r22b-final-closure-20260902/reporting-backend/src/Reporting.Application/bin/Debug/net8.0/Reporting.Application.dll
+  Reporting.Infrastructure -> /private/tmp/r22b-final-closure-20260902/reporting-backend/src/Reporting.Infrastructure/bin/Debug/net8.0/Reporting.Infrastructure.dll
+  Reporting.Api -> /private/tmp/r22b-final-closure-20260902/reporting-backend/src/Reporting.Api/bin/Debug/net8.0/Reporting.Api.dll
+  Reporting.IntegrationTests -> /private/tmp/r22b-final-closure-20260902/reporting-backend/tests/Reporting.IntegrationTests/bin/Debug/net8.0/Reporting.IntegrationTests.dll
+Test run for /private/tmp/r22b-final-closure-20260902/reporting-backend/tests/Reporting.IntegrationTests/bin/Debug/net8.0/Reporting.IntegrationTests.dll (.NETCoreApp,Version=v8.0)
+VSTest version 17.11.1 (arm64)
+
+Starting test execution, please wait...
+A total of 1 test files matched the specified pattern.
+
+Passed!  - Failed:     0, Passed:  2311, Skipped:     0, Total:  2311, Duration: 11 m 42 s - Reporting.IntegrationTests.dll (net8.0)
+EXIT=0

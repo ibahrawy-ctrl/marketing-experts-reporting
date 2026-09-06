@@ -1,0 +1,49 @@
+
+> reporting-frontend@0.0.0 build
+> tsc -b && vite build
+
+vite v8.0.16 building client environment for production...
+transforming...✓ 296 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     0.85 kB │ gzip:   0.50 kB
+dist/assets/index-ENWa4a-J.css     35.67 kB │ gzip:   7.32 kB
+dist/assets/index-CpDO9pG-.js   1,668.58 kB │ gzip: 364.31 kB
+
+[INVALID_ANNOTATION] A comment "/*#__PURE__*/" in "node_modules/@microsoft/signalr/dist/esm/Utils.js" contains an annotation that Rolldown cannot interpret due to the position of the comment.
+     ╭─[ node_modules/@microsoft/signalr/dist/esm/Utils.js:190:1 ]
+     │
+ 190 │ /*#__PURE__*/ function getOsName() {
+     │ ──────┬──────  
+     │       ╰──────── comment ignored due to position
+     │ 
+     │ Help: For more information on how to use pure annotations correctly, check the documentation: https://rolldown.rs/in-depth/dead-code-elimination#pure
+─────╯
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[INVALID_ANNOTATION] A comment "/*#__PURE__*/" in "node_modules/@microsoft/signalr/dist/esm/Utils.js" contains an annotation that Rolldown cannot interpret due to the position of the comment.
+     ╭─[ node_modules/@microsoft/signalr/dist/esm/Utils.js:208:1 ]
+     │
+ 208 │ /*#__PURE__*/ function getRuntimeVersion() {
+     │ ──────┬──────  
+     │       ╰──────── comment ignored due to position
+     │ 
+     │ Help: For more information on how to use pure annotations correctly, check the documentation: https://rolldown.rs/in-depth/dead-code-elimination#pure
+─────╯
+
+✓ built in 1.81s
+BUILD_EXIT=0
+R22B-MULTILINE-RESTORE · فحص الحزمة: dist/assets (1 ملفّ JS)
+  [PASS] MULTILINE_ELEMENT — حقل تعليق التقرير عنصر متعدّد الأسطر (textarea) لا <input type="text"> · anchors=1 · textarea=true · rows:4=true
+  [PASS] RESIZE_Y — الصنف resize-y حاضر (تمدّد رأسيّ للحقل) · occurrences=1
+  [PASS] WHITESPACE_PRE_WRAP — whitespace-pre-wrap حاضر (حفظ الأسطر عند العرض) · occurrences=27
+  [PASS] BREAK_WORDS — break-words حاضر مقترنًا بـpre-wrap (منع التجاوز الأفقيّ) · pre-wrap+break-words=4
+  [PASS] COMMENT_FIELD_PRESENT — حقل «ملاحظة / سبب» ما زال موجودًا في الحزمة · occurrences=2
+  [PASS] NO_ENTER_BLOCKER — لا معالج لوحة مفاتيح ولا preventDefault في جوار حقل تعليق التقرير · anchors=1 · blocker=none
+  [PASS] NO_SECRETS — لا مفاتيح خاصّة ولا توكنات JWT مضمَّنة في الحزمة · none
+BUNDLE_MULTILINE_GATE=PASS
+GATE_EXIT=0
