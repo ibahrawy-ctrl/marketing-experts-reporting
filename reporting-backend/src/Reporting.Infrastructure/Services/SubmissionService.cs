@@ -463,7 +463,12 @@ public class SubmissionService : ISubmissionService
     /// يُستبعَد المقدّم نفسه في كل خطوة (منع اعتماد الذات). يُرجِع null فقط عند انعدام أي بديل صالح
     /// (كمقدّم من الطبقة العليا بلا مدير) ⇒ عندها يُغلق التسليم مباشرة.
     /// </summary>
-    private async Task<Guid?> ResolveFirstApproverAsync(Guid submitterId, Guid? submitterTeamId, Guid? submitterManagerId, CancellationToken ct)
+    /// <param name="excludeUserId">
+    /// RPT-APPROVER-INTEGRITY-01 — معرّف يُستبعَد من كلّ حلقات السلسلة (المستخدم الجاري تعطيله).
+    /// يُمرَّر أثناء التخطيط قبل كتابة IsActive=false كي تتطابق الخطّة مع التطبيق بعدها.
+    /// </param>
+    private async Task<Guid?> ResolveFirstApproverAsync(Guid submitterId, Guid? submitterTeamId, Guid? submitterManagerId,
+        CancellationToken ct, Guid? excludeUserId = null)
     {
         // تجاوز خطوة قائد الفريق (Direct Reporting Override): قاعدة عامة — إن كان المقدّم مضبوطًا على
         // BypassTeamLeaderApproval=true فلا قائد فريق فعلي له في مسار اعتماد التقارير رغم بقائه ضمن فريق
@@ -478,12 +483,12 @@ public class SubmissionService : ISubmissionService
                 .Where(t => t.Id == teamId && t.IsActive)
                 .Select(t => t.TeamLeaderId)
                 .FirstOrDefaultAsync(ct);
-            if (tlId is Guid tl && tl != submitterId && await IsActiveUserAsync(tl, ct))
+            if (tlId is Guid tl && tl != submitterId && tl != excludeUserId && await IsActiveUserAsync(tl, ct))
                 return tl;
         }
 
         // 2) المدير المباشر (ManagerId نشط وليس المقدّم نفسه).
-        if (submitterManagerId is Guid mgr && mgr != submitterId && await IsActiveUserAsync(mgr, ct))
+        if (submitterManagerId is Guid mgr && mgr != submitterId && mgr != excludeUserId && await IsActiveUserAsync(mgr, ct))
             return mgr;
 
         // 3) إن لم يكن المقدّم ضمن الطبقة العليا: تصعيد عام لأول مدير عام ثم أول Admin/CEO.
@@ -491,6 +496,7 @@ public class SubmissionService : ISubmissionService
         if (!submitterIsSenior)
         {
             var exclude = new HashSet<Guid> { submitterId };
+            if (excludeUserId is Guid ex) exclude.Add(ex);
             var gm = await FirstActiveUserInRoleAsync(GeneralManagerRoles, exclude, ct);
             if (gm is Guid g) return g;
             var top = await FirstActiveUserInRoleAsync(FinalFallbackRoles, exclude, ct);
@@ -784,6 +790,160 @@ public class SubmissionService : ISubmissionService
 
         var dto = await BuildDtoAsync(submissionId, ct);
         return Result<SubmissionDto>.Success(dto);
+    }
+
+    // ===== RPT-APPROVER-INTEGRITY-01 — سلامة مسار الاعتماد بعد تغيّر التنظيم =====
+    //
+    // السبب الجذريّ: المعتمِد الحاليّ لقطة تُلتقَط لحظة التسليم ولا يُعاد توجيهها أبدًا عند تعطيل
+    // المعتمِد أو حذفه صلبًا لاحقًا. القوائم تُرشَّح بـ CurrentApproverId == userId ⇒ التسليم يصير
+    // غير مرئيّ لأيّ مراجع فيبقى عالقًا بلا إشارة. العلاج طبقتان: منع النشوء (حارس التعطيل أدناه
+    // في DirectoryService) + سطح إنقاذ يكشف ما نشأ سابقًا.
+
+    /// <summary>الحالات المفتوحة التي يُفترض أن يكون لها معتمِد حاليّ فعّال (Returned مستثناة بالتصميم).</summary>
+    private static readonly SubmissionStatus[] AwaitingApprovalStatuses =
+    {
+        SubmissionStatus.Submitted,
+        SubmissionStatus.ApprovedByDirectManager,
+        SubmissionStatus.ApprovedByNextLevel,
+        SubmissionStatus.Escalated
+    };
+
+    public async Task<Result<ApproverIntegrityReportDto>> GetApproverIntegrityIssuesAsync(CancellationToken ct = default)
+    {
+        if (_currentUser.UserId is null)
+            return Result<ApproverIntegrityReportDto>.Failure("غير مصرّح.", "auth.unauthenticated");
+        if (!_currentUser.IsInAnyRole(Roles.AdminReportKpiDeleters))
+            return Result<ApproverIntegrityReportDto>.Failure(
+                "سطح إنقاذ الاعتمادات العالقة من صلاحية مدير النظام أو الرئيس التنفيذي أو المدير العام فقط.", "auth.forbidden");
+
+        // المرشّح الافتراضيّ يستبعد المحذوف إداريًّا (Global Query Filter على IsDeleted) — وهو المطلوب:
+        // التسليم المحذوف إداريًّا صُفِّر معتمِده عمدًا ولا يجوز أن يظهر كخلل ولا أن يُعاد توجيهه.
+        var rows = await _db.ReportSubmissions.AsNoTracking()
+            .Where(s => AwaitingApprovalStatuses.Contains(s.Status)
+                        && (s.CurrentApproverId == null
+                            || !_db.Users.Any(u => u.Id == s.CurrentApproverId && u.IsActive)))
+            .Select(s => new
+            {
+                s.Id,
+                s.SubmitterId,
+                SubmitterName = _db.Users.Where(u => u.Id == s.SubmitterId).Select(u => u.FullName).FirstOrDefault(),
+                SubmitterIsActive = _db.Users.Where(u => u.Id == s.SubmitterId).Select(u => u.IsActive).FirstOrDefault(),
+                SubmitterTeamId = _db.Users.Where(u => u.Id == s.SubmitterId).Select(u => u.TeamId).FirstOrDefault(),
+                SubmitterManagerId = _db.Users.Where(u => u.Id == s.SubmitterId).Select(u => u.ManagerId).FirstOrDefault(),
+                s.TeamId,
+                TeamName = _db.Teams.Where(t => t.Id == s.TeamId).Select(t => t.NameAr).FirstOrDefault(),
+                s.PeriodType,
+                s.PeriodKey,
+                s.Status,
+                s.CurrentApproverId,
+                ApproverName = _db.Users.Where(u => u.Id == s.CurrentApproverId).Select(u => u.FullName).FirstOrDefault(),
+                ApproverExists = _db.Users.Any(u => u.Id == s.CurrentApproverId),
+                s.SubmittedAtUtc
+            })
+            .ToListAsync(ct);
+
+        var now = _clock.UtcNow.UtcDateTime;
+        var items = new List<ApproverIntegrityIssueDto>(rows.Count);
+        foreach (var r in rows)
+        {
+            var kind = r.CurrentApproverId is null
+                ? ApproverIssueKind.NullApprover
+                : r.ApproverExists ? ApproverIssueKind.InactiveApprover : ApproverIssueKind.OrphanApprover;
+
+            // المعتمِد البديل المقترَح يُحسَب بنفس سلسلة APPROVAL-FALLBACK-R1 مع استبعاد المعتمِد المعطوب.
+            var suggested = await ResolveFirstApproverAsync(
+                r.SubmitterId, r.SubmitterTeamId, r.SubmitterManagerId, ct, excludeUserId: r.CurrentApproverId);
+
+            items.Add(new ApproverIntegrityIssueDto(
+                r.Id, kind, r.SubmitterId, r.SubmitterName ?? string.Empty, r.SubmitterIsActive,
+                r.TeamId, r.TeamName, r.PeriodType, r.PeriodKey, r.Status,
+                r.CurrentApproverId, r.ApproverName,
+                r.SubmittedAtUtc,
+                r.SubmittedAtUtc is DateTime at ? Math.Max(0, (int)(now - at).TotalDays) : 0,
+                suggested,
+                suggested is Guid sid
+                    ? await _db.Users.Where(u => u.Id == sid).Select(u => u.FullName).FirstOrDefaultAsync(ct)
+                    : null));
+        }
+
+        items = items.OrderByDescending(i => i.StalledDays).ThenBy(i => i.SubmissionId).ToList();
+        return Result<ApproverIntegrityReportDto>.Success(new ApproverIntegrityReportDto(
+            items, items.Count,
+            items.Count(i => i.Kind == ApproverIssueKind.NullApprover),
+            items.Count(i => i.Kind == ApproverIssueKind.InactiveApprover),
+            items.Count(i => i.Kind == ApproverIssueKind.OrphanApprover)));
+    }
+
+    public async Task<Result<ApproverRerouteReportDto>> RerouteApprovalsForDeactivatedUserAsync(
+        Guid leavingUserId, Guid actingUserId, bool dryRun, CancellationToken ct = default)
+    {
+        // نطاق العمل: التسليمات المفتوحة التي المغادِر معتمِدها الحاليّ فقط.
+        // • Returned بلا معتمِد حاليّ مستثناة تصميمًا (لا يطابقها الشرط أصلًا، والحالة مستبعدة صراحةً).
+        // • المغلقة والمسودّات مستبعدة بالحالة، والمحذوفة إداريًّا مستبعدة بالمرشّح العامّ.
+        var affected = await _db.ReportSubmissions
+            .Include(s => s.ApprovalSteps)
+            .Where(s => s.CurrentApproverId == leavingUserId && AwaitingApprovalStatuses.Contains(s.Status))
+            .ToListAsync(ct);
+
+        var items = new List<ApproverRerouteItemDto>(affected.Count);
+        var now = DateTime.UtcNow;
+        var notify = new List<(Guid ApproverId, Guid SubmissionId)>();
+
+        foreach (var s in affected)
+        {
+            var submitter = await _db.Users.AsNoTracking().Where(u => u.Id == s.SubmitterId)
+                .Select(u => new { u.TeamId, u.ManagerId }).FirstOrDefaultAsync(ct);
+
+            var target = await ResolveFirstApproverAsync(
+                s.SubmitterId, submitter?.TeamId, submitter?.ManagerId, ct, excludeUserId: leavingUserId);
+
+            if (target is not Guid to || to == leavingUserId)
+            {
+                items.Add(new ApproverRerouteItemDto(s.Id, leavingUserId, null, false));
+                continue;
+            }
+
+            items.Add(new ApproverRerouteItemDto(s.Id, leavingUserId, to, true));
+            if (dryRun) continue;
+
+            s.CurrentApproverId = to;
+            s.UpdatedAtUtc = now;
+            foreach (var step in s.ApprovalSteps.Where(a => a.Status == ApprovalStatus.Pending && a.ApproverId == leavingUserId))
+                step.ApproverId = to;
+            notify.Add((to, s.Id));
+        }
+
+        var reroutedCount = items.Count(i => i.Rerouted);
+        var failedCount = items.Count - reroutedCount;
+
+        if (!dryRun && reroutedCount > 0)
+        {
+            await _db.SaveChangesAsync(ct);
+            foreach (var (approverId, submissionId) in notify)
+                await _notifications.NotifyAsync(approverId, "submission.approver_rerouted",
+                    "تقرير أُعيد توجيهه لاعتمادك", null, $"/app/submissions?open={submissionId}", ct);
+            await _audit.LogAsync(actingUserId, "approval.rerouted", nameof(ReportSubmission), null,
+                JsonSerializer.Serialize(new
+                {
+                    leavingUserId,
+                    reroutedCount,
+                    items = items.Where(i => i.Rerouted)
+                        .Select(i => new { submissionId = i.SubmissionId, from = i.FromApproverId, to = i.ToApproverId })
+                }), ct: ct);
+        }
+
+        if (failedCount > 0)
+            await _audit.LogAsync(actingUserId, "approval.reroute_failed", nameof(ReportSubmission), null,
+                JsonSerializer.Serialize(new
+                {
+                    leavingUserId,
+                    dryRun,
+                    failedCount,
+                    submissionIds = items.Where(i => !i.Rerouted).Select(i => i.SubmissionId)
+                }), ct: ct);
+
+        return Result<ApproverRerouteReportDto>.Success(
+            new ApproverRerouteReportDto(leavingUserId, dryRun, items, reroutedCount, failedCount));
     }
 
     public async Task<Result<IReadOnlyList<SubmissionListItemDto>>> ListAsync(SubmissionFilter filter, CancellationToken ct = default)

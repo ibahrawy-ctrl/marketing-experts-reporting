@@ -34,4 +34,22 @@ public interface ISubmissionService
     /// فيختفي التقرير من كل القوائم والتجميعات ومن «بانتظار اعتمادي». لا حذف صفوف.
     /// </summary>
     Task<Result<SubmissionDto>> AdminDeleteAsync(Guid submissionId, AdminDeleteRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// RPT-APPROVER-INTEGRITY-01 — سطح الإنقاذ الإداريّ (قراءة فقط، Admin/CEO/GM):
+    /// يعرض كلّ تسليم مفتوح لا يظهر في «بانتظار اعتمادي» لأيّ مستخدم — معتمِد فارغ (NULL)،
+    /// أو معتمِد معطَّل، أو مرجع معتمِد يتيم — مع عمر التعطّل والمعتمِد البديل المقترَح.
+    /// تُستبعَد التسليمات المغلقة والمسودّات والمحذوفة إداريًّا، وتُستبعَد Returned لأنّ خلوّها
+    /// من معتمِد حاليّ سلوك مصمَّم لا خلل.
+    /// </summary>
+    Task<Result<ApproverIntegrityReportDto>> GetApproverIntegrityIssuesAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// RPT-APPROVER-INTEGRITY-01 — إعادة توجيه التسليمات المعلّقة عند معتمِد يجري تعطيله،
+    /// وفق نفس سلسلة APPROVAL-FALLBACK-R1 مع استبعاد المغادِر. عمليّة داخليّة تستدعيها إدارة
+    /// الدليل التنظيميّ (التفويض مضمون عند نقطة الاستدعاء)، وهي Idempotent: الاستدعاء الثاني
+    /// لا يجد أيّ تسليم فيُرجِع صفرًا. <paramref name="dryRun"/> يخطّط بلا أيّ كتابة.
+    /// </summary>
+    Task<Result<ApproverRerouteReportDto>> RerouteApprovalsForDeactivatedUserAsync(
+        Guid leavingUserId, Guid actingUserId, bool dryRun, CancellationToken ct = default);
 }

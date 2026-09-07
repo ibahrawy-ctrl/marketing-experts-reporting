@@ -96,4 +96,13 @@ public class SubmissionsController : ApiControllerBase
     [Authorize(Policy = Policies.AdminReportDelete)]
     public async Task<IActionResult> AdminDelete(Guid id, AdminDeleteRequest request, CancellationToken ct)
         => FromResult(await _service.AdminDeleteAsync(id, request, ct));
+
+    /// <summary>
+    /// RPT-APPROVER-INTEGRITY-01 — سطح الإنقاذ الإداريّ (قراءة فقط، Admin/CEO/GM):
+    /// التسليمات المفتوحة بمعتمِد فارغ أو معطَّل أو مرجع يتيم، مع عمر التعطّل والبديل المقترَح.
+    /// </summary>
+    [HttpGet("approver-integrity")]
+    [Authorize(Policy = Policies.AdminReportDelete)]
+    public async Task<IActionResult> ApproverIntegrity(CancellationToken ct)
+        => FromResult(await _service.GetApproverIntegrityIssuesAsync(ct));
 }

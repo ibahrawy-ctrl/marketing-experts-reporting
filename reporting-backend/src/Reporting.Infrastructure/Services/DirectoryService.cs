@@ -9,6 +9,7 @@ using Reporting.Application.Common;
 using Reporting.Application.Directory;
 using Reporting.Domain.Entities.Org;
 using Reporting.Application.Security;
+using Reporting.Application.Submissions;
 using Reporting.Domain.Enums;
 using Reporting.Infrastructure.Identity;
 using Reporting.Infrastructure.Persistence;
@@ -21,13 +22,16 @@ public class DirectoryService : IDirectoryService
     private readonly UserManager<ApplicationUser> _users;
     private readonly IScopeResolver _scope;
     private readonly IAuditService _audit;
+    private readonly ISubmissionService _submissions;
 
-    public DirectoryService(AppDbContext db, UserManager<ApplicationUser> users, IScopeResolver scope, IAuditService audit)
+    public DirectoryService(AppDbContext db, UserManager<ApplicationUser> users, IScopeResolver scope,
+        IAuditService audit, ISubmissionService submissions)
     {
         _db = db;
         _users = users;
         _scope = scope;
         _audit = audit;
+        _submissions = submissions;
     }
 
     // ===== DEF-P123-001/002 — تفرّد وحدات الدليل التنظيميّ =====
@@ -600,6 +604,25 @@ public class DirectoryService : IDirectoryService
                 return Result<DirectoryUserDto>.Failure("لا يمكن تعطيل آخر مدير نظام نشط.", "user.last_admin.conflict");
         }
 
+        // RPT-APPROVER-INTEGRITY-01 — حارس التعطيل: قبل إتمام أيّ تعطيل، تُكتشَف الاعتمادات المعلّقة
+        // عند المستخدم وتُخطَّط إعادة توجيهها وفق APPROVAL-FALLBACK-R1 مع استبعاده. السياسة الموثّقة:
+        // إمّا بديل صالح لكلّ تسليم فيُعاد التوجيه تلقائيًّا، وإمّا يُحجَب التعطيل — كي لا يُنتَج أبدًا
+        // تسليم مفتوح لا يظهر في «بانتظار اعتمادي» لأيّ مراجع (وهو السبب الجذريّ للتسليمات العالقة).
+        var isDeactivating = user.IsActive && !req.IsActive;
+        ApproverRerouteReportDto? reroutePlan = null;
+        if (isDeactivating)
+        {
+            var plan = await _submissions.RerouteApprovalsForDeactivatedUserAsync(userId, actingUserId, dryRun: true, ct);
+            if (!plan.Succeeded)
+                return Result<DirectoryUserDto>.Failure(plan.Error ?? "تعذّر فحص الاعتمادات المعلّقة.", plan.ErrorCode ?? "user.deactivate.reroute_check_failed");
+            reroutePlan = plan.Value!;
+            if (reroutePlan.FailedCount > 0)
+                return Result<DirectoryUserDto>.Failure(
+                    $"لا يمكن تعطيل هذا المستخدم: لديه {reroutePlan.FailedCount} تسليمًا معلّقًا بلا معتمِد بديل صالح. "
+                    + "عيّن قائد فريق أو مديرًا مباشرًا نشطًا لمقدّمي هذه التقارير أوّلًا.",
+                    "user.deactivate.pending_approvals.conflict");
+        }
+
         if (req.ManagerId == userId)
             return Result<DirectoryUserDto>.Failure("لا يمكن أن يكون المستخدم مديرًا لنفسه.", "user.manager.self.conflict");
 
@@ -631,6 +654,21 @@ public class DirectoryService : IDirectoryService
         var upd = await _users.UpdateAsync(user);
         if (!upd.Succeeded)
             return Result<DirectoryUserDto>.Failure(string.Join("; ", upd.Errors.Select(e => e.Description)), "user.update_failed.conflict");
+
+        // بعد ثبوت التعطيل في القاعدة: تُطبَّق إعادة التوجيه المخطَّطة (Idempotent) ويُسجَّل أثر تدقيقيّ
+        // صريح للتعطيل نفسه — كان غائبًا تمامًا قبل هذا الإصلاح فتعذّر تأريخ أيّ تعطيل سابق.
+        if (isDeactivating)
+        {
+            var applied = await _submissions.RerouteApprovalsForDeactivatedUserAsync(userId, actingUserId, dryRun: false, ct);
+            await _audit.LogAsync(actingUserId, "user.deactivated", "User", userId,
+                JsonSerializer.Serialize(new
+                {
+                    targetEmail = user.Email,
+                    plannedReroutes = reroutePlan?.ReroutedCount ?? 0,
+                    appliedReroutes = applied.Value?.ReroutedCount ?? 0,
+                    failedReroutes = applied.Value?.FailedCount ?? 0
+                }), null, ct);
+        }
 
         var roles = (await _users.GetRolesAsync(user)).ToList();
         return Result<DirectoryUserDto>.Success(new DirectoryUserDto(
@@ -845,6 +883,20 @@ public class DirectoryService : IDirectoryService
                 return Result.Failure("لا يمكن حذف آخر مدير نظام في المنظومة.", "user.last_admin.conflict");
         }
 
+        // RPT-APPROVER-INTEGRITY-01 — منع الحذف الصلب عند وجود مراجع تشغيليّة.
+        // الحذف الصلب السابق كان يفكّ ارتباط الفرق/الإدارات/الإدارة المباشرة لكنّه لا يمسّ توجيه
+        // التسليمات، فيبقى ReportSubmissions.CurrentApproverId و ApprovalSteps.ApproverId مرجعًا
+        // يتيمًا لصفّ غير موجود ⇒ تسليم عالق لا يملك أحد اعتماده ولا يظهر لأحد. البديل الحوكميّ:
+        // التعطيل (IsActive=false) الذي يحفظ السلامة المرجعيّة التاريخيّة ويعيد التوجيه تلقائيًّا.
+        var refSubmissions = await _db.ReportSubmissions.IgnoreQueryFilters()
+            .CountAsync(s => s.SubmitterId == userId || s.CurrentApproverId == userId, ct);
+        var refSteps = await _db.ApprovalSteps.IgnoreQueryFilters().CountAsync(a => a.ApproverId == userId, ct);
+        if (refSubmissions > 0 || refSteps > 0)
+            return Result.Failure(
+                $"لا يمكن حذف هذا المستخدم نهائيًّا: مرتبط بـ{refSubmissions} تسليمًا و{refSteps} خطوة اعتماد. "
+                + "عطّل الحساب بدل حذفه للحفاظ على السلامة المرجعيّة التاريخيّة.",
+                "user.delete.operational_references.conflict");
+
         // تنظيف المراجع: رموز التجديد + قيادة الفرق/الإدارات + علاقة الإدارة.
         await _db.RefreshTokens.Where(t => t.UserId == userId).ExecuteDeleteAsync(ct);
         await _db.Teams.Where(t => t.TeamLeaderId == userId)
@@ -854,9 +906,13 @@ public class DirectoryService : IDirectoryService
         await _db.Users.Where(u => u.ManagerId == userId)
             .ExecuteUpdateAsync(s => s.SetProperty(u => u.ManagerId, (Guid?)null), ct);
 
+        var targetEmail = user.Email;
         var del = await _users.DeleteAsync(user);
         if (!del.Succeeded)
             return Result.Failure(string.Join("; ", del.Errors.Select(e => e.Description)), "user.delete_failed.conflict");
+
+        await _audit.LogAsync(actingUserId, "user.deleted", "User", userId,
+            JsonSerializer.Serialize(new { targetEmail }), null, ct);
 
         return Result.Success();
     }

@@ -207,3 +207,61 @@ public sealed record UnifiedSubmissionOverviewDto(
     int Page,
     int PageSize,
     int TotalCount);
+
+// ===== RPT-APPROVER-INTEGRITY-01 — سلامة مسار الاعتماد بعد تغيّر التنظيم =====
+
+/// <summary>نوع خلل سلامة المعتمِد لتسليم مفتوح.</summary>
+public enum ApproverIssueKind
+{
+    /// <summary>تسليم مفتوح بلا معتمِد حاليّ إطلاقًا (لا يشمل Returned المصمَّمة بلا معتمِد).</summary>
+    NullApprover = 1,
+    /// <summary>المعتمِد الحاليّ موجود لكنّه معطَّل (IsActive=false).</summary>
+    InactiveApprover = 2,
+    /// <summary>المعتمِد الحاليّ مرجع يتيم — صفّ المستخدم غير موجود (حذف صلب سابق).</summary>
+    OrphanApprover = 3
+}
+
+/// <summary>صفّ واحد في سطح الإنقاذ الإداريّ: تسليم عالق لا يظهر في «بانتظار اعتمادي» لأيّ مستخدم.</summary>
+public sealed record ApproverIntegrityIssueDto(
+    Guid SubmissionId,
+    ApproverIssueKind Kind,
+    Guid SubmitterId,
+    string SubmitterName,
+    bool SubmitterIsActive,
+    Guid? TeamId,
+    string? TeamName,
+    PeriodType PeriodType,
+    string PeriodKey,
+    SubmissionStatus Status,
+    Guid? CurrentApproverId,
+    string? CurrentApproverName,
+    DateTime? SubmittedAtUtc,
+    int StalledDays,
+    Guid? SuggestedApproverId,
+    string? SuggestedApproverName);
+
+/// <summary>حصيلة سطح الإنقاذ: الصفوف + الإجمالي + التوزيع حسب نوع الخلل.</summary>
+public sealed record ApproverIntegrityReportDto(
+    IReadOnlyList<ApproverIntegrityIssueDto> Items,
+    int TotalCount,
+    int NullApproverCount,
+    int InactiveApproverCount,
+    int OrphanApproverCount);
+
+/// <summary>نتيجة إعادة توجيه تسليم واحد عن معتمِد مغادِر.</summary>
+public sealed record ApproverRerouteItemDto(
+    Guid SubmissionId,
+    Guid? FromApproverId,
+    Guid? ToApproverId,
+    bool Rerouted);
+
+/// <summary>
+/// خطّة/حصيلة إعادة التوجيه لمستخدم يجري تعطيله. <c>Rerouted=false</c> يعني انعدام أيّ معتمِد
+/// بديل صالح وفق APPROVAL-FALLBACK-R1 ⇒ التعطيل يُحجَب كي لا يُنتَج تسليم غير مرئيّ لأيّ مراجع.
+/// </summary>
+public sealed record ApproverRerouteReportDto(
+    Guid LeavingUserId,
+    bool DryRun,
+    IReadOnlyList<ApproverRerouteItemDto> Items,
+    int ReroutedCount,
+    int FailedCount);
