@@ -493,21 +493,33 @@ public class ObsR5OneDualTrackContractTests
         // ولا أثر ربط جديد في الجولة التالية — فلا «تغيير صامت» ولا حتّى ضجيج سجلّ بلا تغيير.
         Assert.Equal(auditsAfterRebind.Count, (await BindingAuditsAsync()).Count);
 
-        // وحارس النشر ليس متجاوَزًا: كلّ قالب منشور له إصدار منشور بمؤشّرات مجموع أوزانها 100.
-        var published = await db.KpiTemplates.AsNoTracking()
-            .Where(t => t.Status == TemplateStatus.Published)
-            .Select(t => new
+        // وحارس النشر ليس متجاوَزًا. والعهد المقيس هنا **لكلّ إصدار منشور على حدة** لا لكلّ قالب:
+        // `KpiTemplateService.PublishVersionAsync` يرفض نشر إصدار مجموع أوزانه ≠ 100، ولا يُلغي نشر
+        // الإصدارات السابقة — فتعدّد الإصدارات المنشورة للقالب الواحد حالة سليمة مقصودة (التقييمات
+        // التاريخيّة تبقى مقروءة بإصداراتها). تسطيح المؤشّرات عبر إصدارات القالب كان يجمع 100+100=200
+        // فيقرأ حالةً سليمة عيبًا. ولكلّ قالب منشور يبقى شرط وجود إصدار منشور واحد على الأقلّ قائمًا.
+        var publishedVersions = await db.KpiTemplateVersions.AsNoTracking()
+            .Where(v => v.IsPublished && v.KpiTemplate!.Status == TemplateStatus.Published)
+            .Select(v => new
             {
-                t.Title,
-                Weights = t.Versions.Where(v => v.IsPublished).SelectMany(v => v.Metrics).Select(m => m.Weight).ToList()
+                v.KpiTemplate!.Title,
+                v.VersionNumber,
+                Weights = v.Metrics.Select(m => m.Weight).ToList()
             })
             .ToListAsync();
-        Assert.NotEmpty(published);
-        Assert.All(published, p =>
+        Assert.NotEmpty(publishedVersions);
+        Assert.All(publishedVersions, p =>
         {
             Assert.NotEmpty(p.Weights);
             Assert.Equal(100m, p.Weights.Sum());
         });
+
+        var publishedTitles = await db.KpiTemplates.AsNoTracking()
+            .Where(t => t.Status == TemplateStatus.Published)
+            .Select(t => t.Title)
+            .ToListAsync();
+        Assert.NotEmpty(publishedTitles);
+        Assert.All(publishedTitles, title => Assert.Contains(publishedVersions, p => p.Title == title));
     }
 
     // ============ المسار الأوّليّ بلا طلب صريح — أخصّ الإسنادين لا نوع المسار ============
