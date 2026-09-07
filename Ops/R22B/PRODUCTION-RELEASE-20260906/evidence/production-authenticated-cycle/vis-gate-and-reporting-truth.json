@@ -1,0 +1,142 @@
+{
+ "employee/1440/my-reports": {
+  "dir": "rtl",
+  "docOverflow": 0,
+  "strayOutsideScrollers": 0,
+  "scrollContainers": 0,
+  "spinners": 0
+ },
+ "employee/1440/scope-list": {
+  "dir": "rtl",
+  "docOverflow": 0,
+  "strayOutsideScrollers": 0,
+  "scrollContainers": 0,
+  "spinners": 0
+ },
+ "employee/1440/canary-detail": {
+  "dir": "rtl",
+  "docOverflow": 0,
+  "strayOutsideScrollers": 0,
+  "scrollContainers": 1,
+  "spinners": 0
+ },
+ "employee/1440/project360": {
+  "dir": "rtl",
+  "docOverflow": 0,
+  "strayOutsideScrollers": 0,
+  "scrollContainers": 1,
+  "spinners": 0
+ },
+ "employee/1440/calendar": {
+  "dir": "rtl",
+  "docOverflow": 0,
+  "strayOutsideScrollers": 0,
+  "scrollContainers": 0,
+  "spinners": 0
+ },
+ "employee/390/my-reports": {
+  "dir": "rtl",
+  "docOverflow": 0,
+  "strayOutsideScrollers": 0,
+  "scrollContainers": 0,
+  "spinners": 0
+ },
+ "employee/390/scope-list": {
+  "dir": "rtl",
+  "docOverflow": 0,
+  "strayOutsideScrollers": 0,
+  "scrollContainers": 0,
+  "spinners": 0
+ },
+ "employee/390/canary-detail": {
+  "dir": "rtl",
+  "docOverflow": 0,
+  "strayOutsideScrollers": 0,
+  "scrollContainers": 1,
+  "spinners": 0
+ },
+ "employee/390/project360": {
+  "dir": "rtl",
+  "docOverflow": 0,
+  "strayOutsideScrollers": 0,
+  "scrollContainers": 1,
+  "spinners": 0
+ },
+ "employee/390/calendar": {
+  "dir": "rtl",
+  "docOverflow": 0,
+  "strayOutsideScrollers": 0,
+  "scrollContainers": 0,
+  "spinners": 0
+ },
+ "leader/1440/my-reports": {
+  "dir": "rtl",
+  "docOverflow": 0,
+  "strayOutsideScrollers": 0,
+  "scrollContainers": 0,
+  "spinners": 0
+ },
+ "leader/1440/scope-list": {
+  "dir": "rtl",
+  "docOverflow": 0,
+  "strayOutsideScrollers": 0,
+  "scrollContainers": 1,
+  "spinners": 0
+ },
+ "leader/1440/canary-detail": {
+  "dir": "rtl",
+  "docOverflow": 0,
+  "strayOutsideScrollers": 0,
+  "scrollContainers": 2,
+  "spinners": 0
+ },
+ "leader/1440/project360": {
+  "dir": "rtl",
+  "docOverflow": 0,
+  "strayOutsideScrollers": 0,
+  "scrollContainers": 1,
+  "spinners": 0
+ },
+ "leader/1440/calendar": {
+  "dir": "rtl",
+  "docOverflow": 0,
+  "strayOutsideScrollers": 0,
+  "scrollContainers": 2,
+  "spinners": 0
+ },
+ "leader/390/my-reports": {
+  "dir": "rtl",
+  "docOverflow": 0,
+  "strayOutsideScrollers": 0,
+  "scrollContainers": 0,
+  "spinners": 0
+ },
+ "leader/390/scope-list": {
+  "dir": "rtl",
+  "docOverflow": 0,
+  "strayOutsideScrollers": 0,
+  "scrollContainers": 1,
+  "spinners": 0
+ },
+ "leader/390/canary-detail": {
+  "dir": "rtl",
+  "docOverflow": 0,
+  "strayOutsideScrollers": 0,
+  "scrollContainers": 2,
+  "spinners": 0
+ },
+ "leader/390/project360": {
+  "dir": "rtl",
+  "docOverflow": 0,
+  "strayOutsideScrollers": 0,
+  "scrollContainers": 1,
+  "spinners": 0
+ },
+ "leader/390/calendar": {
+  "dir": "rtl",
+  "docOverflow": 0,
+  "strayOutsideScrollers": 0,
+  "scrollContainers": 2,
+  "spinners": 0
+ }
+}

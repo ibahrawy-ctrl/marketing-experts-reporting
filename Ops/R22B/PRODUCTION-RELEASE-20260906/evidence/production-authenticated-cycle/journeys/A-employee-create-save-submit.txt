@@ -1,0 +1,13 @@
+DRAFT_OPENED = PASS
+EXISTING_PROJECT_CARDS = 0
+FIELD_SHAPE = textarea=5 input=9 select=2
+FIELDS_FILLED = textareas=2(multiline) project=1 title=1 keyword=1 status=Draft date[6]=2026-09-10
+SAVE_DRAFT = PASS (indicator=true toast=false)
+DRAFT_RELOAD = PASS {"textareas":5,"withTag":2,"exact":2,"newlines":[2,2],"whiteSpace":"pre-wrap","cards":1}
+MULTILINE_AT_INPUT = PASS (سطران جديدان في كلّ حقل)
+SUBMIT_BUTTON_ENABLED = YES
+SUBMIT_REPORT = PASS (toast=false status=true)
+CONSOLE_ERRORS = 0
+NETWORK_ERRORS = 0
+HTTP_5XX = 0
+HTTP_4XX = 0 []

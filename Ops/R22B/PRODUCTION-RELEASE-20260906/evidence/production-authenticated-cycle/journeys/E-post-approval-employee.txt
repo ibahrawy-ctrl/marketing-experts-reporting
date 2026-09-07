@@ -1,0 +1,7 @@
+EMPLOYEE_SEES_CLOSED_IN_MY_REPORTS = PASS — تقرير متابعة مقالات SEO الأسبوعي أسبوعي 2026-W37 مُغلق عرض
+MULTILINE_AFTER_APPROVAL_EMPLOYEE = PASS (سليمة=2/2 · {"tag":"P","newlines":2,"whiteSpace":"pre-wrap","h":78,"lineHeight":20,"visualLines":4,"clipped":false} · تعليق الإرجاع L2=true L3=true · مغلق=false · Published=true)
+LEADER_SEES_CLOSED = CHECK (0)
+CONSOLE_ERRORS = 0 []
+NETWORK_ERRORS = 0
+HTTP_5XX = 0
+HTTP_4XX = 0 []

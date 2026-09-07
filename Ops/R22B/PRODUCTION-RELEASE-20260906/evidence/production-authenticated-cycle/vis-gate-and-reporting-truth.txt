@@ -1,0 +1,23 @@
+VIS03 employee/1440/my-reports = dir=rtl docOvf=0 strayOutsideScrollers=0 scrollers=0 spin=0
+VIS03 employee/1440/scope-list = dir=rtl docOvf=0 strayOutsideScrollers=0 scrollers=0 spin=0
+VIS03 employee/1440/canary-detail = dir=rtl docOvf=0 strayOutsideScrollers=0 scrollers=1 spin=0
+VIS03 employee/1440/project360 = dir=rtl docOvf=0 strayOutsideScrollers=0 scrollers=1 spin=0
+VIS03 employee/1440/calendar = dir=rtl docOvf=0 strayOutsideScrollers=0 scrollers=0 spin=0
+VIS03 employee/390/my-reports = dir=rtl docOvf=0 strayOutsideScrollers=0 scrollers=0 spin=0
+VIS03 employee/390/scope-list = dir=rtl docOvf=0 strayOutsideScrollers=0 scrollers=0 spin=0
+VIS03 employee/390/canary-detail = dir=rtl docOvf=0 strayOutsideScrollers=0 scrollers=1 spin=0
+VIS03 employee/390/project360 = dir=rtl docOvf=0 strayOutsideScrollers=0 scrollers=1 spin=0
+VIS03 employee/390/calendar = dir=rtl docOvf=0 strayOutsideScrollers=0 scrollers=0 spin=0
+REPORTING_TRUTH_P360_LINKED employee = PASS (وسم=true×1 · W37=true · الموظّف=true)
+VIS03 leader/1440/my-reports = dir=rtl docOvf=0 strayOutsideScrollers=0 scrollers=0 spin=0
+VIS03 leader/1440/scope-list = dir=rtl docOvf=0 strayOutsideScrollers=0 scrollers=1 spin=0
+VIS03 leader/1440/canary-detail = dir=rtl docOvf=0 strayOutsideScrollers=0 scrollers=2 spin=0
+VIS03 leader/1440/project360 = dir=rtl docOvf=0 strayOutsideScrollers=0 scrollers=1 spin=0
+VIS03 leader/1440/calendar = dir=rtl docOvf=0 strayOutsideScrollers=0 scrollers=2 spin=0
+VIS03 leader/390/my-reports = dir=rtl docOvf=0 strayOutsideScrollers=0 scrollers=0 spin=0
+VIS03 leader/390/scope-list = dir=rtl docOvf=0 strayOutsideScrollers=0 scrollers=1 spin=0
+VIS03 leader/390/canary-detail = dir=rtl docOvf=0 strayOutsideScrollers=0 scrollers=2 spin=0
+VIS03 leader/390/project360 = dir=rtl docOvf=0 strayOutsideScrollers=0 scrollers=1 spin=0
+VIS03 leader/390/calendar = dir=rtl docOvf=0 strayOutsideScrollers=0 scrollers=2 spin=0
+REPORTING_TRUTH_P360_LINKED leader = PASS (وسم=true×1 · W37=true · الموظّف=true)
+VIS03_VIS04_SUMMARY = PASS 20/20

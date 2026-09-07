@@ -1,0 +1,10 @@
+{
+ "httpStatus": 200,
+ "id": "0b2a60f1-de62-458b-9228-5671b4133e83",
+ "fullName": "جهاد صلاح",
+ "email": "g***@gmail.com",
+ "roles": [
+  "Employee"
+ ],
+ "scopeType": "own"
+}

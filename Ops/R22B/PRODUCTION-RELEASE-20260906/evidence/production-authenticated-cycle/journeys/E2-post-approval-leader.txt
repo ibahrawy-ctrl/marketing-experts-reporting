@@ -1,0 +1,3 @@
+QUICK_FILTER = المغلقة
+LEADER_SEES_CLOSED_IN_SCOPE_LIST = PASS — تقرير متابعة مقالات SEO الأسبوعي جهاد صلاح أسبوعي 2026-W37 مُغلَق ٦ سبتمبر ٢٠٢٦ — استحقاق ٩ سبتمبر ٢٠٢٦ عرض التقرير
+MULTILINE_AFTER_APPROVAL_LEADER = PASS (سليمة=2/2 · {"tag":"P","newlines":2,"whiteSpace":"pre-wrap","h":78,"lineHeight":20,"visualLines":4,"clipped":false} · تعليق الإرجاع=true · مغلق=false)

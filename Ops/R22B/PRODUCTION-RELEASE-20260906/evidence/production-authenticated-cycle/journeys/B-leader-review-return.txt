@@ -1,0 +1,9 @@
+LEADER_QUEUE_CONTAINS_CANARY = PASS (صفّ واحد فقط) — تقرير متابعة مقالات SEO الأسبوعي جهاد صلاح أسبوعي 2026-W37 مُسلَّم — بانتظار الاعتماد ٦ سبتمبر ٢٠٢٦ شيماء عيد استحقاق ٩ سبتمبر ٢٠٢٦ عرض التقرير
+MULTILINE_AT_REVIEW = PASS (عُقَد سليمة=1/1 · {"tag":"P","newlines":2,"whiteSpace":"pre-wrap","h":78,"lineHeight":20,"visualLines":4,"clipped":false})
+LEADER_COMMENT_TYPED_WITH_ENTER = PASS ({"newlines":2,"len":145})
+RETURN_BUTTON_ENABLED_AFTER_REASON = PASS
+RETURN_ACTION = PASS
+CONSOLE_ERRORS = 0
+NETWORK_ERRORS = 0
+HTTP_5XX = 0
+HTTP_4XX = 0 []

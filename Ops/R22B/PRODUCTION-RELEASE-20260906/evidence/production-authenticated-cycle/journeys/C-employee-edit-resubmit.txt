@@ -1,0 +1,11 @@
+RETURN_COMMENT_MULTILINE_AT_EMPLOYEE = PASS {"tag":"P","newlines":2,"whiteSpace":"pre-wrap","h":60,"lineHeight":20,"visualLines":3,"clipped":false}
+STATUS_SHOWS_RETURNED = PASS
+EDIT_APPLIED = حالة المقال: Draft ← Published (select[1])
+SAVE_AFTER_RETURN = PASS (indicator=true toast=false)
+EDIT_PERSISTED = PASS {"taggedTextareas":2,"newlines":[2,2],"articleStatus":"Published"}
+RESUBMIT_BUTTON_ENABLED = YES
+RESUBMIT_REPORT = PASS
+CONSOLE_ERRORS = 0
+NETWORK_ERRORS = 0
+HTTP_5XX = 0
+HTTP_4XX = 0 []
