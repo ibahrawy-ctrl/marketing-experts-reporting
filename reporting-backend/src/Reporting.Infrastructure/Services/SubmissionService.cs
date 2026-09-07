@@ -946,6 +946,85 @@ public class SubmissionService : ISubmissionService
             new ApproverRerouteReportDto(leavingUserId, dryRun, items, reroutedCount, failedCount));
     }
 
+    public async Task<Result<ApproverRepairReportDto>> RepairStuckApprovalsAsync(bool dryRun, CancellationToken ct = default)
+    {
+        if (_currentUser.UserId is not Guid actingUserId)
+            return Result<ApproverRepairReportDto>.Failure("غير مصرّح.", "auth.unauthenticated");
+        if (!_currentUser.IsInAnyRole(Roles.AdminReportKpiDeleters))
+            return Result<ApproverRepairReportDto>.Failure(
+                "إصلاح الاعتمادات العالقة من صلاحية مدير النظام أو الرئيس التنفيذي أو المدير العام فقط.", "auth.forbidden");
+
+        // نفس نطاق سطح الإنقاذ حرفيًّا: مفتوحة بانتظار اعتماد + معتمِدها فارغ أو غير نشط أو يتيم.
+        // Returned خارج الشرط بالحالة، والمغلقة والمسودّات بالحالة، والمحذوفة إداريًّا بالمرشّح العامّ.
+        var affected = await _db.ReportSubmissions
+            .Include(s => s.ApprovalSteps)
+            .Where(s => AwaitingApprovalStatuses.Contains(s.Status)
+                        && (s.CurrentApproverId == null
+                            || !_db.Users.Any(u => u.Id == s.CurrentApproverId && u.IsActive)))
+            .ToListAsync(ct);
+
+        var items = new List<ApproverRerouteItemDto>(affected.Count);
+        var now = DateTime.UtcNow;
+        var notify = new List<(Guid ApproverId, Guid SubmissionId)>();
+
+        foreach (var s in affected)
+        {
+            var broken = s.CurrentApproverId;
+            var submitter = await _db.Users.AsNoTracking().Where(u => u.Id == s.SubmitterId)
+                .Select(u => new { u.TeamId, u.ManagerId }).FirstOrDefaultAsync(ct);
+
+            var target = await ResolveFirstApproverAsync(
+                s.SubmitterId, submitter?.TeamId, submitter?.ManagerId, ct, excludeUserId: broken);
+
+            if (target is not Guid to || to == broken)
+            {
+                items.Add(new ApproverRerouteItemDto(s.Id, broken, null, false));
+                continue;
+            }
+
+            items.Add(new ApproverRerouteItemDto(s.Id, broken, to, true));
+            if (dryRun) continue;
+
+            s.CurrentApproverId = to;
+            s.UpdatedAtUtc = now;
+            foreach (var step in s.ApprovalSteps.Where(a => a.Status == ApprovalStatus.Pending && a.ApproverId == broken))
+                step.ApproverId = to;
+            notify.Add((to, s.Id));
+        }
+
+        var reroutedCount = items.Count(i => i.Rerouted);
+        var failedCount = items.Count - reroutedCount;
+
+        if (!dryRun && reroutedCount > 0)
+        {
+            await _db.SaveChangesAsync(ct);
+            foreach (var (approverId, submissionId) in notify)
+                await _notifications.NotifyAsync(approverId, "submission.approver_rerouted",
+                    "تقرير أُعيد توجيهه لاعتمادك", null, $"/app/submissions?open={submissionId}", ct);
+            await _audit.LogAsync(actingUserId, "approval.rerouted", nameof(ReportSubmission), null,
+                JsonSerializer.Serialize(new
+                {
+                    source = "admin_repair",
+                    reroutedCount,
+                    items = items.Where(i => i.Rerouted)
+                        .Select(i => new { submissionId = i.SubmissionId, from = i.FromApproverId, to = i.ToApproverId })
+                }), ct: ct);
+        }
+
+        if (failedCount > 0)
+            await _audit.LogAsync(actingUserId, "approval.reroute_failed", nameof(ReportSubmission), null,
+                JsonSerializer.Serialize(new
+                {
+                    source = "admin_repair",
+                    dryRun,
+                    failedCount,
+                    submissionIds = items.Where(i => !i.Rerouted).Select(i => i.SubmissionId)
+                }), ct: ct);
+
+        return Result<ApproverRepairReportDto>.Success(
+            new ApproverRepairReportDto(dryRun, items, reroutedCount, failedCount));
+    }
+
     public async Task<Result<IReadOnlyList<SubmissionListItemDto>>> ListAsync(SubmissionFilter filter, CancellationToken ct = default)
     {
         if (_currentUser.UserId is not Guid userId)

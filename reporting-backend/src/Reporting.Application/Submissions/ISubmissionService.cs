@@ -52,4 +52,13 @@ public interface ISubmissionService
     /// </summary>
     Task<Result<ApproverRerouteReportDto>> RerouteApprovalsForDeactivatedUserAsync(
         Guid leavingUserId, Guid actingUserId, bool dryRun, CancellationToken ct = default);
+
+    /// <summary>
+    /// RPT-APPROVER-INTEGRITY-01 — الإصلاح الإداريّ لما رصده سطح الإنقاذ (Admin/CEO/GM).
+    /// حارس التعطيل يمنع نشوء حالات جديدة لكنّه لا يبلغ ما نشأ سابقًا: معتمِدو تلك التسليمات
+    /// معطَّلون أو محذوفون أصلًا فلا يمرّ عليهم مسار التعطيل مجدّدًا. يُعيد التوجيه بنفس سلسلة
+    /// APPROVAL-FALLBACK-R1 مع استبعاد المعتمِد المعطوب، وهو Idempotent: الاستدعاء الثاني يجد
+    /// صفرًا. لا يغيّر نصّ التقرير ولا حالته ولا نسخته ولا فترته ولا صاحبه.
+    /// </summary>
+    Task<Result<ApproverRepairReportDto>> RepairStuckApprovalsAsync(bool dryRun, CancellationToken ct = default);
 }

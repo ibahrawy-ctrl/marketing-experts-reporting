@@ -105,4 +105,13 @@ public class SubmissionsController : ApiControllerBase
     [Authorize(Policy = Policies.AdminReportDelete)]
     public async Task<IActionResult> ApproverIntegrity(CancellationToken ct)
         => FromResult(await _service.GetApproverIntegrityIssuesAsync(ct));
+
+    /// <summary>
+    /// RPT-APPROVER-INTEGRITY-01 — الإصلاح الإداريّ لما رصده سطح الإنقاذ (Admin/CEO/GM).
+    /// <c>dryRun=true</c> يُرجِع الخطّة بلا أيّ كتابة. Idempotent: الاستدعاء الثاني يجد صفرًا.
+    /// </summary>
+    [HttpPost("approver-integrity/repair")]
+    [Authorize(Policy = Policies.AdminReportDelete)]
+    public async Task<IActionResult> RepairApproverIntegrity(ApproverRepairRequest request, CancellationToken ct)
+        => FromResult(await _service.RepairStuckApprovalsAsync(request.DryRun, ct));
 }

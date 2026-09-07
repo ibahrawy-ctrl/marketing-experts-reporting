@@ -122,6 +122,39 @@ public class ApproverIntegrityTests
         => (await (await admin.GetAsync("/api/submissions/approver-integrity"))
             .ReadAsync<ApproverIntegrityReportDto>())!;
 
+    /// <summary>
+    /// يضبط نشاط مستخدم على القاعدة مباشرةً — لمحاكاة حالة **قائمة سلفًا** نشأت قبل حارس التعطيل.
+    /// المرور عبر واجهة الدليل التنظيميّ هنا خطأ منهجيّ: الحارس سيعيد التوجيه فورًا فيُلغي الحالة
+    /// المراد اختبار إصلاحها. الإنتاج نفسه فيه معتمِدون معطَّلون سلفًا لا يمرّون بمسار التعطيل ثانيةً.
+    /// </summary>
+    private async Task SetUserActiveAsync(Guid userId, bool isActive)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var u = await db.Users.FirstAsync(x => x.Id == userId);
+        u.IsActive = isActive;
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task<ApproverRepairReportDto> RepairAsync(HttpClient admin, bool dryRun)
+    {
+        var res = await admin.PostAsJsonAsync("/api/submissions/approver-integrity/repair",
+            new ApproverRepairRequest(dryRun));
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        return (await res.ReadAsync<ApproverRepairReportDto>())!;
+    }
+
+    /// <summary>يعدّ سجلّات التدقيق التي يذكر تفصيلها معرّف التسليم (سجلّ إعادة التوجيه جماعيّ بلا EntityId).</summary>
+    private async Task<int> CountAuditMentioningAsync(string action, Guid submissionId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        // البحث النصّيّ يجري في الذاكرة: DataJson عمود jsonb لا يترجَم له Contains نصّيًّا.
+        var rows = await db.AuditLogs.AsNoTracking()
+            .Where(a => a.Action == action).Select(a => a.DataJson).ToListAsync();
+        return rows.Count(d => d is not null && d.Contains(submissionId.ToString()));
+    }
+
     private async Task<int> CountAuditAsync(string action, Guid entityId)
     {
         using var scope = _factory.Services.CreateScope();
@@ -500,6 +533,176 @@ public class ApproverIntegrityTests
     {
         var employee = await TestAuth.LoginAsRoleAsync(_factory, Roles.Employee);
         var res = await employee.GetAsync("/api/submissions/approver-integrity");
+        Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
+    }
+
+    // ===== مسار الإصلاح الإداريّ: علاج ما نشأ **قبل** حارس التعطيل =====
+    //
+    // حارس التعطيل يمنع نشوء حالات جديدة، لكنّه لا يبلغ ما نشأ سابقًا لأنّ معتمِدي تلك التسليمات
+    // معطَّلون أو محذوفون أصلًا فلا يمرّ عليهم مسار التعطيل مجدّدًا. ولذلك تُهيَّأ الحالة هنا على
+    // القاعدة مباشرةً (لا عبر الواجهة) — وإلّا لأصلحها الحارس فور التهيئة فلا يبقى شيء يُختبَر.
+
+    // ===== 16) معتمِد معطَّل سلفًا ⇒ الإصلاح الإداريّ يعيد التوجيه ويرفعه عن سطح الإنقاذ =====
+    [Fact]
+    public async Task AdminRepair_ReroutesPreexistingInactiveApprover_AndClearsRescueSurface()
+    {
+        var admin = await TestAuth.LoginAsAdminAsync(_factory);
+        var (templateId, fieldId) = await PublishTemplateAsync(admin);
+
+        var (_, gmId) = await TestAuth.CreateUserAsync(_factory, Roles.GeneralManager);
+        var (_, tlId) = await TestAuth.CreateUserAsync(_factory, Roles.TeamLeader, gmId);
+        var (employee, empId) = await TestAuth.CreateUserAsync(_factory, Roles.Employee, gmId);
+        await TestAuth.CreateTeamWithLeaderAsync(_factory, tlId, empId);
+
+        var submitted = await SubmitReportAsync(employee, templateId, fieldId, "2026-W17");
+        Assert.Equal(tlId, submitted.CurrentApproverId);
+
+        await SetUserActiveAsync(tlId, false);
+        var stuck = Assert.Single((await GetIntegrityAsync(admin)).Items, i => i.SubmissionId == submitted.Id);
+        Assert.Equal(ApproverIssueKind.InactiveApprover, stuck.Kind);
+
+        var repair = await RepairAsync(admin, dryRun: false);
+        var item = Assert.Single(repair.Items, i => i.SubmissionId == submitted.Id);
+        Assert.True(item.Rerouted);
+        Assert.Equal(tlId, item.FromApproverId);
+        Assert.Equal(gmId, item.ToApproverId);
+
+        // التقرير لم يتغيّر إلّا في وجهة الاعتماد: الحالة والمالك كما هما.
+        var after = await ReadSubmissionAsync(submitted.Id);
+        Assert.Equal(gmId, after.ApproverId);
+        Assert.Equal(SubmissionStatus.Submitted, after.Status);
+        Assert.False(after.IsDeleted);
+        Assert.Equal(gmId, await ReadPendingStepApproverAsync(submitted.Id));
+
+        Assert.DoesNotContain((await GetIntegrityAsync(admin)).Items, i => i.SubmissionId == submitted.Id);
+
+        // أثر تدقيقيّ صريح لكلّ إعادة توجيه إداريّة.
+        Assert.True(await CountAuditMentioningAsync("approval.rerouted", submitted.Id) >= 1);
+    }
+
+    // ===== 17) مرجع معتمِد يتيم ⇒ الإصلاح يعالجه أيضًا، و dryRun لا يكتب شيئًا =====
+    [Fact]
+    public async Task AdminRepair_DryRun_PlansOrphanApproverWithoutWriting()
+    {
+        var admin = await TestAuth.LoginAsAdminAsync(_factory);
+        var (templateId, fieldId) = await PublishTemplateAsync(admin);
+
+        var (_, gmId) = await TestAuth.CreateUserAsync(_factory, Roles.GeneralManager);
+        var (employee, _) = await TestAuth.CreateUserAsync(_factory, Roles.Employee, gmId);
+        var submitted = await SubmitReportAsync(employee, templateId, fieldId, "2026-W18");
+
+        var orphanId = Guid.NewGuid();
+        await MutateSubmissionAsync(submitted.Id, s => s.CurrentApproverId = orphanId);
+
+        var plan = await RepairAsync(admin, dryRun: true);
+        Assert.True(plan.DryRun);
+        var planned = Assert.Single(plan.Items, i => i.SubmissionId == submitted.Id);
+        Assert.True(planned.Rerouted);
+        Assert.Equal(orphanId, planned.FromApproverId);
+        Assert.Equal(gmId, planned.ToApproverId);
+
+        // لا كتابة إطلاقًا: المعتمِد اليتيم كما هو ولا سجلّ إعادة توجيه.
+        Assert.Equal(orphanId, (await ReadSubmissionAsync(submitted.Id)).ApproverId);
+        Assert.Equal(0, await CountAuditMentioningAsync("approval.rerouted", submitted.Id));
+
+        var applied = await RepairAsync(admin, dryRun: false);
+        Assert.False(applied.DryRun);
+        Assert.Equal(gmId, (await ReadSubmissionAsync(submitted.Id)).ApproverId);
+        Assert.True(await CountAuditMentioningAsync("approval.rerouted", submitted.Id) >= 1);
+    }
+
+    // ===== 18) Idempotency: الاستدعاء الثاني لا يجد التسليم نفسه مرّة أخرى =====
+    [Fact]
+    public async Task AdminRepair_IsIdempotent_SecondCallDoesNotFindSameSubmission()
+    {
+        var admin = await TestAuth.LoginAsAdminAsync(_factory);
+        var (templateId, fieldId) = await PublishTemplateAsync(admin);
+
+        var (_, gmId) = await TestAuth.CreateUserAsync(_factory, Roles.GeneralManager);
+        var (employee, _) = await TestAuth.CreateUserAsync(_factory, Roles.Employee, gmId);
+        var submitted = await SubmitReportAsync(employee, templateId, fieldId, "2026-W19");
+
+        await MutateSubmissionAsync(submitted.Id, s => s.CurrentApproverId = null);
+
+        var first = await RepairAsync(admin, dryRun: false);
+        Assert.True(Assert.Single(first.Items, i => i.SubmissionId == submitted.Id).Rerouted);
+        Assert.Equal(gmId, (await ReadSubmissionAsync(submitted.Id)).ApproverId);
+
+        var second = await RepairAsync(admin, dryRun: false);
+        Assert.DoesNotContain(second.Items, i => i.SubmissionId == submitted.Id);
+        Assert.Equal(gmId, (await ReadSubmissionAsync(submitted.Id)).ApproverId);
+    }
+
+    // ===== 19) Returned بلا معتمِد ⇒ سلوك مصمَّم: الإصلاح لا يمسّه =====
+    [Fact]
+    public async Task AdminRepair_LeavesReturnedSubmissionUntouched()
+    {
+        var admin = await TestAuth.LoginAsAdminAsync(_factory);
+        var (templateId, fieldId) = await PublishTemplateAsync(admin);
+
+        var (_, gmId) = await TestAuth.CreateUserAsync(_factory, Roles.GeneralManager);
+        var (teamLeader, tlId) = await TestAuth.CreateUserAsync(_factory, Roles.TeamLeader, gmId);
+        var (employee, empId) = await TestAuth.CreateUserAsync(_factory, Roles.Employee, gmId);
+        await TestAuth.CreateTeamWithLeaderAsync(_factory, tlId, empId);
+
+        var submitted = await SubmitReportAsync(employee, templateId, fieldId, "2026-W20");
+        Assert.Equal(HttpStatusCode.OK, (await teamLeader.PostAsJsonAsync(
+            $"/api/submissions/{submitted.Id}/return", new ApprovalActionRequest("يُرجى الاستكمال"))).StatusCode);
+
+        var repair = await RepairAsync(admin, dryRun: false);
+        Assert.DoesNotContain(repair.Items, i => i.SubmissionId == submitted.Id);
+
+        var after = await ReadSubmissionAsync(submitted.Id);
+        Assert.Equal(SubmissionStatus.Returned, after.Status);
+        Assert.Null(after.ApproverId);
+    }
+
+    // ===== 20) المغلق والمحذوف إداريًّا ⇒ الإصلاح لا يمسّهما =====
+    [Fact]
+    public async Task AdminRepair_LeavesClosedAndAdministrativelyDeletedUntouched()
+    {
+        var admin = await TestAuth.LoginAsAdminAsync(_factory);
+        var (templateId, fieldId) = await PublishTemplateAsync(admin);
+
+        var (_, gmId) = await TestAuth.CreateUserAsync(_factory, Roles.GeneralManager);
+        var (_, tlId) = await TestAuth.CreateUserAsync(_factory, Roles.TeamLeader, gmId);
+        var (employee, empId) = await TestAuth.CreateUserAsync(_factory, Roles.Employee, gmId);
+        await TestAuth.CreateTeamWithLeaderAsync(_factory, tlId, empId);
+
+        var closed = await SubmitReportAsync(employee, templateId, fieldId, "2026-W21");
+        await MutateSubmissionAsync(closed.Id, s =>
+        {
+            s.Status = SubmissionStatus.Closed;
+            s.ClosedAtUtc = DateTime.UtcNow;
+            s.CurrentApproverId = tlId;
+        });
+
+        var deleted = await SubmitReportAsync(employee, templateId, fieldId, "2026-W22");
+        Assert.Equal(HttpStatusCode.OK, (await admin.PostAsJsonAsync($"/api/submissions/{deleted.Id}/admin-delete",
+            new AdminDeleteRequest("حذف إداريّ ضمن اختبار الإصلاح"))).StatusCode);
+
+        await SetUserActiveAsync(tlId, false);
+
+        var repair = await RepairAsync(admin, dryRun: false);
+        Assert.DoesNotContain(repair.Items, i => i.SubmissionId == closed.Id);
+        Assert.DoesNotContain(repair.Items, i => i.SubmissionId == deleted.Id);
+
+        var closedAfter = await ReadSubmissionAsync(closed.Id);
+        Assert.Equal(SubmissionStatus.Closed, closedAfter.Status);
+        Assert.Equal(tlId, closedAfter.ApproverId);
+
+        var deletedAfter = await ReadSubmissionAsync(deleted.Id);
+        Assert.True(deletedAfter.IsDeleted);
+        Assert.Null(deletedAfter.ApproverId);
+    }
+
+    // ===== 21) مسار الإصلاح محكوم بالتفويض: موظّف عاديّ لا ينفّذه =====
+    [Fact]
+    public async Task AdminRepair_IsForbiddenForNonPrivilegedRoles()
+    {
+        var employee = await TestAuth.LoginAsRoleAsync(_factory, Roles.Employee);
+        var res = await employee.PostAsJsonAsync("/api/submissions/approver-integrity/repair",
+            new ApproverRepairRequest(true));
         Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
     }
 }

@@ -265,3 +265,17 @@ public sealed record ApproverRerouteReportDto(
     IReadOnlyList<ApproverRerouteItemDto> Items,
     int ReroutedCount,
     int FailedCount);
+
+/// <summary>طلب الإصلاح الإداريّ لما رصده سطح الإنقاذ. <c>DryRun=true</c> يخطّط بلا أيّ كتابة.</summary>
+public sealed record ApproverRepairRequest(bool DryRun);
+
+/// <summary>
+/// خطّة/حصيلة الإصلاح الإداريّ للاعتمادات العالقة **القائمة سلفًا**. حارس التعطيل يمنع نشوء
+/// حالات جديدة، لكنّه لا يبلغ ما نشأ قبله لأنّ معتمِديها معطَّلون أو محذوفون أصلًا؛ فهذا المسار
+/// يغطّي الأنواع الثلاثة (معتمِد فارغ · معطَّل · مرجع يتيم) بنفس سلسلة APPROVAL-FALLBACK-R1.
+/// </summary>
+public sealed record ApproverRepairReportDto(
+    bool DryRun,
+    IReadOnlyList<ApproverRerouteItemDto> Items,
+    int ReroutedCount,
+    int FailedCount);
