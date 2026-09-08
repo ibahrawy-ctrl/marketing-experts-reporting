@@ -626,6 +626,25 @@ public class DirectoryService : IDirectoryService
         if (req.ManagerId == userId)
             return Result<DirectoryUserDto>.Failure("لا يمكن أن يكون المستخدم مديرًا لنفسه.", "user.manager.self.conflict");
 
+        // RPT-APPROVER-INTEGRITY-01 — حارس إعادة التفعيل: لا يُعاد تفعيل مستخدم على ارتباط تنظيميّ
+        // معطوب (فريق متوقّف أو مدير مباشر معطَّل/غير موجود). إعادة التفعيل تعيده فورًا إلى دورة
+        // التقارير، فإن كان مساره التنظيميّ معطوبًا عادت المنظومة إلى المشكلة نفسها من الباب الخلفيّ.
+        // العلاج المطلوب أوّلًا: تصحيح الفريق أو المدير المباشر، ثمّ إعادة التفعيل.
+        if (!user.IsActive && req.IsActive)
+        {
+            if (req.TeamId is Guid reTeamId
+                && !await _db.Teams.AnyAsync(t => t.Id == reTeamId && t.IsActive, ct))
+                return Result<DirectoryUserDto>.Failure(
+                    "لا يمكن إعادة تفعيل هذا المستخدم: فريقه غير موجود أو متوقّف. صحّح الفريق أوّلًا.",
+                    "user.reactivate.invalid_team.conflict");
+
+            if (req.ManagerId is Guid reMgrId
+                && !await _db.Users.AnyAsync(u => u.Id == reMgrId && u.IsActive, ct))
+                return Result<DirectoryUserDto>.Failure(
+                    "لا يمكن إعادة تفعيل هذا المستخدم: مديره المباشر غير موجود أو معطَّل. صحّح الإدارة المباشرة أوّلًا.",
+                    "user.reactivate.invalid_manager.conflict");
+        }
+
         var orgErr = await ValidateOrgAsync(req.TeamId, req.DepartmentId, req.ManagerId, ct);
         if (orgErr is not null)
             return Result<DirectoryUserDto>.Failure(orgErr.Value.Error, orgErr.Value.Code);

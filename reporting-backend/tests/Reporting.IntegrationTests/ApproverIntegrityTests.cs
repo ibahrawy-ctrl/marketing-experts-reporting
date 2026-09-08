@@ -63,7 +63,14 @@ public class ApproverIntegrityTests
     }
 
     /// <summary>يعطّل مستخدمًا عبر واجهة الدليل التنظيميّ مع الحفاظ على بقيّة حقوله كما هي.</summary>
-    private async Task<HttpResponseMessage> DeactivateAsync(HttpClient admin, Guid userId)
+    private Task<HttpResponseMessage> DeactivateAsync(HttpClient admin, Guid userId)
+        => SetActiveViaApiAsync(admin, userId, isActive: false);
+
+    /// <summary>يعيد تفعيل مستخدم عبر الواجهة الرسميّة نفسها (لاختبار حارس إعادة التفعيل).</summary>
+    private Task<HttpResponseMessage> ReactivateAsync(HttpClient admin, Guid userId)
+        => SetActiveViaApiAsync(admin, userId, isActive: true);
+
+    private async Task<HttpResponseMessage> SetActiveViaApiAsync(HttpClient admin, Guid userId, bool isActive)
     {
         string name, email;
         Guid? deptId, teamId, mgrId;
@@ -78,7 +85,7 @@ public class ApproverIntegrityTests
             mgrId = u.ManagerId;
         }
         return await admin.PutAsJsonAsync($"/api/directory/users/{userId}",
-            new UpdateUserRequest(name, email, false, deptId, teamId, mgrId));
+            new UpdateUserRequest(name, email, isActive, deptId, teamId, mgrId));
     }
 
     private async Task<(Guid? ApproverId, SubmissionStatus Status, bool IsDeleted)> ReadSubmissionAsync(Guid submissionId)
@@ -704,5 +711,69 @@ public class ApproverIntegrityTests
         var res = await employee.PostAsJsonAsync("/api/submissions/approver-integrity/repair",
             new ApproverRepairRequest(true));
         Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
+    }
+
+    // ===== 22) حارس إعادة التفعيل: فريق متوقّف ⇒ إعادة التفعيل محجوبة =====
+    [Fact]
+    public async Task Reactivation_IsBlocked_WhenTeamIsStopped()
+    {
+        var admin = await TestAuth.LoginAsAdminAsync(_factory);
+
+        var (_, gmId) = await TestAuth.CreateUserAsync(_factory, Roles.GeneralManager);
+        var (_, tlId) = await TestAuth.CreateUserAsync(_factory, Roles.TeamLeader, gmId);
+        var (_, empId) = await TestAuth.CreateUserAsync(_factory, Roles.Employee, gmId);
+        var teamId = await TestAuth.CreateTeamWithLeaderAsync(_factory, tlId, empId);
+
+        Assert.Equal(HttpStatusCode.OK, (await DeactivateAsync(admin, empId)).StatusCode);
+        await SetTeamActiveAsync(teamId, false);
+
+        var res = await ReactivateAsync(admin, empId);
+        Assert.Equal(HttpStatusCode.Conflict, res.StatusCode);
+        Assert.Contains("user.reactivate.invalid_team.conflict", await res.Content.ReadAsStringAsync());
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.False(await db.Users.AsNoTracking().Where(u => u.Id == empId).Select(u => u.IsActive).FirstAsync());
+    }
+
+    // ===== 23) حارس إعادة التفعيل: مدير مباشر معطَّل ⇒ إعادة التفعيل محجوبة =====
+    [Fact]
+    public async Task Reactivation_IsBlocked_WhenDirectManagerIsInactive()
+    {
+        var admin = await TestAuth.LoginAsAdminAsync(_factory);
+
+        var (_, gmId) = await TestAuth.CreateUserAsync(_factory, Roles.GeneralManager);
+        var (_, mgrId) = await TestAuth.CreateUserAsync(_factory, Roles.Manager, gmId);
+        var (_, empId) = await TestAuth.CreateUserAsync(_factory, Roles.Employee, mgrId);
+
+        Assert.Equal(HttpStatusCode.OK, (await DeactivateAsync(admin, empId)).StatusCode);
+        await SetUserActiveAsync(mgrId, false);
+
+        var res = await ReactivateAsync(admin, empId);
+        Assert.Equal(HttpStatusCode.Conflict, res.StatusCode);
+        Assert.Contains("user.reactivate.invalid_manager.conflict", await res.Content.ReadAsStringAsync());
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.False(await db.Users.AsNoTracking().Where(u => u.Id == empId).Select(u => u.IsActive).FirstAsync());
+    }
+
+    // ===== 24) ضابط موجب: ارتباط تنظيميّ سليم ⇒ إعادة التفعيل تنجح ولا يفرط الحارس في الحجب =====
+    [Fact]
+    public async Task Reactivation_Succeeds_WhenTeamAndManagerAreValid()
+    {
+        var admin = await TestAuth.LoginAsAdminAsync(_factory);
+
+        var (_, gmId) = await TestAuth.CreateUserAsync(_factory, Roles.GeneralManager);
+        var (_, tlId) = await TestAuth.CreateUserAsync(_factory, Roles.TeamLeader, gmId);
+        var (_, empId) = await TestAuth.CreateUserAsync(_factory, Roles.Employee, gmId);
+        await TestAuth.CreateTeamWithLeaderAsync(_factory, tlId, empId);
+
+        Assert.Equal(HttpStatusCode.OK, (await DeactivateAsync(admin, empId)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await ReactivateAsync(admin, empId)).StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.True(await db.Users.AsNoTracking().Where(u => u.Id == empId).Select(u => u.IsActive).FirstAsync());
     }
 }
