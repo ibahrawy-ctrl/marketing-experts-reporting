@@ -4180,3 +4180,48 @@ export interface ArchiveListFilter {
 export interface RestoreRequest {
   reason: string;
 }
+
+// RPT-APPROVER-INTEGRITY-01 — سطح الإنقاذ الإداريّ للاعتمادات العالقة والإصلاح الرسميّ لها.
+// تطابق `Policies.AdminReportDelete` بالخادم (Admin/CEO/GM)؛ الحماية الفعليّة خادميّة.
+export type ApproverIssueKind = 'NullApprover' | 'InactiveApprover' | 'OrphanApprover';
+
+export interface ApproverIntegrityIssueDto {
+  submissionId: string;
+  kind: ApproverIssueKind;
+  submitterId: string;
+  submitterName: string;
+  submitterIsActive: boolean;
+  teamId: string | null;
+  teamName: string | null;
+  periodType: PeriodType;
+  periodKey: string;
+  status: SubmissionStatus;
+  currentApproverId: string | null;
+  currentApproverName: string | null;
+  submittedAtUtc: string | null;
+  stalledDays: number;
+  suggestedApproverId: string | null;
+  suggestedApproverName: string | null;
+}
+
+export interface ApproverIntegrityReportDto {
+  items: ApproverIntegrityIssueDto[];
+  totalCount: number;
+  nullApproverCount: number;
+  inactiveApproverCount: number;
+  orphanApproverCount: number;
+}
+
+export interface ApproverRerouteItemDto {
+  submissionId: string;
+  fromApproverId: string | null;
+  toApproverId: string | null;
+  rerouted: boolean;
+}
+
+export interface ApproverRepairReportDto {
+  dryRun: boolean;
+  items: ApproverRerouteItemDto[];
+  reroutedCount: number;
+  failedCount: number;
+}

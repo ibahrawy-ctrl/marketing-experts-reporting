@@ -64,6 +64,7 @@ import GovernanceWorkspacePage from './pages/GovernanceWorkspacePage';
 import GovernanceEscalationsPage from './pages/GovernanceEscalationsPage';
 import GovernanceActionItemsPage from './pages/GovernanceActionItemsPage';
 import AdminArchivePage from './pages/AdminArchivePage';
+import AdminApproverIntegrityPage from './pages/AdminApproverIntegrityPage';
 import type { Role } from './types/api';
 
 const EXEC_ROLES: Role[] = ['Admin', 'CEO', 'GeneralManager', 'Manager', 'TeamLeader', 'CeoSupport', 'Viewer'];
@@ -311,6 +312,8 @@ const APP_ROUTES: { path: string; element: ReactNode; roles?: Role[]; featureKey
   { path: '/app/audit', element: <AuditPage />, roles: ['Admin', 'CEO', 'GeneralManager'] },
   // الأرشيف الإداريّ (RESTORE-ARCHIVE-GOVERNANCE-R1) — قراءة/استرجاع المحذوف إداريًّا؛ تطابق سياسة ArchiveGovernanceAccess بالخادم.
   { path: '/app/admin/archive', element: <AdminArchivePage />, roles: ARCHIVE_GOVERNANCE_ROLES },
+  // سلامة مسارات الاعتماد (RPT-APPROVER-INTEGRITY-01) — سطح الإنقاذ والإصلاح الإداريّ؛ تطابق سياسة AdminReportDelete بالخادم.
+  { path: '/app/admin/approver-integrity', element: <AdminApproverIntegrityPage />, roles: ARCHIVE_GOVERNANCE_ROLES },
   { path: '/app/development', element: <DevelopmentPage /> },
   { path: '/app/reports', element: <ExecutiveReportsPage />, roles: EXEC_ROLES },
 ];

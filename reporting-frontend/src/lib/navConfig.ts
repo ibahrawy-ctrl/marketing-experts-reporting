@@ -268,6 +268,7 @@ export const MODULES: NavModule[] = [
       { id: 'governance.actions', label: 'الإجراءات', target: '/app/governance/action-items', order: 4, roles: GOVERNANCE_ACTION_ITEMS, aliases: ['/app/actions'], keywords: 'إجراءات مرتبطة بي' },
       { id: 'governance.audit', label: 'سجل التدقيق', target: '/app/audit', order: 5, roles: AUDIT },
       { id: 'governance.archive', label: 'الأرشيف الإداري', target: '/app/admin/archive', order: 6, roles: ARCHIVE_GOVERNANCE, keywords: 'استرجاع محذوف أرشفة' },
+      { id: 'governance.approver-integrity', label: 'سلامة مسارات الاعتماد', target: '/app/admin/approver-integrity', order: 7, roles: ARCHIVE_GOVERNANCE, keywords: 'اعتمادات عالقة إنقاذ إعادة توجيه معتمد معطل' },
     ],
   },
 
