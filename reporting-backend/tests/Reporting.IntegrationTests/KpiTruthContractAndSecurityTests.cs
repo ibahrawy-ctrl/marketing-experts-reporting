@@ -229,9 +229,18 @@ public class KpiTruthContractAndSecurityTests
         }
     }
 
-    // ===== 3) فصل نبض الأسبوع عن الربعيّ الرسميّ (B-3) =====
+    // ===== 3) بعد R6: لا مسار ربعيّ يُقرأ أصلًا — والنبض يُقرأ بنافذة الربع =====
+
+    /// <summary>
+    /// R6/§5.3 (NF-08) — كان هذا الاختبار يقيس <b>عدم تسرّب</b> تقييمات النبض إلى «المسار الربعيّ
+    /// الرسميّ»، وأنّ غيابها لا يُعرَض صفرًا. النصف الأسبوعيّ من العقد محفوظ حرفيًّا. أمّا النصف
+    /// الربعيّ فقد صار موضوعه معدومًا: المسار الربعيّ مُقفَل على القراءة كلّها، وهي ضمانة
+    /// <b>أقوى</b> من «لا تسرّب» — إذ لا لوحة ربعيّة تُبنى ليتسرّب إليها شيء. ولمّا كانت اللوحة
+    /// الربعيّة السابقة تُعيد 200 بمقام ممتلئ وبسط صفر، كان «لا تسرّب» يُعرَض للمستخدم كأداء صفريّ
+    /// حقيقيّ — وهو نفس نمط التعتيم الصامت. فيُقاس الآن الردّ المسمّى.
+    /// </summary>
     [Fact]
-    public async Task Performance_QuarterlyCadence_DoesNotSeeWeeklyPulseEvaluations()
+    public async Task Performance_QuarterlyCadence_IsRejectedAsRetiredTrack_NotShownAsZero()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var (weeklyTemplate, mid, aid) = await PublishTemplateAsync(admin, KpiCadence.WeeklyPulse);
@@ -243,10 +252,6 @@ public class KpiTruthContractAndSecurityTests
         var weekly = await (await manager.GetAsync(
             $"/api/kpi/performance?periodType=Quarter&periodKey=2026-Q2&cadence=WeeklyPulse&subjectUserId={subject}"))
             .ReadAsync<KpiPerformanceDto>();
-        var quarterly = await (await manager.GetAsync(
-            $"/api/kpi/performance?periodType=Quarter&periodKey=2026-Q2&cadence=Quarterly&subjectUserId={subject}"))
-            .ReadAsync<KpiPerformanceDto>();
-
         // الرقم يُقرأ من صفّ الموظّف: DEC-01/11 يفصل الدرجة عن التغطية، فالدرجة تُعرَض ولو كانت
         // التغطية دون العتبة (تقييم واحد داخل ربع كامل). المتوسّط المؤسّسيّ هو ما يُقصيه ضعفُ
         // التغطية (DEC-01/14)، لا الدرجة الفرديّة — وهذا بالضبط ما يفصله التوكيدان التاليان.
@@ -255,12 +260,19 @@ public class KpiTruthContractAndSecurityTests
         Assert.True(weeklyRow.Measure.IsProvisional);
         Assert.Equal(KpiCadence.WeeklyPulse, weeklyRow.EffectiveCadence);
 
-        // لا خلط: التقييم أسبوعيّ الكادنس فلا يظهر في المسار الربعيّ الرسميّ، ولا يُعرَض صفرًا.
-        var quarterlyRow = quarterly!.Employees.Single(e => e.UserId == subject);
-        Assert.Null(quarterlyRow.Measure.Value);
-        Assert.Equal(0, quarterlyRow.Measure.EligibleEvaluationCount);
-        Assert.Null(quarterly.Company.Measure.Value);
-        Assert.Equal(KpiDataQuality.NoData, quarterly.Company.Measure.DataQuality);
+        // R6 — والمسار الربعيّ لا يُقرأ: ردّ مسمًّى بدل لوحة صفريّة تُقرأ كأداء حقيقيّ.
+        var quarterlyRes = await manager.GetAsync(
+            $"/api/kpi/performance?periodType=Quarter&periodKey=2026-Q2&cadence=Quarterly&subjectUserId={subject}");
+        Assert.Equal(HttpStatusCode.BadRequest, quarterlyRes.StatusCode);
+        Assert.Contains("legacy_cadence_disabled", await quarterlyRes.Content.ReadAsStringAsync());
+
+        // ونفس النبض يُقرأ بنافذة الربع بلا طلب مسار: الربع حبيبة قراءة لا مسار تقييم.
+        var derived = await (await manager.GetAsync(
+            $"/api/kpi/performance?periodType=Quarter&periodKey=2026-Q2&subjectUserId={subject}"))
+            .ReadAsync<KpiPerformanceDto>();
+        var derivedRow = derived!.Employees.Single(e => e.UserId == subject);
+        Assert.Equal(80.00m, derivedRow.Measure.Value);
+        Assert.Equal(KpiCadence.WeeklyPulse, derivedRow.EffectiveCadence);
     }
 
     // ===== 4) الحالة: Approved فقط (§5) — والمفقود ليس صفرًا =====

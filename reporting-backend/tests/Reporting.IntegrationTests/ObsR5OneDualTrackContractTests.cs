@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Reporting.Application.Common;
 using Reporting.Application.Kpi;
 using Reporting.Domain.Entities.Kpi;
 using Reporting.Domain.Entities.System;
@@ -116,6 +117,38 @@ public class ObsR5OneDualTrackContractTests
         var approved = await (await ceo.PostAsync($"/api/kpi-evaluations/{ev.Id}/approve", null))
             .ReadAsync<KpiEvaluationDto>();
         Assert.Equal(KpiEvaluationStatus.Approved, approved!.Status);
+    }
+
+    /// <summary>
+    /// R6/§5.4 (WS-2) — يبذر صفّ تقييم <b>ربعيّ المسار ومعتمَد</b> مباشرةً في القاعدة. لا يمرّ عبر الـAPI
+    /// لأنّ مسار الكتابة الربعيّة مُقفَل برمز <c>legacy_quarterly_write_disabled</c>؛ والغرض تمثيل
+    /// السجلّات <b>القائمة</b> التي تبقى في القاعدة بلا حذف ولا هجرة، لإثبات استبعادها من القراءات
+    /// التشغيليّة. لا بديل عن البذر المباشر: بغيره لا يمكن قياس الاستبعاد أصلًا.
+    /// </summary>
+    private async Task<Guid> SeedLegacyApprovedQuarterlyRowAsync(
+        Guid quarterlyTemplateId, Guid subjectId, string periodKey, decimal score)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var versionId = await db.KpiTemplateVersions.Where(v => v.KpiTemplateId == quarterlyTemplateId)
+            .OrderByDescending(v => v.VersionNumber).Select(v => v.Id).FirstAsync();
+        var subject = await db.Users.AsNoTracking()
+            .Where(u => u.Id == subjectId).Select(u => new { u.DepartmentId, u.TeamId }).FirstAsync();
+        var row = new KpiEvaluation
+        {
+            KpiTemplateVersionId = versionId,
+            SubjectUserId = subjectId,
+            DepartmentId = subject.DepartmentId,
+            TeamId = subject.TeamId,
+            PeriodType = PeriodType.Quarterly,
+            PeriodKey = periodKey,
+            Status = KpiEvaluationStatus.Approved,
+            TotalScore = score,
+            ReviewedAtUtc = DateTime.UtcNow
+        };
+        db.KpiEvaluations.Add(row);
+        await db.SaveChangesAsync();
+        return row.Id;
     }
 
     private async Task DeactivateGeneralTemplatesAsync()
@@ -267,13 +300,22 @@ public class ObsR5OneDualTrackContractTests
         Assert.False(string.IsNullOrWhiteSpace(weeklyTrack.BlockingReason));
         Assert.Empty(weeklyTrack.Templates);
 
-        // والربعيّ يعمل كاملًا: مُهيّأ، وله قوالبه، ويقبل الإنشاء فعلًا.
+        // والربعيّ لا يُصاب بغياب جاره: مُهيّأ، وله قوالبه، وسببه الحاجب فارغ.
         Assert.True(quarterlyTrack.IsConfigured);
         Assert.True(setup.IsConfigured);
         Assert.Null(setup.BlockingReason);
-        (await manager.PostAsJsonAsync("/api/kpi-evaluations", new CreateKpiEvaluationRequest(
-            quarterly, employee, quarterlyTrack.PeriodType, quarterlyTrack.CurrentPeriodKey)))
-            .EnsureSuccessStatusCode();
+
+        // R6/§5.4 — كان الدليل على «عمل المسار كاملًا» هو قبول الإنشاء، وقد تقاعدت الكتابة الربعيّة
+        // بقرار المالك. الدليل الجديد أدقّ على المحور المقيس نفسه (**عزل سبب الرفض**): الرفض يأتي
+        // برمز الإقفال وحده، لا بـ`kpi_eval.template_not_assigned` ولا برمز «غير مُهيّأ». فلو تسرّب
+        // غيابُ المسار الأسبوعيّ إلى المسار الربعيّ لَظهر ذلك هنا رمزًا مختلفًا — وهو بالضبط العيب
+        // الذي وُضع هذا الاختبار لرصده.
+        var res = await manager.PostAsJsonAsync("/api/kpi-evaluations", new CreateKpiEvaluationRequest(
+            quarterly, employee, quarterlyTrack.PeriodType, quarterlyTrack.CurrentPeriodKey));
+        Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode);
+        var body = await res.Content.ReadAsStringAsync();
+        Assert.Contains("legacy_quarterly_write_disabled", body);
+        Assert.DoesNotContain("kpi_eval.template_not_assigned", body);
     }
 
     [Fact]
@@ -330,17 +372,32 @@ public class ObsR5OneDualTrackContractTests
         Assert.Equal(HttpStatusCode.BadRequest, quarterOnWeekly.StatusCode);
         Assert.Contains("kpi_eval.period_type_not_supported", await quarterOnWeekly.Content.ReadAsStringAsync());
 
-        // وكلٌّ في مساره يُقبَل — الحارس يمنع الخلط لا الرحلة.
-        (await manager.PostAsJsonAsync("/api/kpi-evaluations",
-            new CreateKpiEvaluationRequest(quarterly, employee, PeriodType.Quarterly, Q))).EnsureSuccessStatusCode();
+        // R6/§5.4 (WS-1) — المسار الأسبوعيّ في مساره يُقبَل: الحارس يمنع الخلط لا الرحلة.
         (await manager.PostAsJsonAsync("/api/kpi-evaluations",
             new CreateKpiEvaluationRequest(weekly, employee, PeriodType.Weekly, weeks[0]))).EnsureSuccessStatusCode();
+
+        // أمّا «الربعيّ في مساره» فلم يعد يُقبَل: مسار الكتابة الربعيّة متقاعد برمز مستقلّ،
+        // ويجب أن يكون الرمز رمزَ التقاعد لا رمزَ الخلط — وإلّا اختلط عقدان مختلفان.
+        var retired = await manager.PostAsJsonAsync("/api/kpi-evaluations",
+            new CreateKpiEvaluationRequest(quarterly, employee, PeriodType.Quarterly, Q));
+        Assert.Equal(HttpStatusCode.BadRequest, retired.StatusCode);
+        var retiredBody = await retired.Content.ReadAsStringAsync();
+        Assert.Contains("legacy_quarterly_write_disabled", retiredBody);
+        Assert.DoesNotContain("kpi_eval.period_type_not_supported", retiredBody);
     }
 
-    // ===================== قبول (9) و(10) — لا خلط في العدّادات ولا في المتوسّط الرسميّ =====================
+    // ===================== قبول (9) — عدّادات النبض مستقلّة، و(10) بعد R6: لا مسار ربعيّ يُقرأ =====================
 
+    /// <summary>
+    /// R6/§4+§5.3 — بند القبول (9) <b>محفوظ كما هو</b>: مقام النبض عدد دورات الربع لا 1، وقيمته من
+    /// تقييماته وحدها. أمّا بند (10) — «المسار الربعيّ الرسميّ يستهلك تقييمه الربعيّ وحده» — فقد سقط
+    /// موضوعه: لم يعد ثمّة مسار ربعيّ يُكتب (WS-1) ولا يُقرأ (§5.3/NF-08). فيُقاس بدلًا منه ما طلبه
+    /// المالك نصًّا: أنّ <b>النبض الأسبوعيّ المعتمَد هو مصدر التجميع الوحيد</b>، وأنّ صفًّا ربعيًّا
+    /// إرثيًّا <b>قائمًا ومعتمَدًا</b> في القاعدة لا يدخل أيّ قراءة تشغيليّة ولا يحرّك رقمًا، وأنّ طلب
+    /// المسار الربعيّ صراحةً يُردّ برمز مسمًّى بدل لوحة صفريّة صامتة.
+    /// </summary>
     [Fact]
-    public async Task قبول09و10_العدّادات_والتغطية_والمتوسّط_الرسميّ_لكلّ_مسار_على_حدة_بلا_ابتلاع()
+    public async Task قبول09و10_عدّادات_النبض_مستقلّة_والمسار_الربعيّ_مُقفَل_قراءةً_ولا_يحرّك_رقمًا()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var (manager, managerId) = await TestAuth.CreateUserAsync(_factory, "Manager");
@@ -349,38 +406,45 @@ public class ObsR5OneDualTrackContractTests
         var (_, employee) = await TestAuth.CreateUserWithJobRoleCodeAsync(_factory, "Employee", code, managerId);
 
         await DeactivateGeneralTemplatesAsync();
-        var (quarterly, qManual, qAuto) = await PublishAsync(admin, KpiCadence.Quarterly, role);
+        var (quarterly, _, _) = await PublishAsync(admin, KpiCadence.Quarterly, role);
         var (weekly, wManual, wAuto) = await PublishAsync(admin, KpiCadence.WeeklyPulse, role);
         var weeks = await WeekKeysAsync(manager, "Quarter", Q);
 
-        // نتيجة نبض واحدة (60) ونتيجة ربعيّة واحدة (90) لنفس الموظّف وداخل نفس الربع.
+        // نتيجة نبض معتمَدة واحدة (60)، وبجوارها صفّ ربعيّ إرثيّ **معتمَد** (90) لنفس الموظّف وداخل
+        // نفس الربع. الصفّ الإرثيّ مبذور مباشرةً لأنّ مسار كتابته مُقفَل (WS-1) وهو باقٍ بلا مسّ (WS-2).
         await ApprovedEvaluationAsync(manager, weekly, employee, wManual, wAuto, PeriodType.Weekly, weeks[0], 60m);
-        await ApprovedEvaluationAsync(manager, quarterly, employee, qManual, qAuto, PeriodType.Quarterly, Q, 90m);
+        var legacyId = await SeedLegacyApprovedQuarterlyRowAsync(quarterly, employee, Q, 90m);
 
         var q = $"periodType=Quarter&periodKey={Q}&subjectUserId={employee}";
-        var quarterlyRow = await RowAsync(manager, $"{q}&cadence=Quarterly", employee);
+
+        // (10-بديل) طلب المسار الربعيّ صراحةً مردود برمزه على نقاط القراءة التحليليّة — لا 200 صفريّة.
+        var quarterlyPerf = await manager.GetAsync($"/api/kpi/performance?{q}&cadence=Quarterly");
+        Assert.Equal(HttpStatusCode.BadRequest, quarterlyPerf.StatusCode);
+        Assert.Contains("legacy_cadence_disabled", await quarterlyPerf.Content.ReadAsStringAsync());
+
+        var quarterlyDrill = await manager.GetAsync($"/api/kpi/drilldown?{q}&cadence=Quarterly");
+        Assert.Equal(HttpStatusCode.BadRequest, quarterlyDrill.StatusCode);
+        Assert.Contains("legacy_cadence_disabled", await quarterlyDrill.Content.ReadAsStringAsync());
+
+        // (9) وعدّادات النبض مستقلّة تمامًا: مقامها عدد دورات الربع، لا 1.
         var weeklyRow = await RowAsync(manager, $"{q}&cadence=WeeklyPulse", employee);
-
-        // (10) المسار الرسميّ يستهلك تقييمه الربعيّ وحده — نتيجة النبض (60) لا تدخله ولا تحرّك رقمه.
-        Assert.Equal(90m, quarterlyRow.Measure.Value);
-        Assert.Equal(1, quarterlyRow.Measure.EligibleEvaluationCount);
-        Assert.Equal(1, quarterlyRow.Measure.AdjustedExpectedCount);
-        Assert.Equal(0, quarterlyRow.Measure.MissingCount);
-
-        // (9) وعدّادات النبض مستقلّة تمامًا: مقامها عدد دورات الربع، لا 1، ولا يبتلعها الربعيّ.
         Assert.Equal(60m, weeklyRow.Measure.Value);
         Assert.Equal(1, weeklyRow.Measure.EligibleEvaluationCount);
         Assert.Equal(weeks.Length, weeklyRow.Measure.AdjustedExpectedCount);
         Assert.Equal(weeks.Length - 1, weeklyRow.Measure.MissingCount);
 
-        // والتفصيل يحفظ مسار المصدر: لا صفّ من مسار داخل تفصيل المسار الآخر.
-        var quarterlyRows = (await DrilldownAsync(manager, $"{q}&cadence=Quarterly")).Rows;
-        Assert.NotEmpty(quarterlyRows);
-        Assert.All(quarterlyRows, r => Assert.Equal(KpiCadence.Quarterly, r.Cadence));
+        // ودرجة الصفّ الإرثيّ (90) لا تحرّك الرقم ولا تُحتسب: القراءة الافتراضيّة تطابق قراءة النبض.
+        var defaultRow = await RowAsync(manager, q, employee);
+        Assert.Equal(KpiCadence.WeeklyPulse, defaultRow.EffectiveCadence);
+        Assert.Equal(60m, defaultRow.Measure.Value);
+        Assert.Equal(1, defaultRow.Measure.EligibleEvaluationCount);
 
+        // والتفصيل يحفظ نقاء المصدر: كلّ صفوفه من النبض، ولا أثر للصفّ الإرثيّ ولا لمفتاحه الربعيّ.
         var weeklyRows = (await DrilldownAsync(manager, $"{q}&cadence=WeeklyPulse")).Rows;
         Assert.NotEmpty(weeklyRows);
         Assert.All(weeklyRows, r => Assert.Equal(KpiCadence.WeeklyPulse, r.Cadence));
+        Assert.DoesNotContain(weeklyRows, r => r.EvaluationId == legacyId);
+        Assert.DoesNotContain(weeklyRows, r => r.PeriodKey == Q);
     }
 
     // ===================== قبول (11) — موظّفو القوالب المبذورة لا يفقدون النبض =====================
@@ -392,26 +456,24 @@ public class ObsR5OneDualTrackContractTests
     {
         await ReactivateSeededGeneralTemplatesAsync();
 
+        var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var (manager, managerId) = await TestAuth.CreateUserAsync(_factory, "Manager");
         var (_, employee) = await TestAuth.CreateUserWithJobRoleCodeAsync(
             _factory, "Employee", roleCode, managerId);
 
-        using (var scope = _factory.Services.CreateScope())
-        {
-            // ربط القوالب المبذورة بمسمّياتها يقع في `OrgSeeder` (بيئة التطوير)، وهو ما يخلق السيناريو
-            // المقيس أصلًا: قالب ربعيّ **أخصّ بالمسمّى** بجوار نبض أسبوعيّ عامّ. تشغيله هنا idempotent.
-            //
-            // ويجب أن يقع **بعد** إنشاء الموظّف: `SeedJobRolesAsync` يخرج مبكّرًا إن وُجد أيّ مسمّى في
-            // القاعدة، فلا يُنشئ رمز المسمّى المطلوب حين تكون اختبارات شقيقة قد أنشأت مسمّيات قبله؛
-            // وإنشاء الموظّف برمزه يضمن وجود المسمّى فيقع الربط فعلًا لا صمتًا.
-            await OrgSeeder.SeedAsync(scope.ServiceProvider);
-        }
+        // R6.3/§3 — كان الشرط المسبق يُصنَع عبر `OrgSeeder` الذي يربط **قالبًا ربعيًّا مبذورًا**
+        // بمسمّاه. بعد إقفال بذر الربعيّ لم يعد ذلك القالب يُنشأ على قاعدة نظيفة، فبقي الشرط بلا
+        // مُنتِج والاختبار يقيس العدم. والسيناريو نفسه **ما زال قائمًا في قواعد الإنتاج** (WS-2:
+        // القوالب التاريخيّة لم تُحذف ولا تُهاجَر) ⇒ التغطية تُصان بصناعة الشرط صراحةً بدل
+        // الاعتماد على الباذر: قالب ربعيّ منشور مربوط بالمسمّى نفسه. لا تأكيد حُذف ولا أُضعِف.
+        var role = await TestAuth.GetOrCreateJobRoleAsync(_factory, roleCode);
+        await PublishAsync(admin, KpiCadence.Quarterly, role);
 
         var setup = await SetupAsync(manager, employee);
         var weeklyTrack = Track(setup, KpiCadence.WeeklyPulse);
         var quarterlyTrack = Track(setup, KpiCadence.Quarterly);
 
-        // الشرط المسبق للسيناريو: الربعيّ المبذور فاز بمطابقة المسمّى (المستوى الأخصّ) فعلًا.
+        // الشرط المسبق للسيناريو: الربعيّ المربوط بالمسمّى فاز بالمستوى الأخصّ فعلًا.
         Assert.Equal(KpiCadenceSources.JobRole, quarterlyTrack.CadenceSource);
 
         // ومع ذلك «النبض الأسبوعي العام» (المستوى العامّ) يبقى قائمًا في مساره.
@@ -439,6 +501,11 @@ public class ObsR5OneDualTrackContractTests
         Task<List<AuditLog>> BindingAuditsAsync()
             => db.AuditLogs.AsNoTracking().Where(a => a.Action == BindingAction).ToListAsync();
 
+        // R6.3/§3 — ضمان وجود مسمّى المسبار صراحةً: `OrgSeeder.SeedJobRolesAsync` يخرج مبكّرًا
+        // إن وُجد أيّ مسمّى في القاعدة المشتركة، فربطُ القالب كان يقع أو لا يقع بحسب ترتيب
+        // تشغيل الاختبارات الشقيقة. الإنشاء الصريح يجعل الشرط المسبق ملكًا للاختبار لا للترتيب.
+        await TestAuth.GetOrCreateJobRoleAsync(_factory, "SALES_B2C");
+
         // ندفع القاعدة إلى حالة التقارب أوّلًا. `OrgSeeder` لا يعمل إلّا في Development فقد لا يكون
         // عمل داخل مصنع الاختبار ⟹ لو قِسنا مباشرةً لخلطنا «التقارب الأوّل» بـ«إعادة البذر».
         await TemplateSeeder.SeedAsync(scope.ServiceProvider);
@@ -446,7 +513,12 @@ public class ObsR5OneDualTrackContractTests
 
         // ثمّ نفكّ ربط قالب مبذور بعينه عمدًا لنُعيد خلق حالة «ما قبل الربط» — فيصير القياس مستقلًّا
         // عن كون القاعدة نظيفة أو مبذورة سلفًا، لا رهينة ترتيب التشغيل.
-        const string BoundTitle = "مؤشرات مندوب المبيعات";
+        //
+        // R6.3/§3 — كان المسبار «مؤشرات مندوب المبيعات» (ربعيّ). بعد إقفال بذر الربعيّ لم يعد
+        // يُنشأ على قاعدة نظيفة، فبُدِّل إلى قالب **ما زال يُبذَر ويُربَط** بمسمّاه في القائمة نفسها
+        // (`OrgSeeder.kpiTitleToRole`). المقيس لم يتغيّر: تسجيل أثر صريح عند إعادة الربط، ثمّ
+        // ثبات البذر (لا قالب جديد ولا معرّف ولا حالة ولا أثر إضافيّ). التغطية كما هي بالكامل.
+        const string BoundTitle = B2cReportSchema.KpiTitle;
         var probe = await db.KpiTemplates.FirstAsync(t => t.Title == BoundTitle);
         var expectedRoleId = probe.JobRoleId;
         Assert.NotNull(expectedRoleId);
@@ -497,7 +569,22 @@ public class ObsR5OneDualTrackContractTests
         // `KpiTemplateService.PublishVersionAsync` يرفض نشر إصدار مجموع أوزانه ≠ 100، ولا يُلغي نشر
         // الإصدارات السابقة — فتعدّد الإصدارات المنشورة للقالب الواحد حالة سليمة مقصودة (التقييمات
         // التاريخيّة تبقى مقروءة بإصداراتها). تسطيح المؤشّرات عبر إصدارات القالب كان يجمع 100+100=200
-        // فيقرأ حالةً سليمة عيبًا. ولكلّ قالب منشور يبقى شرط وجود إصدار منشور واحد على الأقلّ قائمًا.
+        // فيقرأ حالةً سليمة عيبًا — خطأ نطاق في القياس لا خرقٌ لحارس النشر.
+        //
+        // R6.5 — توفيق: مرشّحان مستقلّان أصلحا هذا العيب نفسه، واتّفقا حرفيًّا على تأكيد «مجموع أوزان
+        // كلّ إصدار منشور = 100»، واختلفا في صياغة القضيّة المرافقة «كلّ قالب منشور له إصدار منشور»:
+        // أحدهما عدَّ الإصدارات المنشورة للقالب، والآخر تحقّق من احتواء عنوان القالب في قائمة الإصدارات
+        // المنشورة. القضيّتان متكافئتان منطقيًّا على المصدر نفسه (المرشِّحان يقرآن الجدولين ذاتهما بشرطَي
+        // `IsPublished` و`Status == Published`)، فأُبقيت صياغة العدّ لأنّها **الأقوى تشخيصًا**: تنصّ على
+        // العتبة رقمًا وتُسمّي القالب المخالف في رسالة الفشل. المحذوف تكرارٌ لا تغطية.
+        var publishedTemplates = await db.KpiTemplates.AsNoTracking()
+            .Where(t => t.Status == TemplateStatus.Published)
+            .Select(t => new { t.Title, PublishedVersions = t.Versions.Count(v => v.IsPublished) })
+            .ToListAsync();
+        Assert.NotEmpty(publishedTemplates);
+        Assert.All(publishedTemplates, t =>
+            Assert.True(t.PublishedVersions >= 1, $"القالب المنشور «{t.Title}» بلا إصدار منشور."));
+
         var publishedVersions = await db.KpiTemplateVersions.AsNoTracking()
             .Where(v => v.IsPublished && v.KpiTemplate!.Status == TemplateStatus.Published)
             .Select(v => new
@@ -508,18 +595,11 @@ public class ObsR5OneDualTrackContractTests
             })
             .ToListAsync();
         Assert.NotEmpty(publishedVersions);
-        Assert.All(publishedVersions, p =>
+        Assert.All(publishedVersions, v =>
         {
-            Assert.NotEmpty(p.Weights);
-            Assert.Equal(100m, p.Weights.Sum());
+            Assert.NotEmpty(v.Weights);
+            Assert.Equal(100m, v.Weights.Sum());
         });
-
-        var publishedTitles = await db.KpiTemplates.AsNoTracking()
-            .Where(t => t.Status == TemplateStatus.Published)
-            .Select(t => t.Title)
-            .ToListAsync();
-        Assert.NotEmpty(publishedTitles);
-        Assert.All(publishedTitles, title => Assert.Contains(publishedVersions, p => p.Title == title));
     }
 
     // ============ المسار الأوّليّ بلا طلب صريح — أخصّ الإسنادين لا نوع المسار ============
@@ -530,11 +610,16 @@ public class ObsR5OneDualTrackContractTests
     /// قالبٍ ربعيّ <b>عامّ</b> يبتلع نبضًا أسبوعيًّا مُسنَدًا إلى مسمّى الموظّف نفسه: مقام الربع صار 1
     /// بدل 13 أسبوعًا، فتنقلب تغطية الموظّف ومقامه بسبب قالب عامّ لم يُقصَد به.
     ///
-    /// القاعدة الصحيحة المقيسة هنا: الأوّليّ هو <b>الأخصّ إسنادًا</b> بنفس سلّم DEC-01، وعند التساوي
-    /// يفوز الربعيّ الرسميّ. والمساران يبقيان مقروءَين صراحةً بـ<c>cadence</c> — فلا شيء أُخفي.
+    /// القاعدة التي كانت مقيسة: الأوّليّ هو الأخصّ إسنادًا، وعند التساوي يفوز الربعيّ الرسميّ.
+    ///
+    /// R6/§4+§5.5 — <b>العيب المقيس باقٍ ومقيس، وقاعدة كسر التعادل هي التي سقطت</b>: لم يعد ثمّة
+    /// «مسار ربعيّ» يفوز بشيء. الغياب يعني «النبض الأسبوعيّ» صراحةً لا «الأخصّ أيًّا كان»، فيستحيل
+    /// على قالب ربعيّ — عامًّا كان أو بالمسمّى — أن يقلب المقام من 13 أسبوعًا إلى دورة واحدة.
+    /// وهذا يقيس الحماية نفسها بضمانة أقوى: لا مساحة تعادل أصلًا. وطلب المسار الربعيّ صراحةً
+    /// لم يعد قراءةً بديلة بل ردًّا مسمًّى (§5.3/NF-08).
     /// </summary>
     [Fact]
-    public async Task المسار_الأوّليّ_بلا_طلب_صريح_يتبع_أخصّ_إسناد_لا_نوع_المسار()
+    public async Task المسار_الأوّليّ_بلا_طلب_صريح_هو_النبض_الأسبوعيّ_ولا_يقلبه_قالب_ربعيّ()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var (manager, managerId) = await TestAuth.CreateUserAsync(_factory, "Manager");
@@ -558,16 +643,18 @@ public class ObsR5OneDualTrackContractTests
         Assert.Equal(KpiCadenceSources.JobRole, auto.CadenceSource);
         Assert.Equal(weeks.Length, auto.Measure.ExpectedEvaluationCount);
 
-        // والربعيّ العامّ لم يُلغَ: يُقرأ كاملًا حين يُطلَب صراحةً — مساران متزامنان لا واحد يبتلع الآخر.
-        var quarterly = await RowAsync(manager, $"cadence=Quarterly&periodType=Quarter&periodKey={Q}", employee);
-        Assert.Equal(KpiCadence.Quarterly, quarterly.EffectiveCadence);
-        Assert.Equal(KpiCadenceSources.GeneralTemplate, quarterly.CadenceSource);
-        Assert.Equal(1, quarterly.Measure.ExpectedEvaluationCount);
+        // والربعيّ العامّ لم يعد قراءةً بديلة: طلبه صراحةً يُردّ برمزه بدل لوحة موازية.
+        var quarterlyRes = await manager.GetAsync(
+            $"/api/kpi/performance?cadence=Quarterly&periodType=Quarter&periodKey={Q}&subjectUserId={employee}");
+        Assert.Equal(HttpStatusCode.BadRequest, quarterlyRes.StatusCode);
+        Assert.Contains("legacy_cadence_disabled", await quarterlyRes.Content.ReadAsStringAsync());
 
-        // وعند تساوي المستوى (كلاهما بالمسمّى) يفوز الربعيّ الرسميّ — قاعدة معلَنة لا صدفة ترتيب.
+        // وحتّى حين يصير الربعيّ **بالمسمّى** (أخصّ إسناد ممكن) لا يقلب المقام ولا المسار الأوّليّ:
+        // لا قاعدة كسر تعادل تُطبَّق، لأنّ المسار الوحيد هو النبض الأسبوعيّ.
         await PublishAsync(admin, KpiCadence.Quarterly, role);
         var tie = await RowAsync(manager, $"periodType=Quarter&periodKey={Q}", employee);
-        Assert.Equal(KpiCadence.Quarterly, tie.EffectiveCadence);
+        Assert.Equal(KpiCadence.WeeklyPulse, tie.EffectiveCadence);
         Assert.Equal(KpiCadenceSources.JobRole, tie.CadenceSource);
+        Assert.Equal(weeks.Length, tie.Measure.ExpectedEvaluationCount);
     }
 }

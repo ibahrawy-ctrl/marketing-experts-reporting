@@ -105,8 +105,8 @@ public class KpiOverviewScopeTests
         var (templateId, manualId, autoId) = await PublishKpiAsync(admin);
         var org = await BuildOrgAsync();
 
-        await SubmitEvalAsync(admin, templateId, manualId, autoId, org.Emp.Id, TestCalendar.Cycle(1));
-        await SubmitEvalAsync(admin, templateId, manualId, autoId, org.FinEmp.Id, TestCalendar.Cycle(1));
+        await ApproveEvalAsync(admin, org.Gm.C, templateId, manualId, autoId, org.Emp.Id, TestCalendar.Cycle(1));
+        await ApproveEvalAsync(admin, org.Gm.C, templateId, manualId, autoId, org.FinEmp.Id, TestCalendar.Cycle(1));
 
         var report = await (await org.Mgr.C.GetAsync($"/api/reports/kpi-summary?periodType=Weekly&periodKey={TestCalendar.Cycle(1)}"))
             .ReadAsync<KpiSummaryReport>();
@@ -162,8 +162,8 @@ public class KpiOverviewScopeTests
         var (templateId, manualId, autoId) = await PublishKpiAsync(admin);
         var org = await BuildOrgAsync();
 
-        await SubmitEvalAsync(admin, templateId, manualId, autoId, org.Emp.Id, TestCalendar.Cycle(3));
-        await SubmitEvalAsync(admin, templateId, manualId, autoId, org.FinEmp.Id, TestCalendar.Cycle(3));
+        await ApproveEvalAsync(admin, org.Gm.C, templateId, manualId, autoId, org.Emp.Id, TestCalendar.Cycle(3));
+        await ApproveEvalAsync(admin, org.Gm.C, templateId, manualId, autoId, org.FinEmp.Id, TestCalendar.Cycle(3));
 
         var depts = await (await admin.GetAsync("/api/directory/departments"))
             .ReadAsync<List<DirDepartment>>();
@@ -211,7 +211,7 @@ public class KpiOverviewScopeTests
         await db.SaveChangesAsync();
     }
 
-    private static async Task SubmitEvalAsync(HttpClient evaluator, Guid templateId, Guid manualId, Guid autoId,
+    private static async Task<Guid> SubmitEvalAsync(HttpClient evaluator, Guid templateId, Guid manualId, Guid autoId,
         Guid subjectId, string periodKey)
     {
         var ev = await (await evaluator.PostAsJsonAsync("/api/kpi-evaluations",
@@ -224,6 +224,26 @@ public class KpiOverviewScopeTests
                 new KpiResultInput(autoId, 70m, null, null)
             }));
         await evaluator.PostAsync($"/api/kpi-evaluations/{ev.Id}/submit", null);
+        return ev.Id;
+    }
+
+    /// <summary>
+    /// R6/§4 — تقييم **معتمَد**. الاختبارات التي تقيس صفوف ملخّص المؤشّرات تحتاجه: الحالة
+    /// <c>Submitted</c> ليست مصدر حقيقة، ولا تدخل أيّ حساب بعد R6. وما لا يقيس صفوفًا يبقى
+    /// على <see cref="SubmitEvalAsync"/> كما هو — فلا نغيّر تهيئةً لا علاقة لها بالعقد.
+    /// <para>
+    /// المُعتمِد **يجب** أن يكون شخصًا غير مُدخِل التقييم: فصل الإدخال عن المراجعة قاعدة إنتاج
+    /// قائمة (<c>EnsureCanReview</c> يردّ <c>auth.forbidden</c> حين <c>uid == EvaluatorId</c>)،
+    /// وهي ليست من عقد R6 ولا تُمَسّ. لذا يُدخِل المسؤول ويعتمد المدير العام — وهو تصعيد
+    /// أعلى (Admin/CEO/GM) فيعتمد لأيّ موضوع بصرف النظر عن المُراجِع المعيَّن، فيبقى محور
+    /// القياس في هذه الاختبارات هو **النطاق** لا سلسلة المراجعة.
+    /// </para>
+    /// </summary>
+    private static async Task ApproveEvalAsync(HttpClient evaluator, HttpClient approver, Guid templateId,
+        Guid manualId, Guid autoId, Guid subjectId, string periodKey)
+    {
+        var id = await SubmitEvalAsync(evaluator, templateId, manualId, autoId, subjectId, periodKey);
+        (await approver.PostAsync($"/api/kpi-evaluations/{id}/approve", null)).EnsureSuccessStatusCode();
     }
 
     private static async Task<(Guid TemplateId, Guid ManualMetricId, Guid AutoMetricId)> PublishKpiAsync(HttpClient admin)

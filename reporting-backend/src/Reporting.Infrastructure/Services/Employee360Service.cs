@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using Reporting.Application.Attendance;
 using Reporting.Application.Common;
 using Reporting.Application.Employee360;
+using Reporting.Application.Kpi;
 using Reporting.Application.Periods;
 using Reporting.Application.Security;
 using Reporting.Domain.Enums;
@@ -213,14 +214,22 @@ public class Employee360Service : IEmployee360Service
             .Where(c => c.Status is SubmissionStatus.Draft or SubmissionStatus.Returned)
             .Sum(c => c.Count);
 
-        var lastKpi = await _db.KpiEvaluations.AsNoTracking()
-            .Where(e => e.SubjectUserId == subject && e.Status == KpiEvaluationStatus.Approved)
+        // R6/§5.6 — عدّادات المؤشّرات في الملخّص التشغيليّ تخضع لنفس مصدر الحقيقة الذي يخضع له قسم
+        // المؤشّرات التفصيليّ: نبض أسبوعيّ معتمَد وحده. بدون قيد `PeriodType == Weekly` كان الصفّ
+        // الربعيّ الإرثيّ المعتمَد يظلّ يُعَدّ في `kpiCount` ويُحتمَل ظهوره «آخر تقييم» — فيقرأ المدير
+        // ملخّصًا يناقض التفصيل الذي تحته في نفس الشاشة. ولأنّ الترتيب هنا نصّيّ، فمقارنة مفتاح
+        // ربعيّ (`2026-Q2`) بمفتاح أسبوعيّ (`2026-W35`) معجميّة لا زمنيّة أصلًا.
+        var approvedWeekly = _db.KpiEvaluations.AsNoTracking()
+            .Where(e => e.SubjectUserId == subject
+                        && e.PeriodType == PeriodType.Weekly
+                        && KpiScorePolicy.ScoreEligibleStatuses.Contains(e.Status));
+
+        var lastKpi = await approvedWeekly
             .OrderByDescending(e => e.PeriodKey)
             .Select(e => new { e.TotalScore, e.PeriodKey })
             .FirstOrDefaultAsync(ct);
 
-        var kpiCount = await _db.KpiEvaluations.AsNoTracking()
-            .CountAsync(e => e.SubjectUserId == subject && e.Status == KpiEvaluationStatus.Approved, ct);
+        var kpiCount = await approvedWeekly.CountAsync(ct);
 
         var openLeave = await _db.LeaveRequests.AsNoTracking()
             .CountAsync(l => l.RequesterUserId == subject
@@ -290,8 +299,15 @@ public class Employee360Service : IEmployee360Service
     {
         var subject = ctx.SubjectUserId;
 
+        // R6/§5.6 — مصدر الحقيقة الوحيد: نبض أسبوعيّ معتمَد. المُرشِّح يُطبَّق **في الاستعلام** لا بعده،
+        // لأنّ التصفية اللاحقة كانت تُصحّح الأرقام وحدها وتترك وجود القسم وآخر نشاط والاتّجاه وقائمة
+        // التفاصيل ملوّثة بصفوف ربعيّة إرثيّة. الترتيب النصّيّ صحيح حصرًا لمفاتيح YYYY-Www المصفوفة
+        // بأصفار سابقة (زمنيّ = معجميّ)، وهو ما يضمنه هذا المُرشِّح.
+        // الصفوف الربعيّة الإرثيّة لا تظهر في Employee 360 التشغيليّ إطلاقًا.
         var approved = await _db.KpiEvaluations.AsNoTracking()
-            .Where(e => e.SubjectUserId == subject && e.Status == KpiEvaluationStatus.Approved)
+            .Where(e => e.SubjectUserId == subject
+                        && e.PeriodType == PeriodType.Weekly
+                        && KpiScorePolicy.ScoreEligibleStatuses.Contains(e.Status))
             .OrderByDescending(e => e.PeriodKey)
             .Take(200)
             .Select(e => new Employee360KpiEvaluationDto(
@@ -305,13 +321,14 @@ public class Employee360Service : IEmployee360Service
                 e.TotalScore,
                 e.Status.ToString(),
                 e.Trend.ToString(),
-                e.SubmittedAtUtc))
+                e.SubmittedAtUtc,
+                e.KpiTemplateVersionId))
             .ToListAsync(ct);
 
         if (approved.Count == 0)
-            return Empty(Employee360Section.Kpi, "لا توجد تقييمات معتمدة لهذا الموظّف بعد.");
+            return Empty(Employee360Section.Kpi, "لا توجد تقييمات أسبوعيّة معتمدة لهذا الموظّف بعد.");
 
-        var weekly = approved.Where(e => e.PeriodType == nameof(PeriodType.Weekly)).ToList();
+        var weekly = approved;
         var lastCompleted = period ?? _periods.LastCompletedWeek();
         var previous = _periods.PreviousComparable(lastCompleted);
 
@@ -336,10 +353,23 @@ public class Employee360Service : IEmployee360Service
     {
         var inWindow = weekly.Where(e => keys.Contains(e.PeriodKey) && e.TotalScore.HasValue).ToList();
         var coverage = keys.Count == 0 ? 0m : Math.Round((decimal)inWindow.Count / keys.Count, 4);
+
+        // R6/§5.10 — النَسَب والقابليّة للمقارنة يُعلَنان مع الرقم نفسه: أيّ أسابيع بنته، وبأيّ إصدارات
+        // قالب. تعدّد الإصدارات داخل نافذة واحدة يعني تغيُّر المقياس ⇒ وسم صريح بدل متوسّط يبدو متجانسًا.
+        var versions = inWindow.Select(e => e.KpiTemplateVersionId).Distinct().ToList();
+        var templateChanged = versions.Count > 1;
+        var comparability = inWindow.Count == 0
+            ? Employee360MetricComparability.NotComparableNoData
+            : templateChanged
+                ? Employee360MetricComparability.NotComparableTemplateChanged
+                : Employee360MetricComparability.Comparable;
+
         return new Employee360KpiWindowDto(
             windowKey, periodType, periodKey,
             inWindow.Count == 0 ? null : Math.Round(inWindow.Average(e => e.TotalScore!.Value), 2),
-            inWindow.Count, keys.Count, coverage);
+            inWindow.Count, keys.Count, coverage,
+            inWindow.Select(e => e.PeriodKey).OrderBy(k => k, StringComparer.Ordinal).ToList(),
+            versions, templateChanged, comparability);
     }
 
     private Employee360KpiWindowDto? AggregateWindow(
@@ -384,7 +414,10 @@ public class Employee360Service : IEmployee360Service
             : scored.OrderBy(e => e.TotalScore).First();
         return new Employee360KpiWindowDto(
             best ? "BestWeek" : "WorstWeek", nameof(PeriodType.Weekly), pick.PeriodKey,
-            pick.TotalScore, 1, 1, 1m);
+            pick.TotalScore, 1, 1, 1m,
+            // أسبوع واحد ⇒ إصدار واحد بالضرورة، فلا تغيّر قالب ممكن داخل النافذة.
+            new[] { pick.PeriodKey }, new[] { pick.KpiTemplateVersionId }, false,
+            Employee360MetricComparability.Comparable);
     }
 
     // ===== (5) الإجازات والاستئذانات =====

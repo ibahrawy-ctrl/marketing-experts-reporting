@@ -299,7 +299,12 @@ public class KpiCalculationService : IKpiCalculationService
         private KpiEffectiveCadence? TrackOf(Guid userId)
         {
             if (!Tracks.TryGetValue(userId, out var t)) return null;
-            return RequestedCadence is KpiCadence requested ? t.For(requested) : t.Primary;
+
+            // R6/§5.5 — غياب الكادنس لا يُعيد تفعيل السلوك الإرثيّ المختلط.
+            // كان السقوط إلى `t.Primary` يختار المسار الربعيّ للموظّفين ذوي الأخصّيّة الربعيّة، فتُخلَط
+            // حقائق ربعيّة إرثيّة بحقائق النبض الأسبوعيّ داخل نفس اللوحة. مصدر الحقيقة الوحيد هو النبض
+            // الأسبوعيّ ⇒ الغياب يعني «النبض الأسبوعيّ» صراحةً، لا «الأخصّ أيًّا كان».
+            return t.For(RequestedCadence ?? KpiCadence.WeeklyPulse);
         }
 
         public (decimal Threshold, string Source) ThresholdOf(Guid userId) =>
@@ -312,6 +317,18 @@ public class KpiCalculationService : IKpiCalculationService
     {
         if (!_currentUser.IsAuthenticated)
             return new Prepared(null, new Failure("غير مصرّح.", "auth.unauthenticated"));
+
+        // R6/§5.3 (NF-08) — طلب المسار الربعيّ صراحةً مُغلَق على **كلّ** نقاط القراءة التحليليّة
+        // (الأداء والترتيب والتفصيل) لا على `aggregate` وحدها. بدون هذا الحارس كان `cadence=Quarterly`
+        // يُعيد 200 بلوحة مكتملة الشكل: مقام بعدد دورات الربع وبسط صفر — لأنّ محور الحقائق أسبوعيّ
+        // بحت (§5.5) فلا يجد صفًّا واحدًا لمسار ربعيّ. أي «صفر أداء» يُقرأ كحقيقة تشغيليّة بينما هو
+        // أثر مسار متقاعد: نفس نمط التعتيم الصامت الذي أُنهي في التصدير المالي. الرفض المسمّى يجعل
+        // السبب مقروءًا في الواجهة والسجلّ معًا. الرمز هو رمز **القراءة** لا رمز الكتابة (§5.4).
+        if (query.Cadence == KpiCadence.Quarterly)
+            return new Prepared(null, new Failure(
+                "التقييم الربعيّ الرسميّ لم يعد مسارًا للقراءة؛ مصدر الحقيقة الوحيد هو النبض الأسبوعيّ المعتمَد، "
+                + "والقراءة الربعيّة متاحة كحبيبة نافذة فوقه.",
+                "legacy_cadence_disabled"));
 
         var resolved = _periods.Resolve(new PeriodRequest(query.PeriodType, query.PeriodKey, query.From, query.To));
         if (!resolved.Succeeded) return new Prepared(null, new Failure(resolved.Error!, resolved.ErrorCode!));
@@ -397,40 +414,33 @@ public class KpiCalculationService : IKpiCalculationService
         decimal? Score, int EligibleCount, int ExcludedByStatusCount, int Expected, int AdjustedExpected);
 
     /// <summary>
-    /// استعلام التقييمات **المكتمِلة** لفترة ونطاق: حالة اكتمال معتمَدة (DEC-01/9 — Approved أو Closed)
-    /// + درجة غير فارغة + كادنس الموظّف الفعّال + مفتاح الدورة داخل الفترة.
+    /// استعلام التقييمات **المؤهَّلة للدرجة**: <c>Approved</c> وحدها (R6/IC-4 — <see
+    /// cref="KpiScorePolicy.ScoreEligibleStatuses"/>) + درجة غير فارغة، فوق محور حقائق أسبوعيّ بحت.
     /// المحذوف مستبعَد تلقائيًّا بالمرشّح العامّ في <see cref="AppDbContext"/>.
     /// </summary>
     private IQueryable<EvaluationJoin> EligibleEvaluationsQuery(CalculationContext ctx, ResolvedPeriod period)
         => BaseEvaluationsQuery(ctx, period)
-            .Where(x => KpiScorePolicy.CompletedStatuses.Contains(x.e.Status) && x.e.TotalScore != null);
+            .Where(x => KpiScorePolicy.ScoreEligibleStatuses.Contains(x.e.Status) && x.e.TotalScore != null);
 
     private IQueryable<EvaluationJoin> BaseEvaluationsQuery(CalculationContext ctx, ResolvedPeriod period)
     {
-        // DEC-01/3+4 — مساران منفصلان داخل نافذة عرض واحدة (الربع): نبض الأسبوع مفاتيحه YYYY-Www،
-        // والتقييم الربعيّ الرسميّ مفتاحه YYYY-Qn. قصر الاستعلام على مفاتيح الأسابيع وحدها كان يجعل
-        // بسط المسار الربعيّ صفرًا أبدًا مقابل مقام غير صفريّ ⟹ «لم يبدأ» دائمة وتغطية 0% كاذبة.
+        // R6/§4+§5.5 — مصدر الحقيقة الوحيد: النبض الأسبوعيّ المعتمَد. حبيبة القراءة (أسبوع/شهر/ربع/سنة)
+        // تحدّد **النافذة** فقط، ولا تُدخِل مفاتيح `YYYY-Qn` الإرثيّة إلى محور الحقائق. خلط المفاتيح
+        // كان يجعل صفًّا ربعيًّا واحدًا يزن كأسبوع كامل داخل نفس المتوسّط.
         var weekKeys = _periods.WeekKeysWithin(period);
-        var quarterKeys = QuarterWindowsWithin(period).Select(w => w.Key).ToList();
-        var periodKeys = weekKeys.Concat(quarterKeys).ToList();
 
         var q = from e in _db.KpiEvaluations.AsNoTracking()
                 join v in _db.KpiTemplateVersions.AsNoTracking() on e.KpiTemplateVersionId equals v.Id
                 join t in _db.KpiTemplates.AsNoTracking() on v.KpiTemplateId equals t.Id
-                where periodKeys.Contains(e.PeriodKey)
+                where weekKeys.Contains(e.PeriodKey)
                 select new EvaluationJoin { e = e, t = t };
 
-        // OBS-R5-01/5 — لا خلط بين المسارين مطلقًا: البسط لا يضمّ إلّا تقييمات القوالب التي تواترها
-        // هو مسار الموظّف الفعّال في هذا الحساب. فنتيجة نبض أسبوعيّ لا تدخل الربعيّ الرسميّ أبدًا،
-        // والتقييم الربعيّ لا يُعدّ أسبوعًا إضافيًّا داخل النبض. قائمتان فقط ⇒ استعلام واحد بلا N+1.
+        // البسط لا يضمّ إلّا تقييمات قوالب النبض الأسبوعيّ لموظّفين مسارهم الفعّال هو النبض الأسبوعيّ.
+        // التقييمات الربعيّة الإرثيّة لا تدخل الأداء ولا الترتيب مطلقًا (تبقى في الأرشيف الإرثيّ بصلاحيّاته).
         var weeklyIds = ctx.Roster.Where(u => ctx.CadenceOf(u.UserId) == KpiCadence.WeeklyPulse)
             .Select(u => u.UserId).ToList();
-        var quarterlyIds = ctx.Roster.Where(u => ctx.CadenceOf(u.UserId) == KpiCadence.Quarterly)
-            .Select(u => u.UserId).ToList();
 
-        return q.Where(x =>
-            (x.t.Cadence == KpiCadence.WeeklyPulse && weeklyIds.Contains(x.e.SubjectUserId))
-            || (x.t.Cadence == KpiCadence.Quarterly && quarterlyIds.Contains(x.e.SubjectUserId)));
+        return q.Where(x => x.t.Cadence == KpiCadence.WeeklyPulse && weeklyIds.Contains(x.e.SubjectUserId));
     }
 
     private sealed class EvaluationJoin
@@ -443,16 +453,17 @@ public class KpiCalculationService : IKpiCalculationService
         CalculationContext ctx, ResolvedPeriod period, CancellationToken ct)
     {
         // التجميع يُترجَم إلى GROUP BY في SQL: صفّ واحد لكلّ موظّف بدل جلب كل التقييمات إلى الذاكرة.
-        var completed = KpiScorePolicy.CompletedStatuses;
+        // R6/IC-4 — الأهليّة للدرجة = Approved وحدها؛ Closed يبقى «مكتمل دورة حياة» ولا يدخل الدرجة.
+        var eligible = KpiScorePolicy.ScoreEligibleStatuses;
         var approved = await BaseEvaluationsQuery(ctx, period)
             .GroupBy(x => x.e.SubjectUserId)
             .Select(g => new
             {
                 UserId = g.Key,
-                Sum = g.Where(x => completed.Contains(x.e.Status) && x.e.TotalScore != null)
+                Sum = g.Where(x => eligible.Contains(x.e.Status) && x.e.TotalScore != null)
                        .Sum(x => (decimal?)x.e.TotalScore) ?? 0m,
-                EligibleCount = g.Count(x => completed.Contains(x.e.Status) && x.e.TotalScore != null),
-                ExcludedByStatus = g.Count(x => !completed.Contains(x.e.Status))
+                EligibleCount = g.Count(x => eligible.Contains(x.e.Status) && x.e.TotalScore != null),
+                ExcludedByStatus = g.Count(x => !eligible.Contains(x.e.Status))
             })
             .ToListAsync(ct);
 
@@ -506,7 +517,6 @@ public class KpiCalculationService : IKpiCalculationService
                 return new Commitment(k, s, e, ReportingCalendarPolicy.CycleLabel(k), null);
             })
             .ToList();
-        var quarterly = QuarterWindowsWithin(period);
 
         var userIds = ctx.Roster.Select(u => u.UserId).ToList();
 
@@ -537,16 +547,16 @@ public class KpiCalculationService : IKpiCalculationService
         var result = new Dictionary<Guid, List<Commitment>>(ctx.Roster.Count);
         foreach (var u in ctx.Roster)
         {
-            var cadence = ctx.CadenceOf(u.UserId);
-            if (cadence is null)
+            if (ctx.CadenceOf(u.UserId) is null)
             {
                 // DEC-01/5 — لا تواتر مُهيّأ ⇒ لا التزام مفترَض. لا يُخترَع مقام ولا تُلفَّق تغطية.
                 result[u.UserId] = new List<Commitment>();
                 continue;
             }
 
-            var windows = cadence == KpiCadence.WeeklyPulse ? weekly : quarterly;
-            result[u.UserId] = windows.Select(w => w with { ExemptReason = ExemptReasonFor(w, u) }).ToList();
+            // R6/§5.5 — المقام أسبوعيّ حصرًا كالبسط. النوافذ الربعيّة الإرثيّة لم تعد تُصنع مقامًا،
+            // فلا يبقى بسط صفريّ أمام مقام ربعيّ (تغطية 0% كاذبة).
+            result[u.UserId] = weekly.Select(w => w with { ExemptReason = ExemptReasonFor(w, u) }).ToList();
         }
 
         return result;
@@ -561,21 +571,6 @@ public class KpiCalculationService : IKpiCalculationService
                 && lv.Any(l => l.StartDate <= w.Start && l.EndDate >= w.End)) return ExemptApprovedLeave;
             return null;
         }
-    }
-
-    private static List<Commitment> QuarterWindowsWithin(ResolvedPeriod period)
-    {
-        var windows = new List<Commitment>();
-        var cursor = new DateOnly(period.Start.Year, (period.Start.Month - 1) / 3 * 3 + 1, 1);
-        while (cursor <= period.End)
-        {
-            var q = (cursor.Month - 1) / 3 + 1;
-            var (s, e) = ReportingCalendarPolicy.QuarterRange(cursor.Year, q);
-            if (s <= period.End && e >= period.Start)
-                windows.Add(new Commitment($"{cursor.Year}-Q{q}", s, e, $"الربع {q} — {cursor.Year}", null));
-            cursor = cursor.AddMonths(3);
-        }
-        return windows;
     }
 
     // ===================== بناء عناصر العقد =====================
@@ -696,7 +691,11 @@ public class KpiCalculationService : IKpiCalculationService
                 && KpiScorePolicy.IsProvisional(now.Score, now.EligibleCount, now.AdjustedExpected, ctx.MinimumCoverage),
             KpiScorePolicy.JourneyState(
                 cadenceConfigured, now.Expected, now.AdjustedExpected, now.EligibleCount,
-                ctx.Period.IsOpen, ctx.MinimumCoverage));
+                ctx.Period.IsOpen, ctx.MinimumCoverage),
+            // R6/§5.7 — الإعفاء يُفصَح رقمًا صريحًا لا يُشتقّ في الواجهة، وحالة الاكتمال تُحسب
+            // بلا الحدّ الأدنى للتغطية إطلاقًا كي يبقى «ناقص» و«مؤهَّل للمتوسّط» وصفين مستقلَّين.
+            Math.Max(0, now.Expected - now.AdjustedExpected),
+            KpiScorePolicy.Completeness(ctx.Period.IsOpen, now.EligibleCount, now.AdjustedExpected));
     }
 
     private static readonly EmployeeAggregate EmptyAggregate = new(null, 0, 0, 0, 0);

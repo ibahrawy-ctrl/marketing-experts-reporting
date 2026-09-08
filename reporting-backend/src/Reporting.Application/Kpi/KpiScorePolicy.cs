@@ -52,6 +52,25 @@ public static class KpiScorePolicy
     public static bool IsCompleted(KpiEvaluationStatus status) =>
         status is KpiEvaluationStatus.Approved or KpiEvaluationStatus.Closed;
 
+    /// <summary>
+    /// R6/IC-4 (الخيار 4-ب) — الحالة **الوحيدة** المؤهَّلة لدخول درجة KPI وتغطيتها: <c>Approved</c>.
+    ///
+    /// الفصل مقصود: <see cref="CompletedStatuses"/> يعني «اكتملت دورة حياة التقييم» ويشمل <c>Closed</c>
+    /// (إقفال إداريّ لاحق)، أمّا الأهليّة للدرجة فمصدر حقيقة واحد لا يقبل إلّا اعتماد المراجِع.
+    /// خلط المعنيين هو ما أنتج تباعد <c>{Approved}</c> مقابل <c>{Approved, Closed}</c> بين المستهلكين.
+    ///
+    /// **كلّ** مستهلكي KPI (محرّك الحساب، التجميع، Employee 360، ملخّص التقارير، التصدير المالي)
+    /// يقرؤون من هنا حصرًا — ولا يُعاد تعريف المجموعة في أيّ ملفّ آخر.
+    /// </summary>
+    public static readonly KpiEvaluationStatus[] ScoreEligibleStatuses =
+    {
+        KpiEvaluationStatus.Approved
+    };
+
+    /// <inheritdoc cref="ScoreEligibleStatuses"/>
+    public static bool IsScoreEligible(KpiEvaluationStatus status) =>
+        status is KpiEvaluationStatus.Approved;
+
     /// <summary>التغطية = المؤهَّل / المتوقَّع المعدَّل؛ <c>null</c> إذا المقام صفر (لا تُلفَّق قيمة).</summary>
     public static decimal? Coverage(int eligibleCount, int adjustedExpectedCount) =>
         adjustedExpectedCount > 0 ? (decimal)eligibleCount / adjustedExpectedCount : null;
@@ -122,6 +141,20 @@ public static class KpiScorePolicy
         if (coverage is null || coverage.Value >= 1m) return KpiJourneyState.CompleteEligible;
         if (coverage.Value >= minimumCoverage) return KpiJourneyState.CompleteEligible;
         return periodIsOpen ? KpiJourneyState.InProgress : KpiJourneyState.InsufficientCoverage;
+    }
+
+    /// <summary>
+    /// R6/§5.7 — حالة الاكتمال، **بلا أيّ استعمال للحدّ الأدنى للتغطية**: فترة مفتوحة ⇒ مؤقّت،
+    /// وفترة منتهية بتغطية كاملة (أو بلا مقام لأنّ كلّ الالتزامات مُعفاة) ⇒ نهائيّ، وإلّا ⇒ ناقص.
+    /// استقلال العتبة مقصود: 85% في فترة منتهية «ناقص» ومع ذلك «مؤهَّل للمتوسّط الرسميّ» — وصفان صادقان معًا.
+    /// </summary>
+    public static KpiCompletenessState Completeness(bool periodIsOpen, int eligibleCount, int adjustedExpectedCount)
+    {
+        if (periodIsOpen) return KpiCompletenessState.Provisional;
+        var coverage = Coverage(eligibleCount, adjustedExpectedCount);
+        return coverage is null || coverage.Value >= 1m
+            ? KpiCompletenessState.Final
+            : KpiCompletenessState.Incomplete;
     }
 
     /// <summary>

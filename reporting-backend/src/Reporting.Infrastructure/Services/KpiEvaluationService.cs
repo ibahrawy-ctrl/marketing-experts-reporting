@@ -30,6 +30,8 @@ public class KpiEvaluationService : IKpiEvaluationService
     private static readonly Regex WeeklyPeriodKeyPattern = new(@"^\d{4}-W\d{2}$", RegexOptions.Compiled);
 
     // R5/DEC-01/3 — صيغة مفتاح الربع الرسميّ: YYYY-Qn حيث n ∈ 1..4 (مثال 2026-Q3).
+    // R6/§5.4 — تبقى مستعمَلة رغم إقفال الكتابة الربعيّة: الطلب الربعيّ يُرفَض برمز **الإقفال**
+    // لا برمز «صيغة غير صحيحة»، فلا يُخلَط سببُ الرفض الحقيقيّ بخطأ إدخال وهميّ.
     private static readonly Regex QuarterlyPeriodKeyPattern = new(@"^\d{4}-Q[1-4]$", RegexOptions.Compiled);
 
     public KpiEvaluationService(AppDbContext db, ICurrentUser currentUser,
@@ -56,9 +58,10 @@ public class KpiEvaluationService : IKpiEvaluationService
         if (request.SubjectUserId == Guid.Empty)
             return Result<KpiEvaluationDto>.Failure("الموظف المُقيَّم مطلوب.", "kpi_eval.subject_required");
 
-        // R5/DEC-01/3 — «نبض الأسبوع» و«التقييم الربعيّ الرسميّ» مساران منفصلان، والتواتر خاصّية القالب
-        // لا خيار للمُقيِّم. لذلك حلّ الحارس القديم («أسبوعيّ فقط») حارسُ تطابق: نوع فترة التقييم يجب أن
-        // يطابق تواتر قالبه. Monthly/Yearly/AdHoc تبقى مرفوضة بالرمز نفسه لأنّ لا تواتر يقابلها.
+        // R5/DEC-01/3 — التواتر خاصّية القالب لا خيار للمُقيِّم، فالحارس حارسُ تطابق: نوع فترة التقييم
+        // يجب أن يطابق تواتر قالبه. Monthly/Yearly/AdHoc تبقى مرفوضة بالرمز نفسه لأنّ لا تواتر يقابلها.
+        // R6/§5.4 — هذا الحارس **يسبق** حارس الإقفال الربعيّ عمدًا: خلط المسارين خطأ طلب مستقلّ عن
+        // تقاعد المسار، ولو أُقحم الإقفال هنا لأجاب عن سؤال لم يُسأل وأخفى رمز الخلط المسمّى.
         var templateCadence = await _db.KpiTemplates.AsNoTracking()
             .Where(t => t.Id == request.KpiTemplateId)
             .Select(t => (KpiCadence?)t.Cadence)
@@ -94,8 +97,8 @@ public class KpiEvaluationService : IKpiEvaluationService
         }
         else
         {
-            // مفتاح الربع YYYY-Qn بالنمط نفسه الذي يبنيه محرّك الحساب لنوافذ الالتزام الربعيّة،
-            // وبالقيد الزمنيّ نفسه: لا تقييم لربع لم يبدأ بعد بتوقيت الرياض.
+            // مفتاح الربع YYYY-Qn بالقيد الزمنيّ نفسه. يبقى الفحص قائمًا رغم الإقفال (§5.4) كي يظلّ
+            // رمز الرفض النهائيّ هو `legacy_quarterly_write_disabled` لا خطأ صيغة يشوّش التشخيص.
             if (!QuarterlyPeriodKeyPattern.IsMatch(request.PeriodKey.Trim()))
                 return Result<KpiEvaluationDto>.Failure(
                     "صيغة الفترة غير صحيحة؛ استخدم صيغة الربع YYYY-Qn مثل 2026-Q3.",
@@ -124,6 +127,21 @@ public class KpiEvaluationService : IKpiEvaluationService
             return Result<KpiEvaluationDto>.Failure(
                 "القالب المطلوب ليس ضمن القوالب الفعّالة لهذا الموظّف.",
                 "kpi_eval.template_not_assigned");
+
+        // R6/§5.4 (R5 §7-2 الطبقة 1 · WS-1) — إقفال مسار الكتابة الربعيّة. موضعه **هنا بالذات**:
+        // بعد فحص النطاق (`auth.forbidden`) وفحص الإسناد (`kpi_eval.template_not_assigned`) وقبل أيّ
+        // كتابة. من لا يملك حقّ التقييم أصلًا، أو يطلب قالبًا غير مُسنَد، يُردّ بسبب حقّه لا بسبب
+        // تقاعد المسار — فلا يتحوّل رمزُ إقفالٍ إرثيّ إلى ستار يغطّي رفضًا صلاحيًّا.
+        // الرمز `legacy_quarterly_write_disabled` **مستقلّ** عن `legacy_cadence_disabled` الخاصّ بعقد
+        // التجميع (§5.3): محاولةُ كتابة متقاعدة ليست قراءةً من نقطة متقاعدة، وخلط الرمزين يُعمي الرصد.
+        // الصفوف الربعيّة القائمة **لا تُحذف ولا تُهاجَر ولا تُمسّ** — صفر UPDATE/DELETE/هجرة (WS-2).
+        // R6.1/§1.2 — أُغلق `IC-10`: تعديل/اعتماد/رفض/إعادة فتح/حذف تقييم ربعيّ **قائم** مقفل كذلك
+        // عبر `EnsureNotLegacyQuarterly` بالرمز نفسه، فلم يبقَ باب خلفيّ يُنتج حقائق ربعيّة معتمَدة.
+        if (templateCadence == KpiCadence.Quarterly)
+            return Result<KpiEvaluationDto>.Failure(
+                "التقييم الربعيّ الرسميّ متقاعد؛ يُنشَأ التقييم بقالب أسبوعيّ (نبض الأسبوع)، "
+                + "والقراءة الربعيّة متاحة كدرجة مشتقّة من النبض الأسبوعيّ المعتمَد.",
+                "legacy_quarterly_write_disabled");
 
         var version = await _db.KpiTemplateVersions
             .Where(v => v.KpiTemplateId == request.KpiTemplateId && v.IsPublished)
@@ -363,6 +381,9 @@ public class KpiEvaluationService : IKpiEvaluationService
         var ownerCheck = ResourceGuard.EnsureOwnerOrElevated(_currentUser, e.EvaluatorId ?? Guid.Empty);
         if (!ownerCheck.Succeeded) return Result<KpiEvaluationDto>.Failure(ownerCheck.Error!, ownerCheck.ErrorCode!);
 
+        // R6.1/§1.2 — بعد فحص الحقّ وقبل فحص الحالة: من لا يملك الصفّ يُردّ بسبب حقّه لا بتقاعد المسار.
+        if (EnsureNotLegacyQuarterly(e) is Result<KpiEvaluationDto> legacy) return legacy;
+
         // يُسمح بالتعديل قبل الإرسال (Draft/InProgress) أو بعد طلب تعديل من المراجع (NeedsRevision).
         if (e.Status is not (KpiEvaluationStatus.Draft or KpiEvaluationStatus.InProgress or KpiEvaluationStatus.NeedsRevision))
             return Result<KpiEvaluationDto>.Failure("لا يمكن تعديل تقييم في حالته الحاليّة.", "kpi_eval.locked.conflict");
@@ -399,6 +420,9 @@ public class KpiEvaluationService : IKpiEvaluationService
 
         var ownerCheck = ResourceGuard.EnsureOwnerOrElevated(_currentUser, e.EvaluatorId ?? Guid.Empty);
         if (!ownerCheck.Succeeded) return Result<KpiEvaluationDto>.Failure(ownerCheck.Error!, ownerCheck.ErrorCode!);
+
+        // R6.1/§1.2 — الإرسال يُنتج TotalScore ويدفع الصفّ نحو الاعتماد ⇒ مقفل على الربعيّ الإرثيّ.
+        if (EnsureNotLegacyQuarterly(e) is Result<KpiEvaluationDto> legacy) return legacy;
 
         // يُسمح بالإرسال أوّل مرّة (Draft/InProgress) أو إعادة الإرسال بعد طلب تعديل (NeedsRevision).
         if (e.Status is not (KpiEvaluationStatus.Draft or KpiEvaluationStatus.InProgress or KpiEvaluationStatus.NeedsRevision))
@@ -504,6 +528,9 @@ public class KpiEvaluationService : IKpiEvaluationService
         var gate = EnsureCanReview(e);
         if (gate is Result<KpiEvaluationDto> denied) return denied;
 
+        // R6.1/§1.2 — الاعتماد هو ما يصنع «حقيقة معتمَدة»؛ إبقاؤه مفتوحًا يُبقي المسار المتقاعد مُنتِجًا.
+        if (EnsureNotLegacyQuarterly(e) is Result<KpiEvaluationDto> legacy) return legacy;
+
         // يُعتمَد من UnderReview (المسار الجديد) أو Submitted (توافق خلفيّ للسجلّات القديمة).
         if (e.Status is not (KpiEvaluationStatus.UnderReview or KpiEvaluationStatus.Submitted))
             return Result<KpiEvaluationDto>.Failure("لا يمكن اعتماد تقييم إلا وهو قيد المراجعة.", "kpi_eval.not_approvable.conflict");
@@ -537,6 +564,9 @@ public class KpiEvaluationService : IKpiEvaluationService
         var gate = EnsureCanReview(e);
         if (gate is Result<KpiEvaluationDto> denied) return denied;
 
+        // R6.1/§1.2 — طلب التعديل تحوّل حالة (⇐ NeedsRevision) ⇒ مقفل على الربعيّ الإرثيّ.
+        if (EnsureNotLegacyQuarterly(e) is Result<KpiEvaluationDto> legacy) return legacy;
+
         if (e.Status is not (KpiEvaluationStatus.UnderReview or KpiEvaluationStatus.Submitted))
             return Result<KpiEvaluationDto>.Failure("طلب التعديل متاح للتقييم قيد المراجعة فقط.", "kpi_eval.not_reviewable.conflict");
 
@@ -569,6 +599,9 @@ public class KpiEvaluationService : IKpiEvaluationService
 
         var gate = EnsureCanReview(e);
         if (gate is Result<KpiEvaluationDto> denied) return denied;
+
+        // R6.1/§1.2 — الرفض تحوّل حالة (⇐ Rejected) ⇒ مقفل على الربعيّ الإرثيّ.
+        if (EnsureNotLegacyQuarterly(e) is Result<KpiEvaluationDto> legacy) return legacy;
 
         if (e.Status is not (KpiEvaluationStatus.UnderReview or KpiEvaluationStatus.Submitted))
             return Result<KpiEvaluationDto>.Failure("الرفض متاح للتقييم قيد المراجعة فقط.", "kpi_eval.not_reviewable.conflict");
@@ -605,6 +638,13 @@ public class KpiEvaluationService : IKpiEvaluationService
         if (!await CanViewAsync(e, ct))
             return Result<KpiEvaluationDto>.Failure("هذا التقييم خارج نطاق صلاحيتك.", "auth.forbidden");
 
+        // R6.3/§2 — التعليق مقفل على الربعيّ الإرثيّ من المسارات التشغيليّة الحاليّة.
+        // العقد الحاكم يقصر التعامل مع الربعيّ الإرثيّ على «أرشيف إرثيّ مخوَّل»، وهذا المسار مفتوح
+        // اليوم لصلاحيّة تشغيليّة عامّة (Manager/TeamLeader ضمن `KpiReviewers`) لا لأرشيف مخوَّل ⇒
+        // يُقفل حتّى يُصمَّم الأرشيف المستقلّ. الحارس قبل `AddReviewEvent` وقبل `SaveChanges` وقبل
+        // التدقيق ⇒ صفر كتابة. القراءة التاريخيّة و`ListReviewEvents` لم تُمَسّا.
+        if (EnsureNotLegacyQuarterly(e) is Result<KpiEvaluationDto> legacy) return legacy;
+
         AddReviewEvent(e, "Comment", e.Status, e.Status, reason, null);
         await _db.SaveChangesAsync(ct);
         await _audit.LogAsync(_currentUser.UserId, "kpi.review_comment", nameof(KpiEvaluation), e.Id,
@@ -623,6 +663,12 @@ public class KpiEvaluationService : IKpiEvaluationService
         if (e is null) return Result<KpiEvaluationDto>.Failure("التقييم غير موجود.", "kpi_eval.not_found");
         if (!_currentUser.IsInAnyRole(Roles.KpiReviewFlaggers))
             return Result<KpiEvaluationDto>.Failure("لا تملك صلاحية الإشارة للمراجعة.", "auth.forbidden");
+
+        // R6.3/§2 — الإشارة مقفلة على الربعيّ الإرثيّ للسبب نفسه: `KpiReviewFlaggers` صلاحيّة
+        // تشغيليّة (Hr وغيره) لا أرشيف إرثيّ مخوَّل. والإشارة هنا تتجاوز التوثيق: تُخطر Admin/GM/CEO
+        // بمسارٍ لا إجراء تشغيليًّا ممكنًا فيه بعد إقفال التحوّلات كلّها. الحارس قبل حدث المراجعة
+        // وقبل الحفظ وقبل الإشعار والتدقيق ⇒ صفر أثر جانبيّ.
+        if (EnsureNotLegacyQuarterly(e) is Result<KpiEvaluationDto> legacy) return legacy;
 
         // لا تغيير للحالة — إشارة توثيقيّة تُخطر Admin/GM/CEO فقط.
         AddReviewEvent(e, "Flag", e.Status, e.Status, reason, null);
@@ -647,6 +693,12 @@ public class KpiEvaluationService : IKpiEvaluationService
         if (!_currentUser.IsInAnyRole(Roles.KpiReviewFlaggers))
             return Result<KpiEvaluationDto>.Failure("لا تملك صلاحية طلب إعادة الفتح.", "auth.forbidden");
 
+        // R6.2/§1.2 (قرار المالك) — الطلب مقفل على الربعيّ الإرثيّ. بعد إغلاق `ReopenForRevisionAsync`
+        // في R6.1 صار الطلب بلا مآل ممكن: يُنشئ إشعارًا وحدث مراجعة لمسار لا يُكمَل ⇒ dead-end workflow.
+        // موضع الحارس **قبل** `AddReviewEvent` وقبل `SaveChanges` وقبل الإشعار والتدقيق ⇒ صفر إشعار،
+        // صفر حدث مراجعة، صفر تغيير على الصفّ. الرمز هو رمز الكتابة نفسه (لا رمز ثالث — §1.4).
+        if (EnsureNotLegacyQuarterly(e) is Result<KpiEvaluationDto> legacy) return legacy;
+
         // لا تغيير للحالة ولا منح إعادة فتح فعليّة — طلب يُخطر Admin/GM/CEO فقط.
         AddReviewEvent(e, "RequestReopen", e.Status, e.Status, reason, null);
         await _db.SaveChangesAsync(ct);
@@ -669,6 +721,10 @@ public class KpiEvaluationService : IKpiEvaluationService
         if (e is null) return Result<KpiEvaluationDto>.Failure("التقييم غير موجود.", "kpi_eval.not_found");
         if (!_currentUser.IsInAnyRole(Roles.AdminReportKpiDeleters))
             return Result<KpiEvaluationDto>.Failure("إعادة الفتح من صلاحية Admin/CEO/GM فقط.", "auth.forbidden");
+
+        // R6.1/§1.2 — إعادة الفتح تُعيد الصفّ الربعيّ إلى دورة حياة متقاعدة ⇒ مقفلة.
+        // R6.2/§1.2 — وطلب إعادة الفتح (RequestReopen) أُقفل هو أيضًا، فلا يبقى طلب بلا مآل.
+        if (EnsureNotLegacyQuarterly(e) is Result<KpiEvaluationDto> legacy) return legacy;
 
         if (e.Status is not (KpiEvaluationStatus.Approved or KpiEvaluationStatus.Rejected or KpiEvaluationStatus.NeedsRevision))
             return Result<KpiEvaluationDto>.Failure("إعادة الفتح متاحة للتقييم المعتمَد أو المرفوض أو المطلوب تعديله فقط.", "kpi_eval.not_reopenable.conflict");
@@ -718,6 +774,11 @@ public class KpiEvaluationService : IKpiEvaluationService
         if (e is null) return Result<KpiEvaluationDto>.Failure("التقييم غير موجود.", "kpi_eval.not_found");
         if (!_currentUser.IsInAnyRole(Roles.AdminReportKpiDeleters))
             return Result<KpiEvaluationDto>.Failure("الحذف الإداريّ من صلاحية Admin/CEO/GM فقط.", "auth.forbidden");
+        // R6.1/§1.2 — الحذف الإداريّ ليس ماديًّا، لكنّه **يُغيّر صفًّا إرثيًّا قائمًا** ويُخفيه عن الأرشيف
+        // عبر Global Query Filter. القرار يوجب: لا حذف · لا تغيير بيانات قائمة · لا منع العرض في
+        // الأرشيف المخوَّل ⇒ الحذف الإداريّ مقفل هو أيضًا على الربعيّ الإرثيّ. (حكم تقديريّ مُعلَن للمراجع.)
+        if (EnsureNotLegacyQuarterly(e) is Result<KpiEvaluationDto> legacy) return legacy;
+
         if (e.IsDeleted)
             return Result<KpiEvaluationDto>.Failure("هذا التقييم محذوف مسبقًا.", "kpi_eval.already_deleted.conflict");
 
@@ -802,12 +863,26 @@ public class KpiEvaluationService : IKpiEvaluationService
         if (_currentUser.UserId is not Guid userId)
             return Result<KpiAggregateDto>.Failure("غير مصرّح.", "auth.unauthenticated");
 
-        // 1) تحويل الدورية إلى مدى تواريخ [from, to] + تسمية الفترة. الأسبوع وحدة الأساس دائمًا.
+        // R6/§5.3 — المسار الربعيّ الإرثيّ مُغلَق على هذه النقطة: رفض صريح لا نتيجة فارغة صامتة.
+        // كان `cadence=Quarterly` يُعيد 200 بجسم فارغ فيبدو «لا بيانات» بينما الحقيقة «مسار مُلغى».
+        if (request.Cadence == KpiCadence.Quarterly)
+            return Result<KpiAggregateDto>.Failure(
+                "التقييم الربعيّ الرسميّ لم يعد مصدرًا للتجميع؛ مصدر الحقيقة الوحيد هو النبض الأسبوعيّ المعتمَد.",
+                "legacy_cadence_disabled");
+
+        // 1) تحويل الدورية إلى مدى تواريخ [from, to] + تسمية الفترة. الأسبوع وحدة الأساس دائمًا،
+        // وحبيبة القراءة (Weekly/Monthly/Quarterly/Yearly/Custom) تحدّد **النافذة** فقط لا نوع التقييم.
         DateOnly from, to;
         string label;
         var granularity = (request.Granularity ?? string.Empty).Trim();
         switch (granularity)
         {
+            case "Weekly":
+                if (!ReportCalendarPolicy.IsWeekKey(request.PeriodKey))
+                    return Result<KpiAggregateDto>.Failure("صيغة الأسبوع غير صحيحة؛ استخدم YYYY-Www مثل 2026-W27.", "kpi_aggregate.period_format_invalid");
+                (from, to) = ReportCalendarPolicy.WeekRange(request.PeriodKey!.Trim());
+                label = ReportCalendarPolicy.WeekLabel(request.PeriodKey.Trim());
+                break;
             case "Monthly":
                 if (!TryParseYearMonth(request.PeriodKey, out var ym))
                     return Result<KpiAggregateDto>.Failure("صيغة الشهر غير صحيحة؛ استخدم YYYY-MM مثل 2026-06.", "kpi_aggregate.period_format_invalid");
@@ -835,7 +910,7 @@ public class KpiEvaluationService : IKpiEvaluationService
                 label = $"من {cf:yyyy-MM-dd} إلى {cterm:yyyy-MM-dd}";
                 break;
             default:
-                return Result<KpiAggregateDto>.Failure("نوع التجميع غير مدعوم؛ استخدم Monthly/Quarterly/Yearly/Custom.", "kpi_aggregate.granularity_invalid");
+                return Result<KpiAggregateDto>.Failure("نوع التجميع غير مدعوم؛ استخدم Weekly/Monthly/Quarterly/Yearly/Custom.", "kpi_aggregate.granularity_invalid");
         }
 
         // 2) فرض النطاق خادميًّا (لا تصفية من الواجهة فقط).
@@ -843,12 +918,13 @@ public class KpiEvaluationService : IKpiEvaluationService
         if (request.SubjectUserId is Guid sid && userId != sid && !scope.Contains(sid))
             return Result<KpiAggregateDto>.Failure("هذا الموظّف خارج نطاق صلاحيتك.", "auth.forbidden");
 
-        // قاعدة النتائج النهائيّة (تصحيح #7): يدخل التجميع فقط ما كان Approved وغير محذوف
-        // (المحذوف مستبعَد تلقائيًّا عبر Global Query Filter). Submitted/UnderReview/NeedsRevision/Rejected/Closed مستبعَدة.
+        // R6/§5.1 — الأهليّة تُقرأ من مصدر الحقيقة الوحيد <see cref="KpiScorePolicy.ScoreEligibleStatuses"/>
+        // بدل مجموعة محلّيّة مكرّرة، فلا يعود ممكنًا تباعد {Approved} هنا عن {Approved, Closed} هناك.
+        // Draft/Submitted/UnderReview/NeedsRevision/Rejected/Closed مستبعَدة، والمحذوف مستبعَد بالمرشّح العامّ.
         var q = _db.KpiEvaluations.AsNoTracking()
             .Where(e => e.PeriodType == PeriodType.Weekly
                         && e.TotalScore != null
-                        && e.Status == KpiEvaluationStatus.Approved);
+                        && KpiScorePolicy.ScoreEligibleStatuses.Contains(e.Status));
 
         if (!scope.SeesAll)
         {
@@ -859,9 +935,9 @@ public class KpiEvaluationService : IKpiEvaluationService
         if (request.TeamId is Guid t) q = q.Where(e => e.TeamId == t);
         if (request.DepartmentId is Guid d) q = q.Where(e => e.DepartmentId == d);
 
-        // P1-KPI-007 (B-3): فصل نبض الأسبوع عن التقييم الربعيّ الرسميّ. الكادنس يخصّ القالب لا التقييم،
-        // فيُربَط عبر نسخة القالب. الافتراض WeeklyPulse مُعلَن في العقد ويُعاد في AppliedCadence.
-        var cadence = request.Cadence ?? KpiCadence.WeeklyPulse;
+        // الكادنس يخصّ القالب لا التقييم، فيُربَط عبر نسخة القالب. بعد إغلاق المسار الربعيّ أعلاه
+        // لم تبقَ إلّا قيمة واحدة ممكنة، وتُعاد صراحةً في `AppliedCadence` كي يبقى العقد مُفصِحًا.
+        const KpiCadence cadence = KpiCadence.WeeklyPulse;
         q = q.Where(e => _db.KpiTemplateVersions
             .Any(v => v.Id == e.KpiTemplateVersionId && v.KpiTemplate!.Cadence == cadence));
 
@@ -930,6 +1006,14 @@ public class KpiEvaluationService : IKpiEvaluationService
         if (!built.Succeeded) return Result<byte[]>.Failure(built.Error!, built.ErrorCode);
         var data = built.Value!;
 
+        // R6/§5.8 — إنهاء «التعتيم الصامت»: ملفّ بترويسة فقط كان يُعاد كنجاح ويُسجَّل حدث
+        // kpi.finance_exported بـrowCount=0، فيبدو في التدقيق تصديرًا ماليًّا تمّ بينما لم يُصدَّر شيء.
+        // لا صفوف مؤهَّلة ⇒ رفض صريح ولا حدث تدقيق. المعاينة (JSON) تبقى 200 وتُظهر rowCount=0 بصدق.
+        if (data.RowCount == 0)
+            return Result<byte[]>.Failure(
+                "لا توجد تقييمات أسبوعيّة معتمَدة ضمن هذا الربع والمرشّحات المحدّدة؛ لم يُنشأ ملفّ تصدير.",
+                "kpi_finance.no_eligible_rows");
+
         var sb = new StringBuilder();
         sb.Append("اسم الموظف,الإدارة,الفريق,المسمى الوظيفي,نوع الفترة,مفتاح الفترة,السنة,الربع,القالب المستخدم,الدرجة النهائية,الحالة,تاريخ آخر تحديث / اعتماد\n");
         foreach (var r in data.Rows)
@@ -976,29 +1060,30 @@ public class KpiEvaluationService : IKpiEvaluationService
         if (filter.Year is < 2000 or > 3000)
             return Result<KpiFinanceExportDto>.Failure("السنة غير صحيحة.", "kpi_finance.year_invalid");
 
-        // الحالة المسموح تصديرها: Approved (افتراضي) أو Closed فقط — أيّ حالة أخرى تُرفَض.
+        // R6/§5.1+§5.8 — الأهليّة الماليّة هي أهليّة الدرجة نفسها: Approved وحدها.
+        // كان يُسمح بـClosed هنا بينما التجميع يقصره على Approved، فينتج رقمان مختلفان على البيانات نفسها.
         var status = filter.Status ?? KpiEvaluationStatus.Approved;
-        if (status is not (KpiEvaluationStatus.Approved or KpiEvaluationStatus.Closed))
+        if (!KpiScorePolicy.IsScoreEligible(status))
             return Result<KpiFinanceExportDto>.Failure(
-                "حالة التصدير غير مسموحة؛ يُسمح بتصدير المعتمد (Approved) أو المغلق (Closed) فقط.",
+                "حالة التصدير غير مسموحة؛ يُسمح بتصدير المعتمد (Approved) وحده — وهو مصدر الحقيقة نفسه المستعمَل في التجميع.",
                 "kpi_finance.status_invalid");
 
         var (from, to) = ReportCalendarPolicy.QuarterRange(filter.Year, filter.Quarter);
         var label = $"الربع {filter.Quarter} — {filter.Year}";
 
-        // DEC-01 §5 — التصدير المالي يستهلك **المسار الربعيّ الرسميّ وحده**: نبض الأسبوع مؤشّر تشغيليّ
-        // غير رسميّ ولا يجوز أن يكون مصدرًا ماليًّا.
-        // تمييز المسار هنا بتواتر القالب (Cadence) لا بـPeriodType، مطابقةً لما تفعله
-        // KpiCalculationService.BaseEvaluationsQuery. ولو ميّزناه بمفتاح ربعيّ تامّ وحده لاختلف ما
-        // يراه «المتوسّط الرسميّ» عمّا يراه «التصدير المالي» على البيانات نفسها — وهو خلط من نوع
-        // آخر يخالف العقد ذاته، إذ يوجب أن يستهلك الرقمان المجموعة نفسها.
-        var quarterKey = $"{filter.Year}-Q{filter.Quarter}";
+        // R6/§5.8 — LEGACY_CODE_COMMENT_CONTRADICTS_GOVERNING_CONTRACT: التعليق السابق كان ينصّ على أنّ
+        // «نبض الأسبوع مؤشّر تشغيليّ غير رسميّ ولا يجوز أن يكون مصدرًا ماليًّا»، وهو عكس العقد الحاكم.
+        // العقد الحاكم: مصدر الحقيقة الوحيد = نبض أسبوعيّ معتمَد على قالب WeeklyPulse.
+        // الربع هنا **حبيبة قراءة** (نافذة تجميع) لا نوع تقييم؛ والصفوف الربعيّة الإرثيّة مستبعَدة
+        // تمامًا من التصدير المالي وتبقى في الأرشيف الإرثيّ بصلاحيّاته.
 
-        // عرض على مستوى الشركة (بلا ScopeResolver؛ النطاق مفروض بالسياسة). المسار الربعيّ بالحالة المختارة فقط.
+        // عرض على مستوى الشركة (بلا ScopeResolver؛ النطاق مفروض بالسياسة).
         var q = from e in _db.KpiEvaluations.AsNoTracking()
                 join v in _db.KpiTemplateVersions.AsNoTracking() on e.KpiTemplateVersionId equals v.Id
                 join tpl in _db.KpiTemplates.AsNoTracking() on v.KpiTemplateId equals tpl.Id
-                where tpl.Cadence == KpiCadence.Quarterly && e.Status == status
+                where tpl.Cadence == KpiCadence.WeeklyPulse
+                      && e.PeriodType == PeriodType.Weekly
+                      && e.Status == status
                 select e;
         if (filter.DepartmentId is Guid d) q = q.Where(e => e.DepartmentId == d);
         if (filter.TeamId is Guid t) q = q.Where(e => e.TeamId == t);
@@ -1018,11 +1103,10 @@ public class KpiEvaluationService : IKpiEvaluationService
             e.CreatedAtUtc
         }).ToListAsync(ct);
 
-        // عضويّة الفترة بنفس قاعدة التجميع: مفتاح الربع نفسه، أو مفتاح دورة واقع داخل مدى الربع
-        // (سجلّات ربعيّة قديمة أُنشئت بمفتاح دورة قبل DEC-01 تبقى مرئيّة للمالية كما تراها المتوسّطات).
+        // عضويّة الفترة بنفس قاعدة التجميع حرفيًّا: مفتاح دورة أسبوعيّة واقع داخل مدى الربع (بمرجع
+        // الثلاثاء داخل ReportingCalendarPolicy) — فلا تُحتسب دورة في ربعين، ولا يدخل مفتاح `YYYY-Qn`.
         var inRange = raw
-            .Where(r => string.Equals(r.PeriodKey, quarterKey, StringComparison.Ordinal)
-                        || ReportCalendarPolicy.WeekInRange(r.PeriodKey, from, to))
+            .Where(r => ReportCalendarPolicy.WeekInRange(r.PeriodKey, from, to))
             .ToList();
 
         // حلّ الأسماء على دفعات: الموظّفون (الاسم/المسمّى/الإدارة/الفريق الحاليّ)، الإدارات، الفِرق، عناوين القوالب.
@@ -1098,6 +1182,51 @@ public class KpiEvaluationService : IKpiEvaluationService
                 "المراجعة من صلاحية المُراجِع المعيَّن أو تصعيد أعلى (Admin/CEO/GM) فقط.", "auth.forbidden");
         return null;
     }
+
+    /// <summary>
+    /// R6.1/§1.2 (إغلاق IC-10) — التقييم الربعيّ الإرثيّ **القائم** يخرج من دورة الحياة التشغيليّة.
+    ///
+    /// §5.4 أقفل الإنشاء وحده، فبقي السجلّ الربعيّ القائم قابلًا للتعديل والإرسال والاعتماد — أي أنّ
+    /// المسار المتقاعد ظلّ يُنتج **حقائق معتمَدة جديدة** من الباب الخلفيّ. القاعدة الآن: كلّ عمليّة
+    /// تُغيّر أعمدة السجلّ نفسه (تعديل النتائج · إرسال · اعتماد · طلب تعديل · رفض · إعادة فتح · حذف
+    /// إداريّ) تُرفَض حين <c>PeriodType == Quarterly</c>.
+    ///
+    /// حدود القاعدة — ما لا تفعله:
+    /// <list type="bullet">
+    /// <item>لا حذف ماديّ ولا هجرة ولا تعديل صفّ قائم: الحارس **يمنع** الكتابة ولا يكتب شيئًا (WS-2).</item>
+    /// <item>لا تمسّ القراءة: <c>Get</c>/<c>List</c>/<c>Lookup</c>/<c>ListReviewEvents</c> تبقى كما هي،
+    /// فالأرشيف الإرثيّ المخوَّل يعرض الصفّ وسجلّ مراجعته كاملًا.</item>
+    /// <item>لا تمسّ سجلّ المراجعة **القائم**: أحداثه تبقى كما هي وتُقرأ عبر <c>ListReviewEvents</c>؛
+    /// المقفل هو **إلحاق حدث جديد** لا عرض القديم.</item>
+    /// </list>
+    ///
+    /// توسعة النطاق عبر الجولات (كلّها بالرمز نفسه):
+    /// <list type="bullet">
+    /// <item>R6.2 — <c>RequestReopen</c>: بعد إقفال <c>ReopenForRevisionAsync</c> صار الطلب بلا مآل
+    /// ممكن (dead-end workflow) فيُنتج إشعارًا لا يُلبّى.</item>
+    /// <item>R6.3/§2 — <c>Comment</c> و<c>Flag</c>: صحيح أنّهما لا يغيّران الحالة (<c>from == to</c>)،
+    /// لكنّ العقد الحاكم يقصر التعامل مع الربعيّ الإرثيّ على **أرشيف إرثيّ مخوَّل**، وهما اليوم
+    /// متاحان من صلاحيّات تشغيليّة عامّة (<c>KpiReviewers</c> يشمل Manager/TeamLeader ·
+    /// <c>KpiReviewFlaggers</c> يشمل Hr) ولا توجد في النظام صلاحيّة أرشيف أصلًا ⇒ يُقفلان من
+    /// المسارات التشغيليّة حتّى يُصمَّم الأرشيف المستقلّ. لم تُنشَأ صلاحيّة أرشيف شكليّة في هذه الجولة.</item>
+    /// </list>
+    ///
+    /// ⇒ صار كلّ مسار كتابة على الربعيّ الإرثيّ مقفلًا: عشرة مواضع نداء بلا استثناء.
+    ///
+    /// الرمز هو <c>legacy_quarterly_write_disabled</c> نفسه (لا رمز ثالث): القرار المعتمَد يفصل
+    /// **الكتابة عن القراءة**، والإنشاء والتحوّل كلاهما كتابة. وتمييز «إنشاء» عن «تحوّل» متاح أصلًا
+    /// في كلّ سطر سجلّ عبر مسار HTTP (<c>POST /api/kpi-evaluations</c> مقابل
+    /// <c>POST /api/kpi-evaluations/{id}/approve</c>) ⇒ رمز ثالث لا يضيف قدرة رصد جديدة.
+    /// الرمز بلا لاحقة <c>.conflict</c>/<c>.not_found</c> ⇒ يُعيده <c>ApiControllerBase</c> بـ400.
+    /// </summary>
+    private static Result<KpiEvaluationDto>? EnsureNotLegacyQuarterly(KpiEvaluation e) =>
+        e.PeriodType == PeriodType.Quarterly
+            ? Result<KpiEvaluationDto>.Failure(
+                "هذا تقييم ربعيّ إرثيّ خارج دورة الحياة التشغيليّة؛ لا يُعدَّل ولا يُرسَل ولا يُعتمَد ولا يُعاد فتحه، "
+                + "ولا يُلحَق به تعليق أو إشارة جديدة من المسارات التشغيليّة. "
+                + "السجلّ محفوظ كما هو ويبقى معروضًا بسجلّ مراجعته كاملًا في الأرشيف الإرثيّ المخوَّل.",
+                "legacy_quarterly_write_disabled")
+            : null;
 
     /// <summary>
     /// نتيجة محاولة إسناد المُراجِع: تمييز صريح بين النجاح، وحالة «المُراجِع الصريح هو المُدخِل نفسه»

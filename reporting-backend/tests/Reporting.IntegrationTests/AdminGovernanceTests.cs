@@ -326,15 +326,15 @@ public class AdminGovernanceTests
             .ReadAsync<KpiEvaluationDto>();
         Assert.Equal(KpiEvaluationStatus.Approved, approved!.Status);
 
-        // التصدير المالي مصدره المسار الربعيّ الرسميّ وحده (DEC-01 §5) ⇒ نقيسه على تقييم ربعيّ لنفس الموظّف.
-        var (qTemplate, qManual, qAuto) = await PublishKpiAsync(admin, KpiCadence.Quarterly);
-        var qSubmitted = await SubmitEvalAsync(manager, qTemplate, subjectId, qManual, qAuto, "2026-Q2", 80m,
-            PeriodType.Quarterly);
-        var qApproved = await (await admin.PostAsync($"/api/kpi-evaluations/{qSubmitted.Id}/approve", null))
-            .ReadAsync<KpiEvaluationDto>();
-        Assert.Equal(KpiEvaluationStatus.Approved, qApproved!.Status);
+        // R6/§4 — التجميع والتصدير المالي صارا يقرآن **من الحقيقة نفسها**: النبض الأسبوعيّ المعتمَد.
+        // التجهيز الربعيّ الموازي الذي كان هنا (قالب Quarterly + تقييم `2026-Q2`) لم يكن لازمًا إلّا
+        // لأنّ التصدير كان يقرأ من مسار آخر (DEC-01 §5)، وقد تقاعد ذلك المسار بقرار المالك. حذفه
+        // ليس تخفيفًا للضابط بل تقويةٌ له: صار الصفّ **الواحد** `2026-W20` (الواقع داخل الربع الثاني
+        // 2026) هو ما يُقاس عليه المستهلكان معًا، فيثبت أنّ الحذف الإداريّ يُسقطه من كليهما — ولا
+        // يبقى احتمال أن يكون أحدهما أخفاه لسبب آخر غير الحذف. محور القياس (قبل/بعد × تجميع/تصدير)
+        // محفوظ كاملًا وعدد التأكيدات الجوهريّة لم ينقص.
 
-        // قبل الحذف: التجميع يعكس الدرجة، والتصدير يحوي التقييم الربعيّ.
+        // قبل الحذف: التجميع يعكس الدرجة، والتصدير يحوي الصفّ نفسه.
         var beforeAgg = await (await manager.GetAsync(
             $"/api/kpi-evaluations/aggregate?granularity=Monthly&periodKey=2026-05&subjectUserId={subjectId}"))
             .ReadAsync<KpiAggregateDto>();
@@ -343,15 +343,12 @@ public class AdminGovernanceTests
 
         var beforeExport = await (await admin.GetAsync("/api/kpi-evaluations/finance-export?year=2026&quarter=2"))
             .ReadAsync<KpiFinanceExportDto>();
-        Assert.Contains(beforeExport!.Rows, r => r.EvaluationId == qSubmitted.Id);
+        Assert.Contains(beforeExport!.Rows, r => r.EvaluationId == submitted.Id);
 
-        // حذف إداريّ للتقييمَين معًا.
-        foreach (var id in new[] { submitted.Id, qSubmitted.Id })
-        {
-            var del = await admin.PostAsJsonAsync($"/api/kpi-evaluations/{id}/admin-delete",
-                new KpiReviewActionRequest("استبعاد من التجميع"));
-            Assert.Equal(HttpStatusCode.OK, del.StatusCode);
-        }
+        // حذف إداريّ.
+        var del = await admin.PostAsJsonAsync($"/api/kpi-evaluations/{submitted.Id}/admin-delete",
+            new KpiReviewActionRequest("استبعاد من التجميع"));
+        Assert.Equal(HttpStatusCode.OK, del.StatusCode);
 
         // بعد الحذف: التجميع يسقط، والتصدير لا يحوي التقييم.
         var afterAgg = await (await manager.GetAsync(
@@ -362,7 +359,7 @@ public class AdminGovernanceTests
 
         var afterExport = await (await admin.GetAsync("/api/kpi-evaluations/finance-export?year=2026&quarter=2"))
             .ReadAsync<KpiFinanceExportDto>();
-        Assert.DoesNotContain(afterExport!.Rows, r => r.EvaluationId == qSubmitted.Id);
+        Assert.DoesNotContain(afterExport!.Rows, r => r.EvaluationId == submitted.Id);
     }
 
     // §سجلّ أحداث المراجعة (Timeline) يُملأ بأحداث الإرسال والاعتماد.

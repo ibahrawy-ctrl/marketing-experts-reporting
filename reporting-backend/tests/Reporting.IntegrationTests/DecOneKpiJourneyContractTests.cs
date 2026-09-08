@@ -204,17 +204,26 @@ public class DecOneKpiJourneyContractTests
         var (_, leaderId) = await TestAuth.CreateUserAsync(_factory, "TeamLeader");
         var teamId = await TestAuth.CreateTeamWithLeaderAsync(_factory, leaderId, employee);
 
+        // R6/§4 — السلّم يُقاس **داخل مسار النبض** لا بين مسارين: العقد ألغى المسار الربعيّ، فمقارنة
+        // «فريق أسبوعيّ» بـ«موظّف ربعيّ» لم تعد مقارنة أولويّة بل مقارنة بمسار غير موجود. المحور
+        // المقيس (الموظّف يتفوّق على الفريق) محفوظ كما هو، بقالبين أسبوعيَّين — كما فُعل في نظيره
+        // «إسناد الفريق يتفوّق على مطابقة المسمّى» عند انحدار OBS-R5-01/2.
         var role = await TestAuth.GetOrCreateJobRoleAsync(_factory, $"R5_A1_{Guid.NewGuid():N}");
-        var (weeklyTemplate, _, _) = await PublishAsync(admin, KpiCadence.WeeklyPulse, role);
-        var (quarterlyTemplate, _, _) = await PublishAsync(admin, KpiCadence.Quarterly, role);
+        var (teamTemplate, _, _) = await PublishAsync(admin, KpiCadence.WeeklyPulse, role);
+        var (employeeTemplate, _, _) = await PublishAsync(admin, KpiCadence.WeeklyPulse, role);
 
-        await AssignAsync(admin, weeklyTemplate, TemplateAssignmentScope.Team, teamId);
-        await AssignAsync(admin, quarterlyTemplate, TemplateAssignmentScope.Employee, employee);
+        await AssignAsync(admin, teamTemplate, TemplateAssignmentScope.Team, teamId);
+        await AssignAsync(admin, employeeTemplate, TemplateAssignmentScope.Employee, employee);
 
         var row = await RowAsync(manager, $"periodType=Quarter&periodKey={Q}", employee);
 
-        Assert.Equal(KpiCadence.Quarterly, row.EffectiveCadence);
+        Assert.Equal(KpiCadence.WeeklyPulse, row.EffectiveCadence);
         Assert.Equal(KpiCadenceSources.EmployeeAssignment, row.CadenceSource);
+
+        // والفائز فعلًا قالب الموظّف لا قالب الفريق — لا مجرّد تطابق اسم المصدر.
+        var setup = await SetupAsync(manager, employee);
+        var weeklyTrack = setup.Tracks.Single(t => t.Cadence == KpiCadence.WeeklyPulse);
+        Assert.Equal(employeeTemplate, Assert.Single(weeklyTrack.Templates).Id);
     }
 
     [Fact]
@@ -305,11 +314,13 @@ public class DecOneKpiJourneyContractTests
         // الإعداد التاريخيّ: أسبوعيّ عبر المسمّى الوظيفيّ.
         await PublishAsync(admin, KpiCadence.WeeklyPulse, role);
 
-        // إعداد جديد (ربعيّ) يسري من بداية الربع الرابع فقط.
+        // R6/§4 — المحور المقيس هو **مرساة السريان** (نهاية الفترة) لا نوع المسار. وبما أنّ المسار
+        // الربعيّ أُلغي، يُقاس التبدّل بإعداد أسبوعيّ جديد **مُسنَد إلى الموظّف** يسري من بداية الربع
+        // الرابع: مصدر الحسم وحده هو ما يتبدّل بين الربعين، والمسار يبقى النبض في الحالتين.
         var otherRole = await TestAuth.GetOrCreateJobRoleAsync(_factory, $"{code}_NEW");
-        var (quarterly, _, _) = await PublishAsync(admin, KpiCadence.Quarterly, otherRole);
+        var (later, _, _) = await PublishAsync(admin, KpiCadence.WeeklyPulse, otherRole);
         var q4 = await RangeAsync(manager, "Quarter", "2026-Q4");
-        await AssignAsync(admin, quarterly, TemplateAssignmentScope.Employee, employee, from: q4.Start);
+        await AssignAsync(admin, later, TemplateAssignmentScope.Employee, employee, from: q4.Start);
 
         var inQ2 = await RowAsync(manager, $"periodType=Quarter&periodKey={Q}", employee);
         var inQ4 = await RowAsync(manager, "periodType=Quarter&periodKey=2026-Q4", employee);
@@ -318,7 +329,8 @@ public class DecOneKpiJourneyContractTests
         Assert.Equal(KpiCadence.WeeklyPulse, inQ2.EffectiveCadence);
         Assert.Equal(KpiCadenceSources.JobRole, inQ2.CadenceSource);
 
-        Assert.Equal(KpiCadence.Quarterly, inQ4.EffectiveCadence);
+        // والربع الرابع وحده يرى الإسناد الجديد — فالمرساة نهاية الفترة لا لحظة القراءة.
+        Assert.Equal(KpiCadence.WeeklyPulse, inQ4.EffectiveCadence);
         Assert.Equal(KpiCadenceSources.EmployeeAssignment, inQ4.CadenceSource);
     }
 
@@ -580,10 +592,17 @@ public class DecOneKpiJourneyContractTests
         }
     }
 
-    // ===================== البند 3 — المسار الربعيّ الرسميّ مسار حقيقيّ لا اسم =====================
+    // ===================== البند 3 — بعد R6: الربع حبيبة قراءة، لا مسار تقييم يُكتب =====================
 
+    /// <summary>
+    /// R6/§4+§5.4 — <b>بديل عقديّ</b> لاختبار «التقييم الربعيّ الرسميّ يُنشَر ويُنشأ ويُعتمَد ويُغلق الربع».
+    /// كان يقيس أنّ المسار الربعيّ «مسار حقيقيّ لا اسم»؛ وقرار المالك ألغى هذا المسار كتابةً بالكامل.
+    /// فيُقاس بدلًا منه ما طلبه نصًّا: أنّ إنشاء التقييم الربعيّ يُردّ بـ<c>400</c> برمز مسمًّى، وأنّ
+    /// الردّ <b>لا يخفي كتابة صامتة</b> (صفر صفوف)، وأنّ الرقم الذي يراه المستخدم على نافذة الربع
+    /// مشتقّ من النبض الأسبوعيّ المعتمَد وحده. نشر القالب الربعيّ يبقى مقبولًا (WS-1 يقفل الإنشاء لا النشر).
+    /// </summary>
     [Fact]
-    public async Task البند03_التقييم_الربعيّ_الرسميّ_يُنشَر_ويُنشأ_ويُعتمَد_ويُغلق_الربع()
+    public async Task البند03_إنشاء_التقييم_الربعيّ_مردود_برمزه_والرقم_الربعيّ_مشتقّ_من_النبض()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var (manager, managerId) = await TestAuth.CreateUserAsync(_factory, "Manager");
@@ -591,39 +610,46 @@ public class DecOneKpiJourneyContractTests
         var role = await TestAuth.GetOrCreateJobRoleAsync(_factory, code);
         var (_, employee) = await TestAuth.CreateUserWithJobRoleCodeAsync(_factory, "Employee", code, managerId);
 
-        var (templateId, manualId, autoId) = await PublishAsync(admin, KpiCadence.Quarterly, role);
+        // النشر مقبول: الإقفال يقع على إنشاء التقييم لا على القالب.
+        var (quarterlyTemplate, _, _) = await PublishAsync(admin, KpiCadence.Quarterly, role);
 
-        // تقييم ربعيّ واحد بمفتاح الربع نفسه — لا مفتاح أسبوع ولا نوع فترة أسبوعيّ.
-        var ev = await (await manager.PostAsJsonAsync("/api/kpi-evaluations",
-            new CreateKpiEvaluationRequest(templateId, employee, PeriodType.Quarterly, Q)))
-            .ReadAsync<KpiEvaluationDto>();
-        Assert.NotNull(ev);
-        await manager.PutAsJsonAsync($"/api/kpi-evaluations/{ev!.Id}/results",
-            new SaveKpiResultsRequest(new[]
-            {
-                new KpiResultInput(manualId, null, 90m, null),
-                new KpiResultInput(autoId, 90m, null, null)
-            }));
-        await manager.PostAsync($"/api/kpi-evaluations/{ev.Id}/submit", null);
-        var ceo = await TestAuth.LoginAsRoleAsync(_factory, "CEO");
-        var approved = await (await ceo.PostAsync($"/api/kpi-evaluations/{ev.Id}/approve", null))
-            .ReadAsync<KpiEvaluationDto>();
-        Assert.Equal(KpiEvaluationStatus.Approved, approved!.Status);
+        // ومحاولة الإنشاء بمفتاح الربع الصحيح ونوع فترته الصحيح تُردّ برمز التقاعد — لا برمز صيغة
+        // ولا برمز خلط مسارين: العلّة أنّ المسار نفسه متقاعد.
+        var create = await manager.PostAsJsonAsync("/api/kpi-evaluations",
+            new CreateKpiEvaluationRequest(quarterlyTemplate, employee, PeriodType.Quarterly, Q));
+        Assert.Equal(HttpStatusCode.BadRequest, create.StatusCode);
+        var body = await create.Content.ReadAsStringAsync();
+        Assert.Contains("legacy_quarterly_write_disabled", body);
+        Assert.DoesNotContain("kpi_eval.period_type_not_supported", body);
+
+        // ولا كتابة صامتة خلف الردّ: لا صفّ تقييم واحد لهذا الموظّف (WS-2 — القاعدة لم تُمسّ).
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Assert.Equal(0, await db.KpiEvaluations.CountAsync(e => e.SubjectUserId == employee));
+        }
+
+        // والرحلة الفعليّة أسبوعيّة: نبض معتمَد واحد بدرجة 90 داخل الربع.
+        var (weeklyTemplate, manualId, autoId) = await PublishAsync(admin, KpiCadence.WeeklyPulse, role);
+        var weeks = await WeekKeysAsync(manager, "Quarter", Q);
+        await ScoreAsync(manager, weeklyTemplate, employee, manualId, autoId, weeks[0], 90m);
 
         var row = await RowAsync(manager, $"periodType=Quarter&periodKey={Q}", employee);
 
-        Assert.Equal(KpiCadence.Quarterly, row.EffectiveCadence);
+        // المسار المعروض هو النبض، والمقام عدد دورات الربع — الربع نافذة قراءة فوق أسابيع.
+        Assert.Equal(KpiCadence.WeeklyPulse, row.EffectiveCadence);
         Assert.Equal(KpiCadenceSources.JobRole, row.CadenceSource);
-        // المقام دورة ربعيّة واحدة داخل الربع — لا عدد أسابيع.
-        Assert.Equal(1, row.Measure.ExpectedEvaluationCount);
-        Assert.Equal(1, row.Measure.AdjustedExpectedCount);
+        Assert.Equal(weeks.Length, row.Measure.ExpectedEvaluationCount);
+        Assert.Equal(weeks.Length, row.Measure.AdjustedExpectedCount);
+
+        // والقيمة مشتقّة من النبض المعتمَد وحده، والنقص معلن لا مطويّ ولا مصفَّر.
         Assert.Equal(1, row.Measure.EligibleEvaluationCount);
-        Assert.Equal(0, row.Measure.MissingCount);
-        Assert.Equal(100m, row.Measure.CoveragePercent);
+        Assert.Equal(weeks.Length - 1, row.Measure.MissingCount);
         Assert.Equal(90.00m, row.Measure.Value);
-        Assert.False(row.Measure.IsProvisional);
-        Assert.Equal(KpiJourneyState.CompleteEligible, row.Measure.JourneyState);
-        Assert.True(row.EligibleForRanking);
+
+        // وتغطية أسبوع واحد من ثلاثة عشر دون عتبة الأهليّة ⇒ رقم مؤقّت معلَن لا نهائيّ مموّه.
+        Assert.True(row.Measure.IsProvisional);
+        Assert.False(row.EligibleForRanking);
     }
 
     [Fact]

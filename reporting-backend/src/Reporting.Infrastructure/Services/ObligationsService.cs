@@ -274,12 +274,10 @@ public sealed class ObligationsService : IObligationsService
 
         var rolesByUser = await UserPrimaryRolesAsync(ownerIds.Concat(userIds).Distinct().ToList(), ct);
 
-        // مفاتيح الفترات المطلوبة لكلّ دوريّة (الربعيّ يُشتقّ من مرجع الثلاثاء فلا تُحتسب دورة لربعين).
+        // R6.3/§3 — مفاتيح الفترات المُصدِرة للاستحقاق صارت الأسبوعيّة وحدها. اشتقاق مفاتيح ربعيّة
+        // هنا لم يعد له مستهلك بعد إقفال الاستحقاق الربعيّ، وجلب تقييمات ربعيّة لا يُطابَق عليها شيء.
         var weeklyKeys = keys.Distinct().OrderBy(k => k, StringComparer.Ordinal).ToList();
-        var quarterlyKeys = keys.Select(ObligationPolicy.QuarterKeyForCycle)
-            .Distinct().OrderBy(k => k, StringComparer.Ordinal).ToList();
-
-        var allPeriodKeys = weeklyKeys.Concat(quarterlyKeys).Distinct().ToList();
+        var allPeriodKeys = weeklyKeys;
 
         // استعلام واحد لكلّ التقييمات المعنيّة (لا N+1): المستخدمون × الفترات × نسب القوالب المُسنَدة.
         var versionIds = versions.Select(v => v.Id).ToList();
@@ -321,13 +319,16 @@ public sealed class ObligationsService : IObligationsService
             {
                 if (!templateById.TryGetValue(tplId, out var tpl)) continue;
 
-                var periodKeys = tpl.Cadence == KpiCadence.Quarterly ? quarterlyKeys : weeklyKeys;
+                // R6.3/§3 — لا يُصدَر استحقاق ربعيّ. الاستحقاق عقدٌ يُوفَّى بإنشاء تقييم للفترة، وإنشاء
+                // التقييم الربعيّ مقفل منذ R6/§5.4 ⇒ كان الاستحقاق الربعيّ يولد `Missing` ثمّ `Late`
+                // **لا سبيل لإغلاقه إطلاقًا**: ضجيج دائم ينسب تقصيرًا لموظّف لا يملك مسارًا للوفاء.
+                // القالب الربعيّ المُسنَد يبقى قائمًا ومقروءًا؛ المقفل هو توليد الاستحقاق منه فقط.
+                if (tpl.Cadence == KpiCadence.Quarterly) continue;
 
-                foreach (var periodKey in periodKeys)
+                // الدوريّة الوحيدة المُصدِرة للاستحقاق هي الأسبوعيّة (مصدر الحقيقة المعتمَد).
+                foreach (var periodKey in weeklyKeys)
                 {
-                    var (start, end, dueAt) = tpl.Cadence == KpiCadence.Quarterly
-                        ? QuarterWindow(periodKey)
-                        : WeeklyWindow(periodKey, ownerRole);
+                    var (start, end, dueAt) = WeeklyWindow(periodKey, ownerRole);
 
                     evalByKey.TryGetValue((userId, tplId, periodKey), out var ev);
                     var fulfilled = ev is not null && IsKpiFulfilled(ev.Status);
@@ -384,11 +385,8 @@ public sealed class ObligationsService : IObligationsService
         return (start, end, ReportingCalendarPolicy.RoleDueDate(cycleKey, ownerRole));
     }
 
-    private static (DateOnly Start, DateOnly End, DateOnly Due) QuarterWindow(string quarterKey)
-    {
-        var (start, end) = ObligationPolicy.QuarterRange(quarterKey);
-        return (start, end, ObligationPolicy.QuarterlyDueDate(quarterKey));
-    }
+    // R6.3/§3 — أُزيلت `QuarterWindow` (غلاف خاصّ لم يبقَ له نداء بعد إقفال الاستحقاق الربعيّ).
+    // سياسات `ObligationPolicy.QuarterRange`/`QuarterlyDueDate` باقية كما هي لمستهلكيها الآخرين.
 
     /// <summary>«مُنجَز» لتقييم KPI = خرج من يد المُقيِّم. المسودّة/الجاري/طلب التعديل ليست إنجازًا.</summary>
     private static bool IsKpiFulfilled(KpiEvaluationStatus s) => s is
