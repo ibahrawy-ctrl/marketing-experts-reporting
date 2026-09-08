@@ -6,7 +6,7 @@
 import { useState } from 'react';
 import { Alert, Badge, Button, Card, EmptyState, Spinner, StatCard } from '../components/ui';
 import { apiErrorMessage } from '../lib/api';
-import { formatDateTime } from '../lib/format';
+import { formatDateTime, submissionStatusLabel } from '../lib/format';
 import { useApproverIntegrity, useRepairApproverIntegrity } from '../lib/useApproverIntegrity';
 import type {
   ApproverIntegrityIssueDto,
@@ -60,12 +60,13 @@ export default function AdminApproverIntegrityPage() {
         </p>
       </div>
 
-      {list.isLoading ? (
+      {/* isPending لا isLoading: سياسة إعادة المحاولة (shouldRetryQuery) تعيد المحاولة مرّتين على 5xx،
+          وبين المحاولتين يصير isLoading=false مع بقاء البيانات معدومة والخطأ غير نهائيّ ⇒ كان السطح
+          يعرض خطأً كاذبًا أثناء المهلة. isPending يبقى صادقًا حتّى استقرار النتيجة. */}
+      {list.isPending ? (
         <Spinner />
       ) : list.isError ? (
         <Alert tone="alert">{apiErrorMessage(list.error, 'تعذّر تحميل سطح الإنقاذ.')}</Alert>
-      ) : !list.data ? (
-        <Alert tone="alert">تعذّر تحميل سطح الإنقاذ.</Alert>
       ) : (
         <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -192,7 +193,7 @@ function IssueRow({ item }: { item: ApproverIntegrityIssueDto }) {
       </td>
       <td className="px-4 py-3 text-ink-2">{item.teamName ?? '—'}</td>
       <td className="px-4 py-3">{item.periodKey}</td>
-      <td className="px-4 py-3 text-ink-2">{item.status}</td>
+      <td className="px-4 py-3 text-ink-2">{submissionStatusLabel[item.status] ?? item.status}</td>
       <td className="px-4 py-3 text-ink-2">{item.currentApproverName ?? '—'}</td>
       <td className="px-4 py-3 text-ink-2">{formatDateTime(item.submittedAtUtc)}</td>
       <td className="px-4 py-3">{item.stalledDays}</td>

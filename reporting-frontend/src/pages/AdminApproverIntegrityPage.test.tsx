@@ -10,6 +10,17 @@ import { api } from '../lib/api';
 import AdminApproverIntegrityPage from './AdminApproverIntegrityPage';
 import type { ApproverIntegrityReportDto, ApproverRepairReportDto } from '../types/api';
 
+// حالة الهوك المُقحَمة لاختبار «مهلة إعادة المحاولة» وحده؛ فارغة ⇒ يُستعمل الهوك الحقيقيّ.
+const injected = vi.hoisted(() => ({ current: null as Record<string, unknown> | null }));
+
+vi.mock('../lib/useApproverIntegrity', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../lib/useApproverIntegrity')>();
+  return {
+    ...actual,
+    useApproverIntegrity: () => injected.current ?? actual.useApproverIntegrity(),
+  };
+});
+
 function renderPage() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -73,6 +84,7 @@ function axiosError(detail: string, status = 500) {
 
 beforeEach(() => {
   vi.restoreAllMocks();
+  injected.current = null;
 });
 
 describe('AdminApproverIntegrityPage — حالات السطح', () => {
@@ -94,6 +106,16 @@ describe('AdminApproverIntegrityPage — حالات السطح', () => {
     renderPage();
     expect(await screen.findByText('غير مصرَّح لك بهذا السطح.')).toBeTruthy();
     expect(screen.queryByText('لا اعتمادات عالقة')).toBeNull();
+  });
+
+  // انحدار حقيقيّ رُصد في المتصفّح: `shouldRetryQuery` يعيد المحاولة مرّتين على 5xx، وبين المحاولتين
+  // تصير الحالة isPending=true مع isLoading=false وبيانات معدومة وخطأ غير نهائيّ. الاعتماد على
+  // isLoading كان يعرض خطأً كاذبًا أثناء المهلة؛ الصواب isPending.
+  it('3ب) مهلة إعادة المحاولة (isPending دون isFetching): يبقى التحميل ولا يظهر خطأ كاذب', async () => {
+    injected.current = { isPending: true, isLoading: false, isError: false, error: null, data: undefined };
+    const { container } = renderPage();
+    expect(container.querySelector('.animate-spin')).not.toBeNull();
+    expect(screen.queryByText(/تعذّر/)).toBeNull();
   });
 
   it('4) حالة النجاح: تعرض العدّادات وصفّ الحالة العالقة', async () => {
