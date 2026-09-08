@@ -388,6 +388,48 @@ public class ObligationsApiTests
         Assert.All(Items(reportOnly), i => Assert.Equal("Report", i.GetProperty("kind").GetString()));
     }
 
+    // ===================== ⑦ب R6.3/§3 — لا استحقاق ربعيّ =====================
+
+    /// <summary>
+    /// R6.3/§3 — قالب KPI ربعيّ مُسنَد <b>لا يُصدِر استحقاقًا إطلاقًا</b>، بينما القالب الأسبوعيّ
+    /// المُسنَد لنفس الموظّف يبقى يُصدِر استحقاقاته كاملة.
+    ///
+    /// المبرّر الحاكم: الاستحقاق عقدٌ يُوفَّى بإنشاء تقييم للفترة، وإنشاء التقييم الربعيّ مقفل منذ
+    /// R6/§5.4 وكلّ كتابة عليه مقفلة منذ R6.1–R6.3 ⇒ الاستحقاق الربعيّ كان يولد <c>Missing</c> ثمّ
+    /// <c>Late</c> بلا أيّ سبيل لإغلاقه: ضجيج دائم ينسب تقصيرًا لموظّف لا يملك مسارًا للوفاء.
+    ///
+    /// <b>الضابط الموجب داخل الاختبار نفسه</b> (الأسبوعيّ ما زال يُصدِر): بدونه قد ينجح التأكيد
+    /// لأنّ محرّك استحقاقات KPI تعطّل كلّيًّا لا لأنّ الربعيّ وحده أُقفل.
+    /// </summary>
+    [Fact]
+    public async Task A_Quarterly_Kpi_Template_Issues_No_Obligation_While_Weekly_Still_Does()
+    {
+        var (leader, leaderId) = await Phase2TestAuth.CreateUserAsync(
+            _factory, Roles.TeamLeader, permissions: AppPermissions.HrOperationsView);
+        var (_, employeeId) = await Phase2TestAuth.CreateUserAsync(
+            _factory, Roles.Employee, managerId: leaderId);
+
+        var (quarterlyId, _) = await SeedKpiTemplateAsync(
+            KpiCadence.Quarterly, includeUserId: employeeId);
+        var (weeklyId, _) = await SeedKpiTemplateAsync(
+            KpiCadence.WeeklyPulse, includeUserId: employeeId);
+
+        var body = await JsonAsync(await leader.GetAsync(
+            $"/api/obligations?userId={employeeId}&recentCycles={Cycles}"));
+
+        // (1) صفر صفّ من القالب الربعيّ — لا Missing ولا Late ولا حتّى Pending.
+        Assert.Empty(For(body, quarterlyId));
+
+        // (2) الضابط الموجب: الأسبوعيّ أصدر استحقاقًا لكلّ دورة في النافذة.
+        var weeklyRows = For(body, weeklyId).ToList();
+        Assert.Equal(RecentKeys().Count, weeklyRows.Count);
+        Assert.All(weeklyRows, r => Assert.True(r.GetProperty("expected").GetBoolean()));
+
+        // (3) ولا مفتاح فترة ربعيّ (`YYYY-Qn`) تسرّب إلى أيّ صفّ مهما كان مصدره.
+        Assert.All(Items(body), i =>
+            Assert.DoesNotContain("-Q", i.GetProperty("periodKey").GetString()!));
+    }
+
     // ===================== ⑧ اتّساق العدّادات مع الصفوف =====================
 
     [Fact]

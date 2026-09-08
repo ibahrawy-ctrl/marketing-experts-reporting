@@ -552,7 +552,12 @@ function KpiDetail({ id, onBack }: { id: string; onBack: () => void }) {
   });
 
   if (isLoading) return <LoadingState label="يتم تحميل التقييم…" />;
-  if (isError || !ev)
+  // R6.5.3 — حدّ بيانات لا حارس صدق: `!ev` وحده يفحص truthiness، فتعبره حمولةُ 200 مخالفةٌ للعقد
+  // (مصفوفة، أو كائن بلا `results`) ثمّ تنهار الشجرة كلّها عند `ev.results.map` برمية غير مُعالَجة.
+  // العقد يوجب مصفوفة دائمًا (`IReadOnlyList<KpiResultDto> Results` خادميًّا، `results: KpiResultDto[]` هنا)،
+  // فالمخالف خطأُ تحميل لا «لا نتائج» — ولا يُحوَّل إلى `[]` كي لا ينقلب الفشل صمتًا. و`results: []`
+  // المشروعة تبقى على معناها وتُصيَّر جدولًا فارغًا. الحارس الواحد هنا يؤمّن مواضع `ev.results` الثلاثة.
+  if (isError || !ev || !Array.isArray(ev.results))
     return <QueryError onRetry={() => refetch()} title="تعذّر تحميل التقييم" description="حدث خطأ أثناء جلب تفاصيل التقييم. أعد المحاولة." />;
 
   return (

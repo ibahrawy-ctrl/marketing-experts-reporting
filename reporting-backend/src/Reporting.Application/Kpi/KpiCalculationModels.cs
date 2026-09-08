@@ -44,6 +44,22 @@ public enum KpiJourneyState
 }
 
 /// <summary>
+/// R6/§5.7 — حالة اكتمال الرقم، **مستقلّة تمامًا عن نطاق الحدّ الأدنى للتغطية (80%)**.
+/// السؤالان مختلفان ولا يُدمجان: «هل انتهت الفترة واستُوفيت كلّ الالتزامات؟» (هنا)
+/// مقابل «هل يدخل الرقم المتوسّط الرسميّ والترتيب؟» (<see cref="KpiJourneyState"/> و<c>EligibleForRanking</c>).
+/// دمجهما هو ما جعل تغطية 85% في فترة منتهية تُعرَض «نهائيّة» بينما خُمسها ناقص فعلًا.
+/// </summary>
+public enum KpiCompletenessState
+{
+    /// <summary>الفترة ما زالت مفتوحة ⇒ الرقم مؤقّت مهما بلغت تغطيته، لأنّ التزامات لم يحن أوانها بعد.</summary>
+    Provisional = 0,
+    /// <summary>الفترة انتهت والتغطية 100% (أو لا مقام لأنّ كلّ الالتزامات مُعفاة) ⇒ نهائيّ.</summary>
+    Final = 1,
+    /// <summary>الفترة انتهت والتغطية دون 100% ⇒ ناقص، ولو تجاوز الحدّ الأدنى ودخل المتوسّط الرسميّ.</summary>
+    Incomplete = 2
+}
+
+/// <summary>
 /// DEC-01/5 — التواتر الفعّال لموظّف واحد ومصدره. <c>Cadence = null</c> ⇒ «التواتر غير مُهيّأ»:
 /// لا اختيار ولا <c>fallback</c> صامت.
 /// </summary>
@@ -162,7 +178,14 @@ public sealed record KpiMeasureDto(
     /// <summary>DEC-01/14 — درجة محسوبة لكنّ تغطيتها دون الحدّ الأدنى ⇒ «مؤقّتة»، خارج المتوسّط الرسميّ والتصدير المالي.</summary>
     bool IsProvisional = false,
     /// <summary>DEC-01/18 — حالة الرحلة الصريحة.</summary>
-    KpiJourneyState JourneyState = KpiJourneyState.NotStarted);
+    KpiJourneyState JourneyState = KpiJourneyState.NotStarted,
+    /// <summary>
+    /// R6/§5.7 — الالتزامات المُعفاة داخل الفترة = <c>Expected − AdjustedExpected</c>، **مُفصَحًا عنه رقمًا**
+    /// لا مشتقًّا في الواجهة: بدونه يبدو انخفاض المقام تلاعبًا لا إعفاءً موثَّقًا.
+    /// </summary>
+    int ExemptCount = 0,
+    /// <summary>R6/§5.7 — اكتمال مستقلّ عن نطاق الـ80% (انظر <see cref="KpiCompletenessState"/>).</summary>
+    KpiCompletenessState Completeness = KpiCompletenessState.Provisional);
 
 /// <summary>درجة موظّف واحد داخل فترة وكادنس — صفّ واحد لكلّ موظّف دائمًا (§5.7).</summary>
 public sealed record KpiEmployeeScoreDto(
@@ -256,7 +279,7 @@ public sealed record KpiSourcePeriodDto(
     DateOnly Start,
     DateOnly End,
     string Label,
-    /// <summary>هل اكتمل تقييم لهذه الفترة (Approved أو Closed)؟</summary>
+    /// <summary>هل لهذه الفترة تقييم مؤهَّل للدرجة؟ (R6/§5.1: <c>Approved</c> وحدها — <c>Closed</c> ليست منها).</summary>
     bool IsCompleted,
     /// <summary>هل أُعفيت هذه الفترة (إجازة معتمَدة/استثناء إداريّ/خارج نافذة الخدمة)؟ ⇒ خارج المقام.</summary>
     bool IsExempt,

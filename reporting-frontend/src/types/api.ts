@@ -1662,7 +1662,9 @@ export interface EmployeeProfileDto {
 // ===== Phase 5: تقويم التقارير وتجميع KPI الدوري =====
 // كل النواتج مقيَّدة خادميًّا بنطاق المستخدم (ScopeResolver) — لا تصفية من الواجهة فقط.
 
-export type KpiGranularity = 'Monthly' | 'Quarterly' | 'Yearly' | 'Custom';
+// R6/§5.3 — الحبيبة **نافذة قراءة** لا نوع تقييم: كلّها تُجمَّع من نبض الأسبوع المعتمَد نفسه.
+// `Weekly` أُضيفت لأنّ العقد الخادميّ صار يقبلها صراحةً، و`Custom` باقية (يستهلكها «آخر N أسابيع»).
+export type KpiGranularity = 'Weekly' | 'Monthly' | 'Quarterly' | 'Yearly' | 'Custom';
 
 export interface KpiWeeklyPointDto {
   periodKey: string;

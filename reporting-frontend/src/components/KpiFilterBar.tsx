@@ -1,7 +1,7 @@
 // P1-KPI-008 — مُرشِّح KPI الموحّد: مصدر واحد للفترة والكادنس والنطاق تقوده كلّ الشاشة.
 // لا يحسب هذا المكوّن حدود فترة ولا يشتقّها من توقيت المتصفّح (B-1)؛ يرسل النوع/المفتاح
 // إلى الخادم ويعرض ما يعيده محلولًا بتوقيت الرياض.
-import type { KpiCadence, KpiFilter, KpiPeriodResolved } from '../lib/useKpi';
+import type { KpiFilter, KpiPeriodResolved } from '../lib/useKpi';
 
 // DEC-01/1 — الربع الجاري أوّلًا لأنّه الافتراضيّ؛ وبقيّة الأنواع للتنقّل التاريخيّ (ربع سابق مثلًا).
 const PERIOD_TYPES: { value: string; label: string }[] = [
@@ -14,14 +14,10 @@ const PERIOD_TYPES: { value: string; label: string }[] = [
   { value: 'Custom', label: 'مدى مخصّص' },
 ];
 
-// DEC-01/2 — «تلقائي» هو الافتراضيّ: الخادم يحسم تواتر كلّ موظّف من قالبه الفعّال.
-// DEC-01/3 — التحديد الصريح يفصل مسار النبض الأسبوعيّ عن مسار التقييم الربعيّ الرسميّ.
-const CADENCES: { value: KpiCadence | ''; label: string }[] = [
-  { value: '', label: 'تلقائي — حسب تواتر كلّ موظّف' },
-  { value: 'WeeklyPulse', label: 'نبض أسبوعيّ' },
-  { value: 'Quarterly', label: 'تقييم ربعيّ رسميّ' },
-];
-
+// R6/§5.4 — أُزيل منتقي «نوع التقييم». كان يعرض مسارين (نبض أسبوعيّ · تقييم ربعيّ رسميّ)، وقرار
+// المالك ألغى المسار الربعيّ كتابةً وقراءةً: مصدر الحقيقة الوحيد هو النبض الأسبوعيّ المعتمَد،
+// و«الربع» حبيبة نافذة فوقه تُختار من منتقي الفترة أعلاه. إبقاء المنتقي كان يعني أحد سوأين:
+// خيارًا يُرَدّ بـ`legacy_cadence_disabled` فيبدو عطلًا، أو خيارًا وحيدًا لا يختار شيئًا.
 const selectClass =
   'rounded-lg border border-line bg-white px-3 py-2 text-sm text-navy focus:border-orange-500 focus:outline-none';
 
@@ -95,24 +91,6 @@ export function KpiFilterBar({
           </label>
         </>
       )}
-
-      {/* DEC-01/2+3: لا إلزام باختيار نوع التقييم؛ «تلقائي» يترك الحسم للخادم لكلّ موظّف،
-          والتحديد الصريح يفصل المسارين بلا خلط. لا سقوط صامت في أيّ من الحالتين. */}
-      <label className="flex flex-col gap-1 text-xs text-ink-2">
-        نوع التقييم
-        <select
-          aria-label="الكادنس"
-          className={selectClass}
-          value={filter.cadence ?? ''}
-          onChange={(e) => onChange({ ...filter, cadence: (e.target.value || null) as KpiCadence | null })}
-        >
-          {CADENCES.map((c) => (
-            <option key={c.value || 'auto'} value={c.value}>
-              {c.label}
-            </option>
-          ))}
-        </select>
-      </label>
 
       {resolved && (
         <p className="pb-2 text-xs text-ink-3">

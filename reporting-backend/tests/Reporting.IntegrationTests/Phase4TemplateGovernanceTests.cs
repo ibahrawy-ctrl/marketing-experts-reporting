@@ -91,15 +91,21 @@ public class Phase4TemplateGovernanceTests
         Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
     }
 
-    // ===== §9 دورية KPI — أُعيد تعريفها بـR5/DEC-01/3 =====
-    // المقصد الأصليّ لهذا الاختبار: «لا يُنشَر قالب لا يستطيع النظام تشغيله». وقتَ كتابته كان
-    // الربعيّ غير مُشغَّل فعلًا فكان المنع صحيحًا. بعد R5 صار المسار الربعيّ الرسميّ مُشغَّلًا كاملًا
-    // (نشر → إنشاء بمفتاح YYYY-Qn → اعتماد → نافذة التزام ربعيّة في محرّك الحساب)، فأصبح المنع
-    // نفسه مناقضًا للعقد. المقصد محفوظ لا مُضعَّف: النشر يُقبَل لأنّ التشغيل صار حقيقيًّا،
-    // ويبقى الخلط بين المسارَين مرفوضًا صراحةً — وهو الحارس الذي حلّ محلّ المنع الشامل.
+    // ===== §9 دورية KPI — أُعيد تعريفها بـR6/§5.4 (بعد أن أعادت R5/DEC-01/3 تعريفها قبلها) =====
+    // المقصد الأصليّ لهذا الاختبار: «لا يُنشَر قالب لا يستطيع النظام تشغيله». وقتَ كتابته كان الربعيّ
+    // غير مُشغَّل فكان المنع الشامل صحيحًا؛ ثمّ شغّلته R5 فصار المنع مناقضًا للعقد وقُلب إلى قبولٍ
+    // للنشر مع رفض الخلط. وبقرار المالك (R6) تقاعد **مسار الكتابة الربعيّة** نفسه.
+    //
+    // المقصد محفوظ في أدواره الثلاثة: النشر يبقى مقبولًا (الإقفال على إنشاء التقييم لا على القالب —
+    // WS-1/WS-2: لا صفوف تُحذف ولا قوالب تُبطَل)، والخلط بين المسارَين يبقى مرفوضًا برمزه المسمّى،
+    // والذي انقلب هو الطرف الثالث وحده: المفتاح الربعيّ «الصحيح» صار يُرفَض برمز الإقفال.
+    //
+    // ويُثبَت هنا صراحةً **تمايز الرمزين**: `kpi_eval.period_type_not_supported` (خطأ طلب: خلط مسارين)
+    // مقابل `legacy_quarterly_write_disabled` (تقاعد مسار). لو تساوى الرمزان لَعمي الرصد التشغيليّ عن
+    // الفرق بين مستخدم أخطأ في طلبه ومستخدم يطرق بابًا أُغلق عمدًا.
 
     [Fact]
-    public async Task PublishQuarterlyKpiTemplate_IsAccepted_ButWeeklyPulseCannotBeFiledAgainstIt()
+    public async Task PublishQuarterlyKpiTemplate_IsAccepted_ButNoEvaluationCanBeCreatedAgainstIt()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var created = await (await admin.PostAsJsonAsync("/api/kpi-templates",
@@ -115,7 +121,7 @@ public class Phase4TemplateGovernanceTests
 
         var (_, employee) = await TestAuth.CreateUserAsync(_factory, "Employee");
 
-        // نبض أسبوع على قالب ربعيّ = خلط المسارَين ⇒ رفض معلَّل.
+        // نبض أسبوع على قالب ربعيّ = خلط المسارَين ⇒ رفض معلَّل برمز **الخلط** لا برمز الإقفال.
         using var doc = System.Text.Json.JsonDocument.Parse(await (await admin.GetAsync(
             "/api/kpi/periods/resolve?type=CurrentQuarter")).Content.ReadAsStringAsync());
         var firstWeek = doc.RootElement.GetProperty("weekKeys").EnumerateArray().First().GetString()!;
@@ -123,12 +129,20 @@ public class Phase4TemplateGovernanceTests
         var mixed = await admin.PostAsJsonAsync("/api/kpi-evaluations",
             new CreateKpiEvaluationRequest(created.Id, employee, PeriodType.Weekly, firstWeek));
         Assert.Equal(HttpStatusCode.BadRequest, mixed.StatusCode);
+        Assert.Equal("kpi_eval.period_type_not_supported", await ErrorCodeAsync(mixed));
 
-        // وبالمفتاح الربعيّ الصحيح يُقبَل — إثبات أنّ المسار مُشغَّل لا مجرّد مسموح.
-        var ok = await admin.PostAsJsonAsync("/api/kpi-evaluations",
+        // R6/§5.4 (WS-1) — وبالمفتاح الربعيّ **الصحيح** يُرفَض أيضًا: مسار الكتابة الربعيّة متقاعد.
+        var retired = await admin.PostAsJsonAsync("/api/kpi-evaluations",
             new CreateKpiEvaluationRequest(created.Id, employee, PeriodType.Quarterly,
                 doc.RootElement.GetProperty("current").GetProperty("key").GetString()!));
-        ok.EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.BadRequest, retired.StatusCode);
+        Assert.Equal("legacy_quarterly_write_disabled", await ErrorCodeAsync(retired));
+    }
+
+    private static async Task<string?> ErrorCodeAsync(HttpResponseMessage res)
+    {
+        using var doc = System.Text.Json.JsonDocument.Parse(await res.Content.ReadAsStringAsync());
+        return doc.RootElement.TryGetProperty("type", out var t) ? t.GetString() : null;
     }
 
     [Fact]

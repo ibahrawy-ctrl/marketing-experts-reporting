@@ -177,8 +177,16 @@ public class DefR5OneEvaluationSetupContractTests
         });
     }
 
+    /// <summary>
+    /// R6/§5.4 — كان الاختبار يثبت نجاح الإنشاء في **المسارين معًا**. بقرار المالك تقاعد مسار الكتابة
+    /// الربعيّة، فانقلبت نتيجة الشقّ الربعيّ وحده. المحور محفوظ كما هو: نفس الحلقة، ونفس الموظّفَين،
+    /// ونفس المبدأ المقيس («ما ترسله الواجهة = ما أعلنه الخادم حرفيًّا») — وما تغيّر هو أنّ إعلان
+    /// الخادم للمسار الربعيّ صار إعلان بابٍ مغلق، ويجب أن يُغلَق بالرمز المسمّى لا بخطأ غامض.
+    /// وبقاء المسار الربعيّ **معلَنًا في الإعداد** مقصود: الصفوف التاريخيّة تُقرأ ولا تُنكَر (WS-2)،
+    /// والمقفَل هو الكتابة عليها.
+    /// </summary>
     [Fact]
-    public async Task إنشاء_التقييم_من_الإعداد_الفعّال_ينجح_في_المسارين_معًا()
+    public async Task إنشاء_التقييم_من_الإعداد_الفعّال_ينجح_للأسبوعيّ_ويُرفَض_للربعيّ_المتقاعد()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var (manager, managerId) = await TestAuth.CreateUserAsync(_factory, "Manager");
@@ -190,28 +198,30 @@ public class DefR5OneEvaluationSetupContractTests
         await AssignAsync(admin, quarterly, TemplateAssignmentScope.Employee, quarterlySubject);
         await AssignAsync(admin, weekly, TemplateAssignmentScope.Employee, weeklySubject);
 
-        var cases = new[]
-        {
-            (Subject: quarterlySubject, Cadence: KpiCadence.Quarterly, Template: quarterly),
-            (Subject: weeklySubject, Cadence: KpiCadence.WeeklyPulse, Template: weekly)
-        };
+        // الشقّ الأسبوعيّ — مصدر الحقيقة الوحيد بعد R6: يُقبَل كما كان بلا أيّ تخفيف.
+        var weeklyTrack = Track(await SetupAsync(manager, weeklySubject), KpiCadence.WeeklyPulse);
+        Assert.True(weeklyTrack.IsConfigured);
+        Assert.Contains(weeklyTrack.Templates, t => t.Id == weekly);
 
-        foreach (var (subject, cadence, template) in cases)
-        {
-            var track = Track(await SetupAsync(manager, subject), cadence);
-            Assert.True(track.IsConfigured);
-            Assert.Contains(track.Templates, t => t.Id == template);
+        // ما ترسله الواجهة = ما أعلنه الخادم حرفيًّا: قالب من قائمته، ونوع فترة ومفتاحًا من عنده.
+        var weeklyRes = await manager.PostAsJsonAsync("/api/kpi-evaluations", new CreateKpiEvaluationRequest(
+            weekly, weeklySubject, weeklyTrack.PeriodType, weeklyTrack.CurrentPeriodKey));
+        weeklyRes.EnsureSuccessStatusCode();
 
-            // ما ترسله الواجهة = ما أعلنه الخادم حرفيًّا لهذا المسار: قالب من قائمته، ونوع فترة ومفتاحًا من عنده.
-            var res = await manager.PostAsJsonAsync("/api/kpi-evaluations", new CreateKpiEvaluationRequest(
-                template, subject, track.PeriodType, track.CurrentPeriodKey));
-            res.EnsureSuccessStatusCode();
+        var ev = (await weeklyRes.ReadAsync<KpiEvaluationDto>())!;
+        Assert.Equal(weeklySubject, ev.SubjectUserId);
+        Assert.Equal(PeriodType.Weekly, ev.PeriodType);
+        Assert.Equal(weeklyTrack.CurrentPeriodKey, ev.PeriodKey);
 
-            var ev = (await res.ReadAsync<KpiEvaluationDto>())!;
-            Assert.Equal(subject, ev.SubjectUserId);
-            Assert.Equal(track.PeriodType, ev.PeriodType);
-            Assert.Equal(track.CurrentPeriodKey, ev.PeriodKey);
-        }
+        // الشقّ الربعيّ — الإعداد ما زال يعلنه (الصفوف التاريخيّة تُقرأ)، لكنّ الكتابة عليه مُقفَلة.
+        var quarterlyTrack = Track(await SetupAsync(manager, quarterlySubject), KpiCadence.Quarterly);
+        Assert.True(quarterlyTrack.IsConfigured);
+        Assert.Contains(quarterlyTrack.Templates, t => t.Id == quarterly);
+
+        var quarterlyRes = await manager.PostAsJsonAsync("/api/kpi-evaluations", new CreateKpiEvaluationRequest(
+            quarterly, quarterlySubject, quarterlyTrack.PeriodType, quarterlyTrack.CurrentPeriodKey));
+        Assert.Equal(HttpStatusCode.BadRequest, quarterlyRes.StatusCode);
+        Assert.Contains("legacy_quarterly_write_disabled", await quarterlyRes.Content.ReadAsStringAsync());
     }
 
     // ===================== DEF-R5-001 — الخادم هو الحاسم لا الواجهة =====================
@@ -264,10 +274,19 @@ public class DefR5OneEvaluationSetupContractTests
         Assert.Equal(HttpStatusCode.BadRequest, quarterOnWeekly.StatusCode);
         Assert.Contains("kpi_eval.period_type_not_supported", await quarterOnWeekly.Content.ReadAsStringAsync());
 
-        // والقالب الربعيّ الصحيح بنوع فترته الصحيح يُقبَل — الحارس يمنع الخلط لا الرحلة.
+        // الضابط الموجب («الحارس يمنع الخلط لا الرحلة») **محفوظ**، لكنّه نُقل إلى المسار الذي بقي
+        // مفتوحًا: قالب نبض أسبوعيّ بنوع فترته الصحيح يُقبَل. لولا هذا الضابط لَجاز أن يمرّ تنفيذٌ
+        // يرفض كلّ شيء فتبدو الاختبارات السالبة ناجحة بينما الرحلة كلّها معطّلة.
         var correct = await manager.PostAsJsonAsync("/api/kpi-evaluations",
-            new CreateKpiEvaluationRequest(quarterly, employee, PeriodType.Quarterly, Q));
+            new CreateKpiEvaluationRequest(weekly, employee, PeriodType.Weekly, weeks[0]));
         correct.EnsureSuccessStatusCode();
+
+        // R6/§5.4 — والقالب الربعيّ بنوع فترته الصحيح لم يعد يُقبَل، لكن برمز **الإقفال** لا برمز
+        // الخلط: التمييز بين الرمزين هو ما يفرّق بين «أخطأتَ الطلب» و«هذا الباب أُغلق».
+        var retired = await manager.PostAsJsonAsync("/api/kpi-evaluations",
+            new CreateKpiEvaluationRequest(quarterly, employee, PeriodType.Quarterly, Q));
+        Assert.Equal(HttpStatusCode.BadRequest, retired.StatusCode);
+        Assert.Contains("legacy_quarterly_write_disabled", await retired.Content.ReadAsStringAsync());
     }
 
     [Fact]
@@ -374,8 +393,18 @@ public class DefR5OneEvaluationSetupContractTests
 
     // ===================== DEVIATION-02 — لا اختلاط بين نتائج المسارين =====================
 
+    /// <summary>
+    /// R6/§4 — <b>بديل عقديّ</b> لاختبار «نتيجة نبض أسبوعيّ لا تدخل حساب المسار الربعيّ ولا تفصيله».
+    /// العقد المقيس سابقًا كان يفترض أنّ للربع تقييمًا ربعيًّا مستقلًّا يملأ مقامه بمفرده، وأنّ النبض
+    /// الأسبوعيّ دخيل عليه. R6 يعكس هذا الافتراض نصًّا: مصدر الحقيقة الوحيد هو
+    /// <c>PeriodType=Weekly ∧ Cadence=WeeklyPulse ∧ Status=Approved ∧ !IsDeleted</c>، و«الربع» حبيبة
+    /// <b>قراءة</b> مشتقّة لا نوع تقييم يُكتب. فما كان يُقاس هنا (عزل المسارين) لم يعد له وجود؛
+    /// والمقيس بديلًا — وهو مطلب المالك «Quarterly output is derived from Weekly Approved» — أنّ
+    /// القراءة الربعيّة تُبنى من النبض المعتمَد نفسه: مقامها دورات الربع، وبسطها ما اعتُمد منها.
+    /// وجود قالب ربعيّ منشور بجوارها لا يحوّل المسار ولا يُنشئ مقامًا موازيًا.
+    /// </summary>
     [Fact]
-    public async Task نتيجة_نبض_أسبوعيّ_لا_تدخل_حساب_المسار_الربعيّ_ولا_تفصيله()
+    public async Task القراءة_الربعيّة_مشتقّة_من_النبض_الأسبوعيّ_المعتمَد_لا_من_تقييم_ربعيّ()
     {
         var admin = await TestAuth.LoginAsAdminAsync(_factory);
         var (manager, managerId) = await TestAuth.CreateUserAsync(_factory, "Manager");
@@ -383,7 +412,8 @@ public class DefR5OneEvaluationSetupContractTests
         var role = await TestAuth.GetOrCreateJobRoleAsync(_factory, code);
         var (_, employee) = await TestAuth.CreateUserWithJobRoleCodeAsync(_factory, "Employee", code, managerId);
 
-        // المسار الرسميّ لهذا الموظّف ربعيّ، ومع ذلك لديه قالب نبض أسبوعيّ صالح في مساره الخاصّ.
+        // قالب ربعيّ منشور بجوار قالب النبض: النشر يبقى مقبولًا (WS-1 يقفل إنشاء التقييم لا القالب)،
+        // والمقصود إثبات أنّ مجرّد وجوده لا يخلق مسارًا موازيًا ولا يغيّر مصدر القراءة الربعيّة.
         await PublishAsync(admin, KpiCadence.Quarterly, role);
         var (weekly, manualId, autoId) = await PublishAsync(admin, KpiCadence.WeeklyPulse, role);
         var weeks = await WeekKeysAsync(manager, "Quarter", Q);
@@ -404,23 +434,31 @@ public class DefR5OneEvaluationSetupContractTests
 
         var row = await RowAsync(manager, $"periodType=Quarter&periodKey={Q}", employee);
 
-        // المقام دورة ربعيّة واحدة، والنبض الأسبوعيّ المعتمد لا يملؤها ولا يرفع تغطيتها.
-        Assert.Equal(KpiCadence.Quarterly, row.EffectiveCadence);
-        Assert.Equal(1, row.Measure.ExpectedEvaluationCount);
-        Assert.Equal(1, row.Measure.AdjustedExpectedCount);
-        Assert.Equal(0, row.Measure.EligibleEvaluationCount);
-        Assert.Equal(1, row.Measure.MissingCount);
-        Assert.Null(row.Measure.Value);
+        // المسار واحد لا اثنان: النبض الأسبوعيّ، ووجود قالب ربعيّ لا يحوّله.
+        Assert.Equal(KpiCadence.WeeklyPulse, row.EffectiveCadence);
+
+        // والمقام دورات الربع كلّها لا دورة ربعيّة واحدة — «الربع» نافذة قراءة فوق أسابيع.
+        Assert.Equal(weeks.Length, row.Measure.ExpectedEvaluationCount);
+        Assert.Equal(weeks.Length, row.Measure.AdjustedExpectedCount);
+
+        // والبسط هو النبض المعتمَد وحده: أسبوع معتمَد واحد ⇒ قيمة مشتقّة منه، والباقي نقص معلن.
+        Assert.Equal(1, row.Measure.EligibleEvaluationCount);
+        Assert.Equal(weeks.Length - 1, row.Measure.MissingCount);
+        Assert.Equal(95m, row.Measure.Value);
 
         var drillRes = await manager.GetAsync(
             $"/api/kpi/drilldown?periodType=Quarter&periodKey={Q}&subjectUserId={employee}");
         drillRes.EnsureSuccessStatusCode();
         var drill = (await drillRes.ReadAsync<KpiDrilldownDto>())!;
 
-        // التفصيل يسمّي فترة المسار الربعيّ وحدها — مفتاح الأسبوع لا يظهر ولا درجته.
+        // والتفصيل يعلن نَسَب الرقم: مفاتيح أسابيع الربع، لا المفتاح الربعيّ الإرثيّ.
         Assert.NotNull(drill.SourcePeriods);
-        Assert.Equal(new[] { Q }, drill.SourcePeriods!.Select(p => p.PeriodKey).ToArray());
-        Assert.All(drill.SourcePeriods!, p => Assert.False(p.IsCompleted));
-        Assert.Null(drill.RecomputedValue);
+        var periodKeys = drill.SourcePeriods!.Select(p => p.PeriodKey).ToArray();
+        Assert.Equal(weeks, periodKeys);
+        Assert.DoesNotContain(Q, periodKeys);
+
+        // والأسبوع المعتمَد وحده مكتمل؛ البقيّة مُعلَنة ناقصة لا مطويّة.
+        Assert.Equal(new[] { weeks[0] },
+            drill.SourcePeriods!.Where(p => p.IsCompleted).Select(p => p.PeriodKey).ToArray());
     }
 }

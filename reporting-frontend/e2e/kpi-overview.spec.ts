@@ -5,9 +5,11 @@
 // والاستجابة للمقاسات) لا إثبات الحساب — الحساب مُثبَت في اختبارات التكامل المعزولة.
 import { test, expect, type Page } from '@playwright/test';
 
+// R6.3/§4 — الفترة المحلولة نافذة **ربعيّة للقراءة** يعيدها الخادم، ومكوّناتها تقييمات
+// أسبوعيّة معتمَدة (انظر `DRILLDOWN` أدناه: `periodType: 'Weekly'`). لا مسار تقييم ربعيّ.
 const PERIOD = {
-  type: 'LastCompletedWeek', key: '2026-W33', start: '2026-08-15', end: '2026-08-21',
-  timezone: 'Asia/Riyadh', isOpen: false, label: 'الأسبوع 33',
+  type: 'CurrentQuarter', key: '2026-Q3', start: '2026-07-01', end: '2026-09-30',
+  timezone: 'Asia/Riyadh', isOpen: false, label: 'الربع الثالث 2026',
 };
 
 const measure = (over: Record<string, unknown> = {}) => ({
@@ -32,7 +34,7 @@ const REEM = employee('u-3', 'ريم ناصر', measure({ value: 0, trend: 'Down
 
 const PERFORMANCE = {
   periodResolved: PERIOD,
-  previousPeriodResolved: { ...PERIOD, key: '2026-W32', label: 'الأسبوع 32' },
+  previousPeriodResolved: { ...PERIOD, key: '2026-Q2', label: 'الربع الثاني 2026' },
   cadence: 'WeeklyPulse', scopeType: 'Company',
   company: { groupType: 'Company', groupId: null, groupName: 'الشركة', measure: measure(), scoredMemberCount: 2, totalMemberCount: 3 },
   departments: [{ groupType: 'Department', groupId: 'dep-1', groupName: 'إدارة التسويق', measure: measure(), scoredMemberCount: 2, totalMemberCount: 3 }],
@@ -85,6 +87,17 @@ async function stubApi(page: Page, seen: string[]) {
   });
 }
 
+/**
+ * R6.3/§4 — العقد الحاكم بعد R6/§5.4: لا منتقي «نوع تقييم» (كادنس) تشغيليًّا، والواجهة
+ * **لا ترسل** `cadence` إطلاقًا فيحسم الخادم تواتر كلّ موظّف من قالبه الفعّال. «الربع الجاري»
+ * و«ربع محدَّد» نافذتا **قراءة** فوق النبض الأسبوعيّ المعتمَد لا مسار تقييم ربعيّ.
+ *
+ * التغطية المُبدَّلة لا المحذوفة: ما كان يُقاس بتبديل الكادنس (قيادة البطاقات والترتيب معًا،
+ * وانتقال المُرشِّح إلى كلّ طلب) صار يُقاس بتبديل **نوع الفترة** — وأُضيف ضابط سالب صريح:
+ * صفر ظهور لـ`cadence=` في أيّ طلب، وغياب المنتقي نفسه من الشاشة.
+ */
+const CADENCE_PARAM = /[?&]cadence=/;
+
 test.describe('نظرة KPI — E2E', () => {
   test('المُرشِّح الموحّد ينتقل إلى كلّ الطلبات، والترتيب بلا تكرار، والتفصيل يعيد إنتاج الرقم', async ({ page }) => {
     const seen: string[] = [];
@@ -94,14 +107,20 @@ test.describe('نظرة KPI — E2E', () => {
     await expect(page.getByText('متوسط مؤشر الشركة')).toBeVisible();
     // الفترة معروضة كما حلّها الخادم بتوقيت الرياض — لا اشتقاق في المتصفّح (B-1).
     await expect(page.getByText(/Asia\/Riyadh/)).toBeVisible();
-    expect(seen.some((p) => p.includes('cadence=WeeklyPulse'))).toBeTruthy();
+    // الافتراضيّ نافذة الربع الجاري، وبلا أيّ كادنس مُرسَل.
+    expect(seen.some((p) => p.includes('periodType=CurrentQuarter'))).toBeTruthy();
+    expect(seen.some((p) => CADENCE_PARAM.test(p))).toBeFalsy();
+    // ومنتقي «نوع التقييم» غير موجود أصلًا (لا خيارًا معطَّلًا ولا وحيدًا).
+    await expect(page.getByLabel('الكادنس')).toHaveCount(0);
 
-    // تغيير الكادنس يقود البطاقات والترتيب معًا (B-3).
+    // تغيير نافذة القراءة يقود البطاقات والترتيب معًا (B-3) — ولا يُنتج كادنسًا.
     seen.length = 0;
-    await page.getByLabel('الكادنس').selectOption('Quarterly');
-    await expect.poll(() => seen.filter((p) => p.includes('cadence=Quarterly')).length).toBeGreaterThanOrEqual(2);
+    await page.getByLabel('نوع الفترة').selectOption('Quarter');
+    await page.getByLabel('مفتاح الفترة').fill('2026-Q2');
+    await expect.poll(() => seen.filter((p) => p.includes('periodKey=2026-Q2')).length).toBeGreaterThanOrEqual(2);
     expect(seen.some((p) => p.startsWith('kpi/performance'))).toBeTruthy();
     expect(seen.some((p) => p.startsWith('kpi/rankings'))).toBeTruthy();
+    expect(seen.some((p) => CADENCE_PARAM.test(p))).toBeFalsy();
 
     // لا تكرار بين القائمتين: كلّ اسم مرّة واحدة قبل فتح تفصيل الفريق.
     await expect(page.getByText('سارة أحمد')).toHaveCount(1);
@@ -110,8 +129,15 @@ test.describe('نظرة KPI — E2E', () => {
     // تفصيل الرقم: صفوف 85 و45 بمتوسّط 65 — لا طيّ إلى أعلى تقييم.
     await page.getByRole('button', { name: 'تفصيل الأعضاء' }).click();
     await page.getByRole('button', { name: 'تفصيل الرقم' }).first().click();
-    await expect(page.getByText(/تقييم معتمَد · المتوسّط المُعاد حسابه/)).toBeVisible();
-    expect(seen.some((p) => p.startsWith('kpi/drilldown') && p.includes('subjectUserId=u-1'))).toBeTruthy();
+    // النصّ مطابق لما تعرضه الشاشة فعلًا (`KpiOverview.tsx:467`) — التأكيد السابق كان بائتًا
+    // بكلمة «مكتمل» الناقصة، فأُصلح إلى الأدقّ لا إلى الأضعف: العدد صريح (2) لا مبهم.
+    await expect(page.getByText(/2 تقييم مكتمل معتمَد · المتوسّط المُعاد حسابه/)).toBeVisible();
+    // التفصيل يُطلَب بنافذة الربع نفسها ويعود بصفوف **أسبوعيّة معتمَدة** ⇒ النافذة الربعيّة
+    // مشتقّة من النبض الأسبوعيّ لا من تقييم ربعيّ.
+    const drilldown = seen.find((p) => p.startsWith('kpi/drilldown') && p.includes('subjectUserId=u-1'));
+    expect(drilldown).toBeTruthy();
+    expect(drilldown!.includes('periodType=Quarter')).toBeTruthy();
+    expect(CADENCE_PARAM.test(drilldown!)).toBeFalsy();
   });
 
   test('«لا تقييم» تظهر غيابًا صريحًا لا صفرًا', async ({ page }) => {
@@ -123,16 +149,19 @@ test.describe('نظرة KPI — E2E', () => {
   });
 
   // الرابط العميق: تحميل مباشر لـ`/app/kpi` بلا تنقّل سابق داخل التطبيق. المُرشِّح يظهر مضبوطًا
-  // على ما حلّه الخادم (لا حالة محفوظة في العميل)، والطلب الأوّل يحمل كادنسًا صريحًا (B-3).
+  // على الافتراضيّ المعلَن (نافذة الربع الجاري)، وكلّ طلب يحمل نوع فترة صريحًا ولا يحمل كادنسًا
+  // إطلاقًا (R6.3/§4 — بديل مكافئ لتأكيد B-3 القديم بعد إزالة منتقي الكادنس).
   test('الرابط العميق يفتح الشاشة مباشرةً بمُرشِّح مضبوط من الخادم', async ({ page }) => {
     const seen: string[] = [];
     await stubApi(page, seen);
     await page.goto('/app/kpi');
 
-    await expect(page.getByLabel('الكادنس')).toHaveValue('WeeklyPulse');
-    await expect(page.getByLabel('نوع الفترة')).toHaveValue('LastCompletedWeek');
-    await expect(page.getByText('الأسبوع 33')).toBeVisible();
-    expect(seen.every((p) => p.includes('cadence='))).toBeTruthy();
+    await expect(page.getByLabel('نوع الفترة')).toHaveValue('CurrentQuarter');
+    await expect(page.getByText('الربع الثالث 2026')).toBeVisible();
+    await expect(page.getByLabel('الكادنس')).toHaveCount(0);
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.every((p) => p.includes('periodType='))).toBeTruthy();
+    expect(seen.some((p) => CADENCE_PARAM.test(p))).toBeFalsy();
   });
 
   test('الاتجاه RTL ويعمل على سطح المكتب واللوحيّ والجوّال', async ({ page }) => {
@@ -142,7 +171,7 @@ test.describe('نظرة KPI — E2E', () => {
 
     for (const size of [{ width: 1440, height: 900 }, { width: 820, height: 1180 }, { width: 390, height: 844 }]) {
       await page.setViewportSize(size);
-      await expect(page.getByLabel('الكادنس')).toBeVisible();
+      await expect(page.getByLabel('نوع الفترة')).toBeVisible();
       await expect(page.getByText('متوسط مؤشر الشركة')).toBeVisible();
     }
   });

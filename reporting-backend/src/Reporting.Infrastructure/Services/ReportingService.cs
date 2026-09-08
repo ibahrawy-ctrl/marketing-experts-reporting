@@ -729,9 +729,10 @@ public class ReportingService : IReportingService
     private async Task<Result<KpiSummaryReport>> KpiSummaryViaUnifiedEngineAsync(
         ReportFilter filter, CancellationToken ct)
     {
-        // B-3 — الكادنس مشتقّ صراحةً من نوع فترة الطلب القديم، لا سقوط صامت:
-        // Quarterly ⇒ التقييم الربع سنويّ الرسميّ، وما عداه ⇒ النبض الأسبوعيّ.
-        var cadence = filter.PeriodType == PeriodType.Quarterly ? KpiCadence.Quarterly : KpiCadence.WeeklyPulse;
+        // R6/§4 — فصل حبيبة القراءة عن الكادنس: `filter.PeriodType` هنا **نافذة عرض** (شهر/ربع/سنة)
+        // لا «نوع تقييم». اشتقاق `Quarterly ⇒ KpiCadence.Quarterly` كان يخلط المفهومين فيقلب لوحة
+        // ربعيّة إلى قراءة للمسار الإرثيّ. مصدر الحقيقة الوحيد هو النبض الأسبوعيّ المعتمَد.
+        const KpiCadence cadence = KpiCadence.WeeklyPulse;
 
         var periodType = filter.PeriodType switch
         {
@@ -770,19 +771,35 @@ public class ReportingService : IReportingService
 
     /// <summary>
     /// المسار القديم معزولًا — يُحتفَظ به للرجوع المؤقّت فقط ويُحذف كتلةً واحدة بعد قرار الانتقال.
-    /// عيوبه المعروفة والمقيسة: لا شرط <c>Approved</c>، وصفّ لكلّ تقييم لا لكلّ موظّف،
-    /// ومتوسّط خامّ يطغى فيه كثير التقييمات، وخلط للكادنس، وعتبة ثابتة مبعثرة.
+    /// R6/§5.9 أُصلح فيه خرق مصدر الحقيقة (لا شرط <c>Approved</c> وخلط الكادنس والصفوف الربعيّة الإرثيّة).
+    /// عيوبه المتبقّية **المقيسة والمقصود إبقاؤها** حتّى الحذف: صفّ لكلّ تقييم لا لكلّ موظّف،
+    /// ومتوسّط خامّ يطغى فيه كثير التقييمات، وعتبة ثابتة مبعثرة — وهذه بالضبط أسباب هجره
+    /// لصالح <see cref="KpiSummaryViaUnifiedEngineAsync"/> (<c>Kpi:NewCalculationEngine</c>).
     /// </summary>
     private async Task<Result<KpiSummaryReport>> LegacyKpiSummaryAsync(ReportFilter filter, CancellationToken ct)
     {
         var scope = await _scope.ResolveAsync(ct);
-        var q = _db.KpiEvaluations.AsNoTracking().Where(e => e.TotalScore != null);
+
+        // R6/§5.9 — المسار الإرثيّ يبقى (له مستهلكون: `ExecutiveReportsPage` وتصدير الـPDF) لكنّه
+        // لم يعد منفذًا خلفيًّا يلتفّ على مصدر الحقيقة الواحد: نبض أسبوعيّ (`Template.Cadence=WeeklyPulse`
+        // و`PeriodType=Weekly`) بحالة `Approved` حصرًا. قبل ذلك كان `TotalScore != null` وحده كافيًا
+        // فتدخل المسودّات وقيد المراجعة والمرفوضة والصفوف الربعيّة الإرثيّة في المتوسّط المعروض.
+        var q = from e in _db.KpiEvaluations.AsNoTracking()
+                join v in _db.KpiTemplateVersions.AsNoTracking() on e.KpiTemplateVersionId equals v.Id
+                join tpl in _db.KpiTemplates.AsNoTracking() on v.KpiTemplateId equals tpl.Id
+                where tpl.Cadence == KpiCadence.WeeklyPulse
+                      && e.PeriodType == PeriodType.Weekly
+                      && KpiScorePolicy.ScoreEligibleStatuses.Contains(e.Status)
+                      && e.TotalScore != null
+                select e;
+
         if (!scope.SeesAll)
         {
             var ids = scope.UserIds;
             q = q.Where(e => ids.Contains(e.SubjectUserId));
         }
-        if (filter.PeriodType is not null) q = q.Where(e => e.PeriodType == filter.PeriodType);
+        // `filter.PeriodType` هنا **حبيبة قراءة** لا نوع تقييم؛ والمصدر أسبوعيّ دائمًا ⇒ لا يُستعمل
+        // مُرشِّحًا على الصفوف. حبيبات القراءة الأخشن يخدمها المحرّك الموحّد (`Kpi:NewCalculationEngine`).
         if (!string.IsNullOrWhiteSpace(filter.PeriodKey)) q = q.Where(e => e.PeriodKey == filter.PeriodKey);
         if (filter.DepartmentId is not null) q = q.Where(e => e.DepartmentId == filter.DepartmentId);
         if (filter.TeamId is not null) q = q.Where(e => e.TeamId == filter.TeamId);

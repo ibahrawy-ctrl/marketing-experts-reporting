@@ -68,7 +68,24 @@ public sealed record Employee360ReportDto(
 /// <summary>(4) تقييم KPI واحد ضمن نافذة زمنيّة محدّدة.</summary>
 public sealed record Employee360KpiEvaluationDto(
     Guid EvaluationId, string TemplateTitle, string PeriodType, string PeriodKey,
-    decimal? TotalScore, string Status, string Trend, DateTime? SubmittedAtUtc);
+    decimal? TotalScore, string Status, string Trend, DateTime? SubmittedAtUtc,
+    /// <summary>R6/§5.10 — إصدار القالب خلف الصفّ: إثبات نَسَب لكلّ رقم، ومصدر كشف تغيّر القالب.</summary>
+    Guid KpiTemplateVersionId = default);
+
+/// <summary>
+/// R6/§5.10 (R5 §10-4) — قابليّة مقارنة النافذة. <c>StableMetricKey</c> يحتاج هجرة و<c>backfill</c>
+/// (<c>IC-13</c>) ⇒ خارج هذه الدفعة؛ والمنفَّذ هنا هو **الفشل الآمن الصحيح**: عند تغيّر إصدار القالب
+/// داخل النافذة تُعلَن الحالة صراحةً بدل تمرير رقم مقارَن بصمت.
+/// </summary>
+public enum Employee360MetricComparability
+{
+    /// <summary>إصدار قالب واحد عبر النافذة كلّها ⇒ الأرقام على مقياس واحد.</summary>
+    Comparable = 0,
+    /// <summary>أكثر من إصدار قالب داخل النافذة ⇒ المقياس تغيّر؛ المتوسّط يُعرَض بوسم لا بصمت.</summary>
+    NotComparableTemplateChanged = 1,
+    /// <summary>لا صفّ مؤهَّل داخل النافذة ⇒ لا شيء يُقارَن أصلًا (ليس صفرًا ولا تطابقًا).</summary>
+    NotComparableNoData = 2
+}
 
 /// <summary>
 /// (4) ملخّص KPI بنوافذ مرحلة 1 المعتمدة. الأسبوعيّ والربعيّ **منفصلان**
@@ -88,7 +105,15 @@ public sealed record Employee360KpiSummaryDto(
 /// <summary>نافذة KPI واحدة: متوسّطها وتغطيتها وعدد التقييمات المعتمدة داخلها.</summary>
 public sealed record Employee360KpiWindowDto(
     string WindowKey, string PeriodType, string? PeriodKey,
-    decimal? AverageScore, int ApprovedCount, int ExpectedPeriods, decimal Coverage);
+    decimal? AverageScore, int ApprovedCount, int ExpectedPeriods, decimal Coverage,
+    /// <summary>R6/§5.10 — مفاتيح الأسابيع التي بنت الرقم فعلًا: نَسَب تاريخيّ يُتحقَّق منه لا تفسير لفظيّ.</summary>
+    IReadOnlyList<string>? SourceWeekKeys = null,
+    /// <summary>R6/§5.10 — إصدارات القالب داخل النافذة؛ أكثر من واحد ⇒ تغيّر مُعلَن.</summary>
+    IReadOnlyList<Guid>? TemplateVersionIds = null,
+    /// <summary>R6/§5.10 — وسم إلزاميّ لا حاشية اختياريّة (R5 §10-6).</summary>
+    bool TemplateChangedWithinWindow = false,
+    /// <summary>R6/§5.10 — حالة القابليّة للمقارنة صريحةً؛ لا تُترجَم إلى «لا بيانات».</summary>
+    Employee360MetricComparability Comparability = Employee360MetricComparability.NotComparableNoData);
 
 /// <summary>
 /// (5) إجازة/استئذان. سبب الإجازة مصنَّف <c>HrOnly</c>، وحين لا يُصرَّح به

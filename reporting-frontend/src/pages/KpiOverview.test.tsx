@@ -263,18 +263,36 @@ describe('KpiOverview — عقد DEC-01', () => {
     // لا كادنس مُرسَل ⇒ الخادم يحسم تواتر كلّ موظّف من قالبه الفعّال.
     expect(first.cadence).toBeUndefined();
     expect(paramsFor('/kpi/rankings')[0].cadence).toBeUndefined();
-    // المُرشِّح يعرض «تلقائي» لا اختيارًا مفروضًا على المستخدم.
-    expect((screen.getByLabelText('الكادنس') as HTMLSelectElement).value).toBe('');
+    // R6/§5.4 — ولا منتقي «نوع تقييم» أصلًا: لم يعد ثمّة مسار يُختار.
+    expect(screen.queryByLabelText('الكادنس')).toBeNull();
   });
 
-  it('البند 3: تحديد نوع التقييم صراحةً يفصل المسارين ويقود كلّ الطلبات', async () => {
+  // R6/§5.4 — بديل عقديّ لاختبار «البند 3: تحديد نوع التقييم صراحةً يفصل المسارين ويقود كلّ الطلبات».
+  // البند 3 كان يقيس أنّ اختيار المسار الربعيّ يقود كلّ الطلبات؛ وقرار المالك ألغى المسار الربعيّ.
+  // فيُقاس بدلًا منه أنّ السطح التشغيليّ لا يعرض المسار الملغى ولا يرسله في أيّ طلب — فلا يقع
+  // المستخدم على خيار يُرَدّ بـ`legacy_cadence_disabled`.
+  it('R6: لا مسار ربعيّ معروض ولا مُرسَل في أيّ طلب تحليليّ', async () => {
     renderPage();
     await screen.findByText('متوسط مؤشر الشركة');
+
+    expect(screen.queryByText('تقييم ربعيّ رسميّ')).toBeNull();
+    expect(screen.queryByLabelText('الكادنس')).toBeNull();
+
     calls = [];
-    fireEvent.change(screen.getByLabelText('الكادنس'), { target: { value: 'Quarterly' } });
+    fireEvent.change(screen.getByLabelText('نوع الفترة'), { target: { value: 'Quarter' } });
+    fireEvent.change(screen.getByLabelText('مفتاح الفترة'), { target: { value: '2026-Q2' } });
     expect(await screen.findByText('متوسط مؤشر الشركة')).toBeInTheDocument();
-    expect(paramsFor('/kpi/performance').at(-1)).toMatchObject({ cadence: 'Quarterly' });
-    expect(paramsFor('/kpi/rankings').at(-1)).toMatchObject({ cadence: 'Quarterly' });
+
+    // نافذة الربع تُطلَب بالفترة لا بالمسار: لا `cadence` في أيّ طلب، فضلًا عن أن يكون ربعيًّا.
+    for (const path of ['/kpi/performance', '/kpi/rankings']) {
+      const params = paramsFor(path);
+      expect(params.length).toBeGreaterThan(0);
+      for (const p of params) expect(p.cadence).toBeUndefined();
+    }
+    expect(paramsFor('/kpi/performance').at(-1)).toMatchObject({
+      periodType: 'Quarter',
+      periodKey: '2026-Q2',
+    });
   });
 
   it('البند 1: التنقّل إلى ربع تاريخيّ متاح بلا أن يفقد المستخدم الربع الجاري كافتراضيّ', async () => {
